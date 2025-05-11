@@ -1,5 +1,15 @@
 #!/bin/bash
 #
+# todo/backup-skrips/btrfs-recovery.sh
+# Copyright (c) 2025 wuldorf
+# SPDX-License-Identifier: MIT
+#
+# This script is part of the 'little-linux-helper' collection.
+# It is currently in a 'todo' state and will be adapted for the main project.
+# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+#
+
+#
 # BTRFS Snapshot Recovery Script for Manjaro
 # This script restores data from BTRFS snapshots created by the backup script
 #

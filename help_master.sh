@@ -1,6 +1,13 @@
 #!/bin/bash
-# linux_helper_toolkit/help_master.sh
-# Hauptskript für das Linux Helper Toolkit
+#
+# little-linux-helper/help_master.sh
+# Copyright (c) 2025 wuldorf
+# SPDX-License-Identifier: MIT
+#
+# This script is part of the 'little-linux-helper' collection.
+# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+#
+# Hauptskript für Little Linux Helper
 
 # Fehlerbehandlung aktivieren
 set -e
@@ -21,10 +28,10 @@ lh_finalize_initialization
 
 # Willkommensnachricht
 echo "╔════════════════════════════════════════════╗"
-echo "║           Linux Helper Toolkit             ║"
+echo "║           Little Linux Helper              ║"
 echo "╚════════════════════════════════════════════╝"
 
-lh_log_msg "INFO" "Linux Helper Toolkit gestartet."
+lh_log_msg "INFO" "Little Linux Helper gestartet."
 
 # Funktion für das Debugbündel
 function create_debug_bundle() {
@@ -35,7 +42,7 @@ function create_debug_bundle() {
     lh_log_msg "INFO" "Erstelle Debug-Bericht in: $debug_file"
 
     # Header für die Debug-Datei
-    echo "===== Linux Helper Toolkit Debug-Bericht =====" > "$debug_file"
+    echo "===== Little Linux Helper Debug-Bericht =====" > "$debug_file"
     echo "Erstellt: $(date)" >> "$debug_file"
     echo "Hostname: $(hostname)" >> "$debug_file"
     echo "Benutzer: $(whoami)" >> "$debug_file"
@@ -148,7 +155,7 @@ function create_debug_bundle() {
 
 # Hauptschleife
 while true; do
-    lh_print_header "Linux Helper Toolkit - Hauptmenü"
+    lh_print_header "Little Linux Helper - Hauptmenü"
 
     echo "[Wiederherstellung & Neustarts]"
     lh_print_menu_item 1 "Dienste & Desktop Neustart-Optionen"
@@ -194,7 +201,7 @@ while true; do
             create_debug_bundle
             ;;
         0)
-            lh_log_msg "INFO" "Linux Helper Toolkit wird beendet."
+            lh_log_msg "INFO" "Little Linux Helper wird beendet."
             echo "Auf Wiedersehen!"
             exit 0
             ;;

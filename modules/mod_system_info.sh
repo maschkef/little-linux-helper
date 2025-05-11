@@ -1,5 +1,12 @@
 #!/bin/bash
-# linux_helper_toolkit/modules/mod_system_info.sh
+#
+# little-linux-helper/modules/mod_system_info.sh
+# Copyright (c) 2025 wuldorf
+# SPDX-License-Identifier: MIT
+#
+# This script is part of the 'little-linux-helper' collection.
+# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+#
 # Modul zur Anzeige von Systeminformationen
 
 # Laden der gemeinsamen Bibliothek
