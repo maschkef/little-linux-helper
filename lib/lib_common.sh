@@ -79,7 +79,6 @@ function lh_initialize_logging() {
     # Prüfen, ob der Log-Ordner existiert, falls nicht, erstelle ihn
     if [ ! -d "$LH_LOG_DIR" ]; then
         mkdir -p "$LH_LOG_DIR"
-        chmod 700 "$LH_LOG_DIR"  # Setze Berechtigungen für den Ordner
     fi
 
     # Log-Datei definieren mit dem gewünschten Format
@@ -88,7 +87,6 @@ function lh_initialize_logging() {
     # Log-Datei erstellen, falls sie nicht existiert, und Berechtigungen setzen
     if [ ! -f "$LH_LOG_FILE" ]; then
         touch "$LH_LOG_FILE"
-        chmod 600 "$LH_LOG_FILE"  # Nur Eigentümer darf lesen/schreiben
     fi
 
     lh_log_msg "INFO" "Logging initialisiert. Log-Datei: $LH_LOG_FILE"
@@ -128,7 +126,6 @@ function lh_backup_log() {
     # Backup-Log erstellen falls nicht vorhanden
     if [ ! -f "$backup_log" ]; then
         touch "$backup_log"
-        chmod 600 "$backup_log"
     fi
     
     echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" | tee -a "$backup_log"

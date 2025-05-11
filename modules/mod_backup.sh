@@ -32,7 +32,6 @@ backup_log_msg() {
     # Zusätzlich in Backup-spezifisches Log
     if [ ! -f "$BACKUP_LOG" ]; then
         touch "$BACKUP_LOG"
-        chmod 600 "$BACKUP_LOG"
     fi
     
     echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$BACKUP_LOG"
