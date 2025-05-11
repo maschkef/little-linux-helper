@@ -3,6 +3,7 @@
 ## Beschreibung
 
 Little Linux Helper ist eine Sammlung von Bash-Skripten, die entwickelt wurden, um verschiedene Systemadministrations-, Diagnose- und Wartungsaufgaben unter Linux zu vereinfachen. Es bietet ein menügeführtes Interface für einfachen Zugriff auf eine Vielzahl von Werkzeugen und Funktionen.
+Meine Umgebung ist i.d.R. Manjaro, ensprechend kann es unter anderen distos noch unbekannte Probleme geben, auch wenn ich versuche alles kompatibel zu halten
 
 **Bitte beachte die folgenden Punkte sorgfältig, bevor du die Skripte aus diesem Repository verwendest:**
 
@@ -76,7 +77,7 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
         * Xorg-Logs anzeigen.
         * dmesg-Ausgabe anzeigen und filtern.
         * Paketmanager-Logs anzeigen (unterstützt pacman, apt, dnf, yay).
-        * Optionale erweiterte Log-Analyse mit einem Python-Skript (erfordert `python3`).
+        * Optionale erweiterte Log-Analyse mit einem Python-Skript (erfordert `python3`). **Dieser Anteil ist komplett ungetestet und wird vermutlich Probleme verursachen**
 * **Wartung & Sicherheit**:
     * **Paketverwaltung & Updates (`mod_packages.sh`)**:
         * Systemaktualisierung (unterstützt pacman, apt, dnf, yay).
