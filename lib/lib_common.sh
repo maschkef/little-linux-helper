@@ -1,5 +1,12 @@
 #!/bin/bash
-# linux_helper_toolkit/lib/lib_common.sh
+#
+# little-linux-helper/lib/lib_common.sh
+# Copyright (c) 2025 wuldorf
+# SPDX-License-Identifier: MIT
+#
+# This script is part of the 'little-linux-helper' collection.
+# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+#
 # Zentrale Bibliothek für gemeinsame Funktionen und Variablen
 
 # Globale Variablen (werden initialisiert und für alle Skripte verfügbar)
@@ -109,6 +116,41 @@ function lh_check_root_privileges() {
     else
         lh_log_msg "INFO" "Skript läuft mit Root-Rechten."
         LH_SUDO_CMD=''
+    fi
+}
+
+# Funktion zum Erstellen eines Backup-Logs
+function lh_backup_log() {
+    local level="$1"
+    local message="$2"
+    local backup_log="${LH_LOG_DIR}/backup.log"
+    
+    # Backup-Log erstellen falls nicht vorhanden
+    if [ ! -f "$backup_log" ]; then
+        touch "$backup_log"
+        chmod 600 "$backup_log"
+    fi
+    
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" | tee -a "$backup_log"
+}
+
+# Funktion zum Überprüfen der Dateisystem-Art
+function lh_get_filesystem_type() {
+    local path="$1"
+    df -T "$path" | tail -n 1 | awk '{print $2}'
+}
+
+# Funktion zum Bereinigen alter Backups
+function lh_cleanup_old_backups() {
+    local backup_dir="$1"
+    local retention_count="${2:-10}"
+    local pattern="$3"
+    
+    if [ -d "$backup_dir" ]; then
+        ls -1d "$backup_dir"/$pattern 2>/dev/null | sort -r | tail -n +$((retention_count+1)) | while read backup; do
+            lh_log_msg "INFO" "Entferne altes Backup: $backup"
+            rm -rf "$backup"
+        done
     fi
 }
 

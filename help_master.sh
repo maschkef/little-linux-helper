@@ -168,9 +168,10 @@ while true; do
     echo "[Wartung & Sicherheit]"
     lh_print_menu_item 5 "Paketverwaltung & Updates"
     lh_print_menu_item 6 "Sicherheitsüberprüfungen"
+    lh_print_menu_item 7 "Backup & Wiederherstellung"
 
     echo "[Spezialfunktionen]"
-    lh_print_menu_item 7 "Wichtige Debug-Infos in Datei sammeln"
+    lh_print_menu_item 8 "Wichtige Debug-Infos in Datei sammeln"
 
     echo ""
     lh_print_menu_item 0 "Beenden"
@@ -198,6 +199,9 @@ while true; do
             bash "$LH_ROOT_DIR/modules/mod_security.sh"
             ;;
         7)
+            bash "$LH_ROOT_DIR/modules/mod_backup.sh"  # NEU
+            ;;
+        8)
             create_debug_bundle
             ;;
         0)
