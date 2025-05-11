@@ -224,10 +224,10 @@ function disk_check_filesystem() {
                     echo "Konnte die Partition nicht unmounten. Abbruch der Überprüfung."
                     return 1
                 fi
-            else # KORREKTUR: '}' vor 'else' entfernt
+                else
                 echo "Überprüfung abgebrochen."
                 return 1
-            fi # KORREKTUR: 'fi' hinzugefügt, um das äußere 'if' zu schließen
+                fi
         fi
 
         # Optionen für fsck anzeigen
@@ -513,4 +513,3 @@ function disk_tools_menu() {
 # Modul starten
 disk_tools_menu
 exit $?
-# KORREKTUR: Überflüssige schließende Klammer entfernt
