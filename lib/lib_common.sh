@@ -18,6 +18,9 @@ fi
 
 # Der Log-Ordner
 LH_LOG_DIR="$LH_ROOT_DIR/logs"
+# Der Konfig-Ordner
+LH_CONFIG_DIR="$LH_ROOT_DIR/config"
+LH_BACKUP_CONFIG_FILE="$LH_CONFIG_DIR/backup.conf"
 
 # Die aktuelle Log-Datei wird bei Initialisierung gesetzt
 LH_LOG_FILE=""
@@ -33,6 +36,22 @@ declare -a LH_ALT_PKG_MANAGERS=()
 
 # Assoziatives Array für die Benutzerinfo-Daten (wird erst gefüllt, wenn lh_get_target_user_info() aufgerufen wird)
 declare -A LH_TARGET_USER_INFO
+
+# Standard-Backup-Konfiguration (wird durch lh_load_backup_config überschrieben, falls Konfigurationsdatei existiert)
+LH_BACKUP_ROOT_DEFAULT="/run/media/tux/hdd_3tb/"
+LH_BACKUP_DIR_DEFAULT="/backups" # Relativ zu LH_BACKUP_ROOT
+LH_TEMP_SNAPSHOT_DIR_DEFAULT="/.snapshots_backup" # Absoluter Pfad
+LH_TIMESHIFT_BASE_DIR_DEFAULT="/run/timeshift" # Absoluter Pfad
+LH_RETENTION_BACKUP_DEFAULT=10
+LH_BACKUP_LOG_FILENAME_DEFAULT="backup.log" # Relativ zu LH_LOG_DIR
+
+# Aktive Backup-Konfigurationsvariablen
+LH_BACKUP_ROOT=""
+LH_BACKUP_DIR=""
+LH_TEMP_SNAPSHOT_DIR=""
+LH_TIMESHIFT_BASE_DIR=""
+LH_RETENTION_BACKUP=""
+LH_BACKUP_LOG="" # Voller Pfad zur Backup-Logdatei
 
 # Mapping von Programmnamen zu Paketnamen für verschiedene Paketmanager
 declare -A package_names_pacman=(
@@ -92,6 +111,48 @@ function lh_initialize_logging() {
     lh_log_msg "INFO" "Logging initialisiert. Log-Datei: $LH_LOG_FILE"
 }
 
+# Funktion zum Laden der Backup-Konfiguration
+function lh_load_backup_config() {
+    # Standardwerte setzen
+    LH_BACKUP_ROOT="$LH_BACKUP_ROOT_DEFAULT"
+    LH_BACKUP_DIR="$LH_BACKUP_DIR_DEFAULT"
+    LH_TEMP_SNAPSHOT_DIR="$LH_TEMP_SNAPSHOT_DIR_DEFAULT"
+    LH_TIMESHIFT_BASE_DIR="$LH_TIMESHIFT_BASE_DIR_DEFAULT"
+    LH_RETENTION_BACKUP="$LH_RETENTION_BACKUP_DEFAULT"
+    local backup_log_filename="$LH_BACKUP_LOG_FILENAME_DEFAULT"
+
+    if [ -f "$LH_BACKUP_CONFIG_FILE" ]; then
+        lh_log_msg "INFO" "Lade Backup-Konfiguration aus $LH_BACKUP_CONFIG_FILE"
+        # Temporäre Variablen, um $(whoami) korrekt zu expandieren, falls es in der Config steht
+        local temp_backup_root=""
+        source "$LH_BACKUP_CONFIG_FILE"
+        # Weise die geladenen Werte zu, falls sie in der Config-Datei gesetzt wurden
+        LH_BACKUP_ROOT="${CFG_LH_BACKUP_ROOT:-$LH_BACKUP_ROOT}"
+        LH_BACKUP_DIR="${CFG_LH_BACKUP_DIR:-$LH_BACKUP_DIR}"
+        LH_TEMP_SNAPSHOT_DIR="${CFG_LH_TEMP_SNAPSHOT_DIR:-$LH_TEMP_SNAPSHOT_DIR}"
+        LH_TIMESHIFT_BASE_DIR="${CFG_LH_TIMESHIFT_BASE_DIR:-$LH_TIMESHIFT_BASE_DIR}"
+        LH_RETENTION_BACKUP="${CFG_LH_RETENTION_BACKUP:-$LH_RETENTION_BACKUP}"
+        backup_log_filename="${CFG_LH_BACKUP_LOG_FILENAME:-$backup_log_filename}"
+    else
+        lh_log_msg "INFO" "Keine Backup-Konfigurationsdatei gefunden ($LH_BACKUP_CONFIG_FILE). Verwende Standardwerte."
+    fi
+
+    LH_BACKUP_LOG="$LH_LOG_DIR/$backup_log_filename"
+    lh_log_msg "INFO" "Backup-Logdatei: $LH_BACKUP_LOG"
+}
+
+# Funktion zum Speichern der Backup-Konfiguration
+function lh_save_backup_config() {
+    mkdir -p "$LH_CONFIG_DIR"
+    echo "# Little Linux Helper - Backup Konfiguration" > "$LH_BACKUP_CONFIG_FILE"
+    echo "CFG_LH_BACKUP_ROOT=\"$LH_BACKUP_ROOT\"" >> "$LH_BACKUP_CONFIG_FILE"
+    echo "CFG_LH_BACKUP_DIR=\"$LH_BACKUP_DIR\"" >> "$LH_BACKUP_CONFIG_FILE"
+    echo "CFG_LH_TEMP_SNAPSHOT_DIR=\"$LH_TEMP_SNAPSHOT_DIR\"" >> "$LH_BACKUP_CONFIG_FILE"
+    echo "CFG_LH_TIMESHIFT_BASE_DIR=\"$LH_TIMESHIFT_BASE_DIR\"" >> "$LH_BACKUP_CONFIG_FILE"
+    echo "CFG_LH_RETENTION_BACKUP=\"$LH_RETENTION_BACKUP\"" >> "$LH_BACKUP_CONFIG_FILE"
+    echo "CFG_LH_BACKUP_LOG_FILENAME=\"$(basename "$LH_BACKUP_LOG")\"" >> "$LH_BACKUP_CONFIG_FILE"
+    lh_log_msg "INFO" "Backup-Konfiguration gespeichert in $LH_BACKUP_CONFIG_FILE"
+}
 # Funktion zum Schreiben in die Log-Datei
 function lh_log_msg() {
     local level="$1"
@@ -532,9 +593,12 @@ function lh_print_menu_item() {
 
 # Am Ende der Datei lib_common.sh
 function lh_finalize_initialization() {
+    lh_load_backup_config # Lade Backup-Konfiguration
     export LH_LOG_DIR
     export LH_LOG_FILE
     export LH_SUDO_CMD
     export LH_PKG_MANAGER
     export LH_ALT_PKG_MANAGERS
+    # Exportiere auch die Backup-Konfigurationsvariablen, damit sie in Sub-Shells (Modulen) verfügbar sind
+    export LH_BACKUP_ROOT LH_BACKUP_DIR LH_TEMP_SNAPSHOT_DIR LH_TIMESHIFT_BASE_DIR LH_RETENTION_BACKUP LH_BACKUP_LOG
 }

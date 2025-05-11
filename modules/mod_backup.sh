@@ -13,28 +13,19 @@
 source "$(dirname "$0")/../lib/lib_common.sh"
 lh_detect_package_manager
 
-# Globale Variablen für Backup-Konfiguration
-BACKUP_ROOT="/run/media/$(whoami)/hdd_3tb"
-BACKUP_DIR="/backups"
-TEMP_SNAPSHOT_DIR="/.snapshots_backup"
-TIMESHIFT_BASE_DIR="/run/timeshift"
-RETENTION_BACKUP=10
-BACKUP_LOG="$LH_LOG_DIR/backup.log"
-
 # Funktion zum Logging mit Backup-spezifischen Nachrichten
 backup_log_msg() {
     local level="$1"
     local message="$2"
-    
+
     # Auch in Standard-Log schreiben
     lh_log_msg "$level" "$message"
-    
+
     # Zusätzlich in Backup-spezifisches Log
-    if [ ! -f "$BACKUP_LOG" ]; then
-        touch "$BACKUP_LOG"
+    if [ ! -f "$LH_BACKUP_LOG" ]; then
+        touch "$LH_BACKUP_LOG" # Stellt sicher, dass die Datei existiert
     fi
-    
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$BACKUP_LOG"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$LH_BACKUP_LOG"
 }
 
 # Funktion zum Finden des BTRFS root eines Subvolumes
@@ -60,7 +51,7 @@ create_direct_snapshot() {
     local subvol="$1"
     local timestamp="$2"
     local snapshot_name="${subvol}-${timestamp}"
-    local snapshot_path="$TEMP_SNAPSHOT_DIR/$snapshot_name"
+    local snapshot_path="$LH_TEMP_SNAPSHOT_DIR/$snapshot_name"
 
     # Mount-Punkt für das Subvolume ermitteln
     local mount_point=""
@@ -93,7 +84,7 @@ create_direct_snapshot() {
     backup_log_msg "INFO" "Subvolume-Pfad: $subvol_path"
 
     # Read-only Snapshot erstellen
-    mkdir -p "$TEMP_SNAPSHOT_DIR"
+    mkdir -p "$LH_TEMP_SNAPSHOT_DIR"
     btrfs subvolume snapshot -r "$mount_point" "$snapshot_path"
 
     if [ $? -ne 0 ]; then
@@ -166,15 +157,15 @@ btrfs_backup() {
     fi
     
     # Backup-Ziel überprüfen
-    if [ ! -d "$BACKUP_ROOT" ]; then
-        backup_log_msg "WARN" "Backup-Ziel '$BACKUP_ROOT' nicht gefunden"
-        echo "Backup-Ziel '$BACKUP_ROOT' nicht gefunden oder nicht eingehängt."
+    if [ ! -d "$LH_BACKUP_ROOT" ]; then
+        backup_log_msg "WARN" "Backup-Ziel '$LH_BACKUP_ROOT' nicht gefunden"
+        echo "Backup-Ziel '$LH_BACKUP_ROOT' nicht gefunden oder nicht eingehängt."
         local custom_backup=$(lh_ask_for_input "Bitte geben Sie einen anderen Pfad an")
-        BACKUP_ROOT="$custom_backup"
+        LH_BACKUP_ROOT="$custom_backup" # Aktualisiert die globale Variable für diese Sitzung
     fi
     
     # Backup-Verzeichnis sicherstellen
-    mkdir -p "$BACKUP_ROOT$BACKUP_DIR"
+    mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
     if [ $? -ne 0 ]; then
         backup_log_msg "ERROR" "Konnte Backup-Verzeichnis nicht erstellen"
         echo "Fehler beim Erstellen des Backup-Verzeichnisses. Überprüfen Sie die Berechtigungen."
@@ -182,7 +173,7 @@ btrfs_backup() {
     fi
     
     # Temporäres Snapshot-Verzeichnis sicherstellen
-    mkdir -p "$TEMP_SNAPSHOT_DIR"
+    mkdir -p "$LH_TEMP_SNAPSHOT_DIR"
     if [ $? -ne 0 ]; then
         backup_log_msg "ERROR" "Konnte temporäres Snapshot-Verzeichnis nicht erstellen"
         echo "Fehler beim Erstellen des temporären Snapshot-Verzeichnisses."
@@ -196,9 +187,9 @@ btrfs_backup() {
     backup_log_msg "INFO" "Prüfe auf Timeshift-Snapshots"
     
     # Suche nach Timeshift-Verzeichnissen
-    if [ -d "$TIMESHIFT_BASE_DIR" ]; then
+    if [ -d "$LH_TIMESHIFT_BASE_DIR" ]; then
         local timeshift_dirs=()
-        for ts_dir in "$TIMESHIFT_BASE_DIR"/*/backup; do
+        for ts_dir in "$LH_TIMESHIFT_BASE_DIR"/*/backup; do
             if [ -d "$ts_dir" ]; then
                 timeshift_dirs+=("$ts_dir")
             fi
@@ -259,7 +250,7 @@ btrfs_backup() {
         
         # Snapshot-Namen und -Pfade definieren
         local snapshot_name="$subvol-$timestamp"
-        local snapshot_path="$TEMP_SNAPSHOT_DIR/$snapshot_name"
+        local snapshot_path="$LH_TEMP_SNAPSHOT_DIR/$snapshot_name"
         
         # Snapshot erstellen
         if [ "$timeshift_available" = "true" ] && [ -d "$timeshift_snapshot_dir/$subvol" ]; then
@@ -289,7 +280,7 @@ btrfs_backup() {
         fi
         
         # Backup-Verzeichnis für dieses Subvolume vorbereiten
-        local backup_subvol_dir="$BACKUP_ROOT$BACKUP_DIR/$subvol"
+        local backup_subvol_dir="$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol"
         mkdir -p "$backup_subvol_dir"
         if [ $? -ne 0 ]; then
             backup_log_msg "ERROR" "Konnte Backup-Verzeichnis für $subvol nicht erstellen"
@@ -332,7 +323,7 @@ btrfs_backup() {
         
         # Alte Backups aufräumen
         backup_log_msg "INFO" "Räume alte Backups für $subvol auf"
-        ls -1d "$backup_subvol_dir/$subvol-"* 2>/dev/null | sort | head -n -$RETENTION_BACKUP | while read backup; do
+        ls -1d "$backup_subvol_dir/$subvol-"* 2>/dev/null | sort | head -n "-$LH_RETENTION_BACKUP" | while read backup; do
             backup_log_msg "INFO" "Entferne altes Backup: $backup"
             btrfs subvolume delete "$backup"
         done
@@ -349,11 +340,11 @@ btrfs_backup() {
     echo "ZUSAMMENFASSUNG:"
     echo "  Zeitstempel: $timestamp"
     echo "  Quell-System: $(hostname)"
-    echo "  Backup-Ziel: $BACKUP_ROOT$BACKUP_DIR"
+    echo "  Backup-Ziel: $LH_BACKUP_ROOT$LH_BACKUP_DIR"
     echo "  Verarbeitete Subvolumes: ${subvolumes[*]}"
     
     # Fehlerprüfung
-    if grep -q "ERROR" "$BACKUP_LOG" | grep -q "$timestamp"; then
+    if grep -q "ERROR" "$LH_BACKUP_LOG"; then # Einfachere Prüfung auf Fehler in der aktuellen Sitzung
         echo "  Status: MIT FEHLERN ABGESCHLOSSEN (siehe $BACKUP_LOG)"
     else
         echo "  Status: ERFOLGREICH"
@@ -367,14 +358,14 @@ tar_backup() {
     lh_print_header "TAR Archiv Backup"
     
     # Backup-Ziel überprüfen
-    if [ ! -d "$BACKUP_ROOT" ]; then
-        backup_log_msg "WARN" "Backup-Ziel '$BACKUP_ROOT' nicht gefunden"
+    if [ ! -d "$LH_BACKUP_ROOT" ]; then
+        backup_log_msg "WARN" "Backup-Ziel '$LH_BACKUP_ROOT' nicht gefunden"
         local custom_backup=$(lh_ask_for_input "Bitte geben Sie ein Backup-Ziel an")
-        BACKUP_ROOT="$custom_backup"
+        LH_BACKUP_ROOT="$custom_backup"
     fi
     
     # Backup-Verzeichnis erstellen
-    mkdir -p "$BACKUP_ROOT$BACKUP_DIR"
+    mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
     if [ $? -ne 0 ]; then
         backup_log_msg "ERROR" "Konnte Backup-Verzeichnis nicht erstellen"
         return 1
@@ -425,7 +416,7 @@ tar_backup() {
     
     # Backup erstellen
     local timestamp=$(date +%Y-%m-%d_%H-%M-%S)
-    local tar_file="$BACKUP_ROOT$BACKUP_DIR/tar_backup_${timestamp}.tar.gz"
+    local tar_file="$LH_BACKUP_ROOT$LH_BACKUP_DIR/tar_backup_${timestamp}.tar.gz"
     
     echo "Erstelle TAR-Archiv..."
     backup_log_msg "INFO" "Starte TAR-Backup nach $tar_file"
@@ -438,7 +429,7 @@ tar_backup() {
     $LH_SUDO_CMD tar czf "$tar_file" \
         --exclude-from="$exclude_file" \
         --exclude="$tar_file" \
-        "${backup_dirs[@]}" 2>"$BACKUP_LOG.tmp"
+        "${backup_dirs[@]}" 2>"$LH_BACKUP_LOG.tmp"
     
     local tar_status=$?
     
@@ -456,22 +447,22 @@ tar_backup() {
         echo "Fehler beim Erstellen des TAR-Backups"
         if [ -f "$BACKUP_LOG.tmp" ]; then
             echo "Fehlerdetails:"
-            cat "$BACKUP_LOG.tmp" | head -n 10
-            cat "$BACKUP_LOG.tmp" >> "$BACKUP_LOG"
+            cat "$LH_BACKUP_LOG.tmp" | head -n 10
+            cat "$LH_BACKUP_LOG.tmp" >> "$LH_BACKUP_LOG"
         fi
         rm -f "$tar_file"  # Unvollständiges Backup entfernen
         return 1
     fi
     
     # Temporäre Log-Datei einbinden
-    if [ -f "$BACKUP_LOG.tmp" ]; then
-        cat "$BACKUP_LOG.tmp" >> "$BACKUP_LOG"
-        rm -f "$BACKUP_LOG.tmp"
+    if [ -f "$LH_BACKUP_LOG.tmp" ]; then
+        cat "$LH_BACKUP_LOG.tmp" >> "$LH_BACKUP_LOG"
+        rm -f "$LH_BACKUP_LOG.tmp"
     fi
     
     # Alte Backups aufräumen
     backup_log_msg "INFO" "Räume alte TAR-Backups auf"
-    ls -1 "$BACKUP_ROOT$BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | sort -r | tail -n +$((RETENTION_BACKUP+1)) | while read backup; do
+    ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | sort -r | tail -n +$((LH_RETENTION_BACKUP+1)) | while read backup; do
         backup_log_msg "INFO" "Entferne altes TAR-Backup: $backup"
         rm -f "$backup"
     done
@@ -490,14 +481,14 @@ rsync_backup() {
     fi
     
     # Backup-Ziel überprüfen
-    if [ ! -d "$BACKUP_ROOT" ]; then
-        backup_log_msg "WARN" "Backup-Ziel '$BACKUP_ROOT' nicht gefunden"
+    if [ ! -d "$LH_BACKUP_ROOT" ]; then
+        backup_log_msg "WARN" "Backup-Ziel '$LH_BACKUP_ROOT' nicht gefunden"
         local custom_backup=$(lh_ask_for_input "Bitte geben Sie ein Backup-Ziel an")
-        BACKUP_ROOT="$custom_backup"
+        LH_BACKUP_ROOT="$custom_backup"
     fi
     
     # Backup-Verzeichnis erstellen
-    mkdir -p "$BACKUP_ROOT$BACKUP_DIR"
+    mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
     if [ $? -ne 0 ]; then
         backup_log_msg "ERROR" "Konnte Backup-Verzeichnis nicht erstellen"
         return 1
@@ -552,7 +543,7 @@ rsync_backup() {
     
     # Backup erstellen
     local timestamp=$(date +%Y-%m-%d_%H-%M-%S)
-    local rsync_dest="$BACKUP_ROOT$BACKUP_DIR/rsync_backup_${timestamp}"
+    local rsync_dest="$LH_BACKUP_ROOT$LH_BACKUP_DIR/rsync_backup_${timestamp}"
     
     mkdir -p "$rsync_dest"
     
@@ -565,13 +556,13 @@ rsync_backup() {
     if [ "$backup_type" = "1" ]; then
         # Vollbackup
         backup_log_msg "INFO" "Erstelle Vollbackup mit RSYNC"
-        $LH_SUDO_CMD rsync $rsync_options $exclude_options "${source_dirs[@]}" "$rsync_dest/" 2>"$BACKUP_LOG.tmp"
+        $LH_SUDO_CMD rsync $rsync_options $exclude_options "${source_dirs[@]}" "$rsync_dest/" 2>"$LH_BACKUP_LOG.tmp"
         local rsync_status=$?
     else
         # Inkrementelles Backup
         backup_log_msg "INFO" "Erstelle inkrementelles Backup mit RSYNC"
         local link_dest=""
-        local last_backup=$(ls -1d "$BACKUP_ROOT$BACKUP_DIR/rsync_backup_"* 2>/dev/null | sort -r | head -n1)
+        local last_backup=$(ls -1d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/rsync_backup_"* 2>/dev/null | sort -r | head -n1)
         if [ -n "$last_backup" ]; then
             link_dest="--link-dest=$last_backup"
             backup_log_msg "INFO" "Verwende $last_backup als Basis für inkrementelles Backup"
@@ -592,22 +583,22 @@ rsync_backup() {
         echo "Fehler beim Erstellen des RSYNC-Backups"
         if [ -f "$BACKUP_LOG.tmp" ]; then
             echo "Fehlerdetails:"
-            cat "$BACKUP_LOG.tmp" | head -n 10
-            cat "$BACKUP_LOG.tmp" >> "$BACKUP_LOG"
+            cat "$LH_BACKUP_LOG.tmp" | head -n 10
+            cat "$LH_BACKUP_LOG.tmp" >> "$LH_BACKUP_LOG"
         fi
         rm -rf "$rsync_dest"  # Unvollständiges Backup entfernen
         return 1
     fi
     
     # Temporäre Log-Datei einbinden
-    if [ -f "$BACKUP_LOG.tmp" ]; then
-        cat "$BACKUP_LOG.tmp" >> "$BACKUP_LOG"
-        rm -f "$BACKUP_LOG.tmp"
+    if [ -f "$LH_BACKUP_LOG.tmp" ]; then
+        cat "$LH_BACKUP_LOG.tmp" >> "$LH_BACKUP_LOG"
+        rm -f "$LH_BACKUP_LOG.tmp"
     fi
     
     # Alte Backups aufräumen
     backup_log_msg "INFO" "Räume alte RSYNC-Backups auf"
-    ls -1d "$BACKUP_ROOT$BACKUP_DIR/rsync_backup_"* 2>/dev/null | sort -r | tail -n +$((RETENTION_BACKUP+1)) | while read backup; do
+    ls -1d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/rsync_backup_"* 2>/dev/null | sort -r | tail -n +$((LH_RETENTION_BACKUP+1)) | while read backup; do
         backup_log_msg "INFO" "Entferne altes RSYNC-Backup: $backup"
         rm -rf "$backup"
     done
@@ -661,13 +652,13 @@ restore_btrfs() {
     lh_print_header "BTRFS Snapshot Wiederherstellung"
     
     # Verfügbare Backups auflisten
-    if [ ! -d "$BACKUP_ROOT$BACKUP_DIR" ]; then
-        echo "Keine Backups gefunden unter $BACKUP_ROOT$BACKUP_DIR"
+    if [ ! -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
+        echo "Keine Backups gefunden unter $LH_BACKUP_ROOT$LH_BACKUP_DIR"
         return 1
     fi
     
     echo "Verfügbare BTRFS Backups:"
-    local subvols=($(ls -1 "$BACKUP_ROOT$BACKUP_DIR" 2>/dev/null | grep -E '^(@|@home)$'))
+    local subvols=($(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | grep -E '^(@|@home)$'))
     
     if [ ${#subvols[@]} -eq 0 ]; then
         echo "Keine BTRFS Backups gefunden"
@@ -686,7 +677,7 @@ restore_btrfs() {
         
         # Verfügbare Snapshots auflisten
         echo "Verfügbare Snapshots für $selected_subvol:"
-        local snapshots=($(ls -1 "$BACKUP_ROOT$BACKUP_DIR/$selected_subvol" 2>/dev/null | sort -r))
+        local snapshots=($(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$selected_subvol" 2>/dev/null | sort -r))
         
         if [ ${#snapshots[@]} -eq 0 ]; then
             echo "Keine Snapshots für $selected_subvol gefunden"
@@ -737,7 +728,7 @@ restore_btrfs() {
                     
                     # Snapshot empfangen
                     echo "Stelle Snapshot wieder her..."
-                    btrfs send "$BACKUP_ROOT$BACKUP_DIR/$selected_subvol/$selected_snapshot" | btrfs receive "$temp_restore"
+                    btrfs send "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$selected_subvol/$selected_snapshot" | btrfs receive "$temp_restore"
                     
                     # Daten kopieren
                     echo "Kopiere wiederhergestellte Daten..."
@@ -782,8 +773,8 @@ run_recovery_script() {
     # Suche Recovery-Skript
     if [ -f "/usr/local/bin/btrfs-recovery.sh" ]; then
         recovery_script="/usr/local/bin/btrfs-recovery.sh"
-    elif [ -f "$BACKUP_ROOT/backup-scripts/btrfs-recovery.sh" ]; then
-        recovery_script="$BACKUP_ROOT/backup-scripts/btrfs-recovery.sh"
+    elif [ -f "$LH_BACKUP_ROOT/backup-scripts/btrfs-recovery.sh" ]; then
+        recovery_script="$LH_BACKUP_ROOT/backup-scripts/btrfs-recovery.sh"
     elif [ -f "$(dirname "$0")/../backup-scripts/btrfs-recovery.sh" ]; then
         recovery_script="$(dirname "$0")/../backup-scripts/btrfs-recovery.sh"
     fi
@@ -792,7 +783,7 @@ run_recovery_script() {
         echo "Recovery-Skript nicht gefunden."
         echo "Bitte überprüfen Sie folgende Pfade:"
         echo "  - /usr/local/bin/btrfs-recovery.sh"
-        echo "  - $BACKUP_ROOT/backup-scripts/btrfs-recovery.sh"
+        echo "  - $LH_BACKUP_ROOT/backup-scripts/btrfs-recovery.sh"
         echo "  - $(dirname "$0")/../backup-scripts/btrfs-recovery.sh"
         return 1
     fi
@@ -815,13 +806,13 @@ restore_tar() {
     lh_print_header "TAR Archiv Wiederherstellung"
     
     # Verfügbare TAR Archive auflisten
-    if [ ! -d "$BACKUP_ROOT$BACKUP_DIR" ]; then
+    if [ ! -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
         echo "Kein Backup-Verzeichnis gefunden"
         return 1
     fi
     
     echo "Verfügbare TAR Archive:"
-    local archives=($(ls -1 "$BACKUP_ROOT$BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | sort -r))
+    local archives=($(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | sort -r))
     
     if [ ${#archives[@]} -eq 0 ]; then
         echo "Keine TAR Archive gefunden"
@@ -904,13 +895,13 @@ restore_rsync() {
     lh_print_header "RSYNC Backup Wiederherstellung"
     
     # Verfügbare RSYNC Backups auflisten
-    if [ ! -d "$BACKUP_ROOT$BACKUP_DIR" ]; then
+    if [ ! -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
         echo "Kein Backup-Verzeichnis gefunden"
         return 1
     fi
     
     echo "Verfügbare RSYNC Backups:"
-    local backups=($(ls -1d "$BACKUP_ROOT$BACKUP_DIR"/rsync_backup_* 2>/dev/null | sort -r))
+    local backups=($(ls -1d "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/rsync_backup_* 2>/dev/null | sort -r))
     
     if [ ${#backups[@]} -eq 0 ]; then
         echo "Keine RSYNC Backups gefunden"
@@ -993,31 +984,34 @@ configure_backup() {
     lh_print_header "Backup Konfiguration"
     
     echo "Aktuelle Konfiguration:"
-    echo "  Backup-Ziel: $BACKUP_ROOT"
-    echo "  Backup-Verzeichnis: $BACKUP_DIR"
-    echo "  Temporäre Snapshots: $TEMP_SNAPSHOT_DIR"
-    echo "  Timeshift-Basis: $TIMESHIFT_BASE_DIR"
-    echo "  Retention (Anzahl Backups): $RETENTION_BACKUP"
-    echo "  Log-Datei: $BACKUP_LOG"
+    echo "  Backup-Ziel (LH_BACKUP_ROOT): $LH_BACKUP_ROOT"
+    echo "  Backup-Verzeichnis (LH_BACKUP_DIR): $LH_BACKUP_DIR (relativ zum Backup-Ziel)"
+    echo "  Temporäre Snapshots (LH_TEMP_SNAPSHOT_DIR): $LH_TEMP_SNAPSHOT_DIR"
+    echo "  Timeshift-Basis (LH_TIMESHIFT_BASE_DIR): $LH_TIMESHIFT_BASE_DIR"
+    echo "  Retention (LH_RETENTION_BACKUP): $LH_RETENTION_BACKUP Backups"
+    echo "  Log-Datei (LH_BACKUP_LOG): $LH_BACKUP_LOG (Dateiname: $(basename "$LH_BACKUP_LOG"))"
     echo ""
     
     if lh_confirm_action "Möchten Sie die Konfiguration ändern?" "n"; then
+        local changed=false
+
         # Backup-Ziel ändern
         echo ""
         echo "Backup-Ziel:"
-        echo "Aktuell: $BACKUP_ROOT"
+        echo "Aktuell: $LH_BACKUP_ROOT"
         if lh_confirm_action "Ändern?" "n"; then
             local new_backup_root=$(lh_ask_for_input "Neues Backup-Ziel eingeben")
             if [ -n "$new_backup_root" ]; then
-                BACKUP_ROOT="$new_backup_root"
-                echo "Neues Backup-Ziel: $BACKUP_ROOT"
+                LH_BACKUP_ROOT="$new_backup_root"
+                echo "Neues Backup-Ziel: $LH_BACKUP_ROOT"
+                changed=true
             fi
         fi
         
         # Backup-Verzeichnis ändern
         echo ""
         echo "Backup-Verzeichnis (relativ zum Backup-Ziel):"
-        echo "Aktuell: $BACKUP_DIR"
+        echo "Aktuell: $LH_BACKUP_DIR"
         if lh_confirm_action "Ändern?" "n"; then
             local new_backup_dir=$(lh_ask_for_input "Neues Backup-Verzeichnis (mit führendem /) eingeben")
             if [ -n "$new_backup_dir" ]; then
@@ -1025,31 +1019,54 @@ configure_backup() {
                 if [[ ! "$new_backup_dir" == /* ]]; then
                     new_backup_dir="/$new_backup_dir"
                 fi
-                BACKUP_DIR="$new_backup_dir"
-                echo "Neues Backup-Verzeichnis: $BACKUP_DIR"
+                LH_BACKUP_DIR="$new_backup_dir"
+                echo "Neues Backup-Verzeichnis: $LH_BACKUP_DIR"
+                changed=true
             fi
         fi
-        
+
+        # Temporäres Snapshot-Verzeichnis ändern
+        echo ""
+        echo "Temporäres Snapshot-Verzeichnis (absoluter Pfad):"
+        echo "Aktuell: $LH_TEMP_SNAPSHOT_DIR"
+        if lh_confirm_action "Ändern?" "n"; then
+            local new_temp_snapshot_dir=$(lh_ask_for_input "Neues temporäres Snapshot-Verzeichnis eingeben")
+            if [ -n "$new_temp_snapshot_dir" ]; then
+                LH_TEMP_SNAPSHOT_DIR="$new_temp_snapshot_dir"
+                echo "Neues temporäres Snapshot-Verzeichnis: $LH_TEMP_SNAPSHOT_DIR"
+                changed=true
+            fi
+        fi
+
         # Retention ändern
         echo ""
         echo "Anzahl zu behaltender Backups:"
-        echo "Aktuell: $RETENTION_BACKUP"
+        echo "Aktuell: $LH_RETENTION_BACKUP"
         if lh_confirm_action "Ändern?" "n"; then
             local new_retention=$(lh_ask_for_input "Neue Anzahl eingeben (empfohlen: 5-20)" "^[0-9]+$" "Bitte eine Zahl eingeben")
             if [ -n "$new_retention" ]; then
-                RETENTION_BACKUP="$new_retention"
-                echo "Neue Retention: $RETENTION_BACKUP"
+                LH_RETENTION_BACKUP="$new_retention"
+                echo "Neue Retention: $LH_RETENTION_BACKUP"
+                changed=true
             fi
         fi
         
-        echo ""
-        echo "=== Neue Konfiguration ==="
-        echo "  Backup-Ziel: $BACKUP_ROOT"
-        echo "  Backup-Verzeichnis: $BACKUP_DIR"
-        echo "  Retention: $RETENTION_BACKUP"
-        echo ""
-        echo "HINWEIS: Diese Einstellungen gelten nur für diese Sitzung"
-        echo "Um sie dauerhaft zu speichern, müssen Sie das Skript anpassen."
+        # Weitere Parameter könnten hier hinzugefügt werden (LH_TIMESHIFT_BASE_DIR, LH_BACKUP_LOG_FILENAME)
+
+        if [ "$changed" = true ]; then
+            echo ""
+            echo "=== Aktualisierte Konfiguration (für diese Sitzung) ==="
+            echo "  Backup-Ziel: $LH_BACKUP_ROOT"
+            echo "  Backup-Verzeichnis: $LH_BACKUP_DIR"
+            echo "  Temporäre Snapshots: $LH_TEMP_SNAPSHOT_DIR"
+            echo "  Retention: $LH_RETENTION_BACKUP"
+            if lh_confirm_action "Möchten Sie diese Konfiguration dauerhaft speichern?" "y"; then
+                lh_save_backup_config # Funktion aus lib_common.sh
+                echo "Konfiguration wurde in $LH_BACKUP_CONFIG_FILE gespeichert."
+            fi
+        else
+            echo "Keine Änderungen vorgenommen."
+        fi
     fi
 }
 
@@ -1058,9 +1075,9 @@ show_backup_status() {
     lh_print_header "Backup Status"
     
     echo "=== Aktuelle Backup-Situation ==="
-    echo "Backup-Ziel: $BACKUP_ROOT"
+    echo "Backup-Ziel: $LH_BACKUP_ROOT"
     
-    if [ ! -d "$BACKUP_ROOT" ]; then
+    if [ ! -d "$LH_BACKUP_ROOT" ]; then
         echo "Status: OFFLINE (Backup-Ziel nicht verfügbar)"
         return 1
     fi
@@ -1068,12 +1085,12 @@ show_backup_status() {
     echo "Status: ONLINE"
     
     # Freier Speicherplatz
-    local free_space=$(df -h "$BACKUP_ROOT" | awk 'NR==2 {print $4}')
-    local total_space=$(df -h "$BACKUP_ROOT" | awk 'NR==2 {print $2}')
+    local free_space=$(df -h "$LH_BACKUP_ROOT" | awk 'NR==2 {print $4}')
+    local total_space=$(df -h "$LH_BACKUP_ROOT" | awk 'NR==2 {print $2}')
     echo "Freier Speicher: $free_space / $total_space"
     
     # Backup-Übersicht
-    if [ -d "$BACKUP_ROOT$BACKUP_DIR" ]; then
+    if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
         echo ""
         echo "=== Vorhandene Backups ==="
         
@@ -1081,8 +1098,8 @@ show_backup_status() {
         echo "BTRFS Backups:"
         local btrfs_count=0
         for subvol in @ @home; do
-            if [ -d "$BACKUP_ROOT$BACKUP_DIR/$subvol" ]; then
-                local count=$(ls -1 "$BACKUP_ROOT$BACKUP_DIR/$subvol" 2>/dev/null | wc -l)
+            if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" ]; then
+                local count=$(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" 2>/dev/null | wc -l)
                 echo "  $subvol: $count Snapshots"
                 btrfs_count=$((btrfs_count + count))
             fi
@@ -1092,21 +1109,21 @@ show_backup_status() {
         # TAR Backups
         echo ""
         echo "TAR Backups:"
-        local tar_count=$(ls -1 "$BACKUP_ROOT$BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | wc -l)
+        local tar_count=$(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | wc -l)
         echo "  Gesamt: $tar_count TAR Archive"
         
         # RSYNC Backups
         echo ""
         echo "RSYNC Backups:"
-        local rsync_count=$(ls -1d "$BACKUP_ROOT$BACKUP_DIR"/rsync_backup_* 2>/dev/null | wc -l)
+        local rsync_count=$(ls -1d "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/rsync_backup_* 2>/dev/null | wc -l)
         echo "  Gesamt: $rsync_count RSYNC Backups"
         
         # Neustes Backup
         echo ""
         echo "=== Neuste Backups ==="
-        local newest_btrfs=$(find "$BACKUP_ROOT$BACKUP_DIR" -name "*-20*" -type d 2>/dev/null | sort -r | head -n1)
-        local newest_tar=$(ls -1t "$BACKUP_ROOT$BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | head -n1)
-        local newest_rsync=$(ls -1td "$BACKUP_ROOT$BACKUP_DIR"/rsync_backup_* 2>/dev/null | head -n1)
+        local newest_btrfs=$(find "$LH_BACKUP_ROOT$LH_BACKUP_DIR" -name "*-20*" -type d 2>/dev/null | sort -r | head -n1)
+        local newest_tar=$(ls -1t "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | head -n1)
+        local newest_rsync=$(ls -1td "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/rsync_backup_* 2>/dev/null | head -n1)
         
         if [ -n "$newest_btrfs" ]; then
             echo "BTRFS: $(basename "$newest_btrfs")"
@@ -1121,8 +1138,8 @@ show_backup_status() {
         # Gesamtgröße der Backups
         echo ""
         echo "=== Backup-Größen ==="
-        if [ -d "$BACKUP_ROOT$BACKUP_DIR" ]; then
-            local total_size=$(du -sh "$BACKUP_ROOT$BACKUP_DIR" 2>/dev/null | cut -f1)
+        if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
+            local total_size=$(du -sh "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | cut -f1)
             echo "Gesamtgröße aller Backups: $total_size"
         fi
     else
@@ -1130,10 +1147,10 @@ show_backup_status() {
     fi
     
     # Letzte Backup-Aktivitäten aus dem Log
-    if [ -f "$BACKUP_LOG" ]; then
+    if [ -f "$LH_BACKUP_LOG" ]; then
         echo ""
-        echo "=== Letzte Backup-Aktivitäten (aus $BACKUP_LOG) ==="
-        grep -i "backup" "$BACKUP_LOG" | tail -n 5
+        echo "=== Letzte Backup-Aktivitäten (aus $LH_BACKUP_LOG) ==="
+        grep -i "backup" "$LH_BACKUP_LOG" | tail -n 5
     fi
 }
 
