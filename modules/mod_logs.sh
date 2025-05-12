@@ -696,8 +696,52 @@ function logs_show_package_manager() {
 function logs_advanced_analysis() {
     lh_print_header "Erweiterte Log-Analyse"
 
-    if ! lh_check_command "python3" true true; then
-        echo "Python 3 ist nicht installiert und konnte nicht installiert werden."
+    local python_cmd=""
+
+    # Prioritize python3 if available and is Python 3
+    if command -v python3 &>/dev/null; then
+        if python3 -c "import sys; sys.exit(0 if sys.version_info.major == 3 else 1)" &>/dev/null; then
+            python_cmd="python3"
+        else
+            lh_log_msg "WARN" "'python3' wurde gefunden, scheint aber keine gültige Python 3 Installation zu sein."
+        fi
+    fi
+
+    # If python3 is not suitable or not found, try 'python'
+    if [ -z "$python_cmd" ]; then
+        if command -v python &>/dev/null; then
+            if python -c "import sys; sys.exit(0 if sys.version_info.major == 3 else 1)" &>/dev/null; then
+                python_cmd="python"
+                lh_log_msg "INFO" "Verwende 'python' als Python 3 Interpreter."
+            else
+                lh_log_msg "WARN" "'python' wurde gefunden, scheint aber nicht Python 3 zu sein."
+            fi
+        fi
+    fi
+
+    # If no suitable Python found yet, try to ensure one using lh_check_command (which might install)
+    if [ -z "$python_cmd" ]; then
+        lh_log_msg "INFO" "Kein passender Python-Interpreter direkt gefunden. Versuche 'python3' sicherzustellen (ggf. Installation)..."
+        if lh_check_command "python3" true true; then # Attempts to find/install python3
+            if python3 -c "import sys; sys.exit(0 if sys.version_info.major == 3 else 1)" &>/dev/null; then
+                 python_cmd="python3"
+            fi
+        fi
+        
+        if [ -z "$python_cmd" ]; then # If python3 check/install failed or was not Python 3
+            lh_log_msg "INFO" "'python3' nicht erfolgreich. Versuche 'python' sicherzustellen (ggf. Installation)..."
+            if lh_check_command "python" true true; then # Attempts to find/install python
+                if python -c "import sys; sys.exit(0 if sys.version_info.major == 3 else 1)" &>/dev/null; then
+                    python_cmd="python"
+                    lh_log_msg "INFO" "Verwende 'python' als Python 3 Interpreter nach Sicherstellung."
+                fi
+            fi
+        fi
+    fi
+
+    if [ -z "$python_cmd" ]; then
+        lh_log_msg "ERROR" "Python 3 konnte nicht gefunden oder installiert werden (weder als 'python3' noch als 'python')."
+        echo "Python 3 wird für die erweiterte Log-Analyse benötigt."
         echo "Die erweiterte Log-Analyse ist nicht verfügbar."
         return 1
     fi
@@ -705,224 +749,11 @@ function logs_advanced_analysis() {
     local python_script="$LH_ROOT_DIR/scripts/advanced_log_analyzer.py"
 
     if [ ! -f "$python_script" ]; then
-        # Wenn das Python-Skript noch nicht existiert, erstellen wir es
-        echo "Das Python-Skript für die erweiterte Log-Analyse wurde nicht gefunden."
-        echo "Es wird ein einfaches Skript erstellt, das später erweitert werden kann."
-
-        # Verzeichnis erstellen, falls es nicht existiert
-        mkdir -p "$LH_ROOT_DIR/scripts"
-
-        cat > "$python_script" << 'EOL'
-#!/usr/bin/env python3
-# linux_helper_toolkit/scripts/advanced_log_analyzer.py
-# Skript für erweiterte Log-Analyse
-
-import sys
-import re
-import os
-import datetime
-import argparse
-from collections import Counter, defaultdict
-
-def parse_arguments():
-    parser = argparse.ArgumentParser(description='Erweiterte Analyse von Logdateien')
-    parser.add_argument('log_file', help='Pfad zur zu analysierenden Logdatei')
-    parser.add_argument('--format', choices=['syslog', 'journald', 'apache', 'auto'], default='auto',
-                        help='Format der Logdatei (Standard: auto)')
-    parser.add_argument('--top', type=int, default=10,
-                        help='Anzahl der Top-Einträge, die angezeigt werden sollen (Standard: 10)')
-    parser.add_argument('--summary', action='store_true',
-                        help='Nur Zusammenfassung anzeigen')
-    parser.add_argument('--errors', action='store_true',
-                        help='Nur Fehler anzeigen')
-    return parser.parse_args()
-
-def detect_log_format(log_file):
-    # Versucht, das Logformat automatisch zu erkennen
-    with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
-        first_lines = [f.readline() for _ in range(5)]
-
-    # Typische Muster für verschiedene Logformate
-    syslog_pattern = r'^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}'
-    journald_pattern = r'^\w{3}\s\d{2}\s\d{2}:\d{2}:\d{2}.*\[\w+\]'
-    apache_pattern = r'^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
-
-    for line in first_lines:
-        if re.match(syslog_pattern, line):
-            return 'syslog'
-        elif re.match(journald_pattern, line):
-            return 'journald'
-        elif re.match(apache_pattern, line):
-            return 'apache'
-
-    # Wenn kein klares Format erkannt wird, Standard zurückgeben
-    return 'syslog'
-
-def parse_syslog(log_file):
-    entries = []
-    error_entries = []
-
-    # Typisches Syslog-Format: Jan 01 00:00:00 hostname program[pid]: message
-    pattern = r'^([A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+([^:]+):\s+(.*)$'
-
-    with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
-        for line in f:
-            match = re.match(pattern, line)
-            if match:
-                timestamp, hostname, program, message = match.groups()
-                entry = {
-                    'timestamp': timestamp,
-                    'hostname': hostname,
-                    'program': program.split('[')[0],  # Entferne PID
-                    'message': message
-                }
-                entries.append(entry)
-
-                # Suche nach Fehlermeldungen
-                if re.search(r'error|fail|critical|emerg|alert|warning', message, re.IGNORECASE):
-                    error_entries.append(entry)
-
-    return entries, error_entries
-
-def parse_journald(log_file):
-    # Ähnlich wie Syslog, aber anderes Format
-    return parse_syslog(log_file)
-
-def parse_apache(log_file):
-    entries = []
-    error_entries = []
-
-    # Typisches Apache-Zugriffslog-Format
-    pattern = r'^(\S+) \S+ \S+ \[([^]]+)\] "([^"]*)" (\d+) (\d+|-) "([^"]*)" "([^"]*)"'
-
-    with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
-        for line in f:
-            match = re.match(pattern, line)
-            if match:
-                ip, timestamp, request, status, size, referer, user_agent = match.groups()
-                entry = {
-                    'ip': ip,
-                    'timestamp': timestamp,
-                    'request': request,
-                    'status': status,
-                    'size': size,
-                    'referer': referer,
-                    'user_agent': user_agent
-                }
-                entries.append(entry)
-
-                # HTTP-Fehler (4xx und 5xx)
-                if status.startswith(('4', '5')):
-                    error_entries.append(entry)
-
-    return entries, error_entries
-
-def analyze_log(entries, error_entries, top_count=10):
-    if not entries:
-        print("Keine Logeinträge gefunden.")
-        return
-
-    # Allgemeine Statistiken
-    print(f"\n=== Allgemeine Statistiken ===")
-    print(f"Gesamtzahl der Einträge: {len(entries)}")
-    print(f"Anzahl der Fehlereinträge: {len(error_entries)}")
-    error_percentage = (len(error_entries) / len(entries)) * 100 if entries else 0
-    print(f"Fehlerrate: {error_percentage:.2f}%")
-
-    # Durchschnittliche Einträge pro Stunde (vereinfacht)
-    print("\n=== Zeitliche Verteilung ===")
-    hour_distribution = Counter()
-    for entry in entries:
-        if 'timestamp' in entry:
-            # Extrahiere Stunde aus Zeitstempel (vereinfacht)
-            hour_match = re.search(r'(\d{2}):\d{2}:\d{2}', entry['timestamp'])
-            if hour_match:
-                hour = int(hour_match.group(1))
-                hour_distribution[hour] += 1
-
-    for hour in sorted(hour_distribution.keys()):
-        print(f"Stunde {hour:02d}: {hour_distribution[hour]} Einträge")
-
-    # Top Programme/Services (wenn verfügbar)
-    if 'program' in entries[0] if entries else False:
-        print(f"\n=== Top {top_count} Programme/Services ===")
-        program_counter = Counter(entry['program'] for entry in entries if 'program' in entry)
-        for program, count in program_counter.most_common(top_count):
-            print(f"{program}: {count} Einträge")
-
-    # Top Fehlermeldungen
-    if error_entries:
-        print(f"\n=== Top {top_count} Fehlermeldungen ===")
-        if 'message' in error_entries[0]:
-            message_counter = Counter(entry['message'] for entry in error_entries if 'message' in entry)
-            for message, count in message_counter.most_common(top_count):
-                print(f"{count}x: {message[:100]}{'...' if len(message) > 100 else ''}")
-        elif 'status' in error_entries[0]:  # Apache-Logs
-            status_counter = Counter(entry['status'] for entry in error_entries if 'status' in entry)
-            for status, count in status_counter.most_common(top_count):
-                print(f"HTTP-Status {status}: {count} Einträge")
-
-    # Spezialisierte Analysen je nach Logtyp
-    if 'ip' in entries[0] if entries else False:  # Apache-Logs
-        print(f"\n=== Top {top_count} IP-Adressen ===")
-        ip_counter = Counter(entry['ip'] for entry in entries if 'ip' in entry)
-        for ip, count in ip_counter.most_common(top_count):
-            print(f"{ip}: {count} Anfragen")
-
-        # HTTP-Statuscodes
-        print(f"\n=== HTTP-Statuscodes ===")
-        status_counter = Counter(entry['status'] for entry in entries if 'status' in entry)
-        for status, count in sorted(status_counter.items()):
-            print(f"Status {status}: {count} Anfragen")
-
-def main():
-    args = parse_arguments()
-
-    log_file = args.log_file
-    if not os.path.isfile(log_file):
-        print(f"Fehler: Die Datei '{log_file}' existiert nicht.")
-        sys.exit(1)
-
-    print(f"Analysiere Logdatei: {log_file}")
-
-    # Logformat erkennen
-    log_format = args.format
-    if log_format == 'auto':
-        log_format = detect_log_format(log_file)
-    print(f"Erkanntes Logformat: {log_format}")
-
-    # Logdatei parsen
-    if log_format == 'syslog':
-        entries, error_entries = parse_syslog(log_file)
-    elif log_format == 'journald':
-        entries, error_entries = parse_journald(log_file)
-    elif log_format == 'apache':
-        entries, error_entries = parse_apache(log_file)
-    else:
-        print(f"Fehler: Unbekanntes Logformat '{log_format}'.")
-        sys.exit(1)
-
-    # Wenn --errors, nur Fehler anzeigen
-    if args.errors:
-        if error_entries:
-            print("\n=== Fehlereinträge ===")
-            for entry in error_entries[:args.top]:
-                if 'message' in entry:
-                    print(f"{entry['timestamp']} {entry['program']}: {entry['message']}")
-                elif 'status' in entry:  # Apache-Logs
-                    print(f"{entry['timestamp']} {entry['ip']} {entry['request']} - Status: {entry['status']}")
-        else:
-            print("Keine Fehlereinträge gefunden.")
-    else:
-        # Analyse durchführen
-        analyze_log(entries, error_entries, args.top)
-
-if __name__ == "__main__":
-    main()
-EOL
-
-        chmod +x "$python_script"
-        echo "Python-Skript erstellt: $python_script"
+        lh_log_msg "ERROR" "Python-Skript '$python_script' nicht gefunden."
+        echo "Fehler: Das Python-Skript für die erweiterte Log-Analyse wurde nicht gefunden unter:"
+        echo "$python_script"
+        echo "Bitte stellen Sie sicher, dass das Skript vorhanden ist (z.B. durch erneutes Klonen des Repositories)."
+        return 1
     fi
 
     # Auswahl der zu analysierenden Logdatei
@@ -1092,7 +923,7 @@ EOL
     esac
 
     echo "Starte erweiterte Log-Analyse für $log_file..."
-    $LH_SUDO_CMD python3 "$python_script" "$log_file" --format "$log_format" $analysis_args
+    $LH_SUDO_CMD "$python_cmd" "$python_script" "$log_file" --format "$log_format" $analysis_args
 
     if [ $? -ne 0 ]; then
         echo "Fehler bei der Analyse. Bitte überprüfen Sie das Skript und die Logdatei."
