@@ -77,7 +77,16 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
         * Xorg-Logs anzeigen.
         * dmesg-Ausgabe anzeigen und filtern.
         * Paketmanager-Logs anzeigen (unterstützt pacman, apt, dnf, yay).
-        * Optionale erweiterte Log-Analyse mit einem Python-Skript (erfordert `python3`). **Dieser Anteil ist komplett ungetestet und wird vermutlich Probleme verursachen**
+        * **Erweiterte Log-Analyse (`scripts/advanced_log_analyzer.py`)**:
+            * Führt eine detailliertere Analyse von Logdateien durch (erfordert `python3`).
+            * Unterstützt Formate wie Syslog, Journald (Text-Export) und Apache (Common/Combined), inklusive automatischer Formaterkennung.
+            * Zeigt allgemeine Statistiken (Gesamtzahl Einträge, Fehleranzahl, Fehlerrate).
+            * Listet häufige Fehlermeldungen oder Fehler-Statuscodes.
+            * Analysiert die zeitliche Verteilung von Logeinträgen (z.B. pro Stunde).
+            * Identifiziert Top-Quellen (Programme/Dienste bei Syslog, IP-Adressen bei Apache).
+            * Bietet Optionen zur Anpassung der Ausgabe (z.B. Anzahl der Top-Einträge, nur Zusammenfassung, nur Fehler).
+            * *Hinweis: Dieses Skript bietet erweiterte Funktionen, sollte aber mit Bedacht und Verständnis seiner Funktionsweise eingesetzt werden, insbesondere unter Berücksichtigung der allgemeinen Projekthinweise.*
+
 * **Wartung & Sicherheit**:
     * **Paketverwaltung & Updates (`mod_packages.sh`)**:
         * Systemaktualisierung (unterstützt pacman, apt, dnf, yay).
