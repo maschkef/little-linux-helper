@@ -78,7 +78,7 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
         * dmesg-Ausgabe anzeigen und filtern.
         * Paketmanager-Logs anzeigen (unterstützt pacman, apt, dnf, yay).
         * **Erweiterte Log-Analyse (`scripts/advanced_log_analyzer.py`)**:
-            * Führt eine detailliertere Analyse von Logdateien durch (erfordert `python3`).
+            * Führt eine detailliertere Analyse von Logdateien durch (benötigt Python 3, typischerweise als `python3`-Kommando).
             * Unterstützt Formate wie Syslog, Journald (Text-Export) und Apache (Common/Combined), inklusive automatischer Formaterkennung.
             * Zeigt allgemeine Statistiken (Gesamtzahl Einträge, Fehleranzahl, Fehlerrate).
             * Listet häufige Fehlermeldungen oder Fehler-Statuscodes.
@@ -124,7 +124,7 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
     * `chkrootkit` (optional, für zusätzliche Rootkit-Prüfung)
     * `lm-sensors` (für Temperatur- und Sensorwerte)
     * `nmap` (optional, für lokalen Port-Scan)
-    * `python3` (für erweiterte Log-Analyse)
+    * Python 3 (typischerweise als `python3`-Kommando; für erweiterte Log-Analyse)
     * `pacman-contrib` (für `paccache` auf Arch-basierten Systemen, falls nicht vorhanden)
     * `expac` (für kürzlich installierte Pakete auf Arch-basierten Systemen)
 
