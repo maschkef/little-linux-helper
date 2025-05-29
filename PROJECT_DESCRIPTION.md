@@ -84,6 +84,25 @@ The following variables are defined in `lib_common.sh`. Those marked as "Exporte
 - `LH_BACKUP_LOG`: Absolute path to the backup log file. Set by `lh_load_backup_config`.
 - `package_names_pacman`, `package_names_apt`, `package_names_dnf`: Associative arrays mapping program names to package names for specific package managers. Used by `lh_map_program_to_package`.
 
+**Color Variables and Usage:**
+`lib_common.sh` defines a set of ANSI escape code variables for colored terminal output. These are exported by `lh_finalize_initialization` and can be used in modules.
+
+- **Basic Colors:** `LH_COLOR_RED`, `LH_COLOR_GREEN`, `LH_COLOR_YELLOW`, `LH_COLOR_BLUE`, `LH_COLOR_MAGENTA`, `LH_COLOR_CYAN`, `LH_COLOR_WHITE`, `LH_COLOR_BLACK`.
+- **Bold Colors:** `LH_COLOR_BOLD_RED`, `LH_COLOR_BOLD_GREEN`, etc.
+- **Reset Code:** `LH_COLOR_RESET` (crucial to end coloring).
+- **Semantic Aliases:** For consistent UI, use aliases like:
+    - `LH_COLOR_HEADER` (for titles)
+    - `LH_COLOR_MENU_NUMBER` (for menu item numbers)
+    - `LH_COLOR_MENU_TEXT` (for menu item descriptions)
+    - `LH_COLOR_PROMPT` (for user input prompts)
+    - `LH_COLOR_SUCCESS` (for success messages)
+    - `LH_COLOR_ERROR` (for error messages)
+    - `LH_COLOR_WARNING` (for warning messages)
+    - `LH_COLOR_INFO` (for informational messages)
+    - `LH_COLOR_SEPARATOR` (for visual separators like "----")
+- **Usage:** Use with `echo -e` or `printf`. Always end a colored string with `${LH_COLOR_RESET}` to prevent color bleeding. Example: `echo -e "${LH_COLOR_ERROR}This is an error.${LH_COLOR_RESET}"`
+- **Library Integration:** Many library functions like `lh_print_header`, `lh_print_menu_item`, `lh_log_msg`, `lh_confirm_action`, and `lh_ask_for_input` already incorporate these colors for their output. When using these functions, manual color application is often not needed for their standard output.
+
 **Functions:**
 *   `lh_initialize_logging()`
     *   **Purpose:** Sets up the logging system.

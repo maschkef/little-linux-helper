@@ -27,9 +27,9 @@ lh_detect_alternative_managers
 lh_finalize_initialization
 
 # Willkommensnachricht
-echo "╔════════════════════════════════════════════╗"
-echo "║           Little Linux Helper              ║"
-echo "╚════════════════════════════════════════════╝"
+echo -e "${LH_COLOR_BOLD_YELLOW}╔════════════════════════════════════════════╗${LH_COLOR_RESET}"
+echo -e "${LH_COLOR_BOLD_YELLOW}║           ${LH_COLOR_BOLD_WHITE}Little Linux Helper${LH_COLOR_BOLD_YELLOW}              ║${LH_COLOR_RESET}"
+echo -e "${LH_COLOR_BOLD_YELLOW}╚════════════════════════════════════════════╝${LH_COLOR_RESET}"
 
 lh_log_msg "INFO" "Little Linux Helper gestartet."
 
@@ -42,11 +42,13 @@ function create_debug_bundle() {
     lh_log_msg "INFO" "Erstelle Debug-Bericht in: $debug_file"
 
     # Header für die Debug-Datei
-    echo "===== Little Linux Helper Debug-Bericht =====" > "$debug_file"
-    echo "Erstellt: $(date)" >> "$debug_file"
-    echo "Hostname: $(hostname)" >> "$debug_file"
-    echo "Benutzer: $(whoami)" >> "$debug_file"
-    echo "" >> "$debug_file"
+    {
+        echo "===== Little Linux Helper Debug-Bericht ====="
+        echo "Erstellt: $(date)"
+        echo "Hostname: $(hostname)"
+        echo "Benutzer: $(whoami)"
+        echo ""
+    } > "$debug_file"
 
     # Systeminformationen sammeln
     echo "===== Systeminformationen =====" >> "$debug_file"
@@ -54,7 +56,7 @@ function create_debug_bundle() {
     if [ -f /etc/os-release ]; then
         cat /etc/os-release >> "$debug_file"
     else
-        echo "Konnte OS-Informationen nicht ermitteln." >> "$debug_file"
+        echo "Konnte /etc/os-release nicht finden." >> "$debug_file"
     fi
     echo "" >> "$debug_file"
 
@@ -144,11 +146,11 @@ function create_debug_bundle() {
     echo "" >> "$debug_file"
 
     lh_log_msg "INFO" "Debug-Bericht erfolgreich erstellt: $debug_file"
-    echo "Debug-Bericht wurde erstellt: $debug_file"
-    echo "Sie können diese Datei bei der Fehlersuche oder für Support-Anfragen verwenden."
+    echo -e "${LH_COLOR_SUCCESS}Debug-Bericht wurde erstellt: $debug_file${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}Sie können diese Datei bei der Fehlersuche oder für Support-Anfragen verwenden.${LH_COLOR_RESET}"
 
     # Fragen, ob die Datei angezeigt werden soll
-    if lh_confirm_action "Möchten Sie den Bericht jetzt anzeigen?" "n"; then
+    if lh_confirm_action "Möchten Sie den Bericht jetzt mit 'less' anzeigen?" "n"; then
         less "$debug_file"
     fi
 }
@@ -157,27 +159,29 @@ function create_debug_bundle() {
 while true; do
     lh_print_header "Little Linux Helper - Hauptmenü"
 
-    echo "[Wiederherstellung & Neustarts]"
+    echo -e "${LH_COLOR_BOLD_MAGENTA}[Wiederherstellung & Neustarts]${LH_COLOR_RESET}"
     lh_print_menu_item 1 "Dienste & Desktop Neustart-Optionen"
 
-    echo "[Systemdiagnose & Analyse]"
+    echo -e "${LH_COLOR_BOLD_MAGENTA}[Systemdiagnose & Analyse]${LH_COLOR_RESET}"
     lh_print_menu_item 2 "Systeminformationen anzeigen"
     lh_print_menu_item 3 "Festplatten-Werkzeuge"
     lh_print_menu_item 4 "Log-Analyse Werkzeuge"
 
-    echo "[Wartung & Sicherheit]"
+    echo -e "${LH_COLOR_BOLD_MAGENTA}[Wartung & Sicherheit]${LH_COLOR_RESET}"
     lh_print_menu_item 5 "Paketverwaltung & Updates"
     lh_print_menu_item 6 "Sicherheitsüberprüfungen"
     lh_print_menu_item 7 "Backup & Wiederherstellung"
 
-    echo "[Spezialfunktionen]"
+    echo -e "${LH_COLOR_BOLD_MAGENTA}[Spezialfunktionen]${LH_COLOR_RESET}"
     lh_print_menu_item 8 "Wichtige Debug-Infos in Datei sammeln"
 
     echo ""
     lh_print_menu_item 0 "Beenden"
     echo ""
 
-    read -p "Wählen Sie eine Option: " option
+    main_option_prompt="" # Initialisierung ohne local oder einfach direkt verwenden
+    main_option_prompt="$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option:${LH_COLOR_RESET} ")"
+    read -p "$main_option_prompt" option
 
     case $option in
         1)
@@ -206,16 +210,16 @@ while true; do
             ;;
         0)
             lh_log_msg "INFO" "Little Linux Helper wird beendet."
-            echo "Auf Wiedersehen!"
+            echo -e "${LH_COLOR_BOLD_GREEN}Auf Wiedersehen!${LH_COLOR_RESET}"
             exit 0
             ;;
         *)
             lh_log_msg "WARN" "Ungültige Auswahl: $option"
-            echo "Ungültige Auswahl. Bitte versuchen Sie es erneut."
+            echo -e "${LH_COLOR_WARNING}Ungültige Auswahl. Bitte versuchen Sie es erneut.${LH_COLOR_RESET}"
             ;;
     esac
 
     # Kurze Pause, damit Benutzer die Ausgabe lesen kann
-    read -p "Drücken Sie eine Taste, um fortzufahren..." -n1 -s
+    read -p "$(echo -e "${LH_COLOR_INFO}Drücken Sie eine Taste, um fortzufahren...${LH_COLOR_RESET}")" -n1 -s
     echo ""
 done

@@ -139,20 +139,20 @@ btrfs_backup() {
     # BTRFS-Unterstützung prüfen
     local btrfs_supported=$(check_btrfs_support)
     if [ "$btrfs_supported" = "false" ]; then
-        echo "BTRFS wird nicht unterstützt oder ist nicht verfügbar."
-        echo "Dieses System verwendet kein BTRFS oder die erforderlichen Tools fehlen."
+        echo -e "${LH_COLOR_WARNING}BTRFS wird nicht unterstützt oder ist nicht verfügbar.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Dieses System verwendet kein BTRFS oder die erforderlichen Tools fehlen.${LH_COLOR_RESET}"
         return 1
     fi
     
     # Root-Rechte prüfen
     if [ "$EUID" -ne 0 ]; then
-        echo "WARNUNG: BTRFS-Backup benötigt root-Rechte"
+        echo -e "${LH_COLOR_WARNING}WARNUNG: BTRFS-Backup benötigt root-Rechte.${LH_COLOR_RESET}"
         if lh_confirm_action "Mit sudo ausführen?" "y"; then
             backup_log_msg "INFO" "Starte BTRFS-Backup mit sudo"
             sudo "$0" btrfs-backup
             return $?
         else
-            echo "Backup abgebrochen."
+            echo -e "${LH_COLOR_INFO}Backup abgebrochen.${LH_COLOR_RESET}"
             return 1
         fi
     fi
@@ -160,11 +160,11 @@ btrfs_backup() {
     # Backup-Ziel überprüfen und ggf. für diese Sitzung anpassen
     echo "Das aktuell konfigurierte Backup-Ziel ist: $LH_BACKUP_ROOT"
     local change_backup_root_for_session=false
-    local prompt_for_new_path_message=""
+    local prompt_for_new_path_message="" # This variable is used by lh_ask_for_input which handles its own coloring
 
     if [ ! -d "$LH_BACKUP_ROOT" ] || [ -z "$LH_BACKUP_ROOT" ]; then
         backup_log_msg "WARN" "Konfiguriertes Backup-Ziel '$LH_BACKUP_ROOT' nicht gefunden, nicht eingehängt oder nicht konfiguriert."
-        echo "WARNUNG: Das konfigurierte Backup-Ziel '$LH_BACKUP_ROOT' ist nicht verfügbar oder nicht konfiguriert."
+        echo -e "${LH_COLOR_WARNING}WARNUNG: Das konfigurierte Backup-Ziel '$LH_BACKUP_ROOT' ist nicht verfügbar oder nicht konfiguriert.${LH_COLOR_RESET}"
         change_backup_root_for_session=true
         prompt_for_new_path_message="Das konfigurierte Backup-Ziel ist nicht verfügbar. Bitte geben Sie einen neuen Pfad für diese Sitzung an"
     else
@@ -179,7 +179,7 @@ btrfs_backup() {
         while true; do
             new_backup_root_path=$(lh_ask_for_input "$prompt_for_new_path_message")
             if [ -z "$new_backup_root_path" ]; then
-                echo "Der Pfad darf nicht leer sein. Bitte versuchen Sie es erneut."
+                echo -e "${LH_COLOR_ERROR}Der Pfad darf nicht leer sein. Bitte versuchen Sie es erneut.${LH_COLOR_RESET}"
                 prompt_for_new_path_message="Eingabe darf nicht leer sein. Bitte geben Sie den Pfad zum Backup-Ziel an"
                 continue
             fi
@@ -194,11 +194,11 @@ btrfs_backup() {
                         break 
                     else
                         backup_log_msg "ERROR" "Konnte Verzeichnis '$new_backup_root_path' nicht erstellen."
-                        echo "Fehler: Konnte Verzeichnis '$new_backup_root_path' nicht erstellen. Bitte prüfen Sie den Pfad und die Berechtigungen."
+                        echo -e "${LH_COLOR_ERROR}Fehler: Konnte Verzeichnis '$new_backup_root_path' nicht erstellen. Bitte prüfen Sie den Pfad und die Berechtigungen.${LH_COLOR_RESET}"
                         prompt_for_new_path_message="Erstellung fehlgeschlagen. Bitte geben Sie einen anderen Pfad an oder prüfen Sie die Berechtigungen"
                     fi
                 else
-                    echo "Bitte geben Sie einen existierenden Pfad an oder erlauben Sie die Erstellung."
+                    echo -e "${LH_COLOR_INFO}Bitte geben Sie einen existierenden Pfad an oder erlauben Sie die Erstellung.${LH_COLOR_RESET}"
                     prompt_for_new_path_message="Pfad nicht akzeptiert. Bitte geben Sie einen anderen Pfad an"
                 fi
             else # Verzeichnis existiert
@@ -213,15 +213,15 @@ btrfs_backup() {
     $LH_SUDO_CMD mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
     if [ $? -ne 0 ]; then
         backup_log_msg "ERROR" "Konnte Backup-Verzeichnis nicht erstellen"
-        echo "Fehler beim Erstellen des Backup-Verzeichnisses. Überprüfen Sie die Berechtigungen."
+        echo -e "${LH_COLOR_ERROR}Fehler beim Erstellen des Backup-Verzeichnisses. Überprüfen Sie die Berechtigungen.${LH_COLOR_RESET}"
         return 1
     fi
     
     # Temporäres Snapshot-Verzeichnis sicherstellen
     $LH_SUDO_CMD mkdir -p "$LH_TEMP_SNAPSHOT_DIR"
     if [ $? -ne 0 ]; then
-        backup_log_msg "ERROR" "Konnte temporäres Snapshot-Verzeichnis nicht erstellen"
-        echo "Fehler beim Erstellen des temporären Snapshot-Verzeichnisses."
+        backup_log_msg "ERROR" "Konnte temporäres Snapshot-Verzeichnis nicht erstellen."
+        echo -e "${LH_COLOR_ERROR}Fehler beim Erstellen des temporären Snapshot-Verzeichnisses.${LH_COLOR_RESET}"
         return 1
     fi
     
@@ -286,12 +286,12 @@ btrfs_backup() {
     # Liste der zu sichernden Subvolumes
     local subvolumes=("@" "@home")
     
-    echo "Backup-Session gestartet: $timestamp"
-    echo "----------------------------------------"
+    echo -e "${LH_COLOR_SUCCESS}Backup-Session gestartet: $timestamp${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}----------------------------------------${LH_COLOR_RESET}"
     
     # Hauptschleife: Jedes Subvolume verarbeiten
     for subvol in "${subvolumes[@]}"; do
-        echo "Verarbeite Subvolume: $subvol"
+        echo -e "${LH_COLOR_INFO}Verarbeite Subvolume: $subvol${LH_COLOR_RESET}"
         
         # Snapshot-Namen und -Pfade definieren
         local snapshot_name="$subvol-$timestamp"
@@ -309,7 +309,7 @@ btrfs_backup() {
                 backup_log_msg "INFO" "Versuche direkten Snapshot als Fallback"
                 create_direct_snapshot "$subvol" "$timestamp"
                 if [ $? -ne 0 ]; then
-                    echo "Fehler bei $subvol, überspringe dieses Subvolume"
+                    echo -e "${LH_COLOR_ERROR}Fehler bei $subvol, überspringe dieses Subvolume.${LH_COLOR_RESET}"
                     continue
                 fi
             else
@@ -319,7 +319,7 @@ btrfs_backup() {
             # Direkten Snapshot erstellen
             create_direct_snapshot "$subvol" "$timestamp"
             if [ $? -ne 0 ]; then
-                echo "Fehler bei $subvol, überspringe dieses Subvolume"
+                echo -e "${LH_COLOR_ERROR}Fehler bei $subvol, überspringe dieses Subvolume.${LH_COLOR_RESET}"
                 continue
             fi
         fi
@@ -339,7 +339,7 @@ btrfs_backup() {
         
         # Snapshot zum Backup-Ziel übertragen
         backup_log_msg "INFO" "Übertrage Snapshot für $subvol"
-        echo "Übertrage $subvol..."
+        echo -e "${LH_COLOR_INFO}Übertrage $subvol...${LH_COLOR_RESET}"
         
         if [ -n "$last_backup" ]; then
             backup_log_msg "INFO" "Vorheriges Backup gefunden: $last_backup"
@@ -356,10 +356,10 @@ btrfs_backup() {
         # Erfolg überprüfen
         if [ $send_status -ne 0 ]; then
             backup_log_msg "ERROR" "Fehler beim Übertragen des Snapshots für $subvol"
-            echo "Fehler bei der Übertragung von $subvol"
+            echo -e "${LH_COLOR_ERROR}Fehler bei der Übertragung von $subvol.${LH_COLOR_RESET}"
         else
             backup_log_msg "INFO" "Snapshot erfolgreich übertragen: $backup_subvol_dir/$snapshot_name"
-            echo "Backup von $subvol erfolgreich"
+            echo -e "${LH_COLOR_SUCCESS}Backup von $subvol erfolgreich.${LH_COLOR_RESET}"
         fi
         
         # Temporären Snapshot aufräumen
@@ -373,26 +373,26 @@ btrfs_backup() {
             btrfs subvolume delete "$backup"
         done
         
-        echo ""
+        echo "" # Empty line for spacing
     done
     
-    echo "----------------------------------------"
-    echo "Backup-Session abgeschlossen: $timestamp"
+    echo -e "${LH_COLOR_SEPARATOR}----------------------------------------${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SUCCESS}Backup-Session abgeschlossen: $timestamp${LH_COLOR_RESET}"
     backup_log_msg "INFO" "BTRFS Backup-Session abgeschlossen"
     
     # Zusammenfassung
     echo ""
-    echo "ZUSAMMENFASSUNG:"
-    echo "  Zeitstempel: $timestamp"
-    echo "  Quell-System: $(hostname)"
-    echo "  Backup-Ziel: $LH_BACKUP_ROOT$LH_BACKUP_DIR"
-    echo "  Verarbeitete Subvolumes: ${subvolumes[*]}"
+    echo -e "${LH_COLOR_HEADER}ZUSAMMENFASSUNG:${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_INFO}Zeitstempel:${LH_COLOR_RESET} $timestamp"
+    echo -e "  ${LH_COLOR_INFO}Quell-System:${LH_COLOR_RESET} $(hostname)"
+    echo -e "  ${LH_COLOR_INFO}Backup-Ziel:${LH_COLOR_RESET} $LH_BACKUP_ROOT$LH_BACKUP_DIR"
+    echo -e "  ${LH_COLOR_INFO}Verarbeitete Subvolumes:${LH_COLOR_RESET} ${subvolumes[*]}"
     
     # Fehlerprüfung
-    if grep -q "ERROR" "$LH_BACKUP_LOG"; then # Einfachere Prüfung auf Fehler in der aktuellen Sitzung
-        echo "  Status: MIT FEHLERN ABGESCHLOSSEN (siehe $BACKUP_LOG)"
+    if grep -q "ERROR" "$LH_BACKUP_LOG"; then # Check for errors in the current session's log entries
+        echo -e "  ${LH_COLOR_INFO}Status:${LH_COLOR_RESET} ${LH_COLOR_ERROR}MIT FEHLERN ABGESCHLOSSEN (siehe $LH_BACKUP_LOG)${LH_COLOR_RESET}"
     else
-        echo "  Status: ERFOLGREICH"
+        echo -e "  ${LH_COLOR_INFO}Status:${LH_COLOR_RESET} ${LH_COLOR_SUCCESS}ERFOLGREICH${LH_COLOR_RESET}"
     fi
     
     return 0
@@ -405,11 +405,11 @@ tar_backup() {
     # Backup-Ziel überprüfen und ggf. für diese Sitzung anpassen
     echo "Das aktuell konfigurierte Backup-Ziel ist: $LH_BACKUP_ROOT"
     local change_backup_root_for_session=false
-    local prompt_for_new_path_message=""
+    local prompt_for_new_path_message="" # Used by lh_ask_for_input
 
     if [ ! -d "$LH_BACKUP_ROOT" ] || [ -z "$LH_BACKUP_ROOT" ]; then
         backup_log_msg "WARN" "Konfiguriertes Backup-Ziel '$LH_BACKUP_ROOT' nicht gefunden, nicht eingehängt oder nicht konfiguriert."
-        echo "WARNUNG: Das konfigurierte Backup-Ziel '$LH_BACKUP_ROOT' ist nicht verfügbar oder nicht konfiguriert."
+        echo -e "${LH_COLOR_WARNING}WARNUNG: Das konfigurierte Backup-Ziel '$LH_BACKUP_ROOT' ist nicht verfügbar oder nicht konfiguriert.${LH_COLOR_RESET}"
         change_backup_root_for_session=true
         prompt_for_new_path_message="Das konfigurierte Backup-Ziel ist nicht verfügbar. Bitte geben Sie einen neuen Pfad für diese Sitzung an"
     else
@@ -424,7 +424,7 @@ tar_backup() {
         while true; do
             new_backup_root_path=$(lh_ask_for_input "$prompt_for_new_path_message")
             if [ -z "$new_backup_root_path" ]; then
-                echo "Der Pfad darf nicht leer sein. Bitte versuchen Sie es erneut."
+                echo -e "${LH_COLOR_ERROR}Der Pfad darf nicht leer sein. Bitte versuchen Sie es erneut.${LH_COLOR_RESET}"
                 prompt_for_new_path_message="Eingabe darf nicht leer sein. Bitte geben Sie den Pfad zum Backup-Ziel an"
                 continue
             fi
@@ -439,11 +439,11 @@ tar_backup() {
                         break 
                     else
                         backup_log_msg "ERROR" "Konnte Verzeichnis '$new_backup_root_path' nicht erstellen."
-                        echo "Fehler: Konnte Verzeichnis '$new_backup_root_path' nicht erstellen. Bitte prüfen Sie den Pfad und die Berechtigungen."
+                        echo -e "${LH_COLOR_ERROR}Fehler: Konnte Verzeichnis '$new_backup_root_path' nicht erstellen. Bitte prüfen Sie den Pfad und die Berechtigungen.${LH_COLOR_RESET}"
                         prompt_for_new_path_message="Erstellung fehlgeschlagen. Bitte geben Sie einen anderen Pfad an oder prüfen Sie die Berechtigungen"
                     fi
                 else
-                    echo "Bitte geben Sie einen existierenden Pfad an oder erlauben Sie die Erstellung."
+                    echo -e "${LH_COLOR_INFO}Bitte geben Sie einen existierenden Pfad an oder erlauben Sie die Erstellung.${LH_COLOR_RESET}"
                     prompt_for_new_path_message="Pfad nicht akzeptiert. Bitte geben Sie einen anderen Pfad an"
                 fi
             else # Verzeichnis existiert
@@ -462,14 +462,14 @@ tar_backup() {
     fi
     
     # Verzeichnisse für Backup auswählen
-    echo "Welche Verzeichnisse sollen gesichert werden?"
-    echo "1. Nur /home"
-    echo "2. Nur /etc"
-    echo "3. /home und /etc"
-    echo "4. Gesamtes System (außer temporäre Dateien)"
-    echo "5. Benutzerdefiniert"
+    echo -e "${LH_COLOR_PROMPT}Welche Verzeichnisse sollen gesichert werden?${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Nur /home${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Nur /etc${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}/home und /etc${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Gesamtes System (außer temporäre Dateien)${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_MENU_NUMBER}5.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Benutzerdefiniert${LH_COLOR_RESET}"
     
-    read -p "Wählen Sie eine Option (1-5): " choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option (1-5): ${LH_COLOR_RESET}")" choice
     
     local backup_dirs=()
     local exclude_list="--exclude=/proc --exclude=/sys --exclude=/tmp --exclude=/dev --exclude=/mnt --exclude=/media --exclude=/run --exclude=/var/cache --exclude=/var/tmp"
@@ -483,12 +483,12 @@ tar_backup() {
             exclude_list="$exclude_list --exclude=/lost+found --exclude=/var/lib/lxcfs --exclude=/.snapshots* --exclude=/swapfile"
             ;;
         5)
-            echo "Geben Sie die Verzeichnisse getrennt durch Leerzeichen ein:"
-            read -r custom_dirs
+            echo -e "${LH_COLOR_PROMPT}Geben Sie die Verzeichnisse getrennt durch Leerzeichen ein:${LH_COLOR_RESET}"
+            read -r -p "$(echo -e "${LH_COLOR_PROMPT}Eingabe: ${LH_COLOR_RESET}")" custom_dirs
             IFS=' ' read -ra backup_dirs <<< "$custom_dirs"
             ;;
         *) 
-            echo "Ungültige Auswahl"
+            echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
             return 1
             ;;
     esac
@@ -496,8 +496,8 @@ tar_backup() {
     # Zusätzliche Ausschlüsse abfragen
     if [ "$choice" -ne 1 ] && [ "$choice" -ne 2 ]; then
         if lh_confirm_action "Möchten Sie zusätzliche Ausschlüsse angeben?" "n"; then
-            echo "Geben Sie zusätzliche Pfade zum Ausschließen ein (getrennt durch Leerzeichen):"
-            read -r additional_excludes
+            echo -e "${LH_COLOR_PROMPT}Geben Sie zusätzliche Pfade zum Ausschließen ein (getrennt durch Leerzeichen):${LH_COLOR_RESET}"
+            read -r -p "$(echo -e "${LH_COLOR_PROMPT}Eingabe: ${LH_COLOR_RESET}")" additional_excludes
             for exclude in $additional_excludes; do
                 exclude_list="$exclude_list --exclude=$exclude"
             done
@@ -508,7 +508,7 @@ tar_backup() {
     local timestamp=$(date +%Y-%m-%d_%H-%M-%S)
     local tar_file="$LH_BACKUP_ROOT$LH_BACKUP_DIR/tar_backup_${timestamp}.tar.gz"
     
-    echo "Erstelle TAR-Archiv..."
+    echo -e "${LH_COLOR_INFO}Erstelle TAR-Archiv...${LH_COLOR_RESET}"
     backup_log_msg "INFO" "Starte TAR-Backup nach $tar_file"
     
     # Verwende ein temporäres Skript für die exclude-Liste
@@ -529,14 +529,14 @@ tar_backup() {
     # Ergebnisse auswerten
     if [ $tar_status -eq 0 ]; then
         backup_log_msg "INFO" "TAR-Backup erfolgreich erstellt: $tar_file"
-        echo "TAR-Backup erfolgreich erstellt!"
-        echo "Datei: $tar_file"
-        echo "Größe: $(du -sh "$tar_file" | cut -f1)"
+        echo -e "${LH_COLOR_SUCCESS}TAR-Backup erfolgreich erstellt!${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Datei:${LH_COLOR_RESET} $tar_file"
+        echo -e "${LH_COLOR_INFO}Größe:${LH_COLOR_RESET} $(du -sh "$tar_file" | cut -f1)"
     else
         backup_log_msg "ERROR" "TAR-Backup fehlgeschlagen (Exit-Code: $tar_status)"
-        echo "Fehler beim Erstellen des TAR-Backups"
-        if [ -f "$BACKUP_LOG.tmp" ]; then
-            echo "Fehlerdetails:"
+        echo -e "${LH_COLOR_ERROR}Fehler beim Erstellen des TAR-Backups.${LH_COLOR_RESET}"
+        if [ -f "$LH_BACKUP_LOG.tmp" ]; then # Corrected variable name
+            echo -e "${LH_COLOR_INFO}Fehlerdetails:${LH_COLOR_RESET}"
             cat "$LH_BACKUP_LOG.tmp" | head -n 10
             cat "$LH_BACKUP_LOG.tmp" >> "$LH_BACKUP_LOG"
         fi
@@ -566,18 +566,18 @@ rsync_backup() {
     
     # Rsync installieren falls nötig
     if ! lh_check_command "rsync" true; then
-        echo "Rsync ist nicht installiert und konnte nicht installiert werden."
+        echo -e "${LH_COLOR_ERROR}Rsync ist nicht installiert und konnte nicht installiert werden.${LH_COLOR_RESET}"
         return 1
     fi
     
     # Backup-Ziel überprüfen und ggf. für diese Sitzung anpassen
     echo "Das aktuell konfigurierte Backup-Ziel ist: $LH_BACKUP_ROOT"
     local change_backup_root_for_session=false
-    local prompt_for_new_path_message=""
+    local prompt_for_new_path_message="" # Used by lh_ask_for_input
 
     if [ ! -d "$LH_BACKUP_ROOT" ] || [ -z "$LH_BACKUP_ROOT" ]; then
         backup_log_msg "WARN" "Konfiguriertes Backup-Ziel '$LH_BACKUP_ROOT' nicht gefunden, nicht eingehängt oder nicht konfiguriert."
-        echo "WARNUNG: Das konfigurierte Backup-Ziel '$LH_BACKUP_ROOT' ist nicht verfügbar oder nicht konfiguriert."
+        echo -e "${LH_COLOR_WARNING}WARNUNG: Das konfigurierte Backup-Ziel '$LH_BACKUP_ROOT' ist nicht verfügbar oder nicht konfiguriert.${LH_COLOR_RESET}"
         change_backup_root_for_session=true
         prompt_for_new_path_message="Das konfigurierte Backup-Ziel ist nicht verfügbar. Bitte geben Sie einen neuen Pfad für diese Sitzung an"
     else
@@ -592,7 +592,7 @@ rsync_backup() {
         while true; do
             new_backup_root_path=$(lh_ask_for_input "$prompt_for_new_path_message")
             if [ -z "$new_backup_root_path" ]; then
-                echo "Der Pfad darf nicht leer sein. Bitte versuchen Sie es erneut."
+                echo -e "${LH_COLOR_ERROR}Der Pfad darf nicht leer sein. Bitte versuchen Sie es erneut.${LH_COLOR_RESET}"
                 prompt_for_new_path_message="Eingabe darf nicht leer sein. Bitte geben Sie den Pfad zum Backup-Ziel an"
                 continue
             fi
@@ -607,11 +607,11 @@ rsync_backup() {
                         break 
                     else
                         backup_log_msg "ERROR" "Konnte Verzeichnis '$new_backup_root_path' nicht erstellen."
-                        echo "Fehler: Konnte Verzeichnis '$new_backup_root_path' nicht erstellen. Bitte prüfen Sie den Pfad und die Berechtigungen."
+                        echo -e "${LH_COLOR_ERROR}Fehler: Konnte Verzeichnis '$new_backup_root_path' nicht erstellen. Bitte prüfen Sie den Pfad und die Berechtigungen.${LH_COLOR_RESET}"
                         prompt_for_new_path_message="Erstellung fehlgeschlagen. Bitte geben Sie einen anderen Pfad an oder prüfen Sie die Berechtigungen"
                     fi
                 else
-                    echo "Bitte geben Sie einen existierenden Pfad an oder erlauben Sie die Erstellung."
+                    echo -e "${LH_COLOR_INFO}Bitte geben Sie einen existierenden Pfad an oder erlauben Sie die Erstellung.${LH_COLOR_RESET}"
                     prompt_for_new_path_message="Pfad nicht akzeptiert. Bitte geben Sie einen anderen Pfad an"
                 fi
             else # Verzeichnis existiert
@@ -630,20 +630,20 @@ rsync_backup() {
     fi
     
     # Backup-Typ auswählen
-    echo "Welcher Backup-Typ soll erstellt werden?"
-    echo "1. Vollbackup (alles kopieren)"
-    echo "2. Inkrementelles Backup (nur Änderungen)"
+    echo -e "${LH_COLOR_PROMPT}Welcher Backup-Typ soll erstellt werden?${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Vollbackup (alles kopieren)${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Inkrementelles Backup (nur Änderungen)${LH_COLOR_RESET}"
     
-    read -p "Wählen Sie eine Option (1-2): " backup_type
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option (1-2): ${LH_COLOR_RESET}")" backup_type
     
     # Verzeichnisse für Backup auswählen
     echo ""
-    echo "Welche Verzeichnisse sollen gesichert werden?"
-    echo "1. Nur /home"
-    echo "2. Gesamtes System (außer temporäre Dateien)"
-    echo "3. Benutzerdefiniert"
+    echo -e "${LH_COLOR_PROMPT}Welche Verzeichnisse sollen gesichert werden?${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Nur /home${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Gesamtes System (außer temporäre Dateien)${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Benutzerdefiniert${LH_COLOR_RESET}"
     
-    read -p "Wählen Sie eine Option (1-3): " choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option (1-3): ${LH_COLOR_RESET}")" choice
     
     local source_dirs=()
     local exclude_options="--exclude=/proc --exclude=/sys --exclude=/tmp --exclude=/dev --exclude=/mnt --exclude=/media --exclude=/run --exclude=/var/cache --exclude=/var/tmp"
@@ -657,20 +657,20 @@ rsync_backup() {
             exclude_options="$exclude_options --exclude=/lost+found --exclude=/var/lib/lxcfs --exclude=/.snapshots* --exclude=/swapfile"
             ;;
         3)
-            echo "Geben Sie das Quellverzeichnis ein:"
-            read -r custom_source
+            echo -e "${LH_COLOR_PROMPT}Geben Sie das Quellverzeichnis ein:${LH_COLOR_RESET}"
+            read -r -p "$(echo -e "${LH_COLOR_PROMPT}Eingabe: ${LH_COLOR_RESET}")" custom_source
             source_dirs=("$custom_source")
             ;;
         *) 
-            echo "Ungültige Auswahl"
+            echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
             return 1
             ;;
     esac
     
     # Zusätzliche Ausschlüsse
     if lh_confirm_action "Möchten Sie zusätzliche Ausschlüsse angeben?" "n"; then
-        echo "Geben Sie zusätzliche Pfade zum Ausschließen ein (getrennt durch Leerzeichen):"
-        read -r additional_excludes
+        echo -e "${LH_COLOR_PROMPT}Geben Sie zusätzliche Pfade zum Ausschließen ein (getrennt durch Leerzeichen):${LH_COLOR_RESET}"
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}Eingabe: ${LH_COLOR_RESET}")" additional_excludes
         for exclude in $additional_excludes; do
             exclude_options="$exclude_options --exclude=$exclude"
         done
@@ -682,7 +682,7 @@ rsync_backup() {
     
     mkdir -p "$rsync_dest"
     
-    echo "Starte RSYNC Backup..."
+    echo -e "${LH_COLOR_INFO}Starte RSYNC Backup...${LH_COLOR_RESET}"
     backup_log_msg "INFO" "Starte RSYNC-Backup nach $rsync_dest"
     
     # RSYNC ausführen
@@ -703,22 +703,22 @@ rsync_backup() {
             backup_log_msg "INFO" "Verwende $last_backup als Basis für inkrementelles Backup"
         fi
         
-        $LH_SUDO_CMD rsync $rsync_options $exclude_options $link_dest "${source_dirs[@]}" "$rsync_dest/" 2>"$BACKUP_LOG.tmp"
+        $LH_SUDO_CMD rsync $rsync_options $exclude_options $link_dest "${source_dirs[@]}" "$rsync_dest/" 2>"$LH_BACKUP_LOG.tmp" # Corrected variable
         local rsync_status=$?
     fi
     
     # Ergebnisse auswerten
     if [ $rsync_status -eq 0 ]; then
         backup_log_msg "INFO" "RSYNC-Backup erfolgreich erstellt: $rsync_dest"
-        echo "RSYNC-Backup erfolgreich erstellt!"
-        echo "Backup: $rsync_dest"
-        echo "Größe: $(du -sh "$rsync_dest" | cut -f1)"
+        echo -e "${LH_COLOR_SUCCESS}RSYNC-Backup erfolgreich erstellt!${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Backup:${LH_COLOR_RESET} $rsync_dest"
+        echo -e "${LH_COLOR_INFO}Größe:${LH_COLOR_RESET} $(du -sh "$rsync_dest" | cut -f1)"
     else
         backup_log_msg "ERROR" "RSYNC-Backup fehlgeschlagen (Exit-Code: $rsync_status)"
-        echo "Fehler beim Erstellen des RSYNC-Backups"
-        if [ -f "$BACKUP_LOG.tmp" ]; then
-            echo "Fehlerdetails:"
-            cat "$LH_BACKUP_LOG.tmp" | head -n 10
+        echo -e "${LH_COLOR_ERROR}Fehler beim Erstellen des RSYNC-Backups.${LH_COLOR_RESET}"
+        if [ -f "$LH_BACKUP_LOG.tmp" ]; then # Corrected variable
+            echo -e "${LH_COLOR_INFO}Fehlerdetails:${LH_COLOR_RESET}"
+            cat "$LH_BACKUP_LOG.tmp" | head -n 10 # Output from cat will not be colored by this script
             cat "$LH_BACKUP_LOG.tmp" >> "$LH_BACKUP_LOG"
         fi
         rm -rf "$rsync_dest"  # Unvollständiges Backup entfernen
@@ -746,7 +746,7 @@ restore_menu() {
     while true; do
         lh_print_header "Wiederherstellung auswählen"
         
-        echo "Welcher Backup-Typ soll wiederhergestellt werden?"
+        echo -e "${LH_COLOR_PROMPT}Welcher Backup-Typ soll wiederhergestellt werden?${LH_COLOR_RESET}"
         lh_print_menu_item 1 "BTRFS Snapshot wiederherstellen"
         lh_print_menu_item 2 "TAR Archiv wiederherstellen"
         lh_print_menu_item 3 "RSYNC Backup wiederherstellen"
@@ -754,7 +754,7 @@ restore_menu() {
         lh_print_menu_item 0 "Zurück"
         echo ""
         
-        read -p "Wählen Sie eine Option: " option
+        read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option: ${LH_COLOR_RESET}")" option
         
         case $option in
             1)
@@ -773,11 +773,11 @@ restore_menu() {
                 return 0
                 ;;
             *)
-                echo "Ungültige Auswahl"
+                echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
                 ;;
         esac
         
-        read -p "Drücken Sie eine Taste, um fortzufahren..." -n1 -s
+        read -p "$(echo -e "${LH_COLOR_INFO}Drücken Sie eine Taste, um fortzufahren...${LH_COLOR_RESET}")" -n1 -s
         echo ""
     done
 }
@@ -788,63 +788,62 @@ restore_btrfs() {
     
     # Verfügbare Backups auflisten
     if [ ! -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
-        echo "Keine Backups gefunden unter $LH_BACKUP_ROOT$LH_BACKUP_DIR"
+        echo -e "${LH_COLOR_WARNING}Keine Backups gefunden unter $LH_BACKUP_ROOT$LH_BACKUP_DIR${LH_COLOR_RESET}"
         return 1
     fi
     
-    echo "Verfügbare BTRFS Backups:"
+    echo -e "${LH_COLOR_INFO}Verfügbare BTRFS Backups:${LH_COLOR_RESET}"
     local subvols=($(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | grep -E '^(@|@home)$'))
     
     if [ ${#subvols[@]} -eq 0 ]; then
-        echo "Keine BTRFS Backups gefunden"
+        echo -e "${LH_COLOR_WARNING}Keine BTRFS Backups gefunden.${LH_COLOR_RESET}"
         return 1
     fi
     
     # Subvolume auswählen
     for i in "${!subvols[@]}"; do
-        echo "$((i+1)). ${subvols[i]}"
+        echo -e "  ${LH_COLOR_MENU_NUMBER}$((i+1)).${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}${subvols[i]}${LH_COLOR_RESET}"
     done
     
-    read -p "Welches Subvolume soll wiederhergestellt werden? (1-${#subvols[@]}): " choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Welches Subvolume soll wiederhergestellt werden? (1-${#subvols[@]}): ${LH_COLOR_RESET}")" choice
     
     if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#subvols[@]}" ]; then
         local selected_subvol="${subvols[$((choice-1))]}"
         
         # Verfügbare Snapshots auflisten
-        echo "Verfügbare Snapshots für $selected_subvol:"
+        echo -e "${LH_COLOR_INFO}Verfügbare Snapshots für $selected_subvol:${LH_COLOR_RESET}"
         local snapshots=($(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$selected_subvol" 2>/dev/null | sort -r))
         
         if [ ${#snapshots[@]} -eq 0 ]; then
-            echo "Keine Snapshots für $selected_subvol gefunden"
+            echo -e "${LH_COLOR_WARNING}Keine Snapshots für $selected_subvol gefunden.${LH_COLOR_RESET}"
             return 1
         fi
         
         # Snapshots mit Datum/Zeit anzeigen
-        echo "Nr.  Datum/Zeit               Snapshot-Name"
-        echo "---  ----------------------  ------------------------------"
+        echo -e "${LH_COLOR_HEADER}Nr.  Datum/Zeit               Snapshot-Name${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}---  ----------------------  ------------------------------${LH_COLOR_RESET}"
         for i in "${!snapshots[@]}"; do
             local snapshot="${snapshots[i]}"
             local timestamp_part=$(echo "$snapshot" | sed "s/^$selected_subvol-//")
             local formatted_date=$(echo "$timestamp_part" | sed 's/_/ /g' | sed 's/-/:/g' | cut -c1-19)
-            printf "%3d  %s  %s\n" "$((i+1))" "$formatted_date" "$snapshot"
+            printf "${LH_COLOR_MENU_NUMBER}%3d${LH_COLOR_RESET}  ${LH_COLOR_INFO}%s${LH_COLOR_RESET}  ${LH_COLOR_MENU_TEXT}%s${LH_COLOR_RESET}\n" "$((i+1))" "$formatted_date" "$snapshot"
         done
         
-        read -p "Welcher Snapshot soll wiederhergestellt werden? (1-${#snapshots[@]}): " snap_choice
+        read -p "$(echo -e "${LH_COLOR_PROMPT}Welcher Snapshot soll wiederhergestellt werden? (1-${#snapshots[@]}): ${LH_COLOR_RESET}")" snap_choice
         
         if [[ "$snap_choice" =~ ^[0-9]+$ ]] && [ "$snap_choice" -ge 1 ] && [ "$snap_choice" -le "${#snapshots[@]}" ]; then
             local selected_snapshot="${snapshots[$((snap_choice-1))]}"
             
             # Warnung anzeigen
             echo ""
-            echo "=== WICHTIGE WARNUNG ==="
-            echo "Dies wird das aktuelle Subvolume $selected_subvol überschreiben!"
-            echo "Alle aktuellen Daten in diesem Subvolume gehen verloren!"
+            echo -e "${LH_COLOR_BOLD_RED}=== WICHTIGE WARNUNG ===${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}Dies wird das aktuelle Subvolume $selected_subvol überschreiben!${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}Alle aktuellen Daten in diesem Subvolume gehen verloren!${LH_COLOR_RESET}"
             echo ""
             
             if [ "$selected_subvol" = "@" ]; then
-                echo "HINWEIS: Das Root-Subvolume (@) kann nur im Recovery-Modus"
-                echo "wiederhergestellt werden. Bitte booten Sie von einem Live-System"
-                echo "und führen Sie das Recovery-Skript aus."
+                echo -e "${LH_COLOR_INFO}HINWEIS: Das Root-Subvolume (@) kann nur im Recovery-Modus wiederhergestellt werden.${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}Bitte booten Sie von einem Live-System und führen Sie das Recovery-Skript aus.${LH_COLOR_RESET}"
                 return 1
             fi
             
@@ -854,21 +853,20 @@ restore_btrfs() {
                 
                 if [ "$selected_subvol" = "@home" ]; then
                     # /home wiederherstellen
-                    echo "Erstelle Backup der aktuellen /home vor der Wiederherstellung..."
+                    echo -e "${LH_COLOR_INFO}Erstelle Backup der aktuellen /home vor der Wiederherstellung...${LH_COLOR_RESET}"
                     mv /home "/home_backup_$backup_timestamp"
                     
                     # Temporäres Wiederherstellungsverzeichnis
                     local temp_restore="/.snapshots_restore"
                     mkdir -p "$temp_restore"
                     
-                    # Snapshot empfangen
-                    echo "Stelle Snapshot wieder her..."
+                    echo -e "${LH_COLOR_INFO}Stelle Snapshot wieder her...${LH_COLOR_RESET}"
                     btrfs send "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$selected_subvol/$selected_snapshot" | btrfs receive "$temp_restore"
                     
                     # Daten kopieren
-                    echo "Kopiere wiederhergestellte Daten..."
+                    echo -e "${LH_COLOR_INFO}Kopiere wiederhergestellte Daten...${LH_COLOR_RESET}"
                     mkdir -p /home
-                    cp -a "$temp_restore/$selected_snapshot/." /home/
+                    cp -a "$temp_restore/$selected_snapshot/." /home/ # Output from cp will not be colored
                     
                     # Berechtigungen wiederherstellen
                     if [ -d "/home_backup_$backup_timestamp" ]; then
@@ -881,21 +879,21 @@ restore_btrfs() {
                     rmdir "$temp_restore"
                     
                     echo ""
-                    echo "Wiederherstellung erfolgreich abgeschlossen!"
-                    echo "Ihr vorheriges /home wurde nach /home_backup_$backup_timestamp gesichert"
+                    echo -e "${LH_COLOR_SUCCESS}Wiederherstellung erfolgreich abgeschlossen!${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}Ihr vorheriges /home wurde nach /home_backup_$backup_timestamp gesichert.${LH_COLOR_RESET}"
                 else
                     # Andere Subvolumes
-                    echo "Wiederherstellung von $selected_subvol wird implementiert..."
-                    echo "Bitte verwenden Sie das spezielle Recovery-Skript für komplexe Wiederherstellungen."
+                    echo -e "${LH_COLOR_INFO}Wiederherstellung von $selected_subvol wird implementiert...${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}Bitte verwenden Sie das spezielle Recovery-Skript für komplexe Wiederherstellungen.${LH_COLOR_RESET}"
                 fi
             else
-                echo "Wiederherstellung abgebrochen."
+                echo -e "${LH_COLOR_INFO}Wiederherstellung abgebrochen.${LH_COLOR_RESET}"
             fi
         else
-            echo "Ungültige Auswahl"
+            echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
         fi
     else
-        echo "Ungültige Auswahl"
+        echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
     fi
 }
 
@@ -915,20 +913,20 @@ run_recovery_script() {
     fi
     
     if [ -z "$recovery_script" ]; then
-        echo "Recovery-Skript nicht gefunden."
-        echo "Bitte überprüfen Sie folgende Pfade:"
-        echo "  - /usr/local/bin/btrfs-recovery.sh"
-        echo "  - $LH_BACKUP_ROOT/backup-scripts/btrfs-recovery.sh"
-        echo "  - $(dirname "$0")/../backup-scripts/btrfs-recovery.sh"
+        echo -e "${LH_COLOR_ERROR}Recovery-Skript nicht gefunden.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Bitte überprüfen Sie folgende Pfade:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}  - /usr/local/bin/btrfs-recovery.sh${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}  - $LH_BACKUP_ROOT/backup-scripts/btrfs-recovery.sh${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}  - $(dirname "$0")/../backup-scripts/btrfs-recovery.sh${LH_COLOR_RESET}"
         return 1
     fi
     
-    echo "Recovery-Skript gefunden: $recovery_script"
+    echo -e "${LH_COLOR_INFO}Recovery-Skript gefunden: $recovery_script${LH_COLOR_RESET}"
     echo ""
-    echo "Das Recovery-Skript bietet erweiterte Optionen für:"
-    echo "  - Datei-spezifische Wiederherstellungen"
-    echo "  - System-Wiederherstellungen"
-    echo "  - Detaillierte Backup-Verwaltung"
+    echo -e "${LH_COLOR_INFO}Das Recovery-Skript bietet erweiterte Optionen für:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}  - Datei-spezifische Wiederherstellungen${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}  - System-Wiederherstellungen${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}  - Detaillierte Backup-Verwaltung${LH_COLOR_RESET}"
     echo ""
     
     if lh_confirm_action "Möchten Sie das Recovery-Skript ausführen?" "y"; then
@@ -942,52 +940,52 @@ restore_tar() {
     
     # Verfügbare TAR Archive auflisten
     if [ ! -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
-        echo "Kein Backup-Verzeichnis gefunden"
+        echo -e "${LH_COLOR_WARNING}Kein Backup-Verzeichnis gefunden.${LH_COLOR_RESET}"
         return 1
     fi
     
-    echo "Verfügbare TAR Archive:"
+    echo -e "${LH_COLOR_INFO}Verfügbare TAR Archive:${LH_COLOR_RESET}"
     local archives=($(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | sort -r))
     
     if [ ${#archives[@]} -eq 0 ]; then
-        echo "Keine TAR Archive gefunden"
+        echo -e "${LH_COLOR_WARNING}Keine TAR Archive gefunden.${LH_COLOR_RESET}"
         return 1
     fi
     
     # Archive mit Datum/Zeit anzeigen
-    echo "Nr.  Datum/Zeit               Archiv-Name"
-    echo "---  ----------------------  ------------------------------"
+    echo -e "${LH_COLOR_HEADER}Nr.  Datum/Zeit               Archiv-Name                       Größe${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}---  ----------------------  ------------------------------  -------${LH_COLOR_RESET}"
     for i in "${!archives[@]}"; do
         local archive="${archives[i]}"
         local basename=$(basename "$archive")
         local timestamp_part=$(echo "$basename" | sed 's/tar_backup_//' | sed 's/.tar.gz$//')
         local formatted_date=$(echo "$timestamp_part" | sed 's/_/ /g' | sed 's/-/:/g' | cut -c1-19)
         local size=$(du -sh "$archive" | cut -f1)
-        printf "%3d  %s  %s (%s)\n" "$((i+1))" "$formatted_date" "$basename" "$size"
+        printf "${LH_COLOR_MENU_NUMBER}%3d${LH_COLOR_RESET}  ${LH_COLOR_INFO}%s${LH_COLOR_RESET}  ${LH_COLOR_MENU_TEXT}%-30s${LH_COLOR_RESET}  ${LH_COLOR_INFO}(%s)${LH_COLOR_RESET}\n" "$((i+1))" "$formatted_date" "$basename" "$size"
     done
     
-    read -p "Welches Archiv soll wiederhergestellt werden? (1-${#archives[@]}): " choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Welches Archiv soll wiederhergestellt werden? (1-${#archives[@]}): ${LH_COLOR_RESET}")" choice
     
     if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#archives[@]}" ]; then
         local selected_archive="${archives[$((choice-1))]}"
         
         echo ""
-        echo "Wiederherstellungsoptionen:"
-        echo "1. An ursprünglichen Ort (überschreibt bestehende Dateien)"
-        echo "2. In temporäres Verzeichnis (/tmp/restore_tar)"
-        echo "3. Benutzerdefinierter Pfad"
+        echo -e "${LH_COLOR_PROMPT}Wiederherstellungsoptionen:${LH_COLOR_RESET}"
+        echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}An ursprünglichen Ort (überschreibt bestehende Dateien)${LH_COLOR_RESET}"
+        echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}In temporäres Verzeichnis (/tmp/restore_tar)${LH_COLOR_RESET}"
+        echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Benutzerdefinierter Pfad${LH_COLOR_RESET}"
         
-        read -p "Wählen Sie eine Option (1-3): " restore_choice
+        read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option (1-3): ${LH_COLOR_RESET}")" restore_choice
         
         local restore_path="/"
         case $restore_choice in
             1)
                 # Warnung anzeigen
                 echo ""
-                echo "=== WARNUNG ==="
-                echo "Dies überschreibt bestehende Dateien am ursprünglichen Ort!"
+                echo -e "${LH_COLOR_BOLD_RED}=== WARNUNG ===${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_WARNING}Dies überschreibt bestehende Dateien am ursprünglichen Ort!${LH_COLOR_RESET}"
                 if ! lh_confirm_action "Möchten Sie wirklich fortfahren?" "n"; then
-                    echo "Wiederherstellung abgebrochen."
+                    echo -e "${LH_COLOR_INFO}Wiederherstellung abgebrochen.${LH_COLOR_RESET}"
                     return 0
                 fi
                 ;;
@@ -1000,28 +998,28 @@ restore_tar() {
                 mkdir -p "$restore_path"
                 ;;
             *)
-                echo "Ungültige Auswahl"
+                echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
                 return 1
                 ;;
         esac
         
         echo ""
-        echo "Extrahiere Archiv..."
+        echo -e "${LH_COLOR_INFO}Extrahiere Archiv...${LH_COLOR_RESET}"
         $LH_SUDO_CMD tar xzf "$selected_archive" -C "$restore_path" --verbose
         
         if [ $? -eq 0 ]; then
-            echo "Wiederherstellung erfolgreich abgeschlossen"
+            echo -e "${LH_COLOR_SUCCESS}Wiederherstellung erfolgreich abgeschlossen.${LH_COLOR_RESET}"
             backup_log_msg "INFO" "TAR-Archiv wiederhergestellt: $selected_archive -> $restore_path"
             if [ "$restore_choice" -ne 1 ]; then
-                echo "Dateien wurden nach $restore_path extrahiert"
-                echo "Sie können die Dateien manuell an den gewünschten Ort verschieben."
+                echo -e "${LH_COLOR_INFO}Dateien wurden nach $restore_path extrahiert.${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}Sie können die Dateien manuell an den gewünschten Ort verschieben.${LH_COLOR_RESET}"
             fi
         else
-            echo "Fehler bei der Wiederherstellung"
+            echo -e "${LH_COLOR_ERROR}Fehler bei der Wiederherstellung.${LH_COLOR_RESET}"
             backup_log_msg "ERROR" "TAR-Wiederherstellung fehlgeschlagen: $selected_archive"
         fi
     else
-        echo "Ungültige Auswahl"
+        echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
     fi
 }
 
@@ -1031,52 +1029,52 @@ restore_rsync() {
     
     # Verfügbare RSYNC Backups auflisten
     if [ ! -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
-        echo "Kein Backup-Verzeichnis gefunden"
+        echo -e "${LH_COLOR_WARNING}Kein Backup-Verzeichnis gefunden.${LH_COLOR_RESET}"
         return 1
     fi
     
-    echo "Verfügbare RSYNC Backups:"
+    echo -e "${LH_COLOR_INFO}Verfügbare RSYNC Backups:${LH_COLOR_RESET}"
     local backups=($(ls -1d "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/rsync_backup_* 2>/dev/null | sort -r))
     
     if [ ${#backups[@]} -eq 0 ]; then
-        echo "Keine RSYNC Backups gefunden"
+        echo -e "${LH_COLOR_WARNING}Keine RSYNC Backups gefunden.${LH_COLOR_RESET}"
         return 1
     fi
     
     # Backups mit Datum/Zeit anzeigen
-    echo "Nr.  Datum/Zeit               Backup-Name"
-    echo "---  ----------------------  ------------------------------"
+    echo -e "${LH_COLOR_HEADER}Nr.  Datum/Zeit               Backup-Name                       Größe${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}---  ----------------------  ------------------------------  -------${LH_COLOR_RESET}"
     for i in "${!backups[@]}"; do
         local backup="${backups[i]}"
         local basename=$(basename "$backup")
         local timestamp_part=$(echo "$basename" | sed 's/rsync_backup_//')
         local formatted_date=$(echo "$timestamp_part" | sed 's/_/ /g' | sed 's/-/:/g' | cut -c1-19)
         local size=$(du -sh "$backup" | cut -f1)
-        printf "%3d  %s  %s (%s)\n" "$((i+1))" "$formatted_date" "$basename" "$size"
+        printf "${LH_COLOR_MENU_NUMBER}%3d${LH_COLOR_RESET}  ${LH_COLOR_INFO}%s${LH_COLOR_RESET}  ${LH_COLOR_MENU_TEXT}%-30s${LH_COLOR_RESET}  ${LH_COLOR_INFO}(%s)${LH_COLOR_RESET}\n" "$((i+1))" "$formatted_date" "$basename" "$size"
     done
     
-    read -p "Welches Backup soll wiederhergestellt werden? (1-${#backups[@]}): " choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Welches Backup soll wiederhergestellt werden? (1-${#backups[@]}): ${LH_COLOR_RESET}")" choice
     
     if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#backups[@]}" ]; then
         local selected_backup="${backups[$((choice-1))]}"
         
         echo ""
-        echo "Wiederherstellungsoptionen:"
-        echo "1. An ursprünglichen Ort (überschreibt bestehende Dateien)"
-        echo "2. In temporäres Verzeichnis (/tmp/restore_rsync)"
-        echo "3. Benutzerdefinierter Pfad"
+        echo -e "${LH_COLOR_PROMPT}Wiederherstellungsoptionen:${LH_COLOR_RESET}"
+        echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}An ursprünglichen Ort (überschreibt bestehende Dateien)${LH_COLOR_RESET}"
+        echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}In temporäres Verzeichnis (/tmp/restore_rsync)${LH_COLOR_RESET}"
+        echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Benutzerdefinierter Pfad${LH_COLOR_RESET}"
         
-        read -p "Wählen Sie eine Option (1-3): " restore_choice
+        read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option (1-3): ${LH_COLOR_RESET}")" restore_choice
         
         local restore_path="/"
         case $restore_choice in
             1)
                 # Warnung anzeigen
                 echo ""
-                echo "=== WARNUNG ==="
-                echo "Dies überschreibt bestehende Dateien am ursprünglichen Ort!"
+                echo -e "${LH_COLOR_BOLD_RED}=== WARNUNG ===${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_WARNING}Dies überschreibt bestehende Dateien am ursprünglichen Ort!${LH_COLOR_RESET}"
                 if ! lh_confirm_action "Möchten Sie wirklich fortfahren?" "n"; then
-                    echo "Wiederherstellung abgebrochen."
+                    echo -e "${LH_COLOR_INFO}Wiederherstellung abgebrochen.${LH_COLOR_RESET}"
                     return 0
                 fi
                 ;;
@@ -1089,28 +1087,28 @@ restore_rsync() {
                 mkdir -p "$restore_path"
                 ;;
             *)
-                echo "Ungültige Auswahl"
+                echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
                 return 1
                 ;;
         esac
         
         echo ""
-        echo "Stelle Backup wieder her..."
+        echo -e "${LH_COLOR_INFO}Stelle Backup wieder her...${LH_COLOR_RESET}"
         $LH_SUDO_CMD rsync -avxHS --progress "$selected_backup/" "$restore_path/"
         
         if [ $? -eq 0 ]; then
-            echo "Wiederherstellung erfolgreich abgeschlossen"
+            echo -e "${LH_COLOR_SUCCESS}Wiederherstellung erfolgreich abgeschlossen.${LH_COLOR_RESET}"
             backup_log_msg "INFO" "RSYNC-Backup wiederhergestellt: $selected_backup -> $restore_path"
             if [ "$restore_choice" -ne 1 ]; then
-                echo "Dateien wurden nach $restore_path wiederhergestellt"
-                echo "Sie können die Dateien manuell an den gewünschten Ort verschieben."
+                echo -e "${LH_COLOR_INFO}Dateien wurden nach $restore_path wiederhergestellt.${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}Sie können die Dateien manuell an den gewünschten Ort verschieben.${LH_COLOR_RESET}"
             fi
         else
-            echo "Fehler bei der Wiederherstellung"
+            echo -e "${LH_COLOR_ERROR}Fehler bei der Wiederherstellung.${LH_COLOR_RESET}"
             backup_log_msg "ERROR" "RSYNC-Wiederherstellung fehlgeschlagen: $selected_backup"
         fi
     else
-        echo "Ungültige Auswahl"
+        echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
     fi
 }
 
@@ -1118,13 +1116,13 @@ restore_rsync() {
 configure_backup() {
     lh_print_header "Backup Konfiguration"
     
-    echo "Aktuelle Konfiguration:"
-    echo "  Backup-Ziel (LH_BACKUP_ROOT): $LH_BACKUP_ROOT"
-    echo "  Backup-Verzeichnis (LH_BACKUP_DIR): $LH_BACKUP_DIR (relativ zum Backup-Ziel)"
-    echo "  Temporäre Snapshots (LH_TEMP_SNAPSHOT_DIR): $LH_TEMP_SNAPSHOT_DIR"
-    echo "  Timeshift-Basis (LH_TIMESHIFT_BASE_DIR): $LH_TIMESHIFT_BASE_DIR"
-    echo "  Retention (LH_RETENTION_BACKUP): $LH_RETENTION_BACKUP Backups"
-    echo "  Log-Datei (LH_BACKUP_LOG): $LH_BACKUP_LOG (Dateiname: $(basename "$LH_BACKUP_LOG"))"
+    echo -e "${LH_COLOR_INFO}Aktuelle Konfiguration:${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_INFO}Backup-Ziel (LH_BACKUP_ROOT):${LH_COLOR_RESET} $LH_BACKUP_ROOT"
+    echo -e "  ${LH_COLOR_INFO}Backup-Verzeichnis (LH_BACKUP_DIR):${LH_COLOR_RESET} $LH_BACKUP_DIR (relativ zum Backup-Ziel)"
+    echo -e "  ${LH_COLOR_INFO}Temporäre Snapshots (LH_TEMP_SNAPSHOT_DIR):${LH_COLOR_RESET} $LH_TEMP_SNAPSHOT_DIR"
+    echo -e "  ${LH_COLOR_INFO}Timeshift-Basis (LH_TIMESHIFT_BASE_DIR):${LH_COLOR_RESET} $LH_TIMESHIFT_BASE_DIR"
+    echo -e "  ${LH_COLOR_INFO}Retention (LH_RETENTION_BACKUP):${LH_COLOR_RESET} $LH_RETENTION_BACKUP Backups"
+    echo -e "  ${LH_COLOR_INFO}Log-Datei (LH_BACKUP_LOG):${LH_COLOR_RESET} $LH_BACKUP_LOG (Dateiname: $(basename "$LH_BACKUP_LOG"))"
     echo ""
     
     if lh_confirm_action "Möchten Sie die Konfiguration ändern?" "n"; then
@@ -1132,21 +1130,21 @@ configure_backup() {
 
         # Backup-Ziel ändern
         echo ""
-        echo "Backup-Ziel:"
-        echo "Aktuell: $LH_BACKUP_ROOT"
+        echo -e "${LH_COLOR_PROMPT}Backup-Ziel:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Aktuell:${LH_COLOR_RESET} $LH_BACKUP_ROOT"
         if lh_confirm_action "Ändern?" "n"; then
             local new_backup_root=$(lh_ask_for_input "Neues Backup-Ziel eingeben")
             if [ -n "$new_backup_root" ]; then
                 LH_BACKUP_ROOT="$new_backup_root"
-                echo "Neues Backup-Ziel: $LH_BACKUP_ROOT"
+                echo -e "${LH_COLOR_INFO}Neues Backup-Ziel:${LH_COLOR_RESET} $LH_BACKUP_ROOT"
                 changed=true
             fi
         fi
         
         # Backup-Verzeichnis ändern
         echo ""
-        echo "Backup-Verzeichnis (relativ zum Backup-Ziel):"
-        echo "Aktuell: $LH_BACKUP_DIR"
+        echo -e "${LH_COLOR_PROMPT}Backup-Verzeichnis (relativ zum Backup-Ziel):${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Aktuell:${LH_COLOR_RESET} $LH_BACKUP_DIR"
         if lh_confirm_action "Ändern?" "n"; then
             local new_backup_dir=$(lh_ask_for_input "Neues Backup-Verzeichnis (mit führendem /) eingeben")
             if [ -n "$new_backup_dir" ]; then
@@ -1155,46 +1153,45 @@ configure_backup() {
                     new_backup_dir="/$new_backup_dir"
                 fi
                 LH_BACKUP_DIR="$new_backup_dir"
-                echo "Neues Backup-Verzeichnis: $LH_BACKUP_DIR"
+                echo -e "${LH_COLOR_INFO}Neues Backup-Verzeichnis:${LH_COLOR_RESET} $LH_BACKUP_DIR"
                 changed=true
             fi
         fi
 
         # Temporäres Snapshot-Verzeichnis ändern
         echo ""
-        echo "Temporäres Snapshot-Verzeichnis (absoluter Pfad):"
-        echo "Aktuell: $LH_TEMP_SNAPSHOT_DIR"
+        echo -e "${LH_COLOR_PROMPT}Temporäres Snapshot-Verzeichnis (absoluter Pfad):${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Aktuell:${LH_COLOR_RESET} $LH_TEMP_SNAPSHOT_DIR"
         if lh_confirm_action "Ändern?" "n"; then
             local new_temp_snapshot_dir=$(lh_ask_for_input "Neues temporäres Snapshot-Verzeichnis eingeben")
             if [ -n "$new_temp_snapshot_dir" ]; then
                 LH_TEMP_SNAPSHOT_DIR="$new_temp_snapshot_dir"
-                echo "Neues temporäres Snapshot-Verzeichnis: $LH_TEMP_SNAPSHOT_DIR"
+                echo -e "${LH_COLOR_INFO}Neues temporäres Snapshot-Verzeichnis:${LH_COLOR_RESET} $LH_TEMP_SNAPSHOT_DIR"
                 changed=true
             fi
         fi
 
         # Retention ändern
         echo ""
-        echo "Anzahl zu behaltender Backups:"
-        echo "Aktuell: $LH_RETENTION_BACKUP"
+        echo -e "${LH_COLOR_PROMPT}Anzahl zu behaltender Backups:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Aktuell:${LH_COLOR_RESET} $LH_RETENTION_BACKUP"
         if lh_confirm_action "Ändern?" "n"; then
             local new_retention=$(lh_ask_for_input "Neue Anzahl eingeben (empfohlen: 5-20)" "^[0-9]+$" "Bitte eine Zahl eingeben")
             if [ -n "$new_retention" ]; then
                 LH_RETENTION_BACKUP="$new_retention"
-                echo "Neue Retention: $LH_RETENTION_BACKUP"
+                echo -e "${LH_COLOR_INFO}Neue Retention:${LH_COLOR_RESET} $LH_RETENTION_BACKUP"
                 changed=true
             fi
         fi
         
         # Weitere Parameter könnten hier hinzugefügt werden (LH_TIMESHIFT_BASE_DIR, LH_BACKUP_LOG_FILENAME)
-
         if [ "$changed" = true ]; then
             echo ""
-            echo "=== Aktualisierte Konfiguration (für diese Sitzung) ==="
-            echo "  Backup-Ziel: $LH_BACKUP_ROOT"
-            echo "  Backup-Verzeichnis: $LH_BACKUP_DIR"
-            echo "  Temporäre Snapshots: $LH_TEMP_SNAPSHOT_DIR"
-            echo "  Retention: $LH_RETENTION_BACKUP"
+            echo -e "${LH_COLOR_HEADER}=== Aktualisierte Konfiguration (für diese Sitzung) ===${LH_COLOR_RESET}"
+            echo -e "  ${LH_COLOR_INFO}Backup-Ziel:${LH_COLOR_RESET} $LH_BACKUP_ROOT"
+            echo -e "  ${LH_COLOR_INFO}Backup-Verzeichnis:${LH_COLOR_RESET} $LH_BACKUP_DIR"
+            echo -e "  ${LH_COLOR_INFO}Temporäre Snapshots:${LH_COLOR_RESET} $LH_TEMP_SNAPSHOT_DIR"
+            echo -e "  ${LH_COLOR_INFO}Retention:${LH_COLOR_RESET} $LH_RETENTION_BACKUP"
             if lh_confirm_action "Möchten Sie diese Konfiguration dauerhaft speichern?" "y"; then
                 lh_save_backup_config # Funktion aus lib_common.sh
                 echo "Konfiguration wurde in $LH_BACKUP_CONFIG_FILE gespeichert."
@@ -1209,65 +1206,65 @@ configure_backup() {
 show_backup_status() {
     lh_print_header "Backup Status"
     
-    echo "=== Aktuelle Backup-Situation ==="
-    echo "Backup-Ziel: $LH_BACKUP_ROOT"
+    echo -e "${LH_COLOR_HEADER}=== Aktuelle Backup-Situation ===${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}Backup-Ziel:${LH_COLOR_RESET} $LH_BACKUP_ROOT"
     
     if [ ! -d "$LH_BACKUP_ROOT" ]; then
-        echo "Status: OFFLINE (Backup-Ziel nicht verfügbar)"
+        echo -e "${LH_COLOR_INFO}Status:${LH_COLOR_RESET} ${LH_COLOR_WARNING}OFFLINE (Backup-Ziel nicht verfügbar)${LH_COLOR_RESET}"
         return 1
     fi
     
-    echo "Status: ONLINE"
+    echo -e "${LH_COLOR_INFO}Status:${LH_COLOR_RESET} ${LH_COLOR_SUCCESS}ONLINE${LH_COLOR_RESET}"
     
     # Freier Speicherplatz
     local free_space=$(df -h "$LH_BACKUP_ROOT" | awk 'NR==2 {print $4}')
     local total_space=$(df -h "$LH_BACKUP_ROOT" | awk 'NR==2 {print $2}')
-    echo "Freier Speicher: $free_space / $total_space"
+    echo -e "${LH_COLOR_INFO}Freier Speicher:${LH_COLOR_RESET} $free_space / $total_space"
     
     # Backup-Übersicht
     if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
         echo ""
-        echo "=== Vorhandene Backups ==="
+        echo -e "${LH_COLOR_HEADER}=== Vorhandene Backups ===${LH_COLOR_RESET}"
         
         # BTRFS Backups
-        echo "BTRFS Backups:"
+        echo -e "${LH_COLOR_INFO}BTRFS Backups:${LH_COLOR_RESET}"
         local btrfs_count=0
         for subvol in @ @home; do
             if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" ]; then
                 local count=$(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" 2>/dev/null | wc -l)
-                echo "  $subvol: $count Snapshots"
+                echo -e "  ${LH_COLOR_INFO}$subvol:${LH_COLOR_RESET} $count Snapshots"
                 btrfs_count=$((btrfs_count + count))
             fi
         done
-        echo "  Gesamt: $btrfs_count BTRFS Snapshots"
+        echo -e "  ${LH_COLOR_INFO}Gesamt:${LH_COLOR_RESET} $btrfs_count BTRFS Snapshots"
         
         # TAR Backups
         echo ""
-        echo "TAR Backups:"
+        echo -e "${LH_COLOR_INFO}TAR Backups:${LH_COLOR_RESET}"
         local tar_count=$(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | wc -l)
-        echo "  Gesamt: $tar_count TAR Archive"
+        echo -e "  ${LH_COLOR_INFO}Gesamt:${LH_COLOR_RESET} $tar_count TAR Archive"
         
         # RSYNC Backups
         echo ""
-        echo "RSYNC Backups:"
+        echo -e "${LH_COLOR_INFO}RSYNC Backups:${LH_COLOR_RESET}"
         local rsync_count=$(ls -1d "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/rsync_backup_* 2>/dev/null | wc -l)
-        echo "  Gesamt: $rsync_count RSYNC Backups"
+        echo -e "  ${LH_COLOR_INFO}Gesamt:${LH_COLOR_RESET} $rsync_count RSYNC Backups"
         
         # Neustes Backup
         echo ""
-        echo "=== Neuste Backups ==="
+        echo -e "${LH_COLOR_HEADER}=== Neuste Backups ===${LH_COLOR_RESET}"
         local newest_btrfs=$(find "$LH_BACKUP_ROOT$LH_BACKUP_DIR" -name "*-20*" -type d 2>/dev/null | sort -r | head -n1)
         local newest_tar=$(ls -1t "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | head -n1)
         local newest_rsync=$(ls -1td "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/rsync_backup_* 2>/dev/null | head -n1)
         
         if [ -n "$newest_btrfs" ]; then
-            echo "BTRFS: $(basename "$newest_btrfs")"
+            echo -e "${LH_COLOR_INFO}BTRFS:${LH_COLOR_RESET} $(basename "$newest_btrfs")"
         fi
         if [ -n "$newest_tar" ]; then
-            echo "TAR: $(basename "$newest_tar")"
+            echo -e "${LH_COLOR_INFO}TAR:${LH_COLOR_RESET} $(basename "$newest_tar")"
         fi
         if [ -n "$newest_rsync" ]; then
-            echo "RSYNC: $(basename "$newest_rsync")"
+            echo -e "${LH_COLOR_INFO}RSYNC:${LH_COLOR_RESET} $(basename "$newest_rsync")"
         fi
         
         # Gesamtgröße der Backups
@@ -1275,16 +1272,16 @@ show_backup_status() {
         echo "=== Backup-Größen ==="
         if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
             local total_size=$(du -sh "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | cut -f1)
-            echo "Gesamtgröße aller Backups: $total_size"
+            echo -e "${LH_COLOR_INFO}Gesamtgröße aller Backups:${LH_COLOR_RESET} $total_size"
         fi
     else
-        echo "Noch keine Backups vorhanden"
+        echo -e "${LH_COLOR_INFO}Noch keine Backups vorhanden.${LH_COLOR_RESET}"
     fi
     
     # Letzte Backup-Aktivitäten aus dem Log
     if [ -f "$LH_BACKUP_LOG" ]; then
         echo ""
-        echo "=== Letzte Backup-Aktivitäten (aus $LH_BACKUP_LOG) ==="
+        echo -e "${LH_COLOR_HEADER}=== Letzte Backup-Aktivitäten (aus $LH_BACKUP_LOG) ===${LH_COLOR_RESET}"
         grep -i "backup" "$LH_BACKUP_LOG" | tail -n 5
     fi
 }
@@ -1303,7 +1300,7 @@ backup_menu() {
         lh_print_menu_item 0 "Zurück zum Hauptmenü"
         echo ""
         
-        read -p "Wählen Sie eine Option: " option
+        read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option: ${LH_COLOR_RESET}")" option
         
         case $option in
             1)
@@ -1328,11 +1325,11 @@ backup_menu() {
                 return 0
                 ;;
             *)
-                echo "Ungültige Auswahl"
+                echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
                 ;;
         esac
         
-        read -p "Drücken Sie eine Taste, um fortzufahren..." -n1 -s
+        read -p "$(echo -e "${LH_COLOR_INFO}Drücken Sie eine Taste, um fortzufahren...${LH_COLOR_RESET}")" -n1 -s
         echo ""
     done
 }

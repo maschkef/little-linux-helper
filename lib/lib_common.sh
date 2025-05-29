@@ -41,9 +41,9 @@ declare -A LH_TARGET_USER_INFO
 LH_BACKUP_ROOT_DEFAULT="/run/media/tux/hdd_3tb/"
 LH_BACKUP_DIR_DEFAULT="/backups" # Relativ zu LH_BACKUP_ROOT
 LH_TEMP_SNAPSHOT_DIR_DEFAULT="/.snapshots_backup" # Absoluter Pfad
-LH_TIMESHIFT_BASE_DIR_DEFAULT="/run/timeshift" # Absoluter Pfad
+LH_TIMESHIFT_BASE_DIR_DEFAULT="/run/timeshift"    # Absoluter Pfad
 LH_RETENTION_BACKUP_DEFAULT=10
-LH_BACKUP_LOG_FILENAME_DEFAULT="backup.log" # Relativ zu LH_LOG_DIR
+LH_BACKUP_LOG_BASENAME_DEFAULT="backup.log" # Basisname für die Backup-Logdatei
 
 # Aktive Backup-Konfigurationsvariablen
 LH_BACKUP_ROOT=""
@@ -51,7 +51,41 @@ LH_BACKUP_DIR=""
 LH_TEMP_SNAPSHOT_DIR=""
 LH_TIMESHIFT_BASE_DIR=""
 LH_RETENTION_BACKUP=""
-LH_BACKUP_LOG="" # Voller Pfad zur Backup-Logdatei
+LH_BACKUP_LOG_BASENAME="" # Der konfigurierte Basisname für die Backup-Logdatei
+LH_BACKUP_LOG=""          # Voller Pfad zur Backup-Logdatei (mit Zeitstempel)
+
+
+# Farben für die Ausgabe
+LH_COLOR_RESET='\e[0m'
+LH_COLOR_BLACK='\e[0;30m'
+LH_COLOR_RED='\e[0;31m'
+LH_COLOR_GREEN='\e[0;32m'
+LH_COLOR_YELLOW='\e[0;33m'
+LH_COLOR_BLUE='\e[0;34m'
+LH_COLOR_MAGENTA='\e[0;35m'
+LH_COLOR_CYAN='\e[0;36m'
+LH_COLOR_WHITE='\e[0;37m'
+
+LH_COLOR_BOLD_BLACK='\e[1;30m'
+LH_COLOR_BOLD_RED='\e[1;31m'
+LH_COLOR_BOLD_GREEN='\e[1;32m'
+LH_COLOR_BOLD_YELLOW='\e[1;33m'
+LH_COLOR_BOLD_BLUE='\e[1;34m'
+LH_COLOR_BOLD_MAGENTA='\e[1;35m'
+LH_COLOR_BOLD_CYAN='\e[1;36m'
+LH_COLOR_BOLD_WHITE='\e[1;37m'
+
+# Aliase für häufig verwendete Farben
+LH_COLOR_HEADER="${LH_COLOR_BOLD_CYAN}"
+LH_COLOR_MENU_NUMBER="${LH_COLOR_BOLD_YELLOW}"
+LH_COLOR_MENU_TEXT="${LH_COLOR_CYAN}"
+LH_COLOR_PROMPT="${LH_COLOR_BOLD_GREEN}"
+LH_COLOR_SUCCESS="${LH_COLOR_BOLD_GREEN}"
+LH_COLOR_ERROR="${LH_COLOR_BOLD_RED}"
+LH_COLOR_WARNING="${LH_COLOR_BOLD_YELLOW}"
+LH_COLOR_INFO="${LH_COLOR_BOLD_BLUE}"
+LH_COLOR_SEPARATOR="${LH_COLOR_BLUE}"
+
 
 # Mapping von Programmnamen zu Paketnamen für verschiedene Paketmanager
 declare -A package_names_pacman=(
@@ -119,7 +153,7 @@ function lh_load_backup_config() {
     LH_TEMP_SNAPSHOT_DIR="$LH_TEMP_SNAPSHOT_DIR_DEFAULT"
     LH_TIMESHIFT_BASE_DIR="$LH_TIMESHIFT_BASE_DIR_DEFAULT"
     LH_RETENTION_BACKUP="$LH_RETENTION_BACKUP_DEFAULT"
-    local backup_log_filename="$LH_BACKUP_LOG_FILENAME_DEFAULT"
+    LH_BACKUP_LOG_BASENAME="$LH_BACKUP_LOG_BASENAME_DEFAULT"
 
     if [ -f "$LH_BACKUP_CONFIG_FILE" ]; then
         lh_log_msg "INFO" "Lade Backup-Konfiguration aus $LH_BACKUP_CONFIG_FILE"
@@ -132,12 +166,13 @@ function lh_load_backup_config() {
         LH_TEMP_SNAPSHOT_DIR="${CFG_LH_TEMP_SNAPSHOT_DIR:-$LH_TEMP_SNAPSHOT_DIR}"
         LH_TIMESHIFT_BASE_DIR="${CFG_LH_TIMESHIFT_BASE_DIR:-$LH_TIMESHIFT_BASE_DIR}"
         LH_RETENTION_BACKUP="${CFG_LH_RETENTION_BACKUP:-$LH_RETENTION_BACKUP}"
-        backup_log_filename="${CFG_LH_BACKUP_LOG_FILENAME:-$backup_log_filename}"
+        LH_BACKUP_LOG_BASENAME="${CFG_LH_BACKUP_LOG_BASENAME:-$LH_BACKUP_LOG_BASENAME}"
     else
         lh_log_msg "INFO" "Keine Backup-Konfigurationsdatei gefunden ($LH_BACKUP_CONFIG_FILE). Verwende Standardwerte."
     fi
 
-    LH_BACKUP_LOG="$LH_LOG_DIR/$backup_log_filename"
+    # Zeitstempel dem Basis-Log-Dateinamen voranstellen
+    LH_BACKUP_LOG="$LH_LOG_DIR/$(date '+%y%m%d-%H%M')_$LH_BACKUP_LOG_BASENAME"
     lh_log_msg "INFO" "Backup-Logdatei: $LH_BACKUP_LOG"
 }
 
@@ -150,20 +185,44 @@ function lh_save_backup_config() {
     echo "CFG_LH_TEMP_SNAPSHOT_DIR=\"$LH_TEMP_SNAPSHOT_DIR\"" >> "$LH_BACKUP_CONFIG_FILE"
     echo "CFG_LH_TIMESHIFT_BASE_DIR=\"$LH_TIMESHIFT_BASE_DIR\"" >> "$LH_BACKUP_CONFIG_FILE"
     echo "CFG_LH_RETENTION_BACKUP=\"$LH_RETENTION_BACKUP\"" >> "$LH_BACKUP_CONFIG_FILE"
-    echo "CFG_LH_BACKUP_LOG_FILENAME=\"$(basename "$LH_BACKUP_LOG")\"" >> "$LH_BACKUP_CONFIG_FILE"
+    echo "CFG_LH_BACKUP_LOG_BASENAME=\"$LH_BACKUP_LOG_BASENAME\"" >> "$LH_BACKUP_CONFIG_FILE"
     lh_log_msg "INFO" "Backup-Konfiguration gespeichert in $LH_BACKUP_CONFIG_FILE"
 }
 # Funktion zum Schreiben in die Log-Datei
 function lh_log_msg() {
     local level="$1"
     local message="$2"
-    local formatted_message="$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message"
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local plain_log_msg="$timestamp - [$level] $message"
+    local color_log_msg=""
 
-    # Ausgabe auf die Konsole und in die Log-Datei, wenn definiert
-    if [ -n "$LH_LOG_FILE" ] && [ -f "$LH_LOG_FILE" ]; then
-        echo "$formatted_message" | tee -a "$LH_LOG_FILE"
+    local color_code=""
+    case "$level" in
+        ERROR) color_code="$LH_COLOR_ERROR" ;;
+        WARN)  color_code="$LH_COLOR_WARNING" ;;
+        INFO)  color_code="$LH_COLOR_INFO" ;;
+        DEBUG) color_code="$LH_COLOR_MAGENTA" ;;
+        *)     color_code="" ;; # No color for unknown levels
+    esac
+
+    if [ -n "$color_code" ]; then
+        # Farbige Nachricht für die Konsole
+        color_log_msg="$timestamp - [${color_code}$level${LH_COLOR_RESET}] $message"
     else
-        echo "$formatted_message"
+        # Unformatierte Nachricht, falls kein spezifisches Level oder keine Farbe definiert
+        color_log_msg="$plain_log_msg"
+    fi
+
+    # Farbige Ausgabe auf die Konsole
+    echo -e "$color_log_msg"
+
+    # Unformatierte Ausgabe in die Log-Datei, wenn definiert
+    if [ -n "$LH_LOG_FILE" ] && [ -f "$LH_LOG_FILE" ]; then
+        echo "$plain_log_msg" >> "$LH_LOG_FILE"
+    elif [ -n "$LH_LOG_FILE" ] && [ ! -d "$(dirname "$LH_LOG_FILE")" ]; then
+        # Fallback, falls Log-Verzeichnis nicht existiert, aber LH_LOG_FILE gesetzt ist
+        echo "Log-Verzeichnis für $LH_LOG_FILE nicht gefunden."
     fi
 }
 
@@ -379,12 +438,13 @@ function lh_confirm_action() {
     local response=""
 
     if [ "$default_choice" = "y" ]; then
-        prompt_suffix="[Y/n]"
+        prompt_suffix="[${LH_COLOR_BOLD_WHITE}Y${LH_COLOR_RESET}/${LH_COLOR_PROMPT}n${LH_COLOR_RESET}]"
     else
-        prompt_suffix="[y/N]"
+        prompt_suffix="[${LH_COLOR_PROMPT}y${LH_COLOR_RESET}/${LH_COLOR_BOLD_WHITE}N${LH_COLOR_RESET}]"
     fi
 
-    read -p "$prompt_message $prompt_suffix: " response
+    read -p "$(echo -e "${LH_COLOR_PROMPT}${prompt_message}${LH_COLOR_RESET} ${prompt_suffix}: ")" response
+
 
     # Wenn keine Eingabe, verwende Standardauswahl
     if [ -z "$response" ]; then
@@ -413,7 +473,7 @@ function lh_ask_for_input() {
     local user_input=""
 
     while true; do
-        read -p "$prompt_message: " user_input
+        read -p "$(echo -e "${LH_COLOR_PROMPT}${prompt_message}${LH_COLOR_RESET}: ")" user_input
 
         # Wenn kein Regex angegeben, akzeptiere jede Eingabe
         if [ -z "$validation_regex" ]; then
@@ -426,7 +486,7 @@ function lh_ask_for_input() {
             echo "$user_input"
             return
         else
-            echo "$error_message"
+            echo -e "${LH_COLOR_ERROR}${error_message}${LH_COLOR_RESET}"
         fi
     done
 }
@@ -575,9 +635,9 @@ function lh_print_header() {
     done
 
     echo ""
-    echo "$dashes"
-    echo "| $title |"
-    echo "$dashes"
+    echo -e "${LH_COLOR_HEADER}${dashes}${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_HEADER}| $title |${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_HEADER}${dashes}${LH_COLOR_RESET}"
     echo ""
 }
 
@@ -588,7 +648,7 @@ function lh_print_menu_item() {
     local number="$1"
     local text="$2"
 
-    printf "  %2d. %s\n" "$number" "$text"
+    printf "  ${LH_COLOR_MENU_NUMBER}%2s.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}%s${LH_COLOR_RESET}\n" "$number" "$text"
 }
 
 # Am Ende der Datei lib_common.sh
@@ -600,5 +660,9 @@ function lh_finalize_initialization() {
     export LH_PKG_MANAGER
     export LH_ALT_PKG_MANAGERS
     # Exportiere auch die Backup-Konfigurationsvariablen, damit sie in Sub-Shells (Modulen) verfügbar sind
-    export LH_BACKUP_ROOT LH_BACKUP_DIR LH_TEMP_SNAPSHOT_DIR LH_TIMESHIFT_BASE_DIR LH_RETENTION_BACKUP LH_BACKUP_LOG
+    export LH_BACKUP_ROOT LH_BACKUP_DIR LH_TEMP_SNAPSHOT_DIR LH_TIMESHIFT_BASE_DIR LH_RETENTION_BACKUP LH_BACKUP_LOG_BASENAME LH_BACKUP_LOG
+    # Exportiere Farbvariablen
+    export LH_COLOR_RESET LH_COLOR_BLACK LH_COLOR_RED LH_COLOR_GREEN LH_COLOR_YELLOW LH_COLOR_BLUE LH_COLOR_MAGENTA LH_COLOR_CYAN LH_COLOR_WHITE
+    export LH_COLOR_BOLD_BLACK LH_COLOR_BOLD_RED LH_COLOR_BOLD_GREEN LH_COLOR_BOLD_YELLOW LH_COLOR_BOLD_BLUE LH_COLOR_BOLD_MAGENTA LH_COLOR_BOLD_CYAN LH_COLOR_BOLD_WHITE
+    export LH_COLOR_HEADER LH_COLOR_MENU_NUMBER LH_COLOR_MENU_TEXT LH_COLOR_PROMPT LH_COLOR_SUCCESS LH_COLOR_ERROR LH_COLOR_WARNING LH_COLOR_INFO LH_COLOR_SEPARATOR
 }

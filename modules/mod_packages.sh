@@ -20,18 +20,17 @@ function pkg_system_update() {
 
     if [ -z "$LH_PKG_MANAGER" ]; then
         lh_log_msg "ERROR" "Kein unterstützter Paketmanager gefunden."
-        echo "Fehler: Kein unterstützter Paketmanager gefunden."
+        echo -e "${LH_COLOR_ERROR}Fehler: Kein unterstützter Paketmanager gefunden.${LH_COLOR_RESET}"
         return 1
     fi
 
-    echo "Es wird die Systemaktualisierung mit $LH_PKG_MANAGER durchgeführt."
+    echo -e "${LH_COLOR_INFO}Es wird die Systemaktualisierung mit $LH_PKG_MANAGER durchgeführt.${LH_COLOR_RESET}"
 
     local auto_confirm=false
     if lh_confirm_action "Soll die Aktualisierung ohne weitere Bestätigung durchgeführt werden?" "n"; then
         auto_confirm=true
     fi
-
-    echo "Beginne mit der Aktualisierung..."
+    echo -e "${LH_COLOR_INFO}Beginne mit der Aktualisierung...${LH_COLOR_RESET}"
 
     case $LH_PKG_MANAGER in
         pacman)
@@ -42,7 +41,7 @@ function pkg_system_update() {
             fi
             ;;
         apt)
-            echo "Aktualisiere Paketquellen..."
+            echo -e "${LH_COLOR_INFO}Aktualisiere Paketquellen...${LH_COLOR_RESET}"
             $LH_SUDO_CMD apt update
 
             if $auto_confirm; then
@@ -67,15 +66,15 @@ function pkg_system_update() {
             ;;
         *)
             lh_log_msg "ERROR" "Unbekannter Paketmanager: $LH_PKG_MANAGER"
-            echo "Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER"
+            echo -e "${LH_COLOR_ERROR}Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER${LH_COLOR_RESET}"
             return 1
             ;;
     esac
 
     local update_status=$?
     if [ $update_status -eq 0 ]; then
-        lh_log_msg "INFO" "Systemaktualisierung erfolgreich abgeschlossen."
-        echo "Systemaktualisierung erfolgreich abgeschlossen."
+        lh_log_msg "INFO" "Systemaktualisierung erfolgreich abgeschlossen." # lh_log_msg handles its own color
+        echo -e "${LH_COLOR_SUCCESS}Systemaktualisierung erfolgreich abgeschlossen.${LH_COLOR_RESET}"
 
         # Schleife durch alle erkannten alternativen Paketmanager
         for alt_manager in "${LH_ALT_PKG_MANAGERS[@]}"; do
@@ -86,7 +85,7 @@ function pkg_system_update() {
         done
     else
         lh_log_msg "ERROR" "Systemaktualisierung fehlgeschlagen mit Fehlercode: $update_status"
-        echo "Fehler: Systemaktualisierung fehlgeschlagen mit Fehlercode: $update_status"
+        echo -e "${LH_COLOR_ERROR}Fehler: Systemaktualisierung fehlgeschlagen mit Fehlercode: $update_status${LH_COLOR_RESET}"
     fi
 
     # Angebot für zusätzliche Operationen nach dem Update
@@ -102,7 +101,7 @@ function pkg_update_alternative() {
 
     case $alt_manager in
         flatpak)
-            echo "Aktualisiere Flatpak-Pakete..."
+            echo -e "${LH_COLOR_INFO}Aktualisiere Flatpak-Pakete...${LH_COLOR_RESET}"
             if [ "$auto_confirm" = "true" ]; then
                 flatpak update -y
             else
@@ -110,27 +109,27 @@ function pkg_update_alternative() {
             fi
             ;;
         snap)
-            echo "Aktualisiere Snap-Pakete..."
+            echo -e "${LH_COLOR_INFO}Aktualisiere Snap-Pakete...${LH_COLOR_RESET}"
             $LH_SUDO_CMD snap refresh
             ;;
         nix)
-            echo "Aktualisiere Nix-Pakete..."
+            echo -e "${LH_COLOR_INFO}Aktualisiere Nix-Pakete...${LH_COLOR_RESET}"
             if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
                 source "$HOME/.nix-profile/etc/profile.d/nix.sh"
             fi
             nix-env -u
             ;;
         appimage)
-            echo "AppImage-Updates müssen manuell durchgeführt werden."
-            echo "Bitte überprüfen Sie Ihre AppImage-Anwendungen:"
+            echo -e "${LH_COLOR_INFO}AppImage-Updates müssen manuell durchgeführt werden.${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Bitte überprüfen Sie Ihre AppImage-Anwendungen:${LH_COLOR_RESET}"
             if [ -d "$HOME/.local/bin" ]; then
                 find "$HOME/.local/bin" -name "*.AppImage" -print
             fi
-            echo "Weitere AppImage-Speicherorte können manuell überprüft werden."
+            echo -e "${LH_COLOR_INFO}Weitere AppImage-Speicherorte können manuell überprüft werden.${LH_COLOR_RESET}"
             ;;
         *)
             lh_log_msg "WARN" "Unbekannter alternativer Paketmanager: $alt_manager"
-            echo "Warnung: Unbekannter alternativer Paketmanager: $alt_manager"
+            echo -e "${LH_COLOR_WARNING}Warnung: Unbekannter alternativer Paketmanager: $alt_manager${LH_COLOR_RESET}"
             ;;
     esac
 }
@@ -141,21 +140,21 @@ function pkg_find_orphans() {
 
     if [ -z "$LH_PKG_MANAGER" ]; then
         lh_log_msg "ERROR" "Kein unterstützter Paketmanager gefunden."
-        echo "Fehler: Kein unterstützter Paketmanager gefunden."
+        echo -e "${LH_COLOR_ERROR}Fehler: Kein unterstützter Paketmanager gefunden.${LH_COLOR_RESET}"
         return 1
     fi
 
-    echo "Suche nach nicht mehr benötigten Paketen..."
+    echo -e "${LH_COLOR_INFO}Suche nach nicht mehr benötigten Paketen...${LH_COLOR_RESET}"
     local orphaned_packages=""
 
     case $LH_PKG_MANAGER in
         pacman)
             orphaned_packages=$(pacman -Qdtq)
             if [ -n "$orphaned_packages" ]; then
-                echo "Folgende Pakete sind Waisenpakete und können entfernt werden:"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Folgende Pakete sind Waisenpakete und können entfernt werden:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 echo "$orphaned_packages"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
                 if lh_confirm_action "Möchten Sie diese Pakete entfernen?" "n"; then
                     $LH_SUDO_CMD pacman -Rns $orphaned_packages
@@ -164,15 +163,15 @@ function pkg_find_orphans() {
                     lh_log_msg "INFO" "Entfernung der Waisenpakete abgebrochen."
                 fi
             else
-                echo "Keine Waisenpakete gefunden."
+                echo -e "${LH_COLOR_INFO}Keine Waisenpakete gefunden.${LH_COLOR_RESET}"
                 lh_log_msg "INFO" "Keine Waisenpakete gefunden."
             fi
             ;;
         apt)
-            echo "Überprüfung nicht mehr benötigter Pakete (apt autoremove):"
-            echo "--------------------------"
+            echo -e "${LH_COLOR_INFO}Überprüfung nicht mehr benötigter Pakete (apt autoremove):${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             $LH_SUDO_CMD apt autoremove --dry-run
-            echo "--------------------------"
+            echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
             if lh_confirm_action "Möchten Sie diese Pakete entfernen?" "n"; then
                 $LH_SUDO_CMD apt autoremove -y
@@ -182,10 +181,10 @@ function pkg_find_orphans() {
             fi
             ;;
         dnf)
-            echo "Überprüfung nicht mehr benötigter Pakete (dnf autoremove):"
-            echo "--------------------------"
+            echo -e "${LH_COLOR_INFO}Überprüfung nicht mehr benötigter Pakete (dnf autoremove):${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             $LH_SUDO_CMD dnf autoremove --assumeno
-            echo "--------------------------"
+            echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
             if lh_confirm_action "Möchten Sie diese Pakete entfernen?" "n"; then
                 $LH_SUDO_CMD dnf autoremove -y
@@ -197,10 +196,10 @@ function pkg_find_orphans() {
         yay)
             orphaned_packages=$(yay -Qtdq)
             if [ -n "$orphaned_packages" ]; then
-                echo "Folgende Pakete sind Waisenpakete und können entfernt werden:"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Folgende Pakete sind Waisenpakete und können entfernt werden:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 echo "$orphaned_packages"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
                 if lh_confirm_action "Möchten Sie diese Pakete entfernen?" "n"; then
                     yay -Rns $orphaned_packages
@@ -209,13 +208,13 @@ function pkg_find_orphans() {
                     lh_log_msg "INFO" "Entfernung der Waisenpakete abgebrochen."
                 fi
             else
-                echo "Keine Waisenpakete gefunden."
+                echo -e "${LH_COLOR_INFO}Keine Waisenpakete gefunden.${LH_COLOR_RESET}"
                 lh_log_msg "INFO" "Keine Waisenpakete gefunden."
             fi
             ;;
         *)
             lh_log_msg "ERROR" "Unbekannter Paketmanager: $LH_PKG_MANAGER"
-            echo "Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER"
+            echo -e "${LH_COLOR_ERROR}Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER${LH_COLOR_RESET}"
             return 1
             ;;
     esac
@@ -239,30 +238,30 @@ function pkg_find_orphans_alternative() {
 
     case $alt_manager in
         flatpak)
-            echo "Suche nach ungenutzten Flatpak-Laufzeitumgebungen..."
+            echo -e "${LH_COLOR_INFO}Suche nach ungenutzten Flatpak-Laufzeitumgebungen...${LH_COLOR_RESET}"
             if flatpak list --columns=application,runtime | grep -q 'runtime'; then
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 flatpak list --columns=application,runtime | grep 'runtime'
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
                 if lh_confirm_action "Möchten Sie ungenutzte Flatpak-Laufzeitumgebungen entfernen?" "n"; then
                     flatpak uninstall --unused -y
                     lh_log_msg "INFO" "Ungenutzte Flatpak-Laufzeitumgebungen wurden entfernt."
                 fi
             else
-                echo "Keine ungenutzten Flatpak-Laufzeitumgebungen gefunden."
+                echo -e "${LH_COLOR_INFO}Keine ungenutzten Flatpak-Laufzeitumgebungen gefunden.${LH_COLOR_RESET}"
             fi
             ;;
         snap)
-            echo "Überprüfe alte Snap-Pakete..."
+            echo -e "${LH_COLOR_INFO}Überprüfe alte Snap-Pakete...${LH_COLOR_RESET}"
             local old_snaps=$(snap list --all | awk '{if($2 != "Revision") print $1}' | sort | uniq -d)
             if [ -n "$old_snaps" ]; then
-                echo "Folgende Snaps haben alte Revisionen, die entfernt werden können:"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Folgende Snaps haben alte Revisionen, die entfernt werden können:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 for snap_name in $old_snaps; do
                     snap list "$snap_name" --all
                 done
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
                 if lh_confirm_action "Möchten Sie alte Snap-Revisionen entfernen?" "n"; then
                     for snap_name in $old_snaps; do
@@ -271,30 +270,30 @@ function pkg_find_orphans_alternative() {
                     lh_log_msg "INFO" "Alte Snap-Revisionen wurden entfernt."
                 fi
             else
-                echo "Keine alten Snap-Revisionen gefunden."
+                echo -e "${LH_COLOR_INFO}Keine alten Snap-Revisionen gefunden.${LH_COLOR_RESET}"
             fi
             ;;
         nix)
-            echo "Garbage Collection für Nix-Pakete..."
+            echo -e "${LH_COLOR_INFO}Garbage Collection für Nix-Pakete...${LH_COLOR_RESET}"
             if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
                 source "$HOME/.nix-profile/etc/profile.d/nix.sh"
             fi
 
             if nix-collect-garbage --dry-run 2>/dev/null | grep -q "will be freed:"; then
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 nix-collect-garbage --dry-run
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
                 if lh_confirm_action "Möchten Sie die Garbage Collection für Nix durchführen?" "n"; then
                     nix-collect-garbage
                     lh_log_msg "INFO" "Nix Garbage Collection durchgeführt."
                 fi
             else
-                echo "Keine nicht mehr benötigten Nix-Pakete gefunden."
+                echo -e "${LH_COLOR_INFO}Keine nicht mehr benötigten Nix-Pakete gefunden.${LH_COLOR_RESET}"
             fi
             ;;
         appimage)
-            echo "AppImages müssen manuell überprüft werden."
+            echo -e "${LH_COLOR_INFO}AppImages müssen manuell überprüft werden.${LH_COLOR_RESET}"
             ;;
         *)
             lh_log_msg "WARN" "Unbekannter alternativer Paketmanager: $alt_manager"
@@ -308,29 +307,29 @@ function pkg_clean_cache() {
 
     if [ -z "$LH_PKG_MANAGER" ]; then
         lh_log_msg "ERROR" "Kein unterstützter Paketmanager gefunden."
-        echo "Fehler: Kein unterstützter Paketmanager gefunden."
+        echo -e "${LH_COLOR_ERROR}Fehler: Kein unterstützter Paketmanager gefunden.${LH_COLOR_RESET}"
         return 1
     fi
 
-    echo "Der Paket-Cache enthält heruntergeladene Pakete, die Speicherplatz belegen."
-    echo "Das Bereinigen ist sicher, kann aber bei erneuter Installation gleicher Pakete zu erneutem Download führen."
+    echo -e "${LH_COLOR_INFO}Der Paket-Cache enthält heruntergeladene Pakete, die Speicherplatz belegen.${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}Das Bereinigen ist sicher, kann aber bei erneuter Installation gleicher Pakete zu erneutem Download führen.${LH_COLOR_RESET}"
 
     if ! lh_confirm_action "Möchten Sie den Paket-Cache bereinigen?" "n"; then
         lh_log_msg "INFO" "Bereinigung des Paket-Caches abgebrochen."
         return 0
     fi
 
-    echo "Bereinige Paket-Cache..."
+    echo -e "${LH_COLOR_INFO}Bereinige Paket-Cache...${LH_COLOR_RESET}"
 
     case $LH_PKG_MANAGER in
         pacman)
             # Bietet verschiedene Optionen zur Cache-Bereinigung
-            echo "Wählen Sie die Bereinigungsoption:"
-            echo "1. Nur nicht installierte Pakete entfernen (behält installierte Versionen)"
-            echo "2. Alle Pakete außer den 3 neuesten Versionen entfernen"
-            echo "3. Alles bereinigen (vollständige Bereinigung)"
+            echo -e "${LH_COLOR_PROMPT}Wählen Sie die Bereinigungsoption:${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Nur nicht installierte Pakete entfernen (behält installierte Versionen)${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Alle Pakete außer den 3 neuesten Versionen entfernen${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Alles bereinigen (vollständige Bereinigung)${LH_COLOR_RESET}"
 
-            read -p "Option (1-3): " clean_option
+            read -p "$(echo -e "${LH_COLOR_PROMPT}Option (1-3): ${LH_COLOR_RESET}")" clean_option
 
             case $clean_option in
                 1)
@@ -340,7 +339,7 @@ function pkg_clean_cache() {
                     if command -v paccache >/dev/null 2>&1; then
                         $LH_SUDO_CMD paccache -r
                     else
-                        echo "paccache nicht gefunden. Installiere pacman-contrib..."
+                        echo -e "${LH_COLOR_INFO}paccache nicht gefunden. Installiere pacman-contrib...${LH_COLOR_RESET}"
                         $LH_SUDO_CMD pacman -S --noconfirm pacman-contrib
                         $LH_SUDO_CMD paccache -r
                     fi
@@ -349,7 +348,7 @@ function pkg_clean_cache() {
                     $LH_SUDO_CMD pacman -Scc
                     ;;
                 *)
-                    echo "Ungültige Option. Verwende Option 1."
+                    echo -e "${LH_COLOR_WARNING}Ungültige Option. Verwende Option 1.${LH_COLOR_RESET}"
                     $LH_SUDO_CMD pacman -Sc
                     ;;
             esac
@@ -363,12 +362,12 @@ function pkg_clean_cache() {
             ;;
         yay)
             # Bietet ähnliche Optionen wie bei pacman
-            echo "Wählen Sie die Bereinigungsoption:"
-            echo "1. Nur nicht installierte Pakete entfernen (behält installierte Versionen)"
-            echo "2. Alles bereinigen (vollständige Bereinigung)"
-            echo "3. AUR-Build-Verzeichnisse bereinigen"
+            echo -e "${LH_COLOR_PROMPT}Wählen Sie die Bereinigungsoption:${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Nur nicht installierte Pakete entfernen (behält installierte Versionen)${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Alles bereinigen (vollständige Bereinigung)${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}AUR-Build-Verzeichnisse bereinigen${LH_COLOR_RESET}"
 
-            read -p "Option (1-3): " clean_option
+            read -p "$(echo -e "${LH_COLOR_PROMPT}Option (1-3): ${LH_COLOR_RESET}")" clean_option
 
             case $clean_option in
                 1)
@@ -381,14 +380,14 @@ function pkg_clean_cache() {
                     yay -Scca
                     ;;
                 *)
-                    echo "Ungültige Option. Verwende Option 1."
+                    echo -e "${LH_COLOR_WARNING}Ungültige Option. Verwende Option 1.${LH_COLOR_RESET}"
                     yay -Sc
                     ;;
             esac
             ;;
         *)
             lh_log_msg "ERROR" "Unbekannter Paketmanager: $LH_PKG_MANAGER"
-            echo "Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER"
+            echo -e "${LH_COLOR_ERROR}Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER${LH_COLOR_RESET}"
             return 1
             ;;
     esac
@@ -401,7 +400,7 @@ function pkg_clean_cache() {
     done
 
     lh_log_msg "INFO" "Paket-Cache wurde bereinigt."
-    echo "Paket-Cache wurde bereinigt."
+    echo -e "${LH_COLOR_SUCCESS}Paket-Cache wurde bereinigt.${LH_COLOR_RESET}"
 }
 
 # Funktion zum Bereinigen des Caches alternativer Paketmanager
@@ -410,7 +409,7 @@ function pkg_clean_cache_alternative() {
 
     case $alt_manager in
         flatpak)
-            echo "Bereinige Flatpak-Cache..."
+            echo -e "${LH_COLOR_INFO}Bereinige Flatpak-Cache...${LH_COLOR_RESET}"
             # Entferne nicht mehr benötigte Dateien
             if command -v flatpak >/dev/null 2>&1; then
                 rm -rf ~/.local/share/flatpak/.ostree/repo/objects/*.*.filez 2>/dev/null
@@ -418,11 +417,11 @@ function pkg_clean_cache_alternative() {
             fi
             ;;
         snap)
-            echo "Snap-Cache wird automatisch von SnapD verwaltet."
-            echo "Für eine tiefgreifende Bereinigung können Sie 'sudo snap set system snapshots.automatic.retention=no' verwenden."
+            echo -e "${LH_COLOR_INFO}Snap-Cache wird automatisch von SnapD verwaltet.${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Für eine tiefgreifende Bereinigung können Sie 'sudo snap set system snapshots.automatic.retention=no' verwenden.${LH_COLOR_RESET}"
             ;;
         nix)
-            echo "Bereinige Nix-Cache..."
+            echo -e "${LH_COLOR_INFO}Bereinige Nix-Cache...${LH_COLOR_RESET}"
             if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
                 source "$HOME/.nix-profile/etc/profile.d/nix.sh"
             fi
@@ -439,7 +438,7 @@ function pkg_clean_cache_alternative() {
             fi
             ;;
         appimage)
-            echo "AppImage-Cache ist minimal und muss nicht bereinigt werden."
+            echo -e "${LH_COLOR_INFO}AppImage-Cache ist minimal und muss nicht bereinigt werden.${LH_COLOR_RESET}"
             ;;
         *)
             lh_log_msg "WARN" "Unbekannter alternativer Paketmanager: $alt_manager"
@@ -453,27 +452,26 @@ function pkg_search_install() {
 
     if [ -z "$LH_PKG_MANAGER" ]; then
         lh_log_msg "ERROR" "Kein unterstützter Paketmanager gefunden."
-        echo "Fehler: Kein unterstützter Paketmanager gefunden."
+        echo -e "${LH_COLOR_ERROR}Fehler: Kein unterstützter Paketmanager gefunden.${LH_COLOR_RESET}"
         return 1
     fi
 
     local package=$(lh_ask_for_input "Geben Sie den Namen oder ein Suchbegriff für das Paket ein")
 
     if [ -z "$package" ]; then
-        echo "Keine Eingabe. Operation abgebrochen."
+        echo -e "${LH_COLOR_INFO}Keine Eingabe. Operation abgebrochen.${LH_COLOR_RESET}"
         return 1
     fi
 
-    echo "Suche nach Paketen mit '$package'..."
+    echo -e "${LH_COLOR_INFO}Suche nach Paketen mit '$package'...${LH_COLOR_RESET}"
 
     case $LH_PKG_MANAGER in
         pacman)
             $LH_SUDO_CMD pacman -Ss "$package"
-
             local install_pkg=$(lh_ask_for_input "Geben Sie den genauen Namen des zu installierenden Pakets ein (oder 'abbrechen')")
 
             if [ "$install_pkg" = "abbrechen" ]; then
-                echo "Installation abgebrochen."
+                echo -e "${LH_COLOR_INFO}Installation abgebrochen.${LH_COLOR_RESET}"
                 return 0
             fi
 
@@ -483,11 +481,10 @@ function pkg_search_install() {
             ;;
         apt)
             $LH_SUDO_CMD apt search "$package"
-
             local install_pkg=$(lh_ask_for_input "Geben Sie den genauen Namen des zu installierenden Pakets ein (oder 'abbrechen')")
 
             if [ "$install_pkg" = "abbrechen" ]; then
-                echo "Installation abgebrochen."
+                echo -e "${LH_COLOR_INFO}Installation abgebrochen.${LH_COLOR_RESET}"
                 return 0
             fi
 
@@ -497,11 +494,10 @@ function pkg_search_install() {
             ;;
         dnf)
             $LH_SUDO_CMD dnf search "$package"
-
             local install_pkg=$(lh_ask_for_input "Geben Sie den genauen Namen des zu installierenden Pakets ein (oder 'abbrechen')")
 
             if [ "$install_pkg" = "abbrechen" ]; then
-                echo "Installation abgebrochen."
+                echo -e "${LH_COLOR_INFO}Installation abgebrochen.${LH_COLOR_RESET}"
                 return 0
             fi
 
@@ -511,11 +507,10 @@ function pkg_search_install() {
             ;;
         yay)
             yay -Ss "$package"
-
             local install_pkg=$(lh_ask_for_input "Geben Sie den genauen Namen des zu installierenden Pakets ein (oder 'abbrechen')")
 
             if [ "$install_pkg" = "abbrechen" ]; then
-                echo "Installation abgebrochen."
+                echo -e "${LH_COLOR_INFO}Installation abgebrochen.${LH_COLOR_RESET}"
                 return 0
             fi
 
@@ -525,7 +520,7 @@ function pkg_search_install() {
             ;;
         *)
             lh_log_msg "ERROR" "Unbekannter Paketmanager: $LH_PKG_MANAGER"
-            echo "Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER"
+            echo -e "${LH_COLOR_ERROR}Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER${LH_COLOR_RESET}"
             return 1
             ;;
     esac
@@ -544,15 +539,15 @@ function pkg_search_install_alternative() {
     local package="$1"
 
     echo ""
-    echo "Verfügbare alternative Paketquellen:"
+    echo -e "${LH_COLOR_INFO}Verfügbare alternative Paketquellen:${LH_COLOR_RESET}"
     local counter=1
     for alt_manager in "${LH_ALT_PKG_MANAGERS[@]}"; do
-        echo "$counter. $alt_manager"
+        echo -e "${LH_COLOR_MENU_NUMBER}$counter.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$alt_manager${LH_COLOR_RESET}"
         ((counter++))
     done
-    echo "0. Zurück"
+    echo -e "${LH_COLOR_MENU_NUMBER}0.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Zurück${LH_COLOR_RESET}"
 
-    read -p "Wählen Sie eine Paketquelle (0-$((${#LH_ALT_PKG_MANAGERS[@]}))): " choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Paketquelle (0-$((${#LH_ALT_PKG_MANAGERS[@]}))): ${LH_COLOR_RESET}")" choice
 
     if [ "$choice" -eq 0 ]; then
         return 0
@@ -563,7 +558,7 @@ function pkg_search_install_alternative() {
 
         case $selected_manager in
             flatpak)
-                echo "Suche in Flatpak nach '$package'..."
+                echo -e "${LH_COLOR_INFO}Suche in Flatpak nach '$package'...${LH_COLOR_RESET}"
                 if flatpak search "$package" | grep -q .; then
                     flatpak search "$package"
 
@@ -575,11 +570,11 @@ function pkg_search_install_alternative() {
                         fi
                     fi
                 else
-                    echo "Keine Flatpak-Pakete für '$package' gefunden."
+                    echo -e "${LH_COLOR_INFO}Keine Flatpak-Pakete für '$package' gefunden.${LH_COLOR_RESET}"
                 fi
                 ;;
             snap)
-                echo "Suche in Snap nach '$package'..."
+                echo -e "${LH_COLOR_INFO}Suche in Snap nach '$package'...${LH_COLOR_RESET}"
                 snap find "$package"
 
                 local install_pkg=$(lh_ask_for_input "Geben Sie den genauen Snap-Namen ein (oder 'abbrechen')")
@@ -591,7 +586,7 @@ function pkg_search_install_alternative() {
                 fi
                 ;;
             nix)
-                echo "Suche in Nix nach '$package'..."
+                echo -e "${LH_COLOR_INFO}Suche in Nix nach '$package'...${LH_COLOR_RESET}"
                 if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
                     source "$HOME/.nix-profile/etc/profile.d/nix.sh"
                 fi
@@ -607,96 +602,94 @@ function pkg_search_install_alternative() {
                 fi
                 ;;
             appimage)
-                echo "Für AppImages empfehlen wir direkte Downloads von den Anbieter-Websites."
-                echo "Ein zentrales Repository wie https://appimage.github.io/apps/ kann hilfreich sein."
+                echo -e "${LH_COLOR_INFO}Für AppImages empfehlen wir direkte Downloads von den Anbieter-Websites.${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}Ein zentrales Repository wie https://appimage.github.io/apps/ kann hilfreich sein.${LH_COLOR_RESET}"
                 ;;
             *)
                 lh_log_msg "WARN" "Unbekannter alternativer Paketmanager: $selected_manager"
                 ;;
         esac
     else
-        echo "Ungültige Auswahl."
+        echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
     fi
 }
 
 # Funktion zum Anzeigen installierter Pakete
 function pkg_list_installed() {
     lh_print_header "Installierte Pakete anzeigen"
-
     if [ -z "$LH_PKG_MANAGER" ]; then
         lh_log_msg "ERROR" "Kein unterstützter Paketmanager gefunden."
-        echo "Fehler: Kein unterstützter Paketmanager gefunden."
+        echo -e "${LH_COLOR_ERROR}Fehler: Kein unterstützter Paketmanager gefunden.${LH_COLOR_RESET}"
         return 1
     fi
 
-    echo "Wie möchten Sie die installierten Pakete anzeigen?"
-    echo "1. Alle installierten Pakete auflisten"
-    echo "2. Nach installierten Paketen suchen"
-    echo "3. Nur kürzlich installierte Pakete anzeigen"
-    echo "4. Installierte Pakete aus alternativen Quellen anzeigen"
-    echo "5. Abbrechen"
+    echo -e "${LH_COLOR_PROMPT}Wie möchten Sie die installierten Pakete anzeigen?${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Alle installierten Pakete auflisten${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Nach installierten Paketen suchen${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Nur kürzlich installierte Pakete anzeigen${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Installierte Pakete aus alternativen Quellen anzeigen${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}5.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Abbrechen${LH_COLOR_RESET}"
 
-    read -p "Option (1-5): " list_option
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Option (1-5): ${LH_COLOR_RESET}")" list_option
 
     case $list_option in
         1)
             case $LH_PKG_MANAGER in
                 pacman)
-                    echo "Alle installierten Pakete:"
+                    echo -e "${LH_COLOR_INFO}Alle installierten Pakete:${LH_COLOR_RESET}"
                     pacman -Q | less
                     ;;
                 apt)
-                    echo "Alle installierten Pakete:"
+                    echo -e "${LH_COLOR_INFO}Alle installierten Pakete:${LH_COLOR_RESET}"
                     dpkg-query -l | less
                     ;;
                 dnf)
-                    echo "Alle installierten Pakete:"
+                    echo -e "${LH_COLOR_INFO}Alle installierten Pakete:${LH_COLOR_RESET}"
                     dnf list installed | less
                     ;;
                 yay)
-                    echo "Alle installierten Pakete (reguläre Repositorien):"
+                    echo -e "${LH_COLOR_INFO}Alle installierten Pakete (reguläre Repositorien):${LH_COLOR_RESET}"
                     pacman -Q | less
 
                     if lh_confirm_action "Möchten Sie auch die AUR-Pakete separat auflisten?" "y"; then
-                        echo "Installierte AUR-Pakete:"
+                        echo -e "${LH_COLOR_INFO}Installierte AUR-Pakete:${LH_COLOR_RESET}"
                         pacman -Qm | less
                     fi
                     ;;
                 *)
                     lh_log_msg "ERROR" "Unbekannter Paketmanager: $LH_PKG_MANAGER"
-                    echo "Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER"
+                    echo -e "${LH_COLOR_ERROR}Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER${LH_COLOR_RESET}"
                     return 1
                     ;;
             esac
             ;;
         2)
             local search_term=$(lh_ask_for_input "Geben Sie einen Suchbegriff ein")
-
             if [ -z "$search_term" ]; then
-                echo "Keine Eingabe. Operation abgebrochen."
+                echo -e "${LH_COLOR_INFO}Keine Eingabe. Operation abgebrochen.${LH_COLOR_RESET}"
                 return 1
             fi
 
             case $LH_PKG_MANAGER in
                 pacman)
-                    echo "Installierte Pakete, die '$search_term' enthalten:"
+                    echo -e "${LH_COLOR_INFO}Installierte Pakete, die '$search_term' enthalten:${LH_COLOR_RESET}"
                     pacman -Q | grep -i "$search_term"
                     ;;
                 apt)
-                    echo "Installierte Pakete, die '$search_term' enthalten:"
+                    echo -e "${LH_COLOR_INFO}Installierte Pakete, die '$search_term' enthalten:${LH_COLOR_RESET}"
                     dpkg-query -l | grep -i "$search_term"
                     ;;
                 dnf)
-                    echo "Installierte Pakete, die '$search_term' enthalten:"
+                    echo -e "${LH_COLOR_INFO}Installierte Pakete, die '$search_term' enthalten:${LH_COLOR_RESET}"
                     dnf list installed | grep -i "$search_term"
                     ;;
                 yay)
-                    echo "Installierte Pakete, die '$search_term' enthalten:"
+                    echo -e "${LH_COLOR_INFO}Installierte Pakete, die '$search_term' enthalten:${LH_COLOR_RESET}"
                     pacman -Q | grep -i "$search_term"
                     ;;
                 *)
                     lh_log_msg "ERROR" "Unbekannter Paketmanager: $LH_PKG_MANAGER"
-                    echo "Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER"
+                    echo -e "${LH_COLOR_ERROR}Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER${LH_COLOR_RESET}"
                     return 1
                     ;;
             esac
@@ -705,12 +698,12 @@ function pkg_list_installed() {
             case $LH_PKG_MANAGER in
                 pacman)
                     if command -v expac >/dev/null 2>&1; then
-                        echo "Kürzlich installierte Pakete (letzte 20):"
+                        echo -e "${LH_COLOR_INFO}Kürzlich installierte Pakete (letzte 20):${LH_COLOR_RESET}"
                         expac --timefmt='%Y-%m-%d %T' '%l\t%n' | sort -r | head -n 20
                     else
-                        echo "expac ist nicht installiert. Installiere jetzt..."
+                        echo -e "${LH_COLOR_INFO}expac ist nicht installiert. Installiere jetzt...${LH_COLOR_RESET}"
                         $LH_SUDO_CMD pacman -S --noconfirm expac
-                        echo "Kürzlich installierte Pakete (letzte 20):"
+                        echo -e "${LH_COLOR_INFO}Kürzlich installierte Pakete (letzte 20):${LH_COLOR_RESET}"
                         expac --timefmt='%Y-%m-%d %T' '%l\t%n' | sort -r | head -n 20
                     fi
                     ;;
@@ -719,23 +712,23 @@ function pkg_list_installed() {
                     grep " install " /var/log/dpkg.log | tail -n 20
                     ;;
                 dnf)
-                    echo "Kürzlich installierte Pakete:"
+                    echo -e "${LH_COLOR_INFO}Kürzlich installierte Pakete:${LH_COLOR_RESET}"
                     dnf history | head -n 20
                     ;;
                 yay)
                     if command -v expac >/dev/null 2>&1; then
-                        echo "Kürzlich installierte Pakete (letzte 20):"
+                        echo -e "${LH_COLOR_INFO}Kürzlich installierte Pakete (letzte 20):${LH_COLOR_RESET}"
                         expac --timefmt='%Y-%m-%d %T' '%l\t%n' | sort -r | head -n 20
                     else
-                        echo "expac ist nicht installiert. Installiere jetzt..."
+                        echo -e "${LH_COLOR_INFO}expac ist nicht installiert. Installiere jetzt...${LH_COLOR_RESET}"
                         $LH_SUDO_CMD pacman -S --noconfirm expac
-                        echo "Kürzlich installierte Pakete (letzte 20):"
+                        echo -e "${LH_COLOR_INFO}Kürzlich installierte Pakete (letzte 20):${LH_COLOR_RESET}"
                         expac --timefmt='%Y-%m-%d %T' '%l\t%n' | sort -r | head -n 20
                     fi
                     ;;
                 *)
                     lh_log_msg "ERROR" "Unbekannter Paketmanager: $LH_PKG_MANAGER"
-                    echo "Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER"
+                    echo -e "${LH_COLOR_ERROR}Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER${LH_COLOR_RESET}"
                     return 1
                     ;;
             esac
@@ -744,11 +737,11 @@ function pkg_list_installed() {
             pkg_list_installed_alternative
             ;;
         5)
-            echo "Operation abgebrochen."
+            echo -e "${LH_COLOR_INFO}Operation abgebrochen.${LH_COLOR_RESET}"
             return 0
             ;;
         *)
-            echo "Ungültige Option. Operation abgebrochen."
+            echo -e "${LH_COLOR_ERROR}Ungültige Option. Operation abgebrochen.${LH_COLOR_RESET}"
             return 1
             ;;
     esac
@@ -757,20 +750,20 @@ function pkg_list_installed() {
 # Funktion zum Anzeigen installierter Pakete aus alternativen Quellen
 function pkg_list_installed_alternative() {
     if [ ${#LH_ALT_PKG_MANAGERS[@]} -eq 0 ]; then
-        echo "Keine alternativen Paketmanager gefunden."
+        echo -e "${LH_COLOR_INFO}Keine alternativen Paketmanager gefunden.${LH_COLOR_RESET}"
         return 0
     fi
 
     echo ""
-    echo "Verfügbare alternative Paketquellen:"
+    echo -e "${LH_COLOR_INFO}Verfügbare alternative Paketquellen:${LH_COLOR_RESET}"
     local counter=1
     for alt_manager in "${LH_ALT_PKG_MANAGERS[@]}"; do
-        echo "$counter. $alt_manager"
+        echo -e "${LH_COLOR_MENU_NUMBER}$counter.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$alt_manager${LH_COLOR_RESET}"
         ((counter++))
     done
-    echo "0. Zurück"
+    echo -e "${LH_COLOR_MENU_NUMBER}0.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Zurück${LH_COLOR_RESET}"
 
-    read -p "Wählen Sie eine Paketquelle (0-$((${#LH_ALT_PKG_MANAGERS[@]}))): " choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Paketquelle (0-$((${#LH_ALT_PKG_MANAGERS[@]}))): ${LH_COLOR_RESET}")" choice
 
     if [ "$choice" -eq 0 ]; then
         return 0
@@ -782,72 +775,71 @@ function pkg_list_installed_alternative() {
         echo ""
         case $selected_manager in
             flatpak)
-                echo "Installierte Flatpak-Anwendungen:"
-                echo "--------------------------------"
+                echo -e "${LH_COLOR_INFO}Installierte Flatpak-Anwendungen:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------------${LH_COLOR_RESET}"
                 flatpak list --app | less
                 echo ""
-                echo "Installierte Flatpak-Laufzeiten:"
-                echo "--------------------------------"
+                echo -e "${LH_COLOR_INFO}Installierte Flatpak-Laufzeiten:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------------${LH_COLOR_RESET}"
                 flatpak list --runtime | less
                 ;;
             snap)
-                echo "Installierte Snap-Pakete:"
-                echo "------------------------"
+                echo -e "${LH_COLOR_INFO}Installierte Snap-Pakete:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}------------------------${LH_COLOR_RESET}"
                 snap list | less
                 ;;
             nix)
-                echo "Installierte Nix-Pakete:"
-                echo "-----------------------"
+                echo -e "${LH_COLOR_INFO}Installierte Nix-Pakete:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}-----------------------${LH_COLOR_RESET}"
                 if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
                     source "$HOME/.nix-profile/etc/profile.d/nix.sh"
                 fi
                 nix-env -q | less
                 ;;
             appimage)
-                echo "Gefundene AppImages:"
-                echo "-------------------"
+                echo -e "${LH_COLOR_INFO}Gefundene AppImages:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}-------------------${LH_COLOR_RESET}"
                 if [ -d "$HOME/.local/bin" ]; then
                     find "$HOME/.local/bin" -name "*.AppImage" -printf '%p\t%TY-%Tm-%Td %TH:%TM\n' | sort
                 fi
                 echo ""
-                echo "Hinweis: Es können AppImages an anderen Orten installiert sein."
+                echo -e "${LH_COLOR_INFO}Hinweis: Es können AppImages an anderen Orten installiert sein.${LH_COLOR_RESET}"
                 ;;
             *)
                 lh_log_msg "WARN" "Unbekannter alternativer Paketmanager: $selected_manager"
                 ;;
         esac
     else
-        echo "Ungültige Auswahl."
+        echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
     fi
 }
 
 # Funktion zum Anzeigen des Paketmanager-Logs
 function pkg_show_logs() {
     lh_print_header "Paketmanager-Logs anzeigen"
-
     if [ -z "$LH_PKG_MANAGER" ]; then
         lh_log_msg "ERROR" "Kein unterstützter Paketmanager gefunden."
-        echo "Fehler: Kein unterstützter Paketmanager gefunden."
+        echo -e "${LH_COLOR_ERROR}Fehler: Kein unterstützter Paketmanager gefunden.${LH_COLOR_RESET}"
         return 1
     fi
 
     case $LH_PKG_MANAGER in
         pacman)
             if [ -f /var/log/pacman.log ]; then
-                echo "Letzte 50 Einträge des pacman-Logs:"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Letzte 50 Einträge des pacman-Logs:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 tail -n 50 /var/log/pacman.log
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
                 if lh_confirm_action "Möchten Sie nach einem bestimmten Paket im Log suchen?" "n"; then
                     local package=$(lh_ask_for_input "Geben Sie den Namen des Pakets ein")
-                    echo "Einträge für $package:"
-                    echo "--------------------------"
+                    echo -e "${LH_COLOR_INFO}Einträge für $package:${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                     grep "$package" /var/log/pacman.log | tail -n 50
-                    echo "--------------------------"
+                    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 fi
             else
-                echo "Die Logdatei /var/log/pacman.log wurde nicht gefunden."
+                echo -e "${LH_COLOR_WARNING}Die Logdatei /var/log/pacman.log wurde nicht gefunden.${LH_COLOR_RESET}"
             fi
             ;;
         apt)
@@ -863,82 +855,82 @@ function pkg_show_logs() {
             fi
 
             if [ ${#apt_logs[@]} -eq 0 ]; then
-                echo "Keine apt/dpkg-Logs gefunden."
+                echo -e "${LH_COLOR_WARNING}Keine apt/dpkg-Logs gefunden.${LH_COLOR_RESET}"
                 return 1
             fi
 
-            echo "Verfügbare Logs:"
+            echo -e "${LH_COLOR_INFO}Verfügbare Logs:${LH_COLOR_RESET}"
             for ((i=0; i<${#apt_logs[@]}; i++)); do
-                echo "$((i+1)). ${apt_logs[$i]}"
+                echo -e "${LH_COLOR_MENU_NUMBER}$((i+1)).${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}${apt_logs[$i]}${LH_COLOR_RESET}"
             done
 
-            read -p "Wählen Sie ein Log (1-${#apt_logs[@]}): " log_choice
+            read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie ein Log (1-${#apt_logs[@]}): ${LH_COLOR_RESET}")" log_choice
 
             if ! [[ "$log_choice" =~ ^[0-9]+$ ]] || [ "$log_choice" -lt 1 ] || [ "$log_choice" -gt ${#apt_logs[@]} ]; then
-                echo "Ungültige Auswahl."
+                echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
                 return 1
             fi
 
             local selected_log="${apt_logs[$((log_choice-1))]}"
-            echo "Letzte 50 Einträge von $selected_log:"
-            echo "--------------------------"
+            echo -e "${LH_COLOR_INFO}Letzte 50 Einträge von $selected_log:${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             tail -n 50 "$selected_log"
-            echo "--------------------------"
+            echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
             if lh_confirm_action "Möchten Sie nach einem bestimmten Paket im Log suchen?" "n"; then
                 local package=$(lh_ask_for_input "Geben Sie den Namen des Pakets ein")
-                echo "Einträge für $package:"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Einträge für $package:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 grep "$package" "$selected_log" | tail -n 50
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             fi
             ;;
         dnf)
             if [ -d /var/log/dnf ]; then
-                echo "DNF-Logdateien:"
+                echo -e "${LH_COLOR_INFO}DNF-Logdateien:${LH_COLOR_RESET}"
                 ls -la /var/log/dnf/
 
                 if lh_confirm_action "Möchten Sie die neueste Logdatei anzeigen?" "y"; then
                     local newest_log=$(ls -t /var/log/dnf/dnf.log* | head -n 1)
-                    echo "Letzte 50 Einträge von $newest_log:"
-                    echo "--------------------------"
+                    echo -e "${LH_COLOR_INFO}Letzte 50 Einträge von $newest_log:${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                     tail -n 50 "$newest_log"
-                    echo "--------------------------"
+                    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 fi
 
                 if lh_confirm_action "Möchten Sie nach einem bestimmten Paket im Log suchen?" "n"; then
                     local package=$(lh_ask_for_input "Geben Sie den Namen des Pakets ein")
-                    echo "Einträge für $package:"
-                    echo "--------------------------"
+                    echo -e "${LH_COLOR_INFO}Einträge für $package:${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                     grep "$package" /var/log/dnf/dnf.log* | tail -n 50
-                    echo "--------------------------"
+                    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 fi
             else
-                echo "Keine DNF-Logs gefunden in /var/log/dnf."
+                echo -e "${LH_COLOR_WARNING}Keine DNF-Logs gefunden in /var/log/dnf.${LH_COLOR_RESET}"
             fi
             ;;
         yay)
             # yay verwendet auch pacman.log für reguläre Pakete
             if [ -f /var/log/pacman.log ]; then
-                echo "Letzte 50 Einträge des pacman-Logs:"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Letzte 50 Einträge des pacman-Logs:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 tail -n 50 /var/log/pacman.log
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
                 if lh_confirm_action "Möchten Sie nach einem bestimmten Paket im Log suchen?" "n"; then
                     local package=$(lh_ask_for_input "Geben Sie den Namen des Pakets ein")
-                    echo "Einträge für $package:"
-                    echo "--------------------------"
+                    echo -e "${LH_COLOR_INFO}Einträge für $package:${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                     grep "$package" /var/log/pacman.log | tail -n 50
-                    echo "--------------------------"
+                    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 fi
             else
-                echo "Die Logdatei /var/log/pacman.log wurde nicht gefunden."
+                echo -e "${LH_COLOR_WARNING}Die Logdatei /var/log/pacman.log wurde nicht gefunden.${LH_COLOR_RESET}"
             fi
             ;;
         *)
             lh_log_msg "ERROR" "Unbekannter Paketmanager: $LH_PKG_MANAGER"
-            echo "Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER"
+            echo -e "${LH_COLOR_ERROR}Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER${LH_COLOR_RESET}"
             return 1
             ;;
     esac
@@ -955,15 +947,15 @@ function pkg_show_logs() {
 # Funktion zum Anzeigen von Logs alternativer Paketmanager
 function pkg_show_logs_alternative() {
     echo ""
-    echo "Verfügbare alternative Paketquellen:"
+    echo -e "${LH_COLOR_INFO}Verfügbare alternative Paketquellen:${LH_COLOR_RESET}"
     local counter=1
     for alt_manager in "${LH_ALT_PKG_MANAGERS[@]}"; do
-        echo "$counter. $alt_manager"
+        echo -e "${LH_COLOR_MENU_NUMBER}$counter.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$alt_manager${LH_COLOR_RESET}"
         ((counter++))
     done
-    echo "0. Zurück"
+    echo -e "${LH_COLOR_MENU_NUMBER}0.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Zurück${LH_COLOR_RESET}"
 
-    read -p "Wählen Sie eine Paketquelle (0-$((${#LH_ALT_PKG_MANAGERS[@]}))): " choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Paketquelle (0-$((${#LH_ALT_PKG_MANAGERS[@]}))): ${LH_COLOR_RESET}")" choice
 
     if [ "$choice" -eq 0 ]; then
         return 0
@@ -975,73 +967,73 @@ function pkg_show_logs_alternative() {
         echo ""
         case $selected_manager in
             flatpak)
-                echo "Flatpak Aktivitätslogs:"
-                echo "----------------------"
+                echo -e "${LH_COLOR_INFO}Flatpak Aktivitätslogs:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}----------------------${LH_COLOR_RESET}"
                 if journalctl --no-pager -u flatpak-system-helper 2>/dev/null | grep -q .; then
                     journalctl --no-pager -u flatpak-system-helper -n 50
                 else
-                    echo "Keine systemweiten Flatpak-Logs verfügbar."
+                    echo -e "${LH_COLOR_INFO}Keine systemweiten Flatpak-Logs verfügbar.${LH_COLOR_RESET}"
                 fi
                 echo ""
-                echo "Letzte Flatpak-Befehle:"
+                echo -e "${LH_COLOR_INFO}Letzte Flatpak-Befehle:${LH_COLOR_RESET}"
                 if [ -f "$HOME/.var/app/*/data/flatpak/.local/state/flatpak/history" ]; then
                     find "$HOME/.var/app" -name "*history*" | while read -r history_file; do
                         if [ -f "$history_file" ]; then
-                            echo "Historie aus $history_file:"
+                            echo -e "${LH_COLOR_INFO}Historie aus $history_file:${LH_COLOR_RESET}"
                             tail -n 10 "$history_file"
                         fi
                     done
                 fi
                 ;;
             snap)
-                echo "Snap-Logs:"
-                echo "---------"
+                echo -e "${LH_COLOR_INFO}Snap-Logs:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}---------${LH_COLOR_RESET}"
                 if journalctl --no-pager -u snapd 2>/dev/null | grep -q .; then
                     journalctl --no-pager -u snapd -n 50
                 else
-                    echo "Keine Snap-Logs via journalctl verfügbar."
+                    echo -e "${LH_COLOR_INFO}Keine Snap-Logs via journalctl verfügbar.${LH_COLOR_RESET}"
                 fi
                 echo ""
                 # Snap-spezifische Logs
                 if [ -d /var/log/snappy ]; then
-                    echo "Snap-System-Logs:"
+                    echo -e "${LH_COLOR_INFO}Snap-System-Logs:${LH_COLOR_RESET}"
                     ls -la /var/log/snappy/
                 fi
                 ;;
             nix)
-                echo "Nix Aktivitätslogs:"
-                echo "------------------"
+                echo -e "${LH_COLOR_INFO}Nix Aktivitätslogs:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}------------------${LH_COLOR_RESET}"
                 # Nix-Daemon Logs
                 if journalctl --no-pager -u nix-daemon 2>/dev/null | grep -q .; then
                     journalctl --no-pager -u nix-daemon -n 50
                 else
-                    echo "Keine Nix-Daemon-Logs verfügbar."
+                    echo -e "${LH_COLOR_INFO}Keine Nix-Daemon-Logs verfügbar.${LH_COLOR_RESET}"
                 fi
                 echo ""
                 # Benutzer-spezifische Nix-Logs
                 if [ -d "$HOME/.nix-defexpr/channels" ]; then
-                    echo "Nix-Channel-Geschichte:"
+                    echo -e "${LH_COLOR_INFO}Nix-Channel-Geschichte:${LH_COLOR_RESET}"
                     find "$HOME/.nix-defexpr" -name "*generation*" | while read -r gen_file; do
                         if [ -f "$gen_file" ]; then
-                            echo "Generation: $gen_file"
+                            echo -e "${LH_COLOR_INFO}Generation: $gen_file${LH_COLOR_RESET}"
                             cat "$gen_file"
                         fi
                     done
                 fi
                 ;;
             appimage)
-                echo "AppImages haben keine zentralen Logs."
-                echo "Überprüfen Sie individuelle Anwendungslogs in:"
-                echo "  - ~/.local/share/applications/"
-                echo "  - ~/.cache/"
-                echo "  - Anwendungsspezifische Verzeichnisse"
+                echo -e "${LH_COLOR_INFO}AppImages haben keine zentralen Logs.${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}Überprüfen Sie individuelle Anwendungslogs in:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}  - ~/.local/share/applications/${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}  - ~/.cache/${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}  - Anwendungsspezifische Verzeichnisse${LH_COLOR_RESET}"
                 ;;
             *)
                 lh_log_msg "WARN" "Unbekannter alternativer Paketmanager: $selected_manager"
                 ;;
         esac
     else
-        echo "Ungültige Auswahl."
+        echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
     fi
 }
 
@@ -1071,12 +1063,12 @@ function package_management_menu() {
 
         # Zeige erkannte alternative Paketmanager
         if [ ${#LH_ALT_PKG_MANAGERS[@]} -gt 0 ]; then
-            echo "Erkannte alternative Paketquellen: ${LH_ALT_PKG_MANAGERS[*]}"
+            echo -e "${LH_COLOR_INFO}Erkannte alternative Paketquellen: ${LH_ALT_PKG_MANAGERS[*]}${LH_COLOR_RESET}"
             echo ""
         fi
 
-        read -p "Wählen Sie eine Option: " option
-
+        read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option: ${LH_COLOR_RESET}")" option
+        
         case $option in
             1)
                 pkg_system_update
@@ -1102,13 +1094,13 @@ function package_management_menu() {
                 ;;
             *)
                 lh_log_msg "WARN" "Ungültige Auswahl: $option"
-                echo "Ungültige Auswahl. Bitte versuchen Sie es erneut."
+                echo -e "${LH_COLOR_ERROR}Ungültige Auswahl. Bitte versuchen Sie es erneut.${LH_COLOR_RESET}"
                 ;;
         esac
 
         # Kurze Pause, damit Benutzer die Ausgabe lesen kann
         echo ""
-        read -p "Drücken Sie eine Taste, um fortzufahren..." -n1 -s
+        read -p "$(echo -e "${LH_COLOR_INFO}Drücken Sie eine Taste, um fortzufahren...${LH_COLOR_RESET}")" -n1 -s
         echo ""
     done
 }

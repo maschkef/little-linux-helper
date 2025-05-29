@@ -75,8 +75,8 @@ function restart_login_manager_action() {
     local DM_NAME=${DM_SERVICE%.service}
 
     # Warnung und Bestätigung vor dem Neustart
-    echo "WARNUNG: Der Neustart des Login-Managers beendet alle laufenden Benutzersitzungen!"
-    echo "Stellen Sie sicher, dass Sie alle wichtigen Daten gespeichert haben."
+    echo -e "${LH_COLOR_WARNING}WARNUNG: Der Neustart des Login-Managers beendet alle laufenden Benutzersitzungen!${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_WARNING}Stellen Sie sicher, dass Sie alle wichtigen Daten gespeichert haben.${LH_COLOR_RESET}"
 
     if ! lh_confirm_action "Möchten Sie den Login-Manager ($DM_NAME) wirklich neu starten?" "n"; then
         lh_log_msg "INFO" "Neustart des Login-Managers abgebrochen."
@@ -168,14 +168,14 @@ function restart_sound_system_action() {
     fi
 
     echo "Erkannte Audio-Komponenten:"
-    if $has_pipewire; then echo "- PipeWire"; fi
-    if $has_pulseaudio; then echo "- PulseAudio"; fi
-    if $has_alsa; then echo "- ALSA"; fi
+    if $has_pipewire; then echo -e "${LH_COLOR_INFO}- PipeWire${LH_COLOR_RESET}"; fi
+    if $has_pulseaudio; then echo -e "${LH_COLOR_INFO}- PulseAudio${LH_COLOR_RESET}"; fi
+    if $has_alsa; then echo -e "${LH_COLOR_INFO}- ALSA${LH_COLOR_RESET}"; fi
 
     # PipeWire (bevorzugt, da es oft PulseAudio als Kompatibilitätsschicht mitbringt)
     if $has_pipewire; then
         lh_log_msg "INFO" "Starte PipeWire-Dienste neu..."
-        echo "Starte PipeWire-Dienste neu..."
+        echo -e "${LH_COLOR_INFO}Starte PipeWire-Dienste neu...${LH_COLOR_RESET}"
 
         local standard_services="pipewire.service pipewire-pulse.service wireplumber.service"
         local pipewire_services=""
@@ -229,11 +229,11 @@ function restart_sound_system_action() {
 
         if ! $restart_failed; then
             lh_log_msg "INFO" "PipeWire-Dienste wurden erfolgreich neu gestartet."
-            echo "PipeWire-Dienste wurden erfolgreich neu gestartet."
+            echo -e "${LH_COLOR_SUCCESS}PipeWire-Dienste wurden erfolgreich neu gestartet.${LH_COLOR_RESET}"
             sound_restarted=true
         else
             lh_log_msg "WARN" "Fehler beim Neustart der PipeWire-Dienste via systemctl. Versuche manuellen Neustart..."
-            echo "Fehler beim Neustart über systemd. Versuche alternativen Neustart..."
+            echo -e "${LH_COLOR_ERROR}Fehler beim Neustart über systemd. Versuche alternativen Neustart...${LH_COLOR_RESET}"
 
             # Prozesse beenden (ignoriere Fehler mit || true)
             lh_run_command_as_target_user "pkill -e pipewire || true" 2>/dev/null
@@ -253,7 +253,7 @@ function restart_sound_system_action() {
 
             if $manual_restart_success; then
                 lh_log_msg "INFO" "PipeWire erfolgreich manuell neu gestartet."
-                echo "PipeWire wurde manuell neu gestartet."
+                echo -e "${LH_COLOR_SUCCESS}PipeWire wurde manuell neu gestartet.${LH_COLOR_RESET}"
                 sound_restarted=true
             else
                 # Dritter Versuch: direkter Start der Programme
@@ -267,15 +267,15 @@ function restart_sound_system_action() {
                     sleep 2
                     if lh_run_command_as_target_user "pgrep -x pipewire >/dev/null 2>&1"; then
                         lh_log_msg "INFO" "PipeWire-Programme erfolgreich manuell gestartet."
-                        echo "PipeWire wurde mit direktem Aufruf neu gestartet."
+                        echo -e "${LH_COLOR_SUCCESS}PipeWire wurde mit direktem Aufruf neu gestartet.${LH_COLOR_RESET}"
                         sound_restarted=true
                     else
                         lh_log_msg "ERROR" "Konnte PipeWire nicht manuell neu starten."
-                        echo "Fehler: Konnte PipeWire nicht manuell neu starten."
+                        echo -e "${LH_COLOR_ERROR}Fehler: Konnte PipeWire nicht manuell neu starten.${LH_COLOR_RESET}"
                     fi
                 else
                     lh_log_msg "ERROR" "Konnte PipeWire-Programme nicht starten."
-                    echo "Fehler: Konnte PipeWire-Programme nicht starten."
+                    echo -e "${LH_COLOR_ERROR}Fehler: Konnte PipeWire-Programme nicht starten.${LH_COLOR_RESET}"
                 fi
             fi
         fi
@@ -284,25 +284,25 @@ function restart_sound_system_action() {
     # PulseAudio (falls PipeWire nicht aktiv ist)
     if ! $sound_restarted && $has_pulseaudio; then
         lh_log_msg "INFO" "Starte PulseAudio neu..."
-        echo "Starte PulseAudio neu..."
+        echo -e "${LH_COLOR_INFO}Starte PulseAudio neu...${LH_COLOR_RESET}"
 
         # Trennen von 'und'-Befehlen für bessere Fehlerbehandlung
         lh_run_command_as_target_user "pulseaudio -k" >/dev/null 2>&1
         sleep 2
         if lh_run_command_as_target_user "pulseaudio --start" >/dev/null 2>&1; then
             lh_log_msg "INFO" "PulseAudio wurde erfolgreich neu gestartet."
-            echo "PulseAudio wurde erfolgreich neu gestartet."
+            echo -e "${LH_COLOR_SUCCESS}PulseAudio wurde erfolgreich neu gestartet.${LH_COLOR_RESET}"
             sound_restarted=true
         else
             lh_log_msg "ERROR" "Fehler beim Neustart von PulseAudio."
-            echo "Fehler: Konnte PulseAudio nicht neu starten."
+            echo -e "${LH_COLOR_ERROR}Fehler: Konnte PulseAudio nicht neu starten.${LH_COLOR_RESET}"
         fi
     fi
 
     # ALSA (falls nötig oder als letzte Instanz)
     if (! $sound_restarted || $has_pipewire || $has_pulseaudio) && $has_alsa; then
         lh_log_msg "INFO" "Lade ALSA-Einstellungen neu..."
-        echo "Lade ALSA-Einstellungen neu..."
+        echo -e "${LH_COLOR_INFO}Lade ALSA-Einstellungen neu...${LH_COLOR_RESET}"
 
         local alsa_success=false
 
@@ -313,15 +313,15 @@ function restart_sound_system_action() {
             # ALSA-Dienste neu starten
             if $LH_SUDO_CMD systemctl try-restart alsa-restore.service alsa-state.service >/dev/null 2>&1; then
                 lh_log_msg "INFO" "ALSA-Dienste (via systemctl) neu gestartet."
-                echo "ALSA-Dienste wurden neu gestartet."
+                echo -e "${LH_COLOR_SUCCESS}ALSA-Dienste wurden neu gestartet.${LH_COLOR_RESET}"
             elif command -v amixer >/dev/null; then
                 # Master-Kanal umschalten als Reset-Methode
                 lh_run_command_as_target_user "amixer -q set Master toggle && sleep 1 && amixer -q set Master toggle" >/dev/null 2>&1
                 lh_log_msg "INFO" "ALSA-Mixer zurückgesetzt."
-                echo "ALSA-Mixer wurde zurückgesetzt."
+                echo -e "${LH_COLOR_SUCCESS}ALSA-Mixer wurde zurückgesetzt.${LH_COLOR_RESET}"
             else
                 lh_log_msg "INFO" "ALSA-Einstellungen wiederhergestellt."
-                echo "ALSA-Einstellungen wurden wiederhergestellt."
+                echo -e "${LH_COLOR_SUCCESS}ALSA-Einstellungen wurden wiederhergestellt.${LH_COLOR_RESET}"
             fi
         else
             lh_log_msg "WARN" "Fehler beim Wiederherstellen der ALSA-Einstellungen."
@@ -329,7 +329,7 @@ function restart_sound_system_action() {
             # Trotzdem versuchen, die Dienste neu zu starten
             if $LH_SUDO_CMD systemctl try-restart alsa-restore.service alsa-state.service >/dev/null 2>&1; then
                 lh_log_msg "INFO" "ALSA-Dienste wurden dennoch neu gestartet."
-                echo "ALSA-Dienste wurden neu gestartet."
+                echo -e "${LH_COLOR_SUCCESS}ALSA-Dienste wurden neu gestartet.${LH_COLOR_RESET}"
                 alsa_success=true
             fi
         fi
@@ -343,11 +343,11 @@ function restart_sound_system_action() {
     # Überprüfen, ob irgendein Sound-System neu gestartet wurde
     if ! $sound_restarted; then
         lh_log_msg "ERROR" "Kein bekanntes und aktives Sound-System konnte neu gestartet werden."
-        echo "Fehler: Es konnte kein aktives Sound-System gefunden oder neu gestartet werden."
+        echo -e "${LH_COLOR_ERROR}Fehler: Es konnte kein aktives Sound-System gefunden oder neu gestartet werden.${LH_COLOR_RESET}"
         return 1
     else
         lh_log_msg "INFO" "Sound-System wurde neu gestartet."
-        echo "Sound-System wurde erfolgreich neu gestartet."
+        echo -e "${LH_COLOR_SUCCESS}Sound-System wurde erfolgreich neu gestartet.${LH_COLOR_RESET}"
         return 0
     fi
 }
@@ -360,7 +360,7 @@ function restart_desktop_environment_action() {
     lh_get_target_user_info
     if [ $? -ne 0 ]; then
         lh_log_msg "ERROR" "Konnte keinen Desktop-Benutzer ermitteln. Abbruch."
-        echo "Fehler: Konnte keinen Desktop-Benutzer ermitteln. Der Neustart ist nicht möglich."
+        echo -e "${LH_COLOR_ERROR}Fehler: Konnte keinen Desktop-Benutzer ermitteln. Der Neustart ist nicht möglich.${LH_COLOR_RESET}"
         return 1
     fi
 
@@ -407,24 +407,23 @@ function restart_desktop_environment_action() {
 
     if [ -z "$DESKTOP_ENVIRONMENT" ]; then
         lh_log_msg "ERROR" "Desktop-Umgebung konnte nicht ermittelt werden."
-        echo "Fehler: Desktop-Umgebung konnte nicht ermittelt werden."
+        echo -e "${LH_COLOR_ERROR}Fehler: Desktop-Umgebung konnte nicht ermittelt werden.${LH_COLOR_RESET}"
         return 1
     fi
 
     # Warnung und Bestätigung vor dem Neustart
-    echo "WARNUNG: Der Neustart der Desktop-Umgebung ($DESKTOP_ENVIRONMENT) kann laufende Anwendungen beeinträchtigen!"
-    echo "Es wird empfohlen, alle wichtigen Daten vor dem Neustart zu speichern."
+    echo -e "${LH_COLOR_WARNING}WARNUNG: Der Neustart der Desktop-Umgebung ($DESKTOP_ENVIRONMENT) kann laufende Anwendungen beeinträchtigen!${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_WARNING}Es wird empfohlen, alle wichtigen Daten vor dem Neustart zu speichern.${LH_COLOR_RESET}"
 
     if ! lh_confirm_action "Möchten Sie die Desktop-Umgebung ($DESKTOP_ENVIRONMENT) wirklich neu starten?" "n"; then
         lh_log_msg "INFO" "Neustart der Desktop-Umgebung abgebrochen."
         return 0
     fi
 
-    # Option für Neustart-Typ wählen
-    echo "Wählen Sie den Neustart-Typ:"
-    echo "1. Sanfter Neustart (versucht, Anwendungen nicht zu beenden)"
-    echo "2. Harter Neustart (beendet ggf. Desktop-Komponenten erzwungen)"
-    read -p "Wählen Sie eine Option (1-2): " restart_type
+    echo -e "${LH_COLOR_PROMPT}Wählen Sie den Neustart-Typ:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Sanfter Neustart (versucht, Anwendungen nicht zu beenden)${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Harter Neustart (beendet ggf. Desktop-Komponenten erzwungen)${LH_COLOR_RESET}"
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option (1-2): ${LH_COLOR_RESET}")" restart_type
 
     case $DESKTOP_ENVIRONMENT in
         kde|plasma)
@@ -525,7 +524,7 @@ function restart_desktop_environment_action() {
 
             if ! $plasmashell_restarted; then
                  lh_log_msg "ERROR" "KDE Plasma konnte nicht zuverlässig neu gestartet werden."
-                 echo "Fehler: KDE Plasma konnte nicht neu gestartet werden."
+                 echo -e "${LH_COLOR_ERROR}Fehler: KDE Plasma konnte nicht neu gestartet werden.${LH_COLOR_RESET}"
                  return 1
             fi
             ;;
@@ -544,13 +543,13 @@ function restart_desktop_environment_action() {
                         lh_log_msg "INFO" "Befehl an GNOME Shell (Wayland) gesendet, um einen Neustart zu versuchen."
                     else
                         lh_log_msg "ERROR" "Konnte keinen sicheren Neustartbefehl für GNOME unter Wayland finden/ausführen."
-                        echo "Warnung: GNOME unter Wayland kann nicht zuverlässig neu gestartet werden."
-                        echo "Ein Ab- und Anmelden ist die empfohlene Methode für einen vollständigen Neustart."
+                        echo -e "${LH_COLOR_WARNING}Warnung: GNOME unter Wayland kann nicht zuverlässig neu gestartet werden.${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_INFO}Ein Ab- und Anmelden ist die empfohlene Methode für einen vollständigen Neustart.${LH_COLOR_RESET}"
                     fi
                 else
                     # Harter Neustart
                     lh_log_msg "WARN" "Harter Neustart von GNOME unter Wayland ist riskant und kann die Sitzung beenden."
-                    echo "Warnung: Ein harter Neustart von GNOME unter Wayland kann die gesamte Sitzung beenden!"
+                    echo -e "${LH_COLOR_WARNING}Warnung: Ein harter Neustart von GNOME unter Wayland kann die gesamte Sitzung beenden!${LH_COLOR_RESET}"
                     if lh_confirm_action "Möchten Sie trotzdem fortfahren?" "n"; then
                         # Versuchen, gnome-shell mit erzwungener Beendung neu zu starten
                         lh_run_command_as_target_user "killall -q gnome-shell"
@@ -671,12 +670,12 @@ function restart_desktop_environment_action() {
 
         *)
             lh_log_msg "ERROR" "Unbekannte oder nicht direkt unterstützte Desktop-Umgebung: '$DESKTOP_ENVIRONMENT'."
-            echo "Fehler: Desktop-Umgebung '$DESKTOP_ENVIRONMENT' wird nicht direkt unterstützt."
+            echo -e "${LH_COLOR_ERROR}Fehler: Desktop-Umgebung '$DESKTOP_ENVIRONMENT' wird nicht direkt unterstützt.${LH_COLOR_RESET}"
             return 1
             ;;
     esac
 
-    echo "Neustart der Desktop-Umgebung wurde durchgeführt."
+    echo -e "${LH_COLOR_SUCCESS}Neustart der Desktop-Umgebung wurde durchgeführt.${LH_COLOR_RESET}"
     return 0
 }
 
@@ -727,10 +726,10 @@ function restart_network_services_action() {
         # Fallback: Versuche 'networking' Service, falls vorhanden (Debian/Ubuntu-Stil)
         if $LH_SUDO_CMD systemctl restart networking >/dev/null 2>&1; then
              lh_log_msg "INFO" "Fallback: 'networking' Dienst neugestartet."
-             echo "Networking-Dienst wurde neu gestartet."
+             echo -e "${LH_COLOR_SUCCESS}Networking-Dienst wurde neu gestartet.${LH_COLOR_RESET}"
         else
              lh_log_msg "ERROR" "Auch Fallback-Neustart von 'networking' nicht erfolgreich oder Dienst nicht vorhanden."
-             echo "Es konnten keine Netzwerkdienste gefunden werden, die neugestartet werden können."
+             echo -e "${LH_COLOR_ERROR}Es konnten keine Netzwerkdienste gefunden werden, die neugestartet werden können.${LH_COLOR_RESET}"
         fi
         return
     fi
@@ -746,17 +745,17 @@ function restart_network_services_action() {
     echo ""
 
     local net_choice
-    read -p "Wählen Sie einen Dienst zum Neustarten (1-$(( ${#active_services_names[@]} + 2 ))): " net_choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie einen Dienst zum Neustarten (1-$(( ${#active_services_names[@]} + 2 ))): ${LH_COLOR_RESET}")" net_choice
 
     if ! [[ "$net_choice" =~ ^[0-9]+$ ]] || [ "$net_choice" -lt 1 ] || [ "$net_choice" -gt $(( ${#services_to_consider[@]} + 2 )) ]; then
         lh_log_msg "WARN" "Ungültige Auswahl."
-        echo "Ungültige Auswahl."
+        echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
         return
     fi
 
     if [ "$net_choice" -eq $(( ${#services_to_consider[@]} + 2 )) ]; then
         lh_log_msg "INFO" "Neustart der Netzwerkdienste abgebrochen."
-        echo "Neustart der Netzwerkdienste abgebrochen."
+        echo -e "${LH_COLOR_INFO}Neustart der Netzwerkdienste abgebrochen.${LH_COLOR_RESET}"
         return
     fi
 
@@ -770,11 +769,11 @@ function restart_network_services_action() {
     fi
 
     # Warnung und Bestätigung vor dem Neustart
-    echo "WARNUNG: Der Neustart von Netzwerkdiensten kann aktive Verbindungen unterbrechen!"
+    echo -e "${LH_COLOR_WARNING}WARNUNG: Der Neustart von Netzwerkdiensten kann aktive Verbindungen unterbrechen!${LH_COLOR_RESET}"
 
     if ! lh_confirm_action "Möchten Sie fortfahren?" "n"; then
         lh_log_msg "INFO" "Neustart der Netzwerkdienste abgebrochen."
-        echo "Neustart der Netzwerkdienste abgebrochen."
+        echo -e "${LH_COLOR_INFO}Neustart der Netzwerkdienste abgebrochen.${LH_COLOR_RESET}"
         return
     fi
 
@@ -793,10 +792,10 @@ function restart_network_services_action() {
 
     if $all_successful; then
         lh_log_msg "INFO" "Ausgewählte Netzwerkdienste erfolgreich neu gestartet."
-        echo "Ausgewählte Netzwerkdienste wurden erfolgreich neu gestartet."
+        echo -e "${LH_COLOR_SUCCESS}Ausgewählte Netzwerkdienste wurden erfolgreich neu gestartet.${LH_COLOR_RESET}"
     else
         lh_log_msg "WARN" "Mindestens ein Netzwerkdienst konnte nicht erfolgreich neu gestartet werden."
-        echo "Mindestens ein Netzwerkdienst konnte nicht erfolgreich neu gestartet werden."
+        echo -e "${LH_COLOR_WARNING}Mindestens ein Netzwerkdienst konnte nicht erfolgreich neu gestartet werden.${LH_COLOR_RESET}"
     fi
 }
 
@@ -812,7 +811,7 @@ function restart_module_menu() {
         lh_print_menu_item 0 "Zurück zum Hauptmenü"
         echo ""
 
-        read -p "Wählen Sie eine Option: " option
+        read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option: ${LH_COLOR_RESET}")" option
 
         case $option in
             1)
@@ -833,13 +832,13 @@ function restart_module_menu() {
                 ;;
             *)
                 lh_log_msg "WARN" "Ungültige Auswahl: $option"
-                echo "Ungültige Auswahl. Bitte versuchen Sie es erneut."
+                echo -e "${LH_COLOR_ERROR}Ungültige Auswahl. Bitte versuchen Sie es erneut.${LH_COLOR_RESET}"
                 ;;
         esac
 
         # Kurze Pause, damit Benutzer die Ausgabe lesen kann
         echo ""
-        read -p "Drücken Sie eine Taste, um fortzufahren..." -n1 -s
+        read -p "$(echo -e "${LH_COLOR_INFO}Drücken Sie eine Taste, um fortzufahren...${LH_COLOR_RESET}")" -n1 -s
         echo ""
     done
 }

@@ -18,32 +18,32 @@ function security_show_open_ports() {
     lh_print_header "Offene Netzwerkports"
 
     if ! lh_check_command "ss" true; then
-        echo "Das Programm 'ss' ist nicht installiert und konnte nicht installiert werden."
+        echo -e "${LH_COLOR_ERROR}Das Programm 'ss' ist nicht installiert und konnte nicht installiert werden.${LH_COLOR_RESET}"
         return 1
     fi
 
-    echo "Offene TCP-Ports (LISTEN):"
-    echo "--------------------------"
+    echo -e "${LH_COLOR_INFO}Offene TCP-Ports (LISTEN):${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     $LH_SUDO_CMD ss -tulnp | grep LISTEN
-    echo "--------------------------"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
     if lh_confirm_action "Möchten Sie auch UDP-Ports anzeigen?" "y"; then
-        echo -e "\nOffene UDP-Ports:"
-        echo "--------------------------"
+        echo -e "\n${LH_COLOR_INFO}Offene UDP-Ports:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         $LH_SUDO_CMD ss -ulnp
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     fi
 
     if lh_confirm_action "Möchten Sie auch bestehende TCP-Verbindungen anzeigen?" "n"; then
-        echo -e "\nBestehende TCP-Verbindungen:"
-        echo "--------------------------"
+        echo -e "\n${LH_COLOR_INFO}Bestehende TCP-Verbindungen:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         $LH_SUDO_CMD ss -tnp
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     fi
 
     if command -v nmap >/dev/null 2>&1 || lh_check_command "nmap" false; then
         if lh_confirm_action "Möchten Sie einen lokalen Port-Scan durchführen, um offene Ports zu überprüfen?" "n"; then
-            echo -e "\nStarte lokalen Port-Scan (127.0.0.1)..."
+            echo -e "\n${LH_COLOR_INFO}Starte lokalen Port-Scan (127.0.0.1)...${LH_COLOR_RESET}"
             $LH_SUDO_CMD nmap -sT -p 1-1000 127.0.0.1
         fi
     fi
@@ -53,91 +53,91 @@ function security_show_open_ports() {
 function security_show_failed_logins() {
     lh_print_header "Fehlgeschlagene Anmeldeversuche"
 
-    echo "Wählen Sie eine Option für die Anzeige:"
-    echo "1. Letzte fehlgeschlagene Anmeldeversuche via SSH"
-    echo "2. Letzte fehlgeschlagene Anmeldeversuche via PAM/Login"
-    echo "3. Alle fehlgeschlagenen Anmeldeversuche"
-    echo "4. Abbrechen"
+    echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option für die Anzeige:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Letzte fehlgeschlagene Anmeldeversuche via SSH${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Letzte fehlgeschlagene Anmeldeversuche via PAM/Login${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Alle fehlgeschlagenen Anmeldeversuche${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Abbrechen${LH_COLOR_RESET}"
 
-    read -p "Option (1-4): " login_option
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Option (1-4): ${LH_COLOR_RESET}")" login_option
 
     case $login_option in
         1)
             if command -v journalctl >/dev/null 2>&1; then
-                echo "Letzte fehlgeschlagene SSH-Anmeldeversuche (journalctl):"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Letzte fehlgeschlagene SSH-Anmeldeversuche (journalctl):${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 $LH_SUDO_CMD journalctl _SYSTEMD_UNIT=sshd.service -p err --grep="Failed password" --since "1 week ago"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             elif [ -f /var/log/auth.log ]; then
-                echo "Letzte fehlgeschlagene SSH-Anmeldeversuche (auth.log):"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Letzte fehlgeschlagene SSH-Anmeldeversuche (auth.log):${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 $LH_SUDO_CMD grep "sshd.*Failed password" /var/log/auth.log | tail -n 50
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             elif [ -f /var/log/secure ]; then
-                echo "Letzte fehlgeschlagene SSH-Anmeldeversuche (secure):"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Letzte fehlgeschlagene SSH-Anmeldeversuche (secure):${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 $LH_SUDO_CMD grep "sshd.*Failed password" /var/log/secure | tail -n 50
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             else
-                echo "Keine geeigneten Log-Dateien gefunden."
+                echo -e "${LH_COLOR_WARNING}Keine geeigneten Log-Dateien gefunden.${LH_COLOR_RESET}"
             fi
             ;;
         2)
             if command -v journalctl >/dev/null 2>&1; then
-                echo "Letzte fehlgeschlagene Login-Anmeldeversuche (journalctl):"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Letzte fehlgeschlagene Login-Anmeldeversuche (journalctl):${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 $LH_SUDO_CMD journalctl -u systemd-logind -p err --grep="Failed password" --since "1 week ago"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             elif [ -f /var/log/auth.log ]; then
-                echo "Letzte fehlgeschlagene Login-Anmeldeversuche (auth.log):"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Letzte fehlgeschlagene Login-Anmeldeversuche (auth.log):${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 $LH_SUDO_CMD grep -v "sshd" /var/log/auth.log | grep "Failed password" | tail -n 50
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             elif [ -f /var/log/secure ]; then
-                echo "Letzte fehlgeschlagene Login-Anmeldeversuche (secure):"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Letzte fehlgeschlagene Login-Anmeldeversuche (secure):${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 $LH_SUDO_CMD grep -v "sshd" /var/log/secure | grep "Failed password" | tail -n 50
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             else
-                echo "Keine geeigneten Log-Dateien gefunden."
+                echo -e "${LH_COLOR_WARNING}Keine geeigneten Log-Dateien gefunden.${LH_COLOR_RESET}"
             fi
             ;;
         3)
             if command -v journalctl >/dev/null 2>&1; then
-                echo "Alle fehlgeschlagenen Anmeldeversuche (journalctl):"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Alle fehlgeschlagenen Anmeldeversuche (journalctl):${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 $LH_SUDO_CMD journalctl -p err --grep="Failed password" --since "1 week ago"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             elif [ -f /var/log/auth.log ]; then
-                echo "Alle fehlgeschlagenen Anmeldeversuche (auth.log):"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Alle fehlgeschlagenen Anmeldeversuche (auth.log):${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 $LH_SUDO_CMD grep "Failed password" /var/log/auth.log | tail -n 50
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             elif [ -f /var/log/secure ]; then
-                echo "Alle fehlgeschlagenen Anmeldeversuche (secure):"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Alle fehlgeschlagenen Anmeldeversuche (secure):${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 $LH_SUDO_CMD grep "Failed password" /var/log/secure | tail -n 50
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             else
-                echo "Keine geeigneten Log-Dateien gefunden."
+                echo -e "${LH_COLOR_WARNING}Keine geeigneten Log-Dateien gefunden.${LH_COLOR_RESET}"
             fi
             ;;
         4)
-            echo "Operation abgebrochen."
+            echo -e "${LH_COLOR_INFO}Operation abgebrochen.${LH_COLOR_RESET}"
             return 0
             ;;
         *)
-            echo "Ungültige Option. Operation abgebrochen."
+            echo -e "${LH_COLOR_ERROR}Ungültige Option. Operation abgebrochen.${LH_COLOR_RESET}"
             return 1
             ;;
     esac
 
     if command -v lastb >/dev/null 2>&1; then
         if lh_confirm_action "Möchten Sie auch fehlgeschlagene Anmeldeversuche via 'lastb' anzeigen?" "y"; then
-            echo -e "\nFehlgeschlagene Anmeldeversuche (lastb):"
-            echo "--------------------------"
+            echo -e "\n${LH_COLOR_INFO}Fehlgeschlagene Anmeldeversuche (lastb):${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             $LH_SUDO_CMD lastb | head -n 20
-            echo "--------------------------"
+            echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         fi
     fi
 }
@@ -147,40 +147,40 @@ function security_check_rootkits() {
     lh_print_header "System auf Rootkits prüfen"
 
     if ! lh_check_command "rkhunter" true; then
-        echo "Das Programm 'rkhunter' ist nicht installiert und konnte nicht installiert werden."
+        echo -e "${LH_COLOR_ERROR}Das Programm 'rkhunter' ist nicht installiert und konnte nicht installiert werden.${LH_COLOR_RESET}"
         return 1
     fi
 
-    echo "rkhunter bietet folgende Prüfungsmodi:"
-    echo "1. Schnelltest (--check --sk)"
-    echo "2. Vollständiger Test (--check)"
-    echo "3. Nur Eigenschaften prüfen (--propupd)"
-    echo "4. Abbrechen"
+    echo -e "${LH_COLOR_PROMPT}rkhunter bietet folgende Prüfungsmodi:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Schnelltest (--check --sk)${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Vollständiger Test (--check)${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Nur Eigenschaften prüfen (--propupd)${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Abbrechen${LH_COLOR_RESET}"
 
-    read -p "Wählen Sie eine Option (1-4): " rkhunter_option
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option (1-4): ${LH_COLOR_RESET}")" rkhunter_option
 
     case $rkhunter_option in
         1)
-            echo "Starte rkhunter Schnelltest..."
-            echo "Dies kann einige Minuten dauern."
+            echo -e "${LH_COLOR_INFO}Starte rkhunter Schnelltest...${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Dies kann einige Minuten dauern.${LH_COLOR_RESET}"
             $LH_SUDO_CMD rkhunter --check --sk
             ;;
         2)
-            echo "Starte vollständigen rkhunter-Test..."
-            echo "Dies kann deutlich länger dauern und erfordert ggf. Benutzereingaben."
+            echo -e "${LH_COLOR_INFO}Starte vollständigen rkhunter-Test...${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Dies kann deutlich länger dauern und erfordert ggf. Benutzereingaben.${LH_COLOR_RESET}"
             $LH_SUDO_CMD rkhunter --check
             ;;
         3)
-            echo "Aktualisiere die Eigenschaften-Datenbank..."
+            echo -e "${LH_COLOR_INFO}Aktualisiere die Eigenschaften-Datenbank...${LH_COLOR_RESET}"
             $LH_SUDO_CMD rkhunter --propupd
-            echo "Eigenschaften erfolgreich aktualisiert. Es wird empfohlen, nach Änderungen am System die Eigenschaften neu zu prüfen."
+            echo -e "${LH_COLOR_SUCCESS}Eigenschaften erfolgreich aktualisiert. Es wird empfohlen, nach Änderungen am System die Eigenschaften neu zu prüfen.${LH_COLOR_RESET}"
             ;;
         4)
-            echo "Operation abgebrochen."
+            echo -e "${LH_COLOR_INFO}Operation abgebrochen.${LH_COLOR_RESET}"
             return 0
             ;;
         *)
-            echo "Ungültige Option. Operation abgebrochen."
+            echo -e "${LH_COLOR_ERROR}Ungültige Option. Operation abgebrochen.${LH_COLOR_RESET}"
             return 1
             ;;
     esac
@@ -189,12 +189,12 @@ function security_check_rootkits() {
     if ! command -v chkrootkit >/dev/null 2>&1; then
         if lh_confirm_action "Möchten Sie auch 'chkrootkit' als zweiten Rootkit-Scanner installieren und ausführen?" "n"; then
             if lh_check_command "chkrootkit" true; then
-                echo "Starte chkrootkit-Überprüfung..."
+                echo -e "${LH_COLOR_INFO}Starte chkrootkit-Überprüfung...${LH_COLOR_RESET}"
                 $LH_SUDO_CMD chkrootkit
             fi
         fi
     elif lh_confirm_action "chkrootkit ist bereits installiert. Möchten Sie es ausführen?" "y"; then
-        echo "Starte chkrootkit-Überprüfung..."
+        echo -e "${LH_COLOR_INFO}Starte chkrootkit-Überprüfung...${LH_COLOR_RESET}"
         $LH_SUDO_CMD chkrootkit
     fi
 }
@@ -212,10 +212,10 @@ function security_check_firewall() {
         firewall_found=true
         firewall_name="UFW (Uncomplicated Firewall)"
 
-        echo "UFW-Status:"
-        echo "--------------------------"
+        echo -e "${LH_COLOR_INFO}UFW-Status:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         $LH_SUDO_CMD ufw status verbose
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
         if $LH_SUDO_CMD ufw status | grep -q "Status: active"; then
             firewall_active=true
@@ -227,14 +227,14 @@ function security_check_firewall() {
         firewall_found=true
         firewall_name="firewalld"
 
-        echo "firewalld-Status:"
-        echo "--------------------------"
+        echo -e "${LH_COLOR_INFO}firewalld-Status:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         $LH_SUDO_CMD firewall-cmd --state
-        echo "--------------------------"
-        echo "Aktive Zonen:"
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Aktive Zonen:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         $LH_SUDO_CMD firewall-cmd --list-all
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
         if $LH_SUDO_CMD firewall-cmd --state 2>/dev/null | grep -q "running"; then
             firewall_active=true
@@ -248,10 +248,10 @@ function security_check_firewall() {
             firewall_name="iptables"
         fi
 
-        echo "iptables-Regeln:"
-        echo "--------------------------"
+        echo -e "${LH_COLOR_INFO}iptables-Regeln:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         $LH_SUDO_CMD iptables -L -n -v
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
         # Wenn mindestens eine Regel in der INPUT-Kette existiert (außer der Policy)
         if $LH_SUDO_CMD iptables -L INPUT -n -v | grep -q "Chain INPUT" && \
@@ -261,46 +261,46 @@ function security_check_firewall() {
     fi
 
     if ! $firewall_found; then
-        echo "Keine bekannte Firewall (UFW, firewalld, iptables) gefunden."
+        echo -e "${LH_COLOR_WARNING}Keine bekannte Firewall (UFW, firewalld, iptables) gefunden.${LH_COLOR_RESET}"
     fi
 
     if ! $firewall_active && $firewall_found; then
-        echo -e "\nWARNUNG: Es wurde eine Firewall ($firewall_name) gefunden, aber sie scheint nicht aktiv zu sein."
-        echo "Es wird empfohlen, die Firewall zu aktivieren, um Ihr System zu schützen."
+        echo -e "\n${LH_COLOR_WARNING}WARNUNG: Es wurde eine Firewall ($firewall_name) gefunden, aber sie scheint nicht aktiv zu sein.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}Es wird empfohlen, die Firewall zu aktivieren, um Ihr System zu schützen.${LH_COLOR_RESET}"
 
         if lh_confirm_action "Möchten Sie Informationen zur Aktivierung der Firewall anzeigen?" "y"; then
             case $firewall_name in
                 "UFW (Uncomplicated Firewall)")
-                    echo -e "\nUFW aktivieren:"
-                    echo "sudo ufw enable"
-                    echo -e "\nStandardkonfiguration mit SSH-Zugriff erlauben:"
-                    echo "sudo ufw allow ssh"
-                    echo "sudo ufw enable"
-                    echo -e "\nStatus überprüfen:"
-                    echo "sudo ufw status verbose"
+                    echo -e "\n${LH_COLOR_INFO}UFW aktivieren:${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo ufw enable${LH_COLOR_RESET}"
+                    echo -e "\n${LH_COLOR_INFO}Standardkonfiguration mit SSH-Zugriff erlauben:${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo ufw allow ssh${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo ufw enable${LH_COLOR_RESET}"
+                    echo -e "\n${LH_COLOR_INFO}Status überprüfen:${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo ufw status verbose${LH_COLOR_RESET}"
                     ;;
                 "firewalld")
-                    echo -e "\nfirewalld aktivieren:"
-                    echo "sudo systemctl enable --now firewalld"
-                    echo -e "\nStatus überprüfen:"
-                    echo "sudo firewall-cmd --state"
-                    echo "sudo firewall-cmd --list-all"
+                    echo -e "\n${LH_COLOR_INFO}firewalld aktivieren:${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo systemctl enable --now firewalld${LH_COLOR_RESET}"
+                    echo -e "\n${LH_COLOR_INFO}Status überprüfen:${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo firewall-cmd --state${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo firewall-cmd --list-all${LH_COLOR_RESET}"
                     ;;
                 "iptables")
-                    echo -e "\niptables Basiskonfiguration ist komplexer und wird am besten über ein Skript oder eine andere Firewall-Lösung wie UFW verwaltet."
-                    echo "Für minimale Sicherheit könnte man folgendes verwenden (Vorsicht, dies könnte den Fernzugriff blockieren):"
-                    echo "sudo iptables -A INPUT -i lo -j ACCEPT"
-                    echo "sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
-                    echo "sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT # SSH erlauben"
-                    echo "sudo iptables -A INPUT -j DROP"
-                    echo -e "\nUm diese Regeln zu speichern (abhängig von der Distribution):"
-                    echo "sudo apt install iptables-persistent # Für Debian/Ubuntu"
-                    echo "sudo service iptables save # Für manche RHEL-basierte Systeme"
+                    echo -e "\n${LH_COLOR_INFO}iptables Basiskonfiguration ist komplexer und wird am besten über ein Skript oder eine andere Firewall-Lösung wie UFW verwaltet.${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}Für minimale Sicherheit könnte man folgendes verwenden (Vorsicht, dies könnte den Fernzugriff blockieren):${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo iptables -A INPUT -i lo -j ACCEPT${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT # SSH erlauben${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo iptables -A INPUT -j DROP${LH_COLOR_RESET}"
+                    echo -e "\n${LH_COLOR_INFO}Um diese Regeln zu speichern (abhängig von der Distribution):${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo apt install iptables-persistent # Für Debian/Ubuntu${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo service iptables save # Für manche RHEL-basierte Systeme${LH_COLOR_RESET}"
                     ;;
             esac
         fi
     elif $firewall_active; then
-        echo -e "\nDie Firewall ($firewall_name) ist aktiv. Ihr System hat einen grundlegenden Schutz."
+        echo -e "\n${LH_COLOR_SUCCESS}Die Firewall ($firewall_name) ist aktiv. Ihr System hat einen grundlegenden Schutz.${LH_COLOR_RESET}"
     fi
 }
 
@@ -310,11 +310,11 @@ function security_check_updates() {
 
     if [ -z "$LH_PKG_MANAGER" ]; then
         lh_log_msg "ERROR" "Kein unterstützter Paketmanager gefunden."
-        echo "Fehler: Kein unterstützter Paketmanager gefunden."
+        echo -e "${LH_COLOR_ERROR}Fehler: Kein unterstützter Paketmanager gefunden.${LH_COLOR_RESET}"
         return 1
     fi
 
-    echo "Suche nach verfügbaren Sicherheits-Updates..."
+    echo -e "${LH_COLOR_INFO}Suche nach verfügbaren Sicherheits-Updates...${LH_COLOR_RESET}"
 
     case $LH_PKG_MANAGER in
         pacman)
@@ -322,45 +322,45 @@ function security_check_updates() {
 
             local updates=$($LH_SUDO_CMD pacman -Qu 2>/dev/null)
             if [ -n "$updates" ]; then
-                echo "Verfügbare Updates:"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Verfügbare Updates:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 echo "$updates"
-                echo "--------------------------"
-                echo "Es sind Updates verfügbar. Eine umfassende Sicherheitsanalyse pro Paket ist mit pacman nicht direkt möglich."
-                echo "Es wird empfohlen, regelmäßig alle Updates zu installieren."
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}Es sind Updates verfügbar. Eine umfassende Sicherheitsanalyse pro Paket ist mit pacman nicht direkt möglich.${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}Es wird empfohlen, regelmäßig alle Updates zu installieren.${LH_COLOR_RESET}"
 
                 if lh_confirm_action "Möchten Sie jetzt alle Updates installieren?" "n"; then
                     $LH_SUDO_CMD pacman -Syu
                 fi
             else
-                echo "Keine Updates gefunden. Das System ist aktuell."
+                echo -e "${LH_COLOR_SUCCESS}Keine Updates gefunden. Das System ist aktuell.${LH_COLOR_RESET}"
             fi
             ;;
         apt)
             $LH_SUDO_CMD apt update >/dev/null 2>&1
 
-            echo "Sicherheits-Updates (falls verfügbar):"
-            echo "--------------------------"
+            echo -e "${LH_COLOR_INFO}Sicherheits-Updates (falls verfügbar):${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             # Ubuntu/Debian-Security-Updates haben spezifische Quellen
             $LH_SUDO_CMD apt list --upgradable 2>/dev/null | grep -i security
-            echo "--------------------------"
+            echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
             local all_updates=$($LH_SUDO_CMD apt list --upgradable 2>/dev/null | grep -v "Auflistung..." | wc -l)
             if [ "$all_updates" -gt 0 ]; then
-                echo "Insgesamt verfügbare Updates: $all_updates"
+                echo -e "${LH_COLOR_INFO}Insgesamt verfügbare Updates: $all_updates${LH_COLOR_RESET}"
 
                 if lh_confirm_action "Möchten Sie alle verfügbaren Updates anzeigen?" "y"; then
-                    echo -e "\nAlle verfügbaren Updates:"
-                    echo "--------------------------"
+                    echo -e "\n${LH_COLOR_INFO}Alle verfügbaren Updates:${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                     $LH_SUDO_CMD apt list --upgradable
-                    echo "--------------------------"
+                    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 fi
 
                 if lh_confirm_action "Möchten Sie jetzt alle Updates installieren?" "n"; then
                     $LH_SUDO_CMD apt upgrade
                 fi
             else
-                echo "Keine Updates gefunden. Das System ist aktuell."
+                echo -e "${LH_COLOR_SUCCESS}Keine Updates gefunden. Das System ist aktuell.${LH_COLOR_RESET}"
             fi
             ;;
         dnf)
@@ -369,16 +369,16 @@ function security_check_updates() {
 
             local all_updates=$($LH_SUDO_CMD dnf check-update --quiet 2>/dev/null | wc -l)
             if [ "$all_updates" -gt 0 ]; then
-                echo "Verfügbare Updates:"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Verfügbare Updates:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 $LH_SUDO_CMD dnf check-update
-                echo "--------------------------"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
                 if lh_confirm_action "Möchten Sie jetzt alle Updates installieren?" "n"; then
                     $LH_SUDO_CMD dnf upgrade
                 fi
             else
-                echo "Keine Updates gefunden. Das System ist aktuell."
+                echo -e "${LH_COLOR_SUCCESS}Keine Updates gefunden. Das System ist aktuell.${LH_COLOR_RESET}"
             fi
             ;;
         yay)
@@ -386,23 +386,23 @@ function security_check_updates() {
 
             local updates=$(yay -Qu 2>/dev/null)
             if [ -n "$updates" ]; then
-                echo "Verfügbare Updates:"
-                echo "--------------------------"
+                echo -e "${LH_COLOR_INFO}Verfügbare Updates:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 echo "$updates"
-                echo "--------------------------"
-                echo "Es sind Updates verfügbar. Eine umfassende Sicherheitsanalyse pro Paket ist nicht direkt möglich."
-                echo "Es wird empfohlen, regelmäßig alle Updates zu installieren."
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}Es sind Updates verfügbar. Eine umfassende Sicherheitsanalyse pro Paket ist nicht direkt möglich.${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}Es wird empfohlen, regelmäßig alle Updates zu installieren.${LH_COLOR_RESET}"
 
                 if lh_confirm_action "Möchten Sie jetzt alle Updates installieren?" "n"; then
                     yay -Syu
                 fi
             else
-                echo "Keine Updates gefunden. Das System ist aktuell."
+                echo -e "${LH_COLOR_SUCCESS}Keine Updates gefunden. Das System ist aktuell.${LH_COLOR_RESET}"
             fi
             ;;
         *)
             lh_log_msg "ERROR" "Unbekannter Paketmanager: $LH_PKG_MANAGER"
-            echo "Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER"
+            echo -e "${LH_COLOR_ERROR}Fehler: Unbekannter Paketmanager: $LH_PKG_MANAGER${LH_COLOR_RESET}"
             return 1
             ;;
     esac
@@ -414,57 +414,57 @@ function security_check_password_policy() {
 
     # Überprüfen der Passwort-Richtlinien
     if [ -f /etc/security/pwquality.conf ]; then
-        echo "Kennwort-Qualitätsrichtlinien (pwquality.conf):"
-        echo "--------------------------"
+        echo -e "${LH_COLOR_INFO}Kennwort-Qualitätsrichtlinien (pwquality.conf):${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         grep -v "^#" /etc/security/pwquality.conf | grep -v "^$"
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     elif [ -f /etc/pam.d/common-password ]; then
-        echo "PAM-Kennworteinstellungen (common-password):"
-        echo "--------------------------"
+        echo -e "${LH_COLOR_INFO}PAM-Kennworteinstellungen (common-password):${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         grep -v "^#" /etc/pam.d/common-password | grep -v "^$"
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     elif [ -f /etc/pam.d/system-auth ]; then
-        echo "PAM-Kennworteinstellungen (system-auth):"
-        echo "--------------------------"
+        echo -e "${LH_COLOR_INFO}PAM-Kennworteinstellungen (system-auth):${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         grep -v "^#" /etc/pam.d/system-auth | grep -v "^$" | grep "password"
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     else
-        echo "Keine bekannten Kennwort-Richtliniendateien gefunden."
+        echo -e "${LH_COLOR_WARNING}Keine bekannten Kennwort-Richtliniendateien gefunden.${LH_COLOR_RESET}"
     fi
 
     # Ablaufdatum für Benutzerkennwörter
-    echo -e "\nKennwort-Ablaufrichtlinien (login.defs):"
+    echo -e "\n${LH_COLOR_INFO}Kennwort-Ablaufrichtlinien (login.defs):${LH_COLOR_RESET}"
     if [ -f /etc/login.defs ]; then
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         grep "PASS_MAX_DAYS\|PASS_MIN_DAYS\|PASS_WARN_AGE" /etc/login.defs
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     else
-        echo "Datei /etc/login.defs nicht gefunden."
+        echo -e "${LH_COLOR_WARNING}Datei /etc/login.defs nicht gefunden.${LH_COLOR_RESET}"
     fi
 
     # Prüfen, ob Benutzer ohne Passwort existieren
     if ! lh_check_command "passwd" true; then
-        echo "Das Programm 'passwd' ist nicht verfügbar."
+        echo -e "${LH_COLOR_ERROR}Das Programm 'passwd' ist nicht verfügbar.${LH_COLOR_RESET}"
     else
-        echo -e "\nÜberprüfung auf Benutzer ohne Passwort:"
-        echo "--------------------------"
+        echo -e "\n${LH_COLOR_INFO}Überprüfung auf Benutzer ohne Passwort:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         local users_without_password=$($LH_SUDO_CMD passwd -S -a | grep -v "L" | grep "NP" 2>/dev/null || echo "Keine Benutzer ohne Passwort gefunden.")
         if [ -n "$users_without_password" ] && [ "$users_without_password" != "Keine Benutzer ohne Passwort gefunden." ]; then
             echo "$users_without_password"
-            echo -e "\nWARNUNG: Es wurden Benutzer ohne Passwort gefunden. Dies stellt ein Sicherheitsrisiko dar."
-            echo "Verwenden Sie 'sudo passwd [Benutzername]', um ein Passwort zu setzen."
+            echo -e "\n${LH_COLOR_WARNING}WARNUNG: Es wurden Benutzer ohne Passwort gefunden. Dies stellt ein Sicherheitsrisiko dar.${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Verwenden Sie 'sudo passwd [Benutzername]', um ein Passwort zu setzen.${LH_COLOR_RESET}"
         else
-            echo "Keine Benutzer ohne Passwort gefunden."
+            echo -e "${LH_COLOR_SUCCESS}Keine Benutzer ohne Passwort gefunden.${LH_COLOR_RESET}"
         fi
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     fi
 
     # Benutzerkontoinformationen
     if lh_confirm_action "Möchten Sie detaillierte Informationen zu Benutzerkonten anzeigen?" "y"; then
-        echo -e "\nDetails zu Benutzerkonten:"
-        echo "--------------------------"
+        echo -e "\n${LH_COLOR_INFO}Details zu Benutzerkonten:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         $LH_SUDO_CMD passwd -S -a 2>/dev/null || echo "Informationen konnten nicht abgerufen werden."
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     fi
 }
 
@@ -482,7 +482,7 @@ function security_checks_menu() {
         lh_print_menu_item 0 "Zurück zum Hauptmenü"
         echo ""
 
-        read -p "Wählen Sie eine Option: " option
+        read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option: ${LH_COLOR_RESET}")" option
 
         case $option in
             1)
@@ -509,13 +509,13 @@ function security_checks_menu() {
                 ;;
             *)
                 lh_log_msg "WARN" "Ungültige Auswahl: $option"
-                echo "Ungültige Auswahl. Bitte versuchen Sie es erneut."
+                echo -e "${LH_COLOR_ERROR}Ungültige Auswahl. Bitte versuchen Sie es erneut.${LH_COLOR_RESET}"
                 ;;
         esac
 
         # Kurze Pause, damit Benutzer die Ausgabe lesen kann
         echo ""
-        read -p "Drücken Sie eine Taste, um fortzufahren..." -n1 -s
+        read -p "$(echo -e "${LH_COLOR_INFO}Drücken Sie eine Taste, um fortzufahren...${LH_COLOR_RESET}")" -n1 -s
         echo ""
     done
 }

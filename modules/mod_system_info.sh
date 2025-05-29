@@ -17,25 +17,25 @@ lh_detect_package_manager
 function system_os_kernel_info() {
     lh_print_header "Betriebssystem & Kernel"
 
-    echo "Betriebssystem:"
+    echo -e "${LH_COLOR_INFO}Betriebssystem:${LH_COLOR_RESET}"
     if [ -f /etc/os-release ]; then
         # Anzeige ausgewählter Felder aus os-release
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         cat /etc/os-release | grep "^NAME\|^VERSION\|^ID\|^PRETTY_NAME" | sort
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     else
-        echo "OS-Release-Informationen nicht verfügbar."
+        echo -e "${LH_COLOR_WARNING}OS-Release-Informationen nicht verfügbar.${LH_COLOR_RESET}"
     fi
 
-    echo -e "\nKernel-Version:"
-    echo "--------------------------"
+    echo -e "\n${LH_COLOR_INFO}Kernel-Version:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     uname -a
-    echo "--------------------------"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
-    echo -e "\nSystem läuft seit:"
-    echo "--------------------------"
+    echo -e "\n${LH_COLOR_INFO}System läuft seit:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     uptime
-    echo "--------------------------"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 }
 
 # Funktion zum Anzeigen von CPU-Informationen
@@ -44,14 +44,14 @@ function system_cpu_info() {
 
     if command -v lscpu >/dev/null; then
         # Zeige ausgewählte CPU-Details
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         lscpu | grep -E "^Architektur:|^CPU\(s\):|^Thread\(s\) pro Kern:|^Kern\(e\) pro Sockel:|^Sockel:|^Modellname:|^CPU MHz:|^CPU max MHz:|^CPU min MHz:|^L1d Cache:|^L1i Cache:|^L2 Cache:|^L3 Cache:"
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     else
-        echo "CPU-Informationen über /proc/cpuinfo:"
-        echo "--------------------------"
+        echo -e "${LH_COLOR_INFO}CPU-Informationen über /proc/cpuinfo:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         cat /proc/cpuinfo | grep -E "processor|model name|cpu MHz|cache size" | head -20
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     fi
 }
 
@@ -59,22 +59,22 @@ function system_cpu_info() {
 function system_ram_info() {
     lh_print_header "RAM Nutzung"
 
-    echo "Aktuelle RAM-Nutzung (free):"
-    echo "--------------------------"
+    echo -e "${LH_COLOR_INFO}Aktuelle RAM-Nutzung (free):${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     free -h
-    echo "--------------------------"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
     if command -v vmstat >/dev/null; then
-        echo -e "\nSpeicher-Statistik (vmstat):"
-        echo "--------------------------"
+        echo -e "\n${LH_COLOR_INFO}Speicher-Statistik (vmstat):${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         vmstat
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     fi
 
-    echo -e "\nVerteiltung des Speichers (/proc/meminfo):"
-    echo "--------------------------"
+    echo -e "\n${LH_COLOR_INFO}Verteiltung des Speichers (/proc/meminfo):${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     cat /proc/meminfo | grep -E "MemTotal|MemFree|MemAvailable|Buffers|Cached|SwapTotal|SwapFree|Dirty"
-    echo "--------------------------"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 }
 
 # Funktion zum Anzeigen von PCI-Geräten
@@ -82,20 +82,20 @@ function system_pci_devices() {
     lh_print_header "PCI Geräte"
 
     if ! lh_check_command "lspci" true; then
-        echo "lspci ist nicht installiert und konnte nicht installiert werden."
+        echo -e "${LH_COLOR_ERROR}lspci ist nicht installiert und konnte nicht installiert werden.${LH_COLOR_RESET}"
         return 1
     fi
 
-    echo "Basisliste der PCI-Geräte:"
-    echo "--------------------------"
+    echo -e "${LH_COLOR_INFO}Basisliste der PCI-Geräte:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     lspci
-    echo "--------------------------"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
     if lh_confirm_action "Möchten Sie detaillierte Informationen zu den PCI-Geräten anzeigen (ausführlicher)?" "n"; then
-        echo -e "\nDetailinformationen zu PCI-Geräten:"
-        echo "--------------------------"
+        echo -e "\n${LH_COLOR_INFO}Detailinformationen zu PCI-Geräten:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         $LH_SUDO_CMD lspci -vnnk
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     fi
 }
 
@@ -104,20 +104,20 @@ function system_usb_devices() {
     lh_print_header "USB Geräte"
 
     if ! lh_check_command "lsusb" true; then
-        echo "lsusb ist nicht installiert und konnte nicht installiert werden."
+        echo -e "${LH_COLOR_ERROR}lsusb ist nicht installiert und konnte nicht installiert werden.${LH_COLOR_RESET}"
         return 1
     fi
 
     echo "Basisliste der USB-Geräte:"
     echo "--------------------------"
     lsusb
-    echo "--------------------------"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
     if lh_confirm_action "Möchten Sie detaillierte Informationen zu den USB-Geräten anzeigen (ausführlicher)?" "n"; then
-        echo -e "\nDetailinformationen zu USB-Geräten:"
-        echo "--------------------------"
+        echo -e "\n${LH_COLOR_INFO}Detailinformationen zu USB-Geräten:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         $LH_SUDO_CMD lsusb -v | grep -E "^Bus|^Device|^ +Interface|^ +iInterface|^ +iProduct|^ +wMaxPacketSize|^Device Descriptor:|^ +bDeviceClass"
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     fi
 }
 
@@ -125,30 +125,30 @@ function system_usb_devices() {
 function system_disk_overview() {
     lh_print_header "Festplattenübersicht"
 
-    echo "Blockgeräte und Dateisysteme (lsblk):"
-    echo "--------------------------"
+    echo -e "${LH_COLOR_INFO}Blockgeräte und Dateisysteme (lsblk):${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     lsblk -f
-    echo "--------------------------"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
-    echo -e "\nAktuell gemountete Dateisysteme (df):"
-    echo "--------------------------"
+    echo -e "\n${LH_COLOR_INFO}Aktuell gemountete Dateisysteme (df):${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     df -h -T
-    echo "--------------------------"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 }
 
 # Funktion zum Anzeigen der Top-Prozesse
 function system_top_processes() {
     lh_print_header "Top Prozesse"
 
-    echo "Top 10 Prozesse nach CPU-Auslastung:"
-    echo "--------------------------"
+    echo -e "${LH_COLOR_INFO}Top 10 Prozesse nach CPU-Auslastung:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     ps aux --sort=-%cpu | head -11
-    echo "--------------------------"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
-    echo -e "\nTop 10 Prozesse nach Speicherverbrauch:"
-    echo "--------------------------"
+    echo -e "\n${LH_COLOR_INFO}Top 10 Prozesse nach Speicherverbrauch:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     ps aux --sort=-%mem | head -11
-    echo "--------------------------"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
     if command -v top >/dev/null; then
         if lh_confirm_action "Möchten Sie 'top' ausführen, um Prozesse in Echtzeit zu überwachen?" "n"; then
@@ -161,32 +161,32 @@ function system_top_processes() {
 function system_network_config() {
     lh_print_header "Netzwerkkonfiguration"
 
-    echo "Netzwerkschnittstellen (ip addr):"
-    echo "--------------------------"
+    echo -e "${LH_COLOR_INFO}Netzwerkschnittstellen (ip addr):${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     ip addr show
-    echo "--------------------------"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
-    echo -e "\nRouting-Tabelle (ip route):"
-    echo "--------------------------"
+    echo -e "\n${LH_COLOR_INFO}Routing-Tabelle (ip route):${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     ip route show
-    echo "--------------------------"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
     if lh_check_command "ss" true; then
-        echo -e "\nAktive Netzwerkverbindungen (ss):"
-        echo "--------------------------"
+        echo -e "\n${LH_COLOR_INFO}Aktive Netzwerkverbindungen (ss):${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         ss -tulnp
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     fi
 
     if lh_check_command "hostname" false; then
-        echo -e "\nHostname und DNS-Einstellungen:"
-        echo "--------------------------"
-        echo "Hostname: $(hostname)"
+        echo -e "\n${LH_COLOR_INFO}Hostname und DNS-Einstellungen:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Hostname:${LH_COLOR_RESET} $(hostname)"
         if [ -f /etc/resolv.conf ]; then
-            echo "DNS-Server:"
+            echo -e "${LH_COLOR_INFO}DNS-Server:${LH_COLOR_RESET}"
             grep "^nameserver" /etc/resolv.conf
         fi
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     fi
 }
 
@@ -195,14 +195,14 @@ function system_temperature_sensors() {
     lh_print_header "Temperaturen & Sensoren"
 
     if ! lh_check_command "sensors" true; then
-        echo "Das Programm 'sensors' ist nicht installiert und konnte nicht installiert werden."
+        echo -e "${LH_COLOR_ERROR}Das Programm 'sensors' ist nicht installiert und konnte nicht installiert werden.${LH_COLOR_RESET}"
         return 1
     fi
 
-    echo "Sensoren-Ausgabe:"
-    echo "--------------------------"
+    echo -e "${LH_COLOR_INFO}Sensoren-Ausgabe:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     sensors
-    echo "--------------------------"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
     # Alternativ auch über /sys/class/thermal, falls verfügbar
     if [ -d /sys/class/thermal ]; then
@@ -213,10 +213,10 @@ function system_temperature_sensors() {
                 zone_type=$(cat "$thermal_zone/type")
                 temp_millidegree=$(cat "$thermal_zone/temp")
                 temp_degree=$(echo "scale=1; $temp_millidegree / 1000" | bc 2>/dev/null || echo "$temp_millidegree")
-                echo "Zone $(basename "$thermal_zone"): $zone_type = $temp_degree°C"
+                echo -e "${LH_COLOR_INFO}Zone $(basename "$thermal_zone"):${LH_COLOR_RESET} $zone_type = $temp_degree°C"
             fi
         done
-        echo "--------------------------"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     fi
 }
 
@@ -237,7 +237,7 @@ function system_info_menu() {
         lh_print_menu_item 0 "Zurück zum Hauptmenü"
         echo ""
 
-        read -p "Wählen Sie eine Option: " option
+        read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option: ${LH_COLOR_RESET}")" option
 
         case $option in
             1)
@@ -273,13 +273,13 @@ function system_info_menu() {
                 ;;
             *)
                 lh_log_msg "WARN" "Ungültige Auswahl: $option"
-                echo "Ungültige Auswahl. Bitte versuchen Sie es erneut."
+                echo -e "${LH_COLOR_ERROR}Ungültige Auswahl. Bitte versuchen Sie es erneut.${LH_COLOR_RESET}"
                 ;;
         esac
 
         # Kurze Pause, damit Benutzer die Ausgabe lesen kann
         echo ""
-        read -p "Drücken Sie eine Taste, um fortzufahren..." -n1 -s
+        read -p "$(echo -e "${LH_COLOR_INFO}Drücken Sie eine Taste, um fortzufahren...${LH_COLOR_RESET}")" -n1 -s
         echo ""
     done
 }
