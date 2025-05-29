@@ -12,6 +12,7 @@
 # Laden der gemeinsamen Bibliothek
 source "$(dirname "$0")/../lib/lib_common.sh"
 lh_detect_package_manager
+lh_load_backup_config
 
 # Funktion zum Logging mit Backup-spezifischen Nachrichten
 backup_log_msg() {
@@ -156,16 +157,60 @@ btrfs_backup() {
         fi
     fi
     
-    # Backup-Ziel überprüfen
-    if [ ! -d "$LH_BACKUP_ROOT" ]; then
-        backup_log_msg "WARN" "Backup-Ziel '$LH_BACKUP_ROOT' nicht gefunden"
-        echo "Backup-Ziel '$LH_BACKUP_ROOT' nicht gefunden oder nicht eingehängt."
-        local custom_backup=$(lh_ask_for_input "Bitte geben Sie einen anderen Pfad an")
-        LH_BACKUP_ROOT="$custom_backup" # Aktualisiert die globale Variable für diese Sitzung
+    # Backup-Ziel überprüfen und ggf. für diese Sitzung anpassen
+    echo "Das aktuell konfigurierte Backup-Ziel ist: $LH_BACKUP_ROOT"
+    local change_backup_root_for_session=false
+    local prompt_for_new_path_message=""
+
+    if [ ! -d "$LH_BACKUP_ROOT" ] || [ -z "$LH_BACKUP_ROOT" ]; then
+        backup_log_msg "WARN" "Konfiguriertes Backup-Ziel '$LH_BACKUP_ROOT' nicht gefunden, nicht eingehängt oder nicht konfiguriert."
+        echo "WARNUNG: Das konfigurierte Backup-Ziel '$LH_BACKUP_ROOT' ist nicht verfügbar oder nicht konfiguriert."
+        change_backup_root_for_session=true
+        prompt_for_new_path_message="Das konfigurierte Backup-Ziel ist nicht verfügbar. Bitte geben Sie einen neuen Pfad für diese Sitzung an"
+    else
+        if ! lh_confirm_action "Dieses Backup-Ziel ('$LH_BACKUP_ROOT') für die aktuelle Sitzung verwenden?" "y"; then
+            change_backup_root_for_session=true
+            prompt_for_new_path_message="Bitte geben Sie den alternativen Pfad zum Backup-Ziel für diese Sitzung an"
+        fi
     fi
-    
+
+    if [ "$change_backup_root_for_session" = true ]; then
+        local new_backup_root_path
+        while true; do
+            new_backup_root_path=$(lh_ask_for_input "$prompt_for_new_path_message")
+            if [ -z "$new_backup_root_path" ]; then
+                echo "Der Pfad darf nicht leer sein. Bitte versuchen Sie es erneut."
+                prompt_for_new_path_message="Eingabe darf nicht leer sein. Bitte geben Sie den Pfad zum Backup-Ziel an"
+                continue
+            fi
+            new_backup_root_path="${new_backup_root_path%/}" # Entferne optionalen letzten Slash
+
+            if [ ! -d "$new_backup_root_path" ]; then
+                if lh_confirm_action "Das Verzeichnis '$new_backup_root_path' existiert nicht. Möchten Sie es erstellen?" "y"; then
+                    $LH_SUDO_CMD mkdir -p "$new_backup_root_path"
+                    if [ $? -eq 0 ]; then
+                        LH_BACKUP_ROOT="$new_backup_root_path"
+                        backup_log_msg "INFO" "Backup-Ziel für diese Sitzung auf '$LH_BACKUP_ROOT' gesetzt (neu erstellt)."
+                        break 
+                    else
+                        backup_log_msg "ERROR" "Konnte Verzeichnis '$new_backup_root_path' nicht erstellen."
+                        echo "Fehler: Konnte Verzeichnis '$new_backup_root_path' nicht erstellen. Bitte prüfen Sie den Pfad und die Berechtigungen."
+                        prompt_for_new_path_message="Erstellung fehlgeschlagen. Bitte geben Sie einen anderen Pfad an oder prüfen Sie die Berechtigungen"
+                    fi
+                else
+                    echo "Bitte geben Sie einen existierenden Pfad an oder erlauben Sie die Erstellung."
+                    prompt_for_new_path_message="Pfad nicht akzeptiert. Bitte geben Sie einen anderen Pfad an"
+                fi
+            else # Verzeichnis existiert
+                LH_BACKUP_ROOT="$new_backup_root_path"
+                backup_log_msg "INFO" "Backup-Ziel für diese Sitzung auf '$LH_BACKUP_ROOT' gesetzt."
+                break
+            fi
+        done
+    fi
+        
     # Backup-Verzeichnis sicherstellen
-    mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
+    $LH_SUDO_CMD mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
     if [ $? -ne 0 ]; then
         backup_log_msg "ERROR" "Konnte Backup-Verzeichnis nicht erstellen"
         echo "Fehler beim Erstellen des Backup-Verzeichnisses. Überprüfen Sie die Berechtigungen."
@@ -173,7 +218,7 @@ btrfs_backup() {
     fi
     
     # Temporäres Snapshot-Verzeichnis sicherstellen
-    mkdir -p "$LH_TEMP_SNAPSHOT_DIR"
+    $LH_SUDO_CMD mkdir -p "$LH_TEMP_SNAPSHOT_DIR"
     if [ $? -ne 0 ]; then
         backup_log_msg "ERROR" "Konnte temporäres Snapshot-Verzeichnis nicht erstellen"
         echo "Fehler beim Erstellen des temporären Snapshot-Verzeichnisses."
@@ -357,15 +402,60 @@ btrfs_backup() {
 tar_backup() {
     lh_print_header "TAR Archiv Backup"
     
-    # Backup-Ziel überprüfen
-    if [ ! -d "$LH_BACKUP_ROOT" ]; then
-        backup_log_msg "WARN" "Backup-Ziel '$LH_BACKUP_ROOT' nicht gefunden"
-        local custom_backup=$(lh_ask_for_input "Bitte geben Sie ein Backup-Ziel an")
-        LH_BACKUP_ROOT="$custom_backup"
+    # Backup-Ziel überprüfen und ggf. für diese Sitzung anpassen
+    echo "Das aktuell konfigurierte Backup-Ziel ist: $LH_BACKUP_ROOT"
+    local change_backup_root_for_session=false
+    local prompt_for_new_path_message=""
+
+    if [ ! -d "$LH_BACKUP_ROOT" ] || [ -z "$LH_BACKUP_ROOT" ]; then
+        backup_log_msg "WARN" "Konfiguriertes Backup-Ziel '$LH_BACKUP_ROOT' nicht gefunden, nicht eingehängt oder nicht konfiguriert."
+        echo "WARNUNG: Das konfigurierte Backup-Ziel '$LH_BACKUP_ROOT' ist nicht verfügbar oder nicht konfiguriert."
+        change_backup_root_for_session=true
+        prompt_for_new_path_message="Das konfigurierte Backup-Ziel ist nicht verfügbar. Bitte geben Sie einen neuen Pfad für diese Sitzung an"
+    else
+        if ! lh_confirm_action "Dieses Backup-Ziel ('$LH_BACKUP_ROOT') für die aktuelle Sitzung verwenden?" "y"; then
+            change_backup_root_for_session=true
+            prompt_for_new_path_message="Bitte geben Sie den alternativen Pfad zum Backup-Ziel für diese Sitzung an"
+        fi
     fi
-    
+
+    if [ "$change_backup_root_for_session" = true ]; then
+        local new_backup_root_path
+        while true; do
+            new_backup_root_path=$(lh_ask_for_input "$prompt_for_new_path_message")
+            if [ -z "$new_backup_root_path" ]; then
+                echo "Der Pfad darf nicht leer sein. Bitte versuchen Sie es erneut."
+                prompt_for_new_path_message="Eingabe darf nicht leer sein. Bitte geben Sie den Pfad zum Backup-Ziel an"
+                continue
+            fi
+            new_backup_root_path="${new_backup_root_path%/}" # Entferne optionalen letzten Slash
+
+            if [ ! -d "$new_backup_root_path" ]; then
+                if lh_confirm_action "Das Verzeichnis '$new_backup_root_path' existiert nicht. Möchten Sie es erstellen?" "y"; then
+                    $LH_SUDO_CMD mkdir -p "$new_backup_root_path"
+                    if [ $? -eq 0 ]; then
+                        LH_BACKUP_ROOT="$new_backup_root_path"
+                        backup_log_msg "INFO" "Backup-Ziel für diese Sitzung auf '$LH_BACKUP_ROOT' gesetzt (neu erstellt)."
+                        break 
+                    else
+                        backup_log_msg "ERROR" "Konnte Verzeichnis '$new_backup_root_path' nicht erstellen."
+                        echo "Fehler: Konnte Verzeichnis '$new_backup_root_path' nicht erstellen. Bitte prüfen Sie den Pfad und die Berechtigungen."
+                        prompt_for_new_path_message="Erstellung fehlgeschlagen. Bitte geben Sie einen anderen Pfad an oder prüfen Sie die Berechtigungen"
+                    fi
+                else
+                    echo "Bitte geben Sie einen existierenden Pfad an oder erlauben Sie die Erstellung."
+                    prompt_for_new_path_message="Pfad nicht akzeptiert. Bitte geben Sie einen anderen Pfad an"
+                fi
+            else # Verzeichnis existiert
+                LH_BACKUP_ROOT="$new_backup_root_path"
+                backup_log_msg "INFO" "Backup-Ziel für diese Sitzung auf '$LH_BACKUP_ROOT' gesetzt."
+                break
+            fi
+        done
+    fi
+        
     # Backup-Verzeichnis erstellen
-    mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
+    $LH_SUDO_CMD mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
     if [ $? -ne 0 ]; then
         backup_log_msg "ERROR" "Konnte Backup-Verzeichnis nicht erstellen"
         return 1
@@ -480,15 +570,60 @@ rsync_backup() {
         return 1
     fi
     
-    # Backup-Ziel überprüfen
-    if [ ! -d "$LH_BACKUP_ROOT" ]; then
-        backup_log_msg "WARN" "Backup-Ziel '$LH_BACKUP_ROOT' nicht gefunden"
-        local custom_backup=$(lh_ask_for_input "Bitte geben Sie ein Backup-Ziel an")
-        LH_BACKUP_ROOT="$custom_backup"
+    # Backup-Ziel überprüfen und ggf. für diese Sitzung anpassen
+    echo "Das aktuell konfigurierte Backup-Ziel ist: $LH_BACKUP_ROOT"
+    local change_backup_root_for_session=false
+    local prompt_for_new_path_message=""
+
+    if [ ! -d "$LH_BACKUP_ROOT" ] || [ -z "$LH_BACKUP_ROOT" ]; then
+        backup_log_msg "WARN" "Konfiguriertes Backup-Ziel '$LH_BACKUP_ROOT' nicht gefunden, nicht eingehängt oder nicht konfiguriert."
+        echo "WARNUNG: Das konfigurierte Backup-Ziel '$LH_BACKUP_ROOT' ist nicht verfügbar oder nicht konfiguriert."
+        change_backup_root_for_session=true
+        prompt_for_new_path_message="Das konfigurierte Backup-Ziel ist nicht verfügbar. Bitte geben Sie einen neuen Pfad für diese Sitzung an"
+    else
+        if ! lh_confirm_action "Dieses Backup-Ziel ('$LH_BACKUP_ROOT') für die aktuelle Sitzung verwenden?" "y"; then
+            change_backup_root_for_session=true
+            prompt_for_new_path_message="Bitte geben Sie den alternativen Pfad zum Backup-Ziel für diese Sitzung an"
+        fi
     fi
-    
+
+    if [ "$change_backup_root_for_session" = true ]; then
+        local new_backup_root_path
+        while true; do
+            new_backup_root_path=$(lh_ask_for_input "$prompt_for_new_path_message")
+            if [ -z "$new_backup_root_path" ]; then
+                echo "Der Pfad darf nicht leer sein. Bitte versuchen Sie es erneut."
+                prompt_for_new_path_message="Eingabe darf nicht leer sein. Bitte geben Sie den Pfad zum Backup-Ziel an"
+                continue
+            fi
+            new_backup_root_path="${new_backup_root_path%/}" # Entferne optionalen letzten Slash
+
+            if [ ! -d "$new_backup_root_path" ]; then
+                if lh_confirm_action "Das Verzeichnis '$new_backup_root_path' existiert nicht. Möchten Sie es erstellen?" "y"; then
+                    $LH_SUDO_CMD mkdir -p "$new_backup_root_path"
+                    if [ $? -eq 0 ]; then
+                        LH_BACKUP_ROOT="$new_backup_root_path"
+                        backup_log_msg "INFO" "Backup-Ziel für diese Sitzung auf '$LH_BACKUP_ROOT' gesetzt (neu erstellt)."
+                        break 
+                    else
+                        backup_log_msg "ERROR" "Konnte Verzeichnis '$new_backup_root_path' nicht erstellen."
+                        echo "Fehler: Konnte Verzeichnis '$new_backup_root_path' nicht erstellen. Bitte prüfen Sie den Pfad und die Berechtigungen."
+                        prompt_for_new_path_message="Erstellung fehlgeschlagen. Bitte geben Sie einen anderen Pfad an oder prüfen Sie die Berechtigungen"
+                    fi
+                else
+                    echo "Bitte geben Sie einen existierenden Pfad an oder erlauben Sie die Erstellung."
+                    prompt_for_new_path_message="Pfad nicht akzeptiert. Bitte geben Sie einen anderen Pfad an"
+                fi
+            else # Verzeichnis existiert
+                LH_BACKUP_ROOT="$new_backup_root_path"
+                backup_log_msg "INFO" "Backup-Ziel für diese Sitzung auf '$LH_BACKUP_ROOT' gesetzt."
+                break
+            fi
+        done
+    fi
+        
     # Backup-Verzeichnis erstellen
-    mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
+    $LH_SUDO_CMD mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
     if [ $? -ne 0 ]; then
         backup_log_msg "ERROR" "Konnte Backup-Verzeichnis nicht erstellen"
         return 1
