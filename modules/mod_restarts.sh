@@ -446,79 +446,112 @@ function restart_desktop_environment_action() {
                 lh_log_msg "WARN" "Weder Plasma 5 noch Plasma 6 kquit/kstart Werkzeuge gefunden. Versuche direkten plasmashell Neustart."
             fi
 
+            # Prüfe zuerst, ob plasmashell überhaupt läuft
+            local plasmashell_running=false
+            if lh_run_command_as_target_user "pgrep plasmashell" >/dev/null 2>&1; then
+                plasmashell_running=true
+                lh_log_msg "INFO" "plasmashell läuft aktuell."
+            else
+                lh_log_msg "WARN" "plasmashell läuft nicht - möglicherweise bereits abgestürzt."
+            fi
+
             # Neustart-Methode abhängig von der Auswahl
-            if [ "$restart_type" = "1" ] && [ -n "$kquit_cmd" ]; then  # Sanfter Neustart mit kquit/kstart
-                # Versuch 1: systemd user service (sauberster Weg)
-                if lh_run_command_as_target_user "systemctl --user is-active --quiet plasma-plasmashell.service" && \
-                   lh_run_command_as_target_user "systemctl --user restart plasma-plasmashell.service"; then
-                    lh_log_msg "INFO" "plasmashell Dienst erfolgreich via systemctl --user neu gestartet."
-                    plasmashell_restarted=true
-                else
-                    lh_log_msg "WARN" "Neustart von plasma-plasmashell.service via systemctl --user ist fehlgeschlagen."
+            if [ "$restart_type" = "1" ] && [ -n "$kquit_cmd" ] && $plasmashell_running; then  # Sanfter Neustart mit kquit/kstart
+                # Versuch 1: Prüfe systemd user service nur wenn plasmashell läuft
+                local systemd_service_available=false
+                if lh_run_command_as_target_user "systemctl --user list-unit-files plasma-plasmashell.service" 2>/dev/null | grep -q "plasma-plasmashell.service"; then
+                    systemd_service_available=true
+                    lh_log_msg "INFO" "plasma-plasmashell.service ist verfügbar."
+                fi
 
-                    # Versuch 2: Graceful shutdown mit kquit_cmd
-                    lh_log_msg "INFO" "Versuche graceful shutdown mit '$kquit_cmd plasmashell'..."
-                    if lh_run_command_as_target_user "$kquit_cmd plasmashell"; then
-                        lh_log_msg "INFO" "'$kquit_cmd plasmashell' erfolgreich ausgeführt. Warte kurz..."
-                        sleep 3
-
-                        # Prüfen, ob plasmashell beendet wurde
-                        if ! lh_run_command_as_target_user "pgrep plasmashell" >/dev/null; then
-                            lh_log_msg "INFO" "plasmashell wurde nach '$kquit_cmd' erfolgreich beendet."
-
-                            # Starte plasmashell neu
-                            lh_log_msg "INFO" "Starte neue Instanz mit '$kstart_cmd plasmashell'..."
-                            lh_run_command_as_target_user "nohup $kstart_cmd plasmashell >/dev/null 2>&1 &"
-                            lh_log_msg "INFO" "Befehl zum Neustart von plasmashell (via $kstart_cmd) wurde ausgeführt."
-                            plasmashell_restarted=true
-                        else
-                            lh_log_msg "WARN" "plasmashell läuft noch nach '$kquit_cmd'. Versuche sanften Kill."
-                            lh_run_command_as_target_user "killall -q plasmashell"
-                            sleep 1
-
-                            # Starte plasmashell neu
-                            lh_run_command_as_target_user "nohup $kstart_cmd plasmashell >/dev/null 2>&1 &"
-                            lh_log_msg "INFO" "Befehl zum Neustart von plasmashell wurde ausgeführt."
-                            plasmashell_restarted=true
-                        fi
+                if $systemd_service_available && lh_run_command_as_target_user "systemctl --user is-active --quiet plasma-plasmashell.service"; then
+                    lh_log_msg "INFO" "Versuche Neustart via systemctl --user..."
+                    if lh_run_command_as_target_user "systemctl --user restart plasma-plasmashell.service"; then
+                        lh_log_msg "INFO" "plasmashell Dienst erfolgreich via systemctl --user neu gestartet."
+                        plasmashell_restarted=true
                     else
-                        lh_log_msg "ERROR" "'$kquit_cmd plasmashell' ist fehlgeschlagen."
+                        lh_log_msg "WARN" "systemctl --user restart fehlgeschlagen."
+                    fi
+                fi
+
+                # Versuch 2: D-Bus verfügbar? Graceful shutdown mit kquit_cmd
+                if ! $plasmashell_restarted && $plasmashell_running; then
+                    # Prüfe D-Bus Verfügbarkeit
+                    local dbus_available=false
+                    if lh_run_command_as_target_user "dbus-send --session --dest=org.freedesktop.DBus --type=method_call --print-reply /org/freedesktop/DBus org.freedesktop.DBus.ListNames" >/dev/null 2>&1; then
+                        dbus_available=true
+                        lh_log_msg "INFO" "D-Bus Session ist verfügbar."
+                    else
+                        lh_log_msg "WARN" "D-Bus Session nicht verfügbar - kquitapp wird wahrscheinlich fehlschlagen."
+                    fi
+
+                    if $dbus_available; then
+                        lh_log_msg "INFO" "Versuche graceful shutdown mit '$kquit_cmd plasmashell'..."
+                        # Timeout für kquitapp hinzufügen
+                        if timeout 10 lh_run_command_as_target_user "$kquit_cmd plasmashell" 2>/dev/null; then
+                            lh_log_msg "INFO" "'$kquit_cmd plasmashell' erfolgreich ausgeführt. Warte kurz..."
+                            sleep 3
+
+                            # Prüfen, ob plasmashell beendet wurde
+                            if ! lh_run_command_as_target_user "pgrep plasmashell" >/dev/null; then
+                                lh_log_msg "INFO" "plasmashell wurde nach '$kquit_cmd' erfolgreich beendet."
+                                # Starte plasmashell neu
+                                lh_log_msg "INFO" "Starte neue Instanz mit '$kstart_cmd plasmashell'..."
+                                lh_run_command_as_target_user "nohup $kstart_cmd plasmashell >/dev/null 2>&1 &"
+                                sleep 2
+                                plasmashell_restarted=true
+                            else
+                                lh_log_msg "WARN" "plasmashell läuft noch nach '$kquit_cmd'."
+                            fi
+                        else
+                            lh_log_msg "WARN" "'$kquit_cmd plasmashell' ist fehlgeschlagen oder hat timeout erreicht."
+                        fi
                     fi
                 fi
             else
-                # Harter Neustart oder kein kquit/kstart
-                lh_log_msg "INFO" "Führe harten Neustart von plasmashell durch..."
+                lh_log_msg "INFO" "Führe direkten Neustart von plasmashell durch..."
+            fi
 
-                # Beende plasmashell
-                lh_run_command_as_target_user "killall -q plasmashell"
-                sleep 1
-
-                # Falls es noch läuft, mit härteren Methoden versuchen
-                if lh_run_command_as_target_user "pgrep plasmashell" >/dev/null; then
-                    lh_log_msg "WARN" "plasmashell läuft noch nach killall, versuche pkill..."
-                    lh_run_command_as_target_user "pkill plasmashell"
-                    sleep 1
-                fi
-
-                # Als letzten Ausweg SIGKILL verwenden
-                if lh_run_command_as_target_user "pgrep plasmashell" >/dev/null; then
-                    lh_log_msg "WARN" "plasmashell läuft immer noch, versuche härteren Kill (-9)..."
-                    lh_run_command_as_target_user "pkill -9 plasmashell"
-                    sleep 1
+            # Fallback: Direkter Kill und Restart (für harten Neustart oder wenn sanfter fehlschlägt)
+            if ! $plasmashell_restarted; then
+                lh_log_msg "INFO" "Verwende direkten Kill/Start Ansatz..."
+                
+                # Beende plasmashell mit verschiedenen Methoden
+                if $plasmashell_running || lh_run_command_as_target_user "pgrep plasmashell" >/dev/null; then
+                    lh_log_msg "INFO" "Beende plasmashell..."
+                    lh_run_command_as_target_user "killall -TERM plasmashell" 2>/dev/null || true
+                    sleep 2
+                    
+                    # Falls es noch läuft, härteren Kill
+                    if lh_run_command_as_target_user "pgrep plasmashell" >/dev/null; then
+                        lh_log_msg "WARN" "plasmashell läuft noch nach SIGTERM, versuche SIGKILL..."
+                        lh_run_command_as_target_user "killall -KILL plasmashell" 2>/dev/null || true
+                        sleep 1
+                    fi
                 fi
 
                 # Starte plasmashell neu
-                if ! lh_run_command_as_target_user "pgrep plasmashell" >/dev/null; then
-                    lh_log_msg "INFO" "Alte plasmashell Instanz(en) beendet. Starte neue Instanz..."
-                    if [ -n "$kstart_cmd" ]; then
-                        lh_run_command_as_target_user "nohup $kstart_cmd plasmashell >/dev/null 2>&1 &"
-                    else
-                        lh_run_command_as_target_user "nohup plasmashell >/dev/null 2>&1 &"
-                    fi
-                    lh_log_msg "INFO" "Befehl zum Neustart von plasmashell wurde ausgeführt."
-                    plasmashell_restarted=true
+                lh_log_msg "INFO" "Starte neue plasmashell Instanz..."
+                
+                # Verschiedene Start-Methoden versuchen
+                if [ -n "$kstart_cmd" ] && lh_run_command_as_target_user "command -v $kstart_cmd" >/dev/null; then
+                    lh_run_command_as_target_user "nohup $kstart_cmd plasmashell >/dev/null 2>&1 &"
+                elif lh_run_command_as_target_user "command -v plasmashell" >/dev/null; then
+                    lh_run_command_as_target_user "nohup plasmashell >/dev/null 2>&1 &"
                 else
-                    lh_log_msg "ERROR" "Konnte plasmashell nicht beenden. Neustart abgebrochen."
+                    lh_log_msg "ERROR" "plasmashell Binärdatei nicht gefunden."
+                    plasmashell_restarted=false
+                fi
+                
+                if lh_run_command_as_target_user "command -v plasmashell" >/dev/null; then
+                    sleep 3
+                    # Prüfe, ob plasmashell jetzt läuft
+                    if lh_run_command_as_target_user "pgrep plasmashell" >/dev/null; then
+                        lh_log_msg "INFO" "plasmashell wurde erfolgreich neu gestartet."
+                        plasmashell_restarted=true
+                    else
+                        lh_log_msg "WARN" "plasmashell läuft nach dem Neustart nicht."
+                    fi
                 fi
             fi
 
