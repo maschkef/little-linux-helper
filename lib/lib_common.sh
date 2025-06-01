@@ -522,25 +522,43 @@ function lh_get_target_user_info() {
         fi
     fi
 
-    # Fallback oder wenn nicht als root / loginctl nicht erfolgreich
+    # Fallback oder wenn nicht als root / loginctl nicht erfügreich
     if [ -z "$TARGET_USER" ]; then
         if [ -n "$SUDO_USER" ]; then
             TARGET_USER="$SUDO_USER"
-        elif [ -n "$USER" ] && [ "$USER" != "root" ]; then # Wenn $USER root ist, ist es wahrscheinlich nicht der Desktop-Benutzer
-             TARGET_USER="$USER"
+        elif [ -n "$USER" ] && [ "$USER" != "root" ]; then
+            TARGET_USER="$USER"
         else
-            # Als letzten Ausweg versuchen, den Benutzer einer laufenden X-Session zu finden
-            TARGET_USER=$(ps -eo user,command | grep "Xorg\|Xwayland" | grep -v "grep" | head -n 1 | awk '{print $1}')
-            if [ "$TARGET_USER" = "root" ] || [ -z "$TARGET_USER" ]; then # Wenn X als root läuft oder nichts gefunden wurde
-                 TARGET_USER=$(who | grep '(:[0-9])' | awk '{print $1}' | head -n 1) # Benutzer mit Display :0, :1 etc.
+            # Erweiterte Fallback-Methoden für TTY-Sitzungen
+            # 1. Versuche über loginctl (auch ohne root)
+            if command -v loginctl >/dev/null; then
+                TARGET_USER=$(loginctl list-sessions --no-legend 2>/dev/null | grep -E 'seat|tty' | head -n 1 | awk '{print $3}' | head -n 1)
             fi
+            
+            # 2. Versuche über aktive X/Wayland Prozesse
+            if [ -z "$TARGET_USER" ] || [ "$TARGET_USER" = "root" ]; then
+                TARGET_USER=$(ps -eo user,command | grep -E "Xorg|Xwayland|kwin|plasmashell|gnome-shell" | grep -v "grep\|root" | head -n 1 | awk '{print $1}')
+            fi
+            
+            # 3. Versuche über /tmp/.X11-unix Dateien
+            if [ -z "$TARGET_USER" ] || [ "$TARGET_USER" = "root" ]; then
+                for xsocket in /tmp/.X11-unix/X*; do
+                    if [ -S "$xsocket" ]; then
+                        local display_num=$(basename "$xsocket" | sed 's/X//')
+                        TARGET_USER=$(ps -eo user,command | grep "DISPLAY=:$display_num" | grep -v "grep\|root" | head -n 1 | awk '{print $1}')
+                        if [ -n "$TARGET_USER" ] && [ "$TARGET_USER" != "root" ]; then
+                            break
+                        fi
+                    fi
+                done
+            fi
+        
+        # 4. Letzter Ausweg: who Befehl
+        if [ -z "$TARGET_USER" ] || [ "$TARGET_USER" = "root" ]; then
+            TARGET_USER=$(who | grep '(:[0-9])' | awk '{print $1}' | head -n 1)
         fi
     fi
-
-    if [ -z "$TARGET_USER" ] || [ "$TARGET_USER" = "root" ]; then
-        lh_log_msg "WARN" "Konnte den Desktop-Benutzer nicht eindeutig ermitteln. Operationen erfordern möglicherweise manuelle Eingriffe."
-        return 1
-    fi
+fi
 
     # Umgebungsvariablen setzen/überschreiben, falls ermittelt
     # DISPLAY: Standardmäßig :0, wenn nicht anders gefunden (häufigster Fall für die Hauptsession)
@@ -562,10 +580,32 @@ function lh_get_target_user_info() {
     if [ ! -d "$USER_XDG_RUNTIME_DIR" ]; then
         lh_log_msg "WARN" "XDG_RUNTIME_DIR für Benutzer $TARGET_USER konnte nicht ermittelt oder ist ungültig."
     fi
-
+    
     # DBUS_SESSION_BUS_ADDRESS
     if [ -z "$USER_DBUS_SESSION_BUS_ADDRESS" ]; then
-        USER_DBUS_SESSION_BUS_ADDRESS=$(sudo -u "$TARGET_USER" env | grep '^DBUS_SESSION_BUS_ADDRESS=' | cut -d= -f2)
+        # Versuche mehrere Methoden zur D-Bus Erkennung
+        USER_DBUS_SESSION_BUS_ADDRESS=$(sudo -u "$TARGET_USER" env 2>/dev/null | grep '^DBUS_SESSION_BUS_ADDRESS=' | cut -d= -f2-)
+        
+        # Fallback 1: Standard Unix Socket
+        if [ -z "$USER_DBUS_SESSION_BUS_ADDRESS" ] && [ -d "$USER_XDG_RUNTIME_DIR" ]; then
+            if [ -S "$USER_XDG_RUNTIME_DIR/bus" ]; then
+                USER_DBUS_SESSION_BUS_ADDRESS="unix:path=$USER_XDG_RUNTIME_DIR/bus"
+            fi
+        fi
+        
+        # Fallback 2: Suche nach D-Bus Prozessen
+        if [ -z "$USER_DBUS_SESSION_BUS_ADDRESS" ]; then
+            local dbus_address=$(ps -u "$TARGET_USER" -o pid,command | grep "dbus-daemon.*--session" | head -n 1 | awk '{print $1}')
+            if [ -n "$dbus_address" ]; then
+                # Versuche die Adresse aus den Umgebungsvariablen des Prozesses zu extrahieren
+                local dbus_env=$(cat "/proc/$dbus_address/environ" 2>/dev/null | tr '\0' '\n' | grep "^DBUS_SESSION_BUS_ADDRESS=" | cut -d= -f2-)
+                if [ -n "$dbus_env" ]; then
+                    USER_DBUS_SESSION_BUS_ADDRESS="$dbus_env"
+                fi
+            fi
+        fi
+        
+        # Letzter Fallback
         USER_DBUS_SESSION_BUS_ADDRESS="${USER_DBUS_SESSION_BUS_ADDRESS:-unix:path=$USER_XDG_RUNTIME_DIR/bus}"
     fi
 
