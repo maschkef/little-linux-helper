@@ -134,15 +134,110 @@ check_btrfs_support() {
     echo "$btrfs_available"
 }
 
+# Globale Variable für aktuellen temporären Snapshot
+CURRENT_TEMP_SNAPSHOT=""
+
+# Hilfsfunktion: Aufräumen bei Unterbrechung
+cleanup_on_exit() {
+    local exit_code=$?
+    
+    if [ -n "$CURRENT_TEMP_SNAPSHOT" ]; then
+        backup_log_msg "WARN" "Räume temporären Snapshot aufgrund von Unterbrechung auf: $CURRENT_TEMP_SNAPSHOT"
+        echo -e "${LH_COLOR_WARNING}Räume temporären Snapshot auf...${LH_COLOR_RESET}"
+        if [ -d "$CURRENT_TEMP_SNAPSHOT" ]; then
+            btrfs subvolume delete "$CURRENT_TEMP_SNAPSHOT" 2>/dev/null || true
+        fi
+    fi
+    
+    # Trap zurücksetzen
+    trap - INT TERM EXIT
+    
+    if [ $exit_code -ne 0 ]; then
+        backup_log_msg "ERROR" "Backup wurde durch Signal unterbrochen (Exit-Code: $exit_code)"
+        echo -e "${LH_COLOR_ERROR}Backup wurde unterbrochen.${LH_COLOR_RESET}"
+    fi
+    
+    exit $exit_code
+}
+
+# Hilfsfunktion: Aufräumen verwaister temporärer Snapshots
+cleanup_orphaned_temp_snapshots() {
+    backup_log_msg "INFO" "Prüfe auf verwaiste temporäre Snapshots"
+    
+    if [ ! -d "$LH_TEMP_SNAPSHOT_DIR" ]; then
+        return 0
+    fi
+    
+    local orphaned_count=0
+    for snapshot_path in "$LH_TEMP_SNAPSHOT_DIR"/*; do
+        if [ -d "$snapshot_path" ]; then
+            # Prüfe ob es sich um einen BTRFS-Subvolume handelt
+            if btrfs subvolume show "$snapshot_path" >/dev/null 2>&1; then
+                local snapshot_name=$(basename "$snapshot_path")
+                backup_log_msg "WARN" "Verwaister temporärer Snapshot gefunden: $snapshot_name"
+                echo -e "${LH_COLOR_WARNING}Entferne verwaisten temporären Snapshot: $snapshot_name${LH_COLOR_RESET}"
+                
+                if btrfs subvolume delete "$snapshot_path" 2>/dev/null; then
+                    backup_log_msg "INFO" "Verwaister Snapshot erfolgreich entfernt: $snapshot_name"
+                    orphaned_count=$((orphaned_count + 1))
+                else
+                    backup_log_msg "ERROR" "Fehler beim Entfernen von verwaistem Snapshot: $snapshot_name"
+                fi
+            fi
+        fi
+    done
+    
+    if [ $orphaned_count -gt 0 ]; then
+        backup_log_msg "INFO" "Insgesamt $orphaned_count verwaiste temporäre Snapshots entfernt"
+    else
+        backup_log_msg "INFO" "Keine verwaisten temporären Snapshots gefunden"
+    fi
+}
+
+# Hilfsfunktion: Sicheres Aufräumen eines temporären Snapshots + Marker
+safe_cleanup_temp_snapshot() {
+    local snapshot_path="$1"
+    local snapshot_name="$(basename "$snapshot_path")"
+    if [ -d "$snapshot_path" ]; then
+        backup_log_msg "INFO" "Räume temporären Snapshot auf: $snapshot_path"
+        # Temporäre Snapshots sollten keine .backup_complete Marker haben,
+        # da diese nur für finale Backups im Zielverzeichnis erstellt werden.
+        # Das Löschen eines Markers hier ist daher nicht notwendig.
+        # Mehrere Versuche für robustes Löschen
+        local max_attempts=3
+        local attempt=1
+        
+        while [ $attempt -le $max_attempts ]; do
+            if btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1; then
+                backup_log_msg "INFO" "Temporärer Snapshot erfolgreich gelöscht: $snapshot_name"
+                return 0
+            else
+                backup_log_msg "WARN" "Versuch $attempt/$max_attempts zum Löschen von $snapshot_name fehlgeschlagen"
+                if [ $attempt -lt $max_attempts ]; then
+                    sleep 2
+                fi
+                ((attempt++))
+            fi
+        done
+        
+        backup_log_msg "ERROR" "Konnte temporären Snapshot nicht löschen: $snapshot_path"
+        return 1
+    fi
+}
+
 # BTRFS Backup Hauptfunktion
 btrfs_backup() {
     lh_print_header "BTRFS Snapshot Backup"
+    
+    # Signal-Handler für sauberes Aufräumen bei Unterbrechung
+    trap cleanup_on_exit INT TERM EXIT
     
     # BTRFS-Unterstützung prüfen
     local btrfs_supported=$(check_btrfs_support)
     if [ "$btrfs_supported" = "false" ]; then
         echo -e "${LH_COLOR_WARNING}BTRFS wird nicht unterstützt oder ist nicht verfügbar.${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}Dieses System verwendet kein BTRFS oder die erforderlichen Tools fehlen.${LH_COLOR_RESET}"
+        trap - INT TERM EXIT
         return 1
     fi
     
@@ -151,10 +246,12 @@ btrfs_backup() {
         echo -e "${LH_COLOR_WARNING}WARNUNG: BTRFS-Backup benötigt root-Rechte.${LH_COLOR_RESET}"
         if lh_confirm_action "Mit sudo ausführen?" "y"; then
             backup_log_msg "INFO" "Starte BTRFS-Backup mit sudo"
+            trap - INT TERM EXIT
             sudo "$0" btrfs-backup
             return $?
         else
             echo -e "${LH_COLOR_INFO}Backup abgebrochen.${LH_COLOR_RESET}"
+            trap - INT TERM EXIT
             return 1
         fi
     fi
@@ -216,6 +313,7 @@ btrfs_backup() {
     if [ $? -ne 0 ]; then
         backup_log_msg "ERROR" "Konnte Backup-Verzeichnis nicht erstellen"
         echo -e "${LH_COLOR_ERROR}Fehler beim Erstellen des Backup-Verzeichnisses. Überprüfen Sie die Berechtigungen.${LH_COLOR_RESET}"
+        trap - INT TERM EXIT
         return 1
     fi
     
@@ -224,8 +322,12 @@ btrfs_backup() {
     if [ $? -ne 0 ]; then
         backup_log_msg "ERROR" "Konnte temporäres Snapshot-Verzeichnis nicht erstellen."
         echo -e "${LH_COLOR_ERROR}Fehler beim Erstellen des temporären Snapshot-Verzeichnisses.${LH_COLOR_RESET}"
+        trap - INT TERM EXIT
         return 1
     fi
+    
+    # Aufräumen verwaister temporärer Snapshots
+    cleanup_orphaned_temp_snapshots
     
     # Timeshift-Erkennung
     local timeshift_available=false
@@ -299,6 +401,9 @@ btrfs_backup() {
         local snapshot_name="$subvol-$timestamp"
         local snapshot_path="$LH_TEMP_SNAPSHOT_DIR/$snapshot_name"
         
+        # Globale Variable für Cleanup bei Unterbrechung
+        CURRENT_TEMP_SNAPSHOT="$snapshot_path"
+        
         # Snapshot erstellen
         if [ "$timeshift_available" = "true" ] && [ -d "$timeshift_snapshot_dir/$subvol" ]; then
             # Von Timeshift-Snapshot erstellen
@@ -312,6 +417,7 @@ btrfs_backup() {
                 create_direct_snapshot "$subvol" "$timestamp"
                 if [ $? -ne 0 ]; then
                     echo -e "${LH_COLOR_ERROR}Fehler bei $subvol, überspringe dieses Subvolume.${LH_COLOR_RESET}"
+                    CURRENT_TEMP_SNAPSHOT=""
                     continue
                 fi
             else
@@ -322,6 +428,7 @@ btrfs_backup() {
             create_direct_snapshot "$subvol" "$timestamp"
             if [ $? -ne 0 ]; then
                 echo -e "${LH_COLOR_ERROR}Fehler bei $subvol, überspringe dieses Subvolume.${LH_COLOR_RESET}"
+                CURRENT_TEMP_SNAPSHOT=""
                 continue
             fi
         fi
@@ -331,8 +438,9 @@ btrfs_backup() {
         mkdir -p "$backup_subvol_dir"
         if [ $? -ne 0 ]; then
             backup_log_msg "ERROR" "Konnte Backup-Verzeichnis für $subvol nicht erstellen"
-            # Temporären Snapshot aufräumen
-            btrfs subvolume delete "$snapshot_path"
+            # Sicheres Aufräumen des temporären Snapshots
+            safe_cleanup_temp_snapshot "$snapshot_path"
+            CURRENT_TEMP_SNAPSHOT=""
             continue
         fi
         
@@ -346,7 +454,7 @@ btrfs_backup() {
         if [ -n "$last_backup" ]; then
             backup_log_msg "INFO" "Vorheriges Backup gefunden: $last_backup"
             # Derzeit nur vollständige Backups, inkrementell für später
-            backup_log_msg "INFO" "Sende vollständigen Snapshot (für Zuverlässigkeit)"
+            backup_log_msg "INFO" "Sende vollständigen Snapshot (derzeit kein inkrementelles Backup implementiert)"
             btrfs send "$snapshot_path" | btrfs receive "$backup_subvol_dir"
             local send_status=$?
         else
@@ -362,21 +470,40 @@ btrfs_backup() {
         else
             backup_log_msg "INFO" "Snapshot erfolgreich übertragen: $backup_subvol_dir/$snapshot_name"
             echo -e "${LH_COLOR_SUCCESS}Backup von $subvol erfolgreich.${LH_COLOR_RESET}"
+            
+            # Backup-Marker erstellen
+            if ! create_backup_marker "$backup_subvol_dir/$snapshot_name" "$timestamp" "$subvol"; then
+                backup_log_msg "ERROR" "Konnte Backup-Marker für $backup_subvol_dir/$snapshot_name nicht erstellen. Das Backup könnte als unvollständig markiert werden."
+                echo -e "${LH_COLOR_WARNING}WARNUNG: Backup-Marker konnte nicht erstellt werden für $snapshot_name. Das Backup ist möglicherweise nicht als vollständig verifizierbar.${LH_COLOR_RESET}"
+                # Optional: Hier könnte man den send_status auf einen Fehlercode setzen, um die Gesamt-Backup-Session als fehlerhaft zu markieren
+            else
+                backup_log_msg "INFO" "Backup-Marker erfolgreich erstellt für $snapshot_name."
+            fi
         fi
         
-        # Temporären Snapshot aufräumen
-        backup_log_msg "INFO" "Räume temporären Snapshot auf: $snapshot_path"
-        btrfs subvolume delete "$snapshot_path"
+        # Sicheres Aufräumen des temporären Snapshots
+        safe_cleanup_temp_snapshot "$snapshot_path"
+        
+        # Variable zurücksetzen
+        CURRENT_TEMP_SNAPSHOT=""
         
         # Alte Backups aufräumen
         backup_log_msg "INFO" "Räume alte Backups für $subvol auf"
         ls -1d "$backup_subvol_dir/$subvol-"* 2>/dev/null | sort | head -n "-$LH_RETENTION_BACKUP" | while read backup; do
-            backup_log_msg "INFO" "Entferne altes Backup: $backup"
-            btrfs subvolume delete "$backup"
+            local marker_file_to_delete="${backup}.backup_complete"
+            backup_log_msg "INFO" "Entferne altes Backup: $backup und Marker: $marker_file_to_delete"
+            if btrfs subvolume delete "$backup"; then
+                rm -f "$marker_file_to_delete"
+            else
+                backup_log_msg "ERROR" "Fehler beim Löschen des alten Backups: $backup"
+            fi
         done
         
         echo "" # Empty line for spacing
     done
+  
+    # Trap zurücksetzen
+    trap - INT TERM EXIT
     
     echo -e "${LH_COLOR_SEPARATOR}----------------------------------------${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SUCCESS}Backup-Session abgeschlossen: $timestamp${LH_COLOR_RESET}"
@@ -395,6 +522,693 @@ btrfs_backup() {
         echo -e "  ${LH_COLOR_INFO}Status:${LH_COLOR_RESET} ${LH_COLOR_ERROR}MIT FEHLERN ABGESCHLOSSEN (siehe $LH_BACKUP_LOG)${LH_COLOR_RESET}"
     else
         echo -e "  ${LH_COLOR_INFO}Status:${LH_COLOR_RESET} ${LH_COLOR_SUCCESS}ERFOLGREICH${LH_COLOR_RESET}"
+    fi
+    
+    # Fehlerprüfung und Desktop-Benachrichtigung
+    if grep -q "ERROR" "$LH_BACKUP_LOG"; then
+        echo -e "  ${LH_COLOR_INFO}Status:${LH_COLOR_RESET} ${LH_COLOR_ERROR}MIT FEHLERN ABGESCHLOSSEN (siehe $LH_BACKUP_LOG)${LH_COLOR_RESET}"
+        
+        # Desktop-Benachrichtigung für Fehler
+        lh_send_notification "error" \
+            "❌ BTRFS Backup fehlgeschlagen" \
+            "Fehler beim Backup der Subvolumes: ${subvolumes[*]}\nZeitpunkt: $timestamp\nSiehe Log: $(basename "$LH_BACKUP_LOG")"
+    else
+        echo -e "  ${LH_COLOR_INFO}Status:${LH_COLOR_RESET} ${LH_COLOR_SUCCESS}ERFOLGREICH${LH_COLOR_RESET}"
+        
+        # Desktop-Benachrichtigung für Erfolg
+        lh_send_notification "success" \
+            "✅ BTRFS Backup erfolgreich" \
+            "Alle Subvolumes erfolgreich gesichert: ${subvolumes[*]}\nZiel: $LH_BACKUP_ROOT$LH_BACKUP_DIR\nZeitpunkt: $timestamp"
+    fi
+    
+    return 0
+}
+
+# Funktion zum Aufräumen verwaister temporärer Snapshots
+cleanup_orphaned_temp_snapshots() {
+    backup_log_msg "INFO" "Prüfe auf verwaiste temporäre Snapshots"
+    
+    if [ ! -d "$LH_TEMP_SNAPSHOT_DIR" ]; then
+        return 0
+    fi
+    
+    # Suche nach temporären Snapshots (Muster: @-YYYY-MM-DD_HH-MM-SS oder @home-YYYY-MM-DD_HH-MM-SS)
+    local orphaned_snapshots=($(find "$LH_TEMP_SNAPSHOT_DIR" -maxdepth 1 -name "@-20*" -o -name "@home-20*" 2>/dev/null))
+    
+    if [ ${#orphaned_snapshots[@]} -gt 0 ]; then
+        echo -e "${LH_COLOR_WARNING}Gefunden: ${#orphaned_snapshots[@]} verwaiste temporäre Snapshots${LH_COLOR_RESET}"
+        
+        for snapshot in "${orphaned_snapshots[@]}"; do
+            echo -e "${LH_COLOR_INFO}Gefunden: $(basename "$snapshot")${LH_COLOR_RESET}"
+        done
+        
+        if lh_confirm_action "Verwaiste temporäre Snapshots aufräumen?" "y"; then
+            local cleaned_count=0
+            local error_count=0
+            
+            for snapshot in "${orphaned_snapshots[@]}"; do
+                backup_log_msg "INFO" "Räume verwaisten temporären Snapshot auf: $snapshot"
+                echo -e "${LH_COLOR_INFO}Lösche: $(basename "$snapshot")${LH_COLOR_RESET}"
+                
+                if btrfs subvolume delete "$snapshot" >/dev/null 2>&1; then
+                    echo -e "  ${LH_COLOR_SUCCESS}✓ Erfolgreich gelöscht${LH_COLOR_RESET}"
+                    ((cleaned_count++))
+                else
+                    echo -e "  ${LH_COLOR_ERROR}✗ Fehler beim Löschen${LH_COLOR_RESET}"
+                    backup_log_msg "ERROR" "Fehler beim Löschen des verwaisten Snapshots: $snapshot"
+                    ((error_count++))
+                fi
+            done
+            
+            echo -e "${LH_COLOR_SUCCESS}Aufgeräumt: $cleaned_count Snapshots${LH_COLOR_RESET}"
+            if [ $error_count -gt 0 ]; then
+                echo -e "${LH_COLOR_ERROR}Fehler: $error_count Snapshots${LH_COLOR_RESET}"
+            fi
+        else
+            backup_log_msg "INFO" "Aufräumen verwaister Snapshots übersprungen"
+        fi
+    else
+        backup_log_msg "INFO" "Keine verwaisten temporären Snapshots gefunden"
+    fi
+}
+
+# Verbesserte Aufräum-Funktion mit Fehlerbehandlung
+safe_cleanup_temp_snapshot() {
+    local snapshot_path="$1"
+    local snapshot_name="$(basename "$snapshot_path")"
+    
+    if [ -d "$snapshot_path" ]; then
+        backup_log_msg "INFO" "Räume temporären Snapshot auf: $snapshot_path"
+        
+        # Mehrere Versuche für robustes Löschen
+        local max_attempts=3
+        local attempt=1
+        
+        while [ $attempt -le $max_attempts ]; do
+            if btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1; then
+                backup_log_msg "INFO" "Temporärer Snapshot erfolgreich gelöscht: $snapshot_name"
+                return 0
+            else
+                backup_log_msg "WARN" "Versuch $attempt/$max_attempts zum Löschen von $snapshot_name fehlgeschlagen"
+                if [ $attempt -lt $max_attempts ]; then
+                    sleep 2  # Kurz warten vor erneutem Versuch
+                fi
+                ((attempt++))
+            fi
+        done
+        
+        backup_log_msg "ERROR" "Konnte temporären Snapshot nicht löschen: $snapshot_path"
+        echo -e "${LH_COLOR_WARNING}WARNUNG: Temporärer Snapshot konnte nicht gelöscht werden: $snapshot_name${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Bitte manuell löschen mit: sudo btrfs subvolume delete \"$snapshot_path\"${LH_COLOR_RESET}"
+        return 1
+    fi
+}
+
+# Trap-Handler für sauberes Aufräumen bei Unterbrechung
+cleanup_on_exit() {
+    local exit_code=$?
+    
+    if [ -n "$CURRENT_TEMP_SNAPSHOT" ] && [ -d "$CURRENT_TEMP_SNAPSHOT" ]; then
+        echo ""
+        echo -e "${LH_COLOR_WARNING}Backup unterbrochen - räume temporären Snapshot auf...${LH_COLOR_RESET}"
+        backup_log_msg "WARN" "Backup unterbrochen, räume temporären Snapshot auf: $CURRENT_TEMP_SNAPSHOT"
+        
+        if btrfs subvolume delete "$CURRENT_TEMP_SNAPSHOT" >/dev/null 2>&1; then
+            echo -e "${LH_COLOR_SUCCESS}Temporärer Snapshot aufgeräumt.${LH_COLOR_RESET}"
+            backup_log_msg "INFO" "Temporärer Snapshot bei Unterbrechung erfolgreich aufgeräumt"
+        else
+            echo -e "${LH_COLOR_ERROR}Fehler beim Aufräumen des temporären Snapshots!${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Bitte manuell löschen: sudo btrfs subvolume delete \"$CURRENT_TEMP_SNAPSHOT\"${LH_COLOR_RESET}"
+            backup_log_msg "ERROR" "Konnte temporären Snapshot bei Unterbrechung nicht aufräumen: $CURRENT_TEMP_SNAPSHOT"
+        fi
+    fi
+    
+    exit $exit_code
+}
+
+# BTRFS Backup Löschfunktion
+delete_btrfs_backups() {
+    lh_print_header "BTRFS Backup Löschen"
+    
+    # Root-Rechte prüfen
+    if [ "$EUID" -ne 0 ]; then
+        echo -e "${LH_COLOR_WARNING}WARNUNG: Das Löschen von BTRFS-Backups benötigt root-Rechte.${LH_COLOR_RESET}"
+        if lh_confirm_action "Mit sudo ausführen?" "y"; then
+            backup_log_msg "INFO" "Starte BTRFS-Backup-Löschung mit sudo"
+            sudo "$0" delete-btrfs-backups
+            return $?
+        else
+            echo -e "${LH_COLOR_INFO}Löschvorgang abgebrochen.${LH_COLOR_RESET}"
+            return 1
+        fi
+    fi
+    
+    # Backup-Verzeichnis prüfen
+    if [ ! -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
+        echo -e "${LH_COLOR_WARNING}Keine Backups gefunden unter $LH_BACKUP_ROOT$LH_BACKUP_DIR${LH_COLOR_RESET}"
+        return 1
+    fi
+    
+    # Verfügbare Subvolumes auflisten
+    echo -e "${LH_COLOR_INFO}Verfügbare BTRFS Backup-Subvolumes:${LH_COLOR_RESET}"
+    local subvols=($(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | grep -E '^(@|@home)$'))
+    
+    if [ ${#subvols[@]} -eq 0 ]; then
+        echo -e "${LH_COLOR_WARNING}Keine BTRFS Backups gefunden.${LH_COLOR_RESET}"
+        return 1
+    fi
+    
+    # Subvolume auswählen
+    echo -e "${LH_COLOR_PROMPT}Für welches Subvolume möchten Sie Backups löschen?${LH_COLOR_RESET}"
+    for i in "${!subvols[@]}"; do
+        local subvol="${subvols[i]}"
+        local count=$(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" 2>/dev/null | wc -l)
+        echo -e "  ${LH_COLOR_MENU_NUMBER}$((i+1)).${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$subvol${LH_COLOR_RESET} ${LH_COLOR_INFO}($count Snapshots)${LH_COLOR_RESET}"
+    done
+    echo -e "  ${LH_COLOR_MENU_NUMBER}$((${#subvols[@]}+1)).${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Alle Subvolumes${LH_COLOR_RESET}"
+    
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option (1-$((${#subvols[@]}+1))): ${LH_COLOR_RESET}")" choice
+    
+    local selected_subvols=()
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#subvols[@]}" ]; then
+        selected_subvols=("${subvols[$((choice-1))]}")
+    elif [ "$choice" -eq $((${#subvols[@]}+1)) ]; then
+        selected_subvols=("${subvols[@]}")
+    else
+        echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
+        return 1
+    fi
+    
+    # Für jedes ausgewählte Subvolume
+    for subvol in "${selected_subvols[@]}"; do
+        echo ""
+        echo -e "${LH_COLOR_HEADER}=== Subvolume: $subvol ===${LH_COLOR_RESET}"
+        
+        # Verfügbare Snapshots auflisten
+        local snapshots=($(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" 2>/dev/null | grep -v '\.backup_complete$' | sort -r))
+        
+        if [ ${#snapshots[@]} -eq 0 ]; then
+            echo -e "${LH_COLOR_WARNING}Keine Snapshots für $subvol gefunden.${LH_COLOR_RESET}"
+            continue
+        fi
+        
+        list_snapshots_with_integrity "$subvol"
+        
+        echo ""
+        echo -e "${LH_COLOR_PROMPT}Löschoptionen für $subvol:${LH_COLOR_RESET}"
+        echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Einzelne Snapshots auswählen${LH_COLOR_RESET}"
+        echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Alte Snapshots automatisch löschen (mehr als Retention-Limit)${LH_COLOR_RESET}"
+        echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Snapshots älter als X Tage${LH_COLOR_RESET}"
+        echo -e "  ${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}ALLE Snapshots (GEFÄHRLICH!)${LH_COLOR_RESET}"
+        echo -e "  ${LH_COLOR_MENU_NUMBER}0.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Überspringen${LH_COLOR_RESET}"
+        
+        read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option (0-4): ${LH_COLOR_RESET}")" delete_choice
+        
+        local snapshots_to_delete=()
+        
+        case $delete_choice in
+            1)
+                # Einzelne Snapshots auswählen
+                echo -e "${LH_COLOR_PROMPT}Geben Sie die Nummern der zu löschenden Snapshots ein (durch Leerzeichen getrennt):${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}Beispiel: 1 3 5${LH_COLOR_RESET}"
+                read -r -p "$(echo -e "${LH_COLOR_PROMPT}Eingabe: ${LH_COLOR_RESET}")" selection
+                
+                for num in $selection; do
+                    if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le "${#snapshots[@]}" ]; then
+                        snapshots_to_delete+=("${snapshots[$((num-1))]}")
+                    else
+                        echo -e "${LH_COLOR_WARNING}Ungültige Nummer ignoriert: $num${LH_COLOR_RESET}"
+                    fi
+                done
+                ;;
+            2)
+                # Automatisch alte Snapshots löschen
+                if [ "${#snapshots[@]}" -gt "$LH_RETENTION_BACKUP" ]; then
+                    local excess_count=$((${#snapshots[@]} - LH_RETENTION_BACKUP))
+                    echo -e "${LH_COLOR_INFO}Aktuelle Snapshots: ${#snapshots[@]}, Retention-Limit: $LH_RETENTION_BACKUP${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}Überschuss: $excess_count Snapshots${LH_COLOR_RESET}"
+                    
+                    # Die ältesten überschüssigen Snapshots auswählen
+                    for ((i=${#snapshots[@]}-excess_count; i<${#snapshots[@]}; i++)); do
+                        snapshots_to_delete+=("${snapshots[i]}")
+                    done
+                else
+                    echo -e "${LH_COLOR_INFO}Anzahl Snapshots (${#snapshots[@]}) ist innerhalb des Retention-Limits ($LH_RETENTION_BACKUP).${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}Keine Snapshots zum automatischen Löschen.${LH_COLOR_RESET}"
+                    continue
+                fi
+                ;;
+            3)
+                # Snapshots älter als X Tage
+                local days=$(lh_ask_for_input "Snapshots älter als wie viele Tage sollen gelöscht werden?" "^[0-9]+$" "Bitte eine Zahl eingeben")
+                if [ -n "$days" ]; then
+                    local cutoff_date=$(date -d "$days days ago" +%Y-%m-%d_%H-%M-%S)
+                    echo -e "${LH_COLOR_INFO}Suche Snapshots älter als $days Tage (vor $cutoff_date)...${LH_COLOR_RESET}"
+                    
+                    for snapshot in "${snapshots[@]}"; do
+                        local timestamp_part=$(echo "$snapshot" | sed "s/^$subvol-//")
+                        # Vergleiche Timestamps (einfache String-Vergleichung funktioniert bei diesem Format)
+                        if [[ "$timestamp_part" < "$cutoff_date" ]]; then
+                            snapshots_to_delete+=("$snapshot")
+                        fi
+                    done
+                    
+                    if [ ${#snapshots_to_delete[@]} -eq 0 ]; then
+                        echo -e "${LH_COLOR_INFO}Keine Snapshots älter als $days Tage gefunden.${LH_COLOR_RESET}"
+                        continue
+                    fi
+                else
+                    echo -e "${LH_COLOR_ERROR}Ungültige Eingabe.${LH_COLOR_RESET}"
+                    continue
+                fi
+                ;;
+            4)
+                # ALLE Snapshots löschen
+                echo -e "${LH_COLOR_BOLD_RED}=== ACHTUNG: ALLE SNAPSHOTS LÖSCHEN ===${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_WARNING}Dies wird ALLE ${#snapshots[@]} Snapshots für $subvol unwiderruflich löschen!${LH_COLOR_RESET}"
+                if lh_confirm_action "Sind Sie WIRKLICH sicher?" "n"; then
+                    if lh_confirm_action "Letzte Bestätigung: ALLE $subvol Snapshots löschen?" "n"; then
+                        snapshots_to_delete=("${snapshots[@]}")
+                    else
+                        echo -e "${LH_COLOR_INFO}Abgebrochen.${LH_COLOR_RESET}"
+                        continue
+                    fi
+                else
+                    echo -e "${LH_COLOR_INFO}Abgebrochen.${LH_COLOR_RESET}"
+                    continue
+                fi
+                ;;
+            0)
+                # Überspringen
+                echo -e "${LH_COLOR_INFO}Subvolume $subvol übersprungen.${LH_COLOR_RESET}"
+                continue
+                ;;
+            *)
+                echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
+                continue
+                ;;
+        esac
+        
+        # Bestätigung für die Löschung
+        if [ ${#snapshots_to_delete[@]} -gt 0 ]; then
+            echo ""
+            echo -e "${LH_COLOR_HEADER}=== ZU LÖSCHENDE SNAPSHOTS ===${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Subvolume: $subvol${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Anzahl: ${#snapshots_to_delete[@]} Snapshots${LH_COLOR_RESET}"
+            echo ""
+            echo -e "${LH_COLOR_INFO}Liste der zu löschenden Snapshots:${LH_COLOR_RESET}"
+            for snapshot in "${snapshots_to_delete[@]}"; do
+                local timestamp_part=$(echo "$snapshot" | sed "s/^$subvol-//")
+                local formatted_date=$(echo "$timestamp_part" | sed 's/_/ /g' | sed 's/-/:/g' | cut -c1-19)
+                echo -e "  ${LH_COLOR_WARNING}▶${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$snapshot${LH_COLOR_RESET} ${LH_COLOR_INFO}($formatted_date)${LH_COLOR_RESET}"
+            done
+            
+            echo ""
+            echo -e "${LH_COLOR_BOLD_RED}=== WARNUNG ===${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}Diese Aktion kann NICHT rückgängig gemacht werden!${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}Die ausgewählten Backups werden permanent gelöscht!${LH_COLOR_RESET}"
+            
+            if lh_confirm_action "Möchten Sie diese ${#snapshots_to_delete[@]} Snapshots wirklich löschen?" "n"; then
+                echo ""
+                echo -e "${LH_COLOR_INFO}Lösche Snapshots...${LH_COLOR_RESET}"
+                
+                local success_count=0
+                local error_count=0
+                
+                for snapshot in "${snapshots_to_delete[@]}"; do
+                    local snapshot_path="$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol/$snapshot"
+                    local marker_file_to_delete="${snapshot_path}.backup_complete"
+                    
+                    echo -e "${LH_COLOR_INFO}Lösche: $snapshot${LH_COLOR_RESET}"
+                    backup_log_msg "INFO" "Lösche BTRFS-Snapshot: $snapshot_path"
+                    
+                    # BTRFS Subvolume löschen
+                    if btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1; then
+                        # Marker-Datei ebenfalls löschen
+                        if [ -f "$marker_file_to_delete" ]; then
+                            rm -f "$marker_file_to_delete"
+                            backup_log_msg "INFO" "Marker-Datei gelöscht: $marker_file_to_delete"
+                        fi
+                        echo -e "  ${LH_COLOR_SUCCESS}✓ Erfolgreich gelöscht${LH_COLOR_RESET}"
+                        backup_log_msg "INFO" "BTRFS-Snapshot erfolgreich gelöscht: $snapshot_path"
+                        ((success_count++))
+                    else
+                        echo -e "  ${LH_COLOR_ERROR}✗ Fehler beim Löschen${LH_COLOR_RESET}"
+                        backup_log_msg "ERROR" "Fehler beim Löschen von BTRFS-Snapshot: $snapshot_path"
+                        ((error_count++))
+                    fi
+                done
+                
+                echo ""
+                echo -e "${LH_COLOR_HEADER}=== LÖSCHERGEBNIS für $subvol ===${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SUCCESS}Erfolgreich gelöscht: $success_count Snapshots${LH_COLOR_RESET}"
+                if [ $error_count -gt 0 ]; then
+                    echo -e "${LH_COLOR_ERROR}Fehler beim Löschen: $error_count Snapshots${LH_COLOR_RESET}"
+                fi
+                
+                backup_log_msg "INFO" "BTRFS-Löschvorgang abgeschlossen für $subvol: $success_count erfolgreich, $error_count Fehler"
+            else
+                echo -e "${LH_COLOR_INFO}Löschvorgang für $subvol abgebrochen.${LH_COLOR_RESET}"
+            fi
+        fi
+    done
+    
+    echo ""
+    echo -e "${LH_COLOR_SUCCESS}BTRFS-Backup-Löschvorgang abgeschlossen.${LH_COLOR_RESET}"
+    backup_log_msg "INFO" "BTRFS-Backup-Löschvorgang abgeschlossen"
+    
+    return 0
+}
+
+# Funktion zur Erkennung unvollständiger BTRFS-Backups
+check_backup_integrity() {
+    local snapshot_path="$1"
+    local snapshot_name="$2"
+    local subvol="$3"
+    
+    local issues=()
+    local status="OK"
+    
+    # 1. Marker-Datei prüfen (neben dem Snapshot)
+    local marker_file="${snapshot_path}.backup_complete"
+    if [ ! -f "$marker_file" ]; then
+        issues+=("Keine Abschluss-Markierung")
+        status="UNVOLLSTÄNDIG"
+    else
+        # Marker-Datei validieren
+        if ! grep -q "BACKUP_COMPLETED=" "$marker_file" || \
+           ! grep -q "BACKUP_TIMESTAMP=" "$marker_file"; then
+            issues+=("Ungültige Abschluss-Markierung")
+            status="VERDÄCHTIG"
+        fi
+    fi
+    
+    # 2. Log-Datei prüfen
+    if [ -f "$LH_BACKUP_LOG" ]; then
+        local success_pattern="Snapshot erfolgreich übertragen.*$snapshot_name"
+        if ! grep -q "$success_pattern" "$LH_BACKUP_LOG"; then
+            issues+=("Kein Erfolgs-Eintrag im Log")
+            if [ "$status" = "OK" ]; then
+                status="VERDÄCHTIG"
+            fi
+        fi
+    fi
+    
+    # 3. BTRFS-Snapshot-Integrität prüfen
+    if ! btrfs subvolume show "$snapshot_path" >/dev/null 2>&1; then
+        issues+=("BTRFS-Snapshot beschädigt")
+        status="BESCHÄDIGT"
+    fi
+    
+    # 4. Größenvergleich (nur wenn mehrere Snapshots vorhanden)
+    local subvol_dir="$(dirname "$snapshot_path")"
+    local other_snapshots=($(ls -1 "$subvol_dir" | grep -v "^$(basename "$snapshot_path")$" | head -3))
+    
+    if [ ${#other_snapshots[@]} -gt 0 ]; then
+        local current_size=$(du -sb "$snapshot_path" 2>/dev/null | cut -f1)
+        local avg_size=0
+        local count=0
+        
+        for other in "${other_snapshots[@]}"; do
+            local other_path="$subvol_dir/$other"
+            if [ -d "$other_path" ]; then
+                local other_size=$(du -sb "$other_path" 2>/dev/null | cut -f1)
+                if [ -n "$other_size" ] && [ "$other_size" -gt 0 ]; then
+                    avg_size=$((avg_size + other_size))
+                    ((count++))
+                fi
+            fi
+        done
+        
+        if [ $count -gt 0 ]; then
+            avg_size=$((avg_size / count))
+            # Wenn aktueller Snapshot weniger als 50% der durchschnittlichen Größe hat
+            local min_size=$((avg_size / 2))
+            if [ "$current_size" -lt "$min_size" ]; then
+                issues+=("Ungewöhnlich klein ($(du -sh "$snapshot_path" | cut -f1) vs. Ø $(echo $avg_size | numfmt --to=iec-i)B)")
+                if [ "$status" = "OK" ]; then
+                    status="VERDÄCHTIG"
+                fi
+            fi
+        fi
+    fi
+    
+    # 5. Zeitstempel-Plausibilität prüfen
+    local snapshot_time=$(stat -c %Y "$snapshot_path" 2>/dev/null)
+    local current_time=$(date +%s)
+    local time_diff=$((current_time - snapshot_time))
+    
+    # Wenn Snapshot während der letzten 30 Minuten erstellt wurde, aber keine Marker-Datei hat
+    if [ $time_diff -lt 1800 ] && [ ! -f "$marker_file" ]; then
+        if [ "$status" = "OK" ]; then
+            status="WIRD_ERSTELLT"
+        fi
+    fi
+    
+    # Ergebnis zurückgeben
+    echo "$status|${issues[*]}"
+}
+
+# Marker-Datei erstellen (muss am Ende der erfolgreichen Backup-Übertragung aufgerufen werden)
+create_backup_marker() {
+    local snapshot_path="$1"
+    local timestamp="$2"
+    local subvol="$3"
+    
+    # Marker-Datei NEBEN dem Snapshot erstellen (nicht darin)
+    local marker_file="${snapshot_path}.backup_complete"
+    
+    # Prüfen ob das Verzeichnis beschreibbar ist
+    local parent_dir=$(dirname "$marker_file")
+    if [ ! -w "$parent_dir" ]; then
+        backup_log_msg "ERROR" "Kann nicht in Verzeichnis schreiben: $parent_dir"
+        return 1
+    fi
+    
+    # Marker-Datei erstellen
+    cat > "$marker_file" << EOF
+# BTRFS Backup Completion Marker
+# Generated by little-linux-helper mod_backup.sh
+BACKUP_TIMESTAMP=$timestamp
+BACKUP_SUBVOLUME=$subvol
+BACKUP_COMPLETED=$(date '+%Y-%m-%d %H:%M:%S')
+BACKUP_HOST=$(hostname)
+SCRIPT_VERSION=1.0
+SNAPSHOT_PATH=$snapshot_path
+BACKUP_SIZE=$(du -sb "$snapshot_path" 2>/dev/null | cut -f1 || echo "unknown")
+EOF
+    
+    if [ $? -eq 0 ] && [ -f "$marker_file" ]; then
+        backup_log_msg "INFO" "Backup-Marker erfolgreich erstellt: $marker_file"
+        return 0
+    else
+        backup_log_msg "ERROR" "Konnte Backup-Marker nicht erstellen: $marker_file"
+        return 1
+    fi
+}
+
+# Erweiterte Snapshot-Auflistung mit Integritätsprüfung
+list_snapshots_with_integrity() {
+    local subvol="$1"
+    local snapshot_dir="$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol"
+    
+    if [ ! -d "$snapshot_dir" ]; then
+        echo -e "${LH_COLOR_WARNING}Keine Snapshots für $subvol gefunden.${LH_COLOR_RESET}"
+        return 1
+    fi
+    
+    local snapshots=($(ls -1 "$snapshot_dir" 2>/dev/null | grep -v '\.backup_complete$' | sort -r))
+    
+    if [ ${#snapshots[@]} -eq 0 ]; then
+        echo -e "${LH_COLOR_WARNING}Keine Snapshots für $subvol gefunden.${LH_COLOR_RESET}"
+        return 1
+    fi
+    
+    echo -e "${LH_COLOR_INFO}Verfügbare Snapshots für $subvol:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}Hinweis: Die Auflistung kann je nach Anzahl und Größe der Backups einige Zeit dauern...${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_HEADER}Nr.  Status        Datum/Zeit               Snapshot-Name                     Größe${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}---  ------------  ----------------------  ------------------------------  -------${LH_COLOR_RESET}"
+    
+    for i in "${!snapshots[@]}"; do
+        local snapshot="${snapshots[i]}"
+        local snapshot_path="$snapshot_dir/$snapshot"
+        local timestamp_part=$(echo "$snapshot" | sed "s/^$subvol-//")
+        local formatted_date=$(echo "$timestamp_part" | sed 's/_/ /g' | sed 's/-/:/g' | cut -c1-19)
+        local size=$(du -sh "$snapshot_path" 2>/dev/null | cut -f1 || echo "?")
+        
+        # Integritätsprüfung
+        local integrity_result=$(check_backup_integrity "$snapshot_path" "$snapshot" "$subvol")
+        local integrity_status=$(echo "$integrity_result" | cut -d'|' -f1)
+        local integrity_issues=$(echo "$integrity_result" | cut -d'|' -f2)
+        
+        # Status-Farbe bestimmen
+        local status_color="$LH_COLOR_SUCCESS"
+        local status_text="OK        "
+        
+        case "$integrity_status" in
+            "UNVOLLSTÄNDIG")
+                status_color="$LH_COLOR_ERROR"
+                status_text="UNVOLLS.  "
+                ;;
+            "VERDÄCHTIG")
+                status_color="$LH_COLOR_WARNING"
+                status_text="VERDÄCHT. "
+                ;;
+            "BESCHÄDIGT")
+                status_color="$LH_COLOR_BOLD_RED"
+                status_text="BESCHÄD.  "
+                ;;
+            "WIRD_ERSTELLT")
+                status_color="$LH_COLOR_INFO"
+                status_text="AKTIV     "
+                ;;
+        esac
+        
+        printf "${LH_COLOR_MENU_NUMBER}%3d${LH_COLOR_RESET}  ${status_color}%s${LH_COLOR_RESET}  ${LH_COLOR_INFO}%s${LH_COLOR_RESET}  ${LH_COLOR_MENU_TEXT}%-30s${LH_COLOR_RESET}  ${LH_COLOR_INFO}%s${LH_COLOR_RESET}" \
+               "$((i+1))" "$status_text" "$formatted_date" "$snapshot" "$size"
+        
+        # Zusätzliche Informationen bei Problemen
+        if [ "$integrity_status" != "OK" ] && [ -n "$integrity_issues" ]; then
+            printf " ${LH_COLOR_WARNING}(%s)${LH_COLOR_RESET}" "$integrity_issues"
+        fi
+        
+        echo ""
+    done
+    
+    # Zusammenfassung
+    local total_count=${#snapshots[@]}
+    local ok_count=0
+    local problem_count=0
+    
+    for snapshot in "${snapshots[@]}"; do
+        local snapshot_path="$snapshot_dir/$snapshot"
+        local integrity_result=$(check_backup_integrity "$snapshot_path" "$snapshot" "$subvol")
+        local integrity_status=$(echo "$integrity_result" | cut -d'|' -f1)
+        
+        if [ "$integrity_status" = "OK" ]; then
+            ((ok_count++))
+        else
+            ((problem_count++))
+        fi
+    done
+    
+    echo ""
+    echo -e "${LH_COLOR_INFO}Zusammenfassung:${LH_COLOR_RESET} $total_count Snapshots insgesamt"
+    echo -e "${LH_COLOR_SUCCESS}▶ $ok_count OK${LH_COLOR_RESET}"
+    if [ $problem_count -gt 0 ]; then
+        echo -e "${LH_COLOR_WARNING}▶ $problem_count mit Problemen${LH_COLOR_RESET}"
+    fi
+}
+
+# Funktion zum Bereinigen problematischer Backups
+cleanup_problematic_backups() {
+    lh_print_header "Problematische BTRFS-Backups bereinigen"
+    
+    # Root-Rechte prüfen
+    if [ "$EUID" -ne 0 ]; then
+        echo -e "${LH_COLOR_WARNING}WARNUNG: Das Bereinigen von BTRFS-Backups benötigt root-Rechte.${LH_COLOR_RESET}"
+        if lh_confirm_action "Mit sudo ausführen?" "y"; then
+            backup_log_msg "INFO" "Starte BTRFS-Backup-Bereinigung mit sudo"
+            sudo "$0" cleanup-problematic-backups
+            return $?
+        else
+            echo -e "${LH_COLOR_INFO}Bereinigung abgebrochen.${LH_COLOR_RESET}"
+            return 1
+        fi
+    fi
+    
+    # Verfügbare Subvolumes prüfen
+    local subvols=($(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | grep -E '^(@|@home)$'))
+    
+    if [ ${#subvols[@]} -eq 0 ]; then
+        echo -e "${LH_COLOR_WARNING}Keine BTRFS Backups gefunden.${LH_COLOR_RESET}"
+        return 1
+    fi
+    
+    echo -e "${LH_COLOR_INFO}Suche nach problematischen Backups...${LH_COLOR_RESET}"
+    echo ""
+    
+    local total_problematic=0
+    local snapshots_to_clean=()
+    
+    for subvol in "${subvols[@]}"; do
+        local snapshot_dir="$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol"
+        local snapshots=($(ls -1 "$snapshot_dir" 2>/dev/null | grep -v '\.backup_complete$' | sort -r))
+        
+        echo -e "${LH_COLOR_HEADER}=== $subvol ===${LH_COLOR_RESET}"
+        
+        for snapshot in "${snapshots[@]}"; do
+            local snapshot_path="$snapshot_dir/$snapshot"
+            local integrity_result=$(check_backup_integrity "$snapshot_path" "$snapshot" "$subvol")
+            local integrity_status=$(echo "$integrity_result" | cut -d'|' -f1)
+            local integrity_issues=$(echo "$integrity_result" | cut -d'|' -f2)
+            
+            if [ "$integrity_status" != "OK" ] && [ "$integrity_status" != "WIRD_ERSTELLT" ]; then
+                echo -e "${LH_COLOR_WARNING}▶ $snapshot${LH_COLOR_RESET} - Status: ${LH_COLOR_ERROR}$integrity_status${LH_COLOR_RESET}"
+                if [ -n "$integrity_issues" ]; then
+                    echo -e "  Probleme: $integrity_issues"
+                fi
+                snapshots_to_clean+=("$snapshot_path|$snapshot|$subvol")
+                ((total_problematic++))
+            fi
+        done
+        
+        if [ $total_problematic -eq 0 ]; then
+            echo -e "${LH_COLOR_SUCCESS}Keine Probleme gefunden${LH_COLOR_RESET}"
+        fi
+        echo ""
+    done
+    
+    if [ $total_problematic -eq 0 ]; then
+        echo -e "${LH_COLOR_SUCCESS}Alle Backups sind in Ordnung!${LH_COLOR_RESET}"
+        return 0
+    fi
+    
+    echo -e "${LH_COLOR_WARNING}Gefunden: $total_problematic problematische Backups${LH_COLOR_RESET}"
+    echo ""
+    
+    if lh_confirm_action "Möchten Sie alle problematischen Backups löschen?" "n"; then
+        echo -e "${LH_COLOR_INFO}Bereinige problematische Backups...${LH_COLOR_RESET}"
+        
+        local cleaned_count=0
+        local error_count=0
+        
+        for entry in "${snapshots_to_clean[@]}"; do
+            local snapshot_path=$(echo "$entry" | cut -d'|' -f1)
+            local snapshot_name=$(echo "$entry" | cut -d'|' -f2)
+            local subvol=$(echo "$entry" | cut -d'|' -f3)
+            local marker_file_to_delete="${snapshot_path}.backup_complete"
+            
+            echo -e "${LH_COLOR_INFO}Lösche: $snapshot_name${LH_COLOR_RESET}"
+            backup_log_msg "INFO" "Bereinige problematischen Snapshot: $snapshot_path"
+            
+            if btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1; then
+                # Marker-Datei ebenfalls löschen
+                if [ -f "$marker_file_to_delete" ]; then
+                    rm -f "$marker_file_to_delete"
+                    backup_log_msg "INFO" "Marker-Datei für problematischen Snapshot gelöscht: $marker_file_to_delete"
+                fi
+
+                echo -e "  ${LH_COLOR_SUCCESS}✓ Erfolgreich gelöscht${LH_COLOR_RESET}"
+                backup_log_msg "INFO" "Problematischer Snapshot erfolgreich gelöscht: $snapshot_path"
+                ((cleaned_count++))
+            else
+                echo -e "  ${LH_COLOR_ERROR}✗ Fehler beim Löschen${LH_COLOR_RESET}"
+                backup_log_msg "ERROR" "Fehler beim Löschen des problematischen Snapshots: $snapshot_path"
+                ((error_count++))
+            fi
+        done
+        
+        echo ""
+        echo -e "${LH_COLOR_HEADER}=== BEREINIGUNGSERGEBNIS ===${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SUCCESS}Bereinigt: $cleaned_count Snapshots${LH_COLOR_RESET}"
+        if [ $error_count -gt 0 ]; then
+            echo -e "${LH_COLOR_ERROR}Fehler: $error_count Snapshots${LH_COLOR_RESET}"
+        fi
+        
+        backup_log_msg "INFO" "Bereinigung problematischer Backups abgeschlossen: $cleaned_count bereinigt, $error_count Fehler"
+    else
+        echo -e "${LH_COLOR_INFO}Bereinigung abgebrochen.${LH_COLOR_RESET}"
     fi
     
     return 0
@@ -533,16 +1347,24 @@ tar_backup() {
         backup_log_msg "INFO" "TAR-Backup erfolgreich erstellt: $tar_file"
         echo -e "${LH_COLOR_SUCCESS}TAR-Backup erfolgreich erstellt!${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}Datei:${LH_COLOR_RESET} $tar_file"
-        echo -e "${LH_COLOR_INFO}Größe:${LH_COLOR_RESET} $(du -sh "$tar_file" | cut -f1)"
+        
+        local file_size=$(du -sh "$tar_file" | cut -f1)
+        echo -e "${LH_COLOR_INFO}Größe:${LH_COLOR_RESET} $file_size"
+        
+        # Desktop-Benachrichtigung für Erfolg
+        lh_send_notification "success" \
+            "✅ TAR Backup erfolgreich" \
+            "Archiv erstellt: $(basename "$tar_file")\nGröße: $file_size\nZeitpunkt: $timestamp"
+        
     else
         backup_log_msg "ERROR" "TAR-Backup fehlgeschlagen (Exit-Code: $tar_status)"
         echo -e "${LH_COLOR_ERROR}Fehler beim Erstellen des TAR-Backups.${LH_COLOR_RESET}"
-        if [ -f "$LH_BACKUP_LOG.tmp" ]; then # Corrected variable name
-            echo -e "${LH_COLOR_INFO}Fehlerdetails:${LH_COLOR_RESET}"
-            cat "$LH_BACKUP_LOG.tmp" | head -n 10
-            cat "$LH_BACKUP_LOG.tmp" >> "$LH_BACKUP_LOG"
-        fi
-        rm -f "$tar_file"  # Unvollständiges Backup entfernen
+        
+        # Desktop-Benachrichtigung für Fehler
+        lh_send_notification "error" \
+            "❌ TAR Backup fehlgeschlagen" \
+            "Exit-Code: $tar_status\nZeitpunkt: $timestamp\nSiehe Log für Details: $(basename "$LH_BACKUP_LOG")"
+        
         return 1
     fi
     
@@ -714,16 +1536,30 @@ rsync_backup() {
         backup_log_msg "INFO" "RSYNC-Backup erfolgreich erstellt: $rsync_dest"
         echo -e "${LH_COLOR_SUCCESS}RSYNC-Backup erfolgreich erstellt!${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}Backup:${LH_COLOR_RESET} $rsync_dest"
-        echo -e "${LH_COLOR_INFO}Größe:${LH_COLOR_RESET} $(du -sh "$rsync_dest" | cut -f1)"
+        
+        local backup_size=$(du -sh "$rsync_dest" | cut -f1)
+        echo -e "${LH_COLOR_INFO}Größe:${LH_COLOR_RESET} $backup_size"
+        
+        # Backup-Typ für Benachrichtigung
+        local backup_type_desc="Vollbackup"
+        if [ "$backup_type" = "2" ]; then
+            backup_type_desc="Inkrementelles Backup"
+        fi
+        
+        # Desktop-Benachrichtigung für Erfolg
+        lh_send_notification "success" \
+            "✅ RSYNC Backup erfolgreich" \
+            "$backup_type_desc abgeschlossen\nVerzeichnis: $(basename "$rsync_dest")\nGröße: $backup_size\nZeitpunkt: $timestamp"
+        
     else
         backup_log_msg "ERROR" "RSYNC-Backup fehlgeschlagen (Exit-Code: $rsync_status)"
         echo -e "${LH_COLOR_ERROR}Fehler beim Erstellen des RSYNC-Backups.${LH_COLOR_RESET}"
-        if [ -f "$LH_BACKUP_LOG.tmp" ]; then # Corrected variable
-            echo -e "${LH_COLOR_INFO}Fehlerdetails:${LH_COLOR_RESET}"
-            cat "$LH_BACKUP_LOG.tmp" | head -n 10 # Output from cat will not be colored by this script
-            cat "$LH_BACKUP_LOG.tmp" >> "$LH_BACKUP_LOG"
-        fi
-        rm -rf "$rsync_dest"  # Unvollständiges Backup entfernen
+        
+        # Desktop-Benachrichtigung für Fehler
+        lh_send_notification "error" \
+            "❌ RSYNC Backup fehlgeschlagen" \
+            "Exit-Code: $rsync_status\nZeitpunkt: $timestamp\nSiehe Log für Details: $(basename "$LH_BACKUP_LOG")"
+        
         return 1
     fi
     
@@ -784,7 +1620,7 @@ restore_menu() {
     done
 }
 
-# BTRFS Wiederherstellung verbessert
+# BTRFS Wiederherstellung
 restore_btrfs() {
     lh_print_header "BTRFS Snapshot Wiederherstellung"
     
@@ -1297,8 +2133,9 @@ backup_menu() {
         lh_print_menu_item 2 "TAR Archiv Backup"
         lh_print_menu_item 3 "RSYNC Backup"
         lh_print_menu_item 4 "Wiederherstellung"
-        lh_print_menu_item 5 "Backup-Status anzeigen"
-        lh_print_menu_item 6 "Backup-Konfiguration anzeigen/ändern"
+        lh_print_menu_item 5 "BTRFS Backups manuell löschen"
+        lh_print_menu_item 6 "Backup-Status anzeigen"
+        lh_print_menu_item 7 "Backup-Konfiguration anzeigen/ändern"
         lh_print_menu_item 0 "Zurück zum Hauptmenü"
         echo ""
         
@@ -1318,9 +2155,12 @@ backup_menu() {
                 restore_menu
                 ;;
             5)
-                show_backup_status
+                delete_btrfs_backups
                 ;;
             6)
+                show_backup_status
+                ;;
+            7)
                 configure_backup
                 ;;
             0)
