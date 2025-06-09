@@ -62,7 +62,7 @@ After initialization, the script enters an infinite loop that displays the main 
 The following variables are defined in `lib_common.sh`. Those marked as "Exported" are made available to module scripts because `help_master.sh` calls `lh_finalize_initialization` (which exports them) before running the modules as sub-processes. Modules inherit these exported variables. Other global variables (not explicitly exported) become available within modules when they `source lib_common.sh`.
 
 - `LH_ROOT_DIR`: Absolute path to the project's main directory. Dynamically determined if not already set.
-- `LH_LOG_DIR`: Absolute path to the log directory (`$LH_ROOT_DIR/logs`).
+- `LH_LOG_DIR`: Absolute path to the current monthly log directory (e.g., `$LH_ROOT_DIR/logs/2025-06`).
 - `LH_CONFIG_DIR`: Absolute path to the configuration directory (`$LH_ROOT_DIR/config`).
 - `LH_BACKUP_CONFIG_FILE`: Absolute path to the backup configuration file (`$LH_CONFIG_DIR/backup.conf`).
 - `LH_LOG_FILE`: Absolute path to the current main log file. Set by `lh_initialize_logging`.
@@ -75,13 +75,14 @@ The following variables are defined in `lib_common.sh`. Those marked as "Exporte
 - `LH_TEMP_SNAPSHOT_DIR_DEFAULT`: Default value for the temporary snapshot directory (absolute).
 - `LH_TIMESHIFT_BASE_DIR_DEFAULT`: Default value for the Timeshift base directory (absolute).
 - `LH_RETENTION_BACKUP_DEFAULT`: Default value for the number of backups to retain.
-- `LH_BACKUP_LOG_FILENAME_DEFAULT`: Default filename for the backup log (relative to `LH_LOG_DIR`).
+- `LH_BACKUP_LOG_BASENAME_DEFAULT`: Default basename for the backup log file (e.g., "backup.log").
 - `LH_BACKUP_ROOT`: Currently configured value for the root directory of backups. Set by `lh_load_backup_config`.
 - `LH_BACKUP_DIR`: Currently configured value for the backup subdirectory. Set by `lh_load_backup_config`.
 - `LH_TEMP_SNAPSHOT_DIR`: Currently configured value for the temporary snapshot directory. Set by `lh_load_backup_config`.
 - `LH_TIMESHIFT_BASE_DIR`: Currently configured value for the Timeshift base directory. Set by `lh_load_backup_config`.
 - `LH_RETENTION_BACKUP`: Currently configured value for the number of backups to retain. Set by `lh_load_backup_config`.
-- `LH_BACKUP_LOG`: Absolute path to the backup log file. Set by `lh_load_backup_config`.
+- `LH_BACKUP_LOG_BASENAME`: Currently configured basename for the backup log file. Set by `lh_load_backup_config`.
+- `LH_BACKUP_LOG`: Absolute path to the timestamped backup log file for the current run. Set by `lh_load_backup_config`. (e.g., `<LH_LOG_DIR>/250609-1630_backup.log`)
 - `package_names_pacman`, `package_names_apt`, `package_names_dnf`: Associative arrays mapping program names to package names for specific package managers. Used by `lh_map_program_to_package`.
 
 **Color Variables and Usage:**
@@ -108,7 +109,7 @@ The following variables are defined in `lib_common.sh`. Those marked as "Exporte
     *   **Purpose:** Sets up the logging system.
     *   **Dependencies:** `date`, `mkdir`, `touch`, `lh_log_msg`.
     *   **Side Effects:**
-        - Creates the `$LH_LOG_DIR` directory if it doesn't exist.
+        - Creates the monthly log directory (`$LH_LOG_DIR`) if it doesn't exist (e.g., `.../logs/YYYY-MM`).
         - Sets the global variable `LH_LOG_FILE` to a path in the format `$LH_LOG_DIR/YYMMDD-HHMM_maintenance_script.log`.
         - Creates the `$LH_LOG_FILE` file if it doesn't exist.
         - Writes an info message to the log.
@@ -118,8 +119,9 @@ The following variables are defined in `lib_common.sh`. Those marked as "Exporte
     *   **Purpose:** Loads the backup configuration from the `$LH_BACKUP_CONFIG_FILE` file or uses default values.
     *   **Dependencies:** `source`, `basename`, `lh_log_msg`.
     *   **Side Effects:**
-        - Sets the global variables `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_TIMESHIFT_BASE_DIR`, `LH_RETENTION_BACKUP`, and `LH_BACKUP_LOG`.
+        - Sets the global variables `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_TIMESHIFT_BASE_DIR`, `LH_RETENTION_BACKUP`, and `LH_BACKUP_LOG_BASENAME`.
         - If the configuration file exists, the `CFG_LH_*` variables defined there are read and override the default values.
+        - Sets the global variable `LH_BACKUP_LOG` to a timestamped path within the current monthly log directory (`$LH_LOG_DIR`).
         - Writes info messages to the log.
     *   **Usage:** Should be called once during initialization.
 
@@ -128,7 +130,7 @@ The following variables are defined in `lib_common.sh`. Those marked as "Exporte
     *   **Dependencies:** `mkdir`, `echo`, `basename`, `lh_log_msg`.
     *   **Side Effects:**
         - Creates the `$LH_CONFIG_DIR` directory if it doesn't exist.
-        - Writes the current values of `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_TIMESHIFT_BASE_DIR`, `LH_RETENTION_BACKUP`, and the filename of `LH_BACKUP_LOG` to the configuration file.
+        - Writes the current values of `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_TIMESHIFT_BASE_DIR`, `LH_RETENTION_BACKUP`, and `LH_BACKUP_LOG_BASENAME` to the configuration file.
         - Overwrites the file if it exists.
         - Writes an info message to the log.
     *   **Usage:** Can be called by modules that modify the backup configuration.
@@ -154,17 +156,17 @@ The following variables are defined in `lib_common.sh`. Those marked as "Exporte
     *   **Usage:** Should be called once during initialization. `LH_SUDO_CMD` can then be used before commands requiring root privileges (e.g., `$LH_SUDO_CMD apt update`).
 
 *   `lh_backup_log(level, message)`
-    *   **Purpose:** Writes a formatted log message specifically to the backup log file (`$LH_LOG_DIR/backup.log`).
+    *   **Purpose:** Writes a formatted log message specifically to the current, timestamped backup log file (`$LH_BACKUP_LOG`).
     *   **Parameters:**
         - `$1` (`level`): The log level.
         - `$2` (`message`): The log message.
     *   **Dependencies:** `date`, `touch`, `echo`, `tee`.
     *   **Side Effects:**
-        - Creates the `$LH_LOG_DIR/backup.log` file if it doesn't exist.
+        - Creates the `$LH_BACKUP_LOG` file if it doesn't exist.
         - Formats the message with a timestamp and level.
         - Outputs the formatted message to standard output (console).
-        - Appends the formatted message to the `$LH_LOG_DIR/backup.log` file.
-    *   **Usage:** Should be used for all log messages specifically related to backup operations. Note that this function uses a separate log file from `lh_log_msg`.
+        - Appends the formatted message to the `$LH_BACKUP_LOG` file.
+    *   **Usage:** Should be used for all log messages specifically related to backup operations.
 
 *   `lh_get_filesystem_type(path)`
     *   **Purpose:** Determines the filesystem type of a given path.
@@ -263,6 +265,25 @@ The following variables are defined in `lib_common.sh`. Those marked as "Exporte
     *   **Side Effects:** Executes the command as the user stored in `LH_TARGET_USER_INFO[TARGET_USER]`, with the environment variables stored there. Writes debug messages to the log.
     *   **Usage:** For executing commands that need to run in the context of the desktop user (e.g., GUI notifications, commands accessing their home directory).
 
+*   `lh_send_notification(type, title, message, urgency)`
+    *   **Purpose:** Sends a desktop notification to the determined graphical session user.
+    *   **Parameters:**
+        - `$1` (`type`): Notification type ("success", "error", "warning", "info"). Used for icons and default urgency.
+        - `$2` (`title`): The title of the notification.
+        - `$3` (`message`): The body text of the notification.
+        - `$4` (`urgency`): Optional. Urgency level ("low", "normal", "critical"). If omitted, it's inferred from the type.
+    *   **Dependencies:** `lh_get_target_user_info`, `lh_run_command_as_target_user`. System commands like `notify-send`, `zenity`, or `kdialog`.
+    *   **Return Value:** Returns 0 on success, 1 on failure (e.g., no target user or no notification tool found).
+    *   **Side Effects:** Tries to send a notification using available tools (`notify-send`, `zenity`, `kdialog`) in the context of the target user. Logs the success or failure.
+    *   **Usage:** To provide non-interactive feedback to the desktop user about the result of a long-running or background task.
+
+*   `lh_check_notification_tools()`
+    *   **Purpose:** Checks for available desktop notification tools, reports their status, and offers to install them.
+    *   **Dependencies:** `lh_get_target_user_info`, `lh_run_command_as_target_user`, `lh_confirm_action`, package manager commands.
+    *   **Return Value:** Returns 0 if at least one tool is available, 1 otherwise.
+    *   **Side Effects:** Prints the status of available tools to the console. May prompt the user to install missing tools (`libnotify-bin`/`libnotify`, `zenity`). May offer to send a test notification.
+    *   **Usage:** Can be used in a settings or diagnostics module to ensure the notification system is working.
+
 *   `lh_print_header(title)`
     *   **Purpose:** Prints a formatted header with a title.
     *   **Parameters:**
@@ -281,15 +302,15 @@ The following variables are defined in `lib_common.sh`. Those marked as "Exporte
     *   **Usage:** For creating menus.
 
 *   `lh_finalize_initialization()`
-    *   **Purpose:** Executes final initialization steps and exports important variables.
+    *   **Purpose:** Executes final initialization steps and exports important variables and functions.
     *   **Dependencies:** `lh_load_backup_config`, `export`.
     *   **Side Effects:**
         - Calls `lh_load_backup_config`.
-        - Exports several key global variables such as `LH_LOG_DIR`, `LH_LOG_FILE`, `LH_SUDO_CMD`, and all `LH_BACKUP_*` variables, making them available in the environment of sub-shells (the module scripts). While `LH_PKG_MANAGER` and `LH_ALT_PKG_MANAGERS` are also exported here after detection in `help_master.sh`, modules should re-initialize them by calling their respective detection functions after sourcing `lib_common.sh` (see "Interaction and Extension" for details).
+        - Exports several key global variables such as `LH_LOG_DIR`, `LH_LOG_FILE`, `LH_SUDO_CMD`, all `LH_BACKUP_*` variables, and color variables, making them available in the environment of sub-shells (the module scripts).
+        - **Exports the functions** `lh_send_notification` and `lh_check_notification_tools` using `export -f`, making them directly callable by module scripts.
     *   **Usage:** Should be called once at the end of the initialization sequence in the main script.
 
 ### 3. Interaction and Extension
-
 
 The project is modular. `help_master.sh` is the coordinator that loads the common library `lib_common.sh` and passes control to separate module scripts (like `mod_restarts.sh`, `mod_disk.sh`, etc.).
 
@@ -299,7 +320,8 @@ To integrate a new module into the main menu, `help_master.sh` needs to be edite
 1.  Add a new `lh_print_menu_item` call in the main menu.
 2.  Add a new `case` branch in the `case` statement that links the chosen number to the path of the new module script (e.g., `bash "$LH_ROOT_DIR/modules/my_new_module.sh"`).
 
-Modules should utilize the functions from `lib_common.sh`, especially for logging (`lh_log_msg`, `lh_backup_log`), user interaction (`lh_confirm_action`, `lh_ask_for_input`), system checks (`lh_check_command`, `lh_check_root_privileges`), package manager interactions (`$LH_SUDO_CMD`, `$LH_PKG_MANAGER`, `lh_map_program_to_package`), and executing commands in the user context (`lh_run_command_as_target_user`).
+Modules should utilize the functions from `lib_common.sh`, especially for logging (`lh_log_msg`, `lh_backup_log`), user interaction (`lh_confirm_action`, `lh_ask_for_input`), system checks (`lh_check_command`), package manager interactions (`$LH_SUDO_CMD`, `$LH_PKG_MANAGER`), executing commands in the user context (`lh_run_command_as_target_user`), and sending desktop notifications (`lh_send_notification`).
+
 Global variables set and exported by `help_master.sh` (e.g., `LH_ROOT_DIR`, `LH_LOG_FILE` via `lh_finalize_initialization`) are available in the environment of module scripts.
 
 However, for variables like `LH_PKG_MANAGER` and the array `LH_ALT_PKG_MANAGERS`, which are determined by detection functions (`lh_detect_package_manager`, `lh_detect_alternative_managers`), there's a subtlety. If a module sources `lib_common.sh` (which is standard practice to access library functions), this can affect how these specific variables are seen. Sourcing might re-declare them (potentially as empty) as defined in `lib_common.sh`'s global scope, shadowing any inherited values.
@@ -331,8 +353,9 @@ The project uses a number of standard Linux commands. Some of the most important
 - `sh -c`: For executing commands via a shell (especially in `lh_run_command_as_target_user`).
 - Package manager commands (`pacman`, `yay`, `apt`, `dnf`) and alternative managers (`flatpak`, `snap`, `nix-env`, `appimagetool`): For package management and detection.
 - `loginctl`: For querying session information (requires root privileges).
+- **Notification tools:** `notify-send` (from `libnotify` or similar), `zenity`, `kdialog` for desktop notifications.
 
-It is important to ensure these commands are available on the target system, or to use the `lh_check_command` function to check dependencies and offer installation if necessary.
+It is important to ensure these commands are available on the target system, or to use the `lh_check_command` or `lh_check_notification_tools` functions to check dependencies and offer installation if necessary.
 
 This document should provide a solid foundation for understanding the functionality of `help_master.sh` and `lib_common.sh` and for starting to develop further modules or adapt existing functions.
 
