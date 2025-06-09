@@ -20,11 +20,14 @@ function restart_login_manager_action() {
     local INIT_SYSTEM=""
 
     # Bestimme das Init-System
-    if command -v systemctl >/dev/null && systemctl is-active --quiet systemd; then
+    # Überprüfe systemd (Kommandoname von PID 1 ist systemd)
+    if command -v systemctl >/dev/null 2>&1 && [ "$(ps -o comm= -p 1)" = "systemd" ]; then
         INIT_SYSTEM="systemd"
-    elif pidof upstart > /dev/null 2>&1; then # Heutzutage selten
+    # Überprüfe upstart (zuverlässigere Prüfung)
+    elif command -v initctl >/dev/null 2>&1 && initctl version 2>/dev/null | grep -q upstart; then
         INIT_SYSTEM="upstart"
-    elif [ -f /etc/init.d/cron ]; then # Grobe Annahme für SysVinit
+    # Überprüfe SysVinit (Existenz von /etc/init.d und Abwesenheit von systemd/upstart-Indikatoren)
+    elif [ -d /etc/init.d ] && [ ! -d /run/systemd/system ] && ! (command -v initctl >/dev/null 2>&1 && initctl version 2>/dev/null | grep -q upstart); then
         INIT_SYSTEM="sysvinit"
     else
         INIT_SYSTEM="unknown"
@@ -37,15 +40,25 @@ function restart_login_manager_action() {
             DM_SERVICE=$(basename "$(readlink -f /etc/systemd/system/display-manager.service)")
             lh_log_msg "INFO" "Display Manager Service (via systemd link): $DM_SERVICE"
         else
-            # Versuche gängige Display Manager, falls der Link nicht existiert oder nicht standardmäßig ist
-            local common_dms=("sddm" "gdm" "gdm3" "lightdm" "lxdm" "mdm")
-            for dm in "${common_dms[@]}"; do
-                if systemctl is-active --quiet "${dm}.service" || systemctl list-unit-files --type=service | grep -q "^${dm}.service"; then
-                    DM_SERVICE="${dm}.service"
-                    lh_log_msg "INFO" "Display Manager Service (gefunden durch Testen): $DM_SERVICE"
-                    break
-                fi
-            done
+            # Versuch 2: Über Abhängigkeiten von graphical.target
+            local dm_from_target
+            dm_from_target=$(systemctl list-dependencies graphical.target --plain --no-legend | awk '/\.service$/ {print $1}' | grep -E 'gdm|sddm|lightdm|lxdm|mdm|slim' | head -n 1)
+            if [ -n "$dm_from_target" ]; then
+                DM_SERVICE="$dm_from_target"
+                lh_log_msg "INFO" "Display Manager Service (via graphical.target dependency): $DM_SERVICE"
+            else
+                # Versuch 3: Gängige Display Manager direkt prüfen
+                local common_dms_services=("sddm.service" "gdm.service" "gdm3.service" "lightdm.service" "lxdm.service" "mdm.service" "slim.service")
+                for dm_candidate in "${common_dms_services[@]}"; do
+                    # Prüfen, ob der Dienst existiert (installiert ist) und aktiv ist oder zumindest geladen
+                    if systemctl list-unit-files --type=service | grep -q "^${dm_candidate}" && \
+                       (systemctl is-active --quiet "$dm_candidate" || systemctl status "$dm_candidate" >/dev/null 2>&1); then
+                        DM_SERVICE="$dm_candidate"
+                        lh_log_msg "INFO" "Display Manager Service (gefunden durch Testen gängiger Dienste): $DM_SERVICE"
+                        break
+                    fi
+                done
+            fi
         fi
     fi
 
@@ -180,36 +193,21 @@ function restart_sound_system_action() {
         local standard_services="pipewire.service pipewire-pulse.service wireplumber.service"
         local pipewire_services=""
 
-        # Temporäre Datei für die Roh-Ausgabe des Befehls
-        local tmpfile=$(mktemp)
+        # Ermittle aktive PipeWire-bezogene Dienste direkt
+        # lh_run_command_as_target_user leitet seine Debug-Ausgaben bereits ins Log, nicht nach STDOUT.
+        local services_output
+        services_output=$(lh_run_command_as_target_user "systemctl --user list-units --state=active --no-legend --plain 'pipewire*' 'wireplumber*' 2>/dev/null | awk '/\\.service/ {print \$1}'")
 
-        # Führe den Befehl aus und leite die Ausgabe in tmpfile.
-        # Diese Ausgabe könnte Debug-Informationen von lh_run_command_as_target_user enthalten.
-        lh_run_command_as_target_user "systemctl --user list-units --state=active 'pipewire*' 'wireplumber*' 2>/dev/null | grep '\.service' | awk '{print \$1}'" > "$tmpfile"
 
-        # Extrahiere nur Zeilen, die auf '.service' enden, aus tmpfile.
-        # Dies filtert die Debug-Zeilen von lh_run_command_as_target_user heraus.
-        local extracted_services
-        extracted_services=$(grep '\.service$' "$tmpfile")
-
-        if [ -n "$extracted_services" ]; then
+        if [ -n "$services_output" ]; then
             # Konvertiere die newline-separierte Liste in eine space-separierte Liste.
             # Und entferne mögliche Leerzeichen am Ende.
-            pipewire_services=$(echo "$extracted_services" | tr '\n' ' ' | sed 's/ *$//')
+            pipewire_services=$(echo "$services_output" | tr '\n' ' ' | sed 's/ *$//')
             lh_log_msg "INFO" "Gefundene aktive PipeWire-Dienste: $pipewire_services"
         else
             pipewire_services="$standard_services"
             lh_log_msg "INFO" "Keine aktiven PipeWire-Dienste über systemctl gefunden (oder Filterung fehlgeschlagen), versuche Standarddienste: $standard_services"
-            # Optional: Zusätzliches Logging, falls tmpfile Inhalt hatte, aber nichts gefiltert wurde
-            if [ -s "$tmpfile" ]; then
-                lh_log_msg "DEBUG" "tmpfile enthielt Daten, aber keine '.service'-Einträge nach Filterung."
-                # Um den Inhalt von tmpfile zu loggen (mit Vorsicht bei potenziell großen oder sensiblen Daten):
-                # (IFSOLD="$IFS"; IFS=$'\n'; for line in $(cat "$tmpfile"); do lh_log_msg "DEBUG" "tmpfile raw: $line"; done; IFS="$IFSOLD")
-            fi
         fi
-
-        # Temporäre Datei löschen
-        rm -f "$tmpfile"
 
         # Jeden Dienst EINZELN neu starten
         local restart_failed=false
@@ -378,15 +376,11 @@ function restart_desktop_environment_action() {
     fi
 
     # Desktop-Umgebung ermitteln
-    # Verwende eine temporäre Datei, um die Ausgabe zu speichern
-    DESKTOP_ENVIRONMENT_TMP=$(mktemp)
-    lh_run_command_as_target_user "printenv XDG_CURRENT_DESKTOP 2>/dev/null" > "$DESKTOP_ENVIRONMENT_TMP"
-    DESKTOP_ENVIRONMENT=$(cat "$DESKTOP_ENVIRONMENT_TMP" | tr '[:upper:]' '[:lower:]')
-    rm -f "$DESKTOP_ENVIRONMENT_TMP"
-
-    # Stellen Sie sicher, dass Sie nur die eigentliche Desktop-Umgebung bekommen
-    # Reinige die Ausgabe von Debug-Meldungen
-    DESKTOP_ENVIRONMENT=$(echo "$DESKTOP_ENVIRONMENT" | grep -v "^\[" | tail -n 1)
+    local raw_xdg_desktop
+    raw_xdg_desktop=$(lh_run_command_as_target_user "printenv XDG_CURRENT_DESKTOP 2>/dev/null")
+    # Hole die letzte nicht-leere Zeile und konvertiere zu Kleinbuchstaben.
+    # Dies ist robust, falls printenv (oder die Umgebung) unerwartete Formatierungen hätte.
+    DESKTOP_ENVIRONMENT=$(echo "$raw_xdg_desktop" | awk 'NF{val=$0}END{print val}' | tr '[:upper:]' '[:lower:]')
 
     if [ -z "$DESKTOP_ENVIRONMENT" ]; then
         if lh_run_command_as_target_user "pgrep plasmashell" >/dev/null; then
