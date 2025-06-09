@@ -193,21 +193,36 @@ function restart_sound_system_action() {
         local standard_services="pipewire.service pipewire-pulse.service wireplumber.service"
         local pipewire_services=""
 
-        # Ermittle aktive PipeWire-bezogene Dienste direkt
-        # lh_run_command_as_target_user leitet seine Debug-Ausgaben bereits ins Log, nicht nach STDOUT.
-        local services_output
-        services_output=$(lh_run_command_as_target_user "systemctl --user list-units --state=active --no-legend --plain 'pipewire*' 'wireplumber*' 2>/dev/null | awk '/\\.service/ {print \$1}'")
+        # Temporäre Datei für die Roh-Ausgabe des Befehls
+        local tmpfile=$(mktemp)
 
+        # Führe den Befehl aus und leite die Ausgabe in tmpfile.
+        # Diese Ausgabe könnte Debug-Informationen von lh_run_command_as_target_user enthalten.
+        lh_run_command_as_target_user "systemctl --user list-units --state=active 'pipewire*' 'wireplumber*' 2>/dev/null | grep '\.service' | awk '{print \$1}'" > "$tmpfile"
 
-        if [ -n "$services_output" ]; then
+        # Extrahiere nur Zeilen, die auf '.service' enden, aus tmpfile.
+        # Dies filtert die Debug-Zeilen von lh_run_command_as_target_user heraus.
+        local extracted_services
+        extracted_services=$(grep '\.service$' "$tmpfile")
+
+        if [ -n "$extracted_services" ]; then
             # Konvertiere die newline-separierte Liste in eine space-separierte Liste.
             # Und entferne mögliche Leerzeichen am Ende.
-            pipewire_services=$(echo "$services_output" | tr '\n' ' ' | sed 's/ *$//')
+            pipewire_services=$(echo "$extracted_services" | tr '\n' ' ' | sed 's/ *$//')
             lh_log_msg "INFO" "Gefundene aktive PipeWire-Dienste: $pipewire_services"
         else
             pipewire_services="$standard_services"
             lh_log_msg "INFO" "Keine aktiven PipeWire-Dienste über systemctl gefunden (oder Filterung fehlgeschlagen), versuche Standarddienste: $standard_services"
+            # Optional: Zusätzliches Logging, falls tmpfile Inhalt hatte, aber nichts gefiltert wurde
+            if [ -s "$tmpfile" ]; then
+                lh_log_msg "DEBUG" "tmpfile enthielt Daten, aber keine '.service'-Einträge nach Filterung."
+                # Um den Inhalt von tmpfile zu loggen (mit Vorsicht bei potenziell großen oder sensiblen Daten):
+                # (IFSOLD="$IFS"; IFS=$'\n'; for line in $(cat "$tmpfile"); do lh_log_msg "DEBUG" "tmpfile raw: $line"; done; IFS="$IFSOLD")
+            fi
         fi
+
+        # Temporäre Datei löschen
+        rm -f "$tmpfile"
 
         # Jeden Dienst EINZELN neu starten
         local restart_failed=false
@@ -376,11 +391,15 @@ function restart_desktop_environment_action() {
     fi
 
     # Desktop-Umgebung ermitteln
-    local raw_xdg_desktop
-    raw_xdg_desktop=$(lh_run_command_as_target_user "printenv XDG_CURRENT_DESKTOP 2>/dev/null")
-    # Hole die letzte nicht-leere Zeile und konvertiere zu Kleinbuchstaben.
-    # Dies ist robust, falls printenv (oder die Umgebung) unerwartete Formatierungen hätte.
-    DESKTOP_ENVIRONMENT=$(echo "$raw_xdg_desktop" | awk 'NF{val=$0}END{print val}' | tr '[:upper:]' '[:lower:]')
+    # Verwende eine temporäre Datei, um die Ausgabe zu speichern
+    DESKTOP_ENVIRONMENT_TMP=$(mktemp)
+    lh_run_command_as_target_user "printenv XDG_CURRENT_DESKTOP 2>/dev/null" > "$DESKTOP_ENVIRONMENT_TMP"
+    DESKTOP_ENVIRONMENT=$(cat "$DESKTOP_ENVIRONMENT_TMP" | tr '[:upper:]' '[:lower:]')
+    rm -f "$DESKTOP_ENVIRONMENT_TMP"
+
+    # Stellen Sie sicher, dass Sie nur die eigentliche Desktop-Umgebung bekommen
+    # Reinige die Ausgabe von Debug-Meldungen
+    DESKTOP_ENVIRONMENT=$(echo "$DESKTOP_ENVIRONMENT" | grep -v "^\[" | tail -n 1)
 
     if [ -z "$DESKTOP_ENVIRONMENT" ]; then
         if lh_run_command_as_target_user "pgrep plasmashell" >/dev/null; then
