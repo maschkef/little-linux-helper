@@ -22,9 +22,11 @@ backup_log_msg() {
     # Auch in Standard-Log schreiben
     lh_log_msg "$level" "$message"
 
-    # Zusätzlich in Backup-spezifisches Log
-    if [ ! -f "$LH_BACKUP_LOG" ]; then
-        touch "$LH_BACKUP_LOG" # Stellt sicher, dass die Datei existiert
+    # Zusätzlich in Backup-spezifisches Log.
+    # Das Verzeichnis für LH_BACKUP_LOG ($LH_LOG_DIR) sollte bereits existieren.
+    if [ -n "$LH_BACKUP_LOG" ] && [ ! -f "$LH_BACKUP_LOG" ]; then
+        # Versuche, die Datei zu erstellen, falls sie noch nicht existiert.
+        touch "$LH_BACKUP_LOG" || echo "WARN (mod_backup): Konnte Backup-Logdatei $LH_BACKUP_LOG nicht erstellen/berühren." >&2
     fi
     echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$LH_BACKUP_LOG"
 }

@@ -16,11 +16,16 @@ if [ -z "$LH_ROOT_DIR" ]; then
     LH_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 fi
 
-# Der Log-Ordner
-LH_LOG_DIR="$LH_ROOT_DIR/logs"
+# Der Log-Ordner, jetzt mit monatlichem Unterordner
+LH_LOG_DIR_BASE="$LH_ROOT_DIR/logs"
+LH_LOG_DIR="$LH_LOG_DIR_BASE/$(date '+%Y-%m')"
+
 # Der Konfig-Ordner
 LH_CONFIG_DIR="$LH_ROOT_DIR/config"
 LH_BACKUP_CONFIG_FILE="$LH_CONFIG_DIR/backup.conf"
+
+# Sicherstellen, dass das (monatliche) Log-Verzeichnis existiert
+mkdir -p "$LH_LOG_DIR" || echo "WARNUNG: Konnte initiales Log-Verzeichnis nicht erstellen: $LH_LOG_DIR" >&2
 
 # Die aktuelle Log-Datei wird bei Initialisierung gesetzt
 LH_LOG_FILE="${LH_LOG_FILE:-}" # Stellt sicher, dass sie existiert, aber überschreibt sie nicht, wenn sie bereits von außen gesetzt/exportiert wurde.
@@ -130,13 +135,12 @@ declare -A package_names_dnf=(
 # Funktion zum Initialisieren des Loggings
 function lh_initialize_logging() {
     # Prüfen, ob der Log-Ordner existiert, falls nicht, erstelle ihn
+    # LH_LOG_DIR enthält bereits den Monats-Unterordner und wurde oben schon mit mkdir -p behandelt.
+    # Diese Prüfung ist eine zusätzliche Sicherheit, falls das Verzeichnis zwischenzeitlich gelöscht wurde.
     if [ -z "$LH_LOG_FILE" ]; then # Nur initialisieren, wenn LH_LOG_FILE noch nicht gesetzt/leer ist
         if [ ! -d "$LH_LOG_DIR" ]; then
-            if ! mkdir -p "$LH_LOG_DIR"; then
-                echo "FEHLER: Konnte Log-Verzeichnis nicht erstellen: $LH_LOG_DIR" >&2
-                LH_LOG_FILE="" 
-                return 1
-            fi
+            # Versuche es erneut zu erstellen, falls es aus irgendeinem Grund nicht mehr existiert
+            mkdir -p "$LH_LOG_DIR" || { echo "FEHLER: Konnte Log-Verzeichnis nicht erstellen: $LH_LOG_DIR" >&2; LH_LOG_FILE=""; return 1; }
         fi
 
         LH_LOG_FILE="$LH_LOG_DIR/$(date '+%y%m%d-%H%M')_maintenance_script.log"
@@ -184,9 +188,9 @@ function lh_load_backup_config() {
         lh_log_msg "INFO" "Keine Backup-Konfigurationsdatei gefunden ($LH_BACKUP_CONFIG_FILE). Verwende Standardwerte."
     fi
 
-    # Zeitstempel dem Basis-Log-Dateinamen voranstellen
+    # Backup-Logdatei im monatlichen Unterordner (LH_LOG_DIR) erstellen.
+    # LH_LOG_DIR enthält bereits den Pfad zum Monatsordner.
     LH_BACKUP_LOG="$LH_LOG_DIR/$(date '+%y%m%d-%H%M')_$LH_BACKUP_LOG_BASENAME"
-    # Die Backup-Logdatei wird erst bei der ersten Verwendung durch lh_backup_log() tatsächlich erstellt.
     lh_log_msg "INFO" "Backup-Logdatei konfiguriert als: $LH_BACKUP_LOG"
 }
 
@@ -236,7 +240,7 @@ function lh_log_msg() {
         echo "$plain_log_msg" >> "$LH_LOG_FILE"
     elif [ -n "$LH_LOG_FILE" ] && [ ! -d "$(dirname "$LH_LOG_FILE")" ]; then
         # Fallback, falls Log-Verzeichnis nicht existiert, aber LH_LOG_FILE gesetzt ist
-        echo "Log-Verzeichnis für $LH_LOG_FILE nicht gefunden."
+        echo "Log-Verzeichnis für $LH_LOG_FILE nicht gefunden." >&2
     fi
 }
 
@@ -265,13 +269,10 @@ function lh_backup_log() {
 
     # Sicherstellen, dass die Backup-Logdatei existiert (doppelte Prüfung schadet nicht)
     local backup_log_dir
-    backup_log_dir=$(dirname "$LH_BACKUP_LOG")
-    if [ ! -d "$backup_log_dir" ]; then
-        # Versuche, das Log-Verzeichnis zu erstellen, falls es nicht existiert
-        mkdir -p "$backup_log_dir" || lh_log_msg "WARN" "Konnte Backup-Logverzeichnis $backup_log_dir nicht erstellen."
-    fi
+    backup_log_dir=$(dirname "$LH_BACKUP_LOG") # Dies ist jetzt identisch mit LH_LOG_DIR
+    # Das Verzeichnis LH_LOG_DIR (und damit backup_log_dir) sollte bereits existieren.
     if [ ! -f "$LH_BACKUP_LOG" ]; then
-        touch "$LH_BACKUP_LOG" || lh_log_msg "WARN" "Konnte Backup-Logdatei $LH_BACKUP_LOG nicht erstellen/berühren."
+        touch "$LH_BACKUP_LOG" || lh_log_msg "WARN" "Konnte Backup-Logdatei $LH_BACKUP_LOG nicht erstellen/berühren. Verzeichnis: $backup_log_dir"
     fi
 
     echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" | tee -a "$LH_BACKUP_LOG"
