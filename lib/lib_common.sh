@@ -689,6 +689,230 @@ function lh_run_command_as_target_user() {
     return $?
 }
 
+# Sendet eine Desktop-Benachrichtigung an den ermittelten Target User
+# $1: notification_type ("success", "error", "warning", "info")
+# $2: title (Titel der Benachrichtigung)
+# $3: message (Hauptnachricht)
+# $4: (Optional) urgency ("low", "normal", "critical") - wird automatisch gesetzt falls leer
+# Rückgabe: 0 bei Erfolg, 1 bei Fehler
+function lh_send_notification() {
+    local notification_type="$1"
+    local title="$2"
+    local message="$3"
+    local urgency="${4:-}"
+    
+    # Validierung der Parameter
+    if [ -z "$notification_type" ] || [ -z "$title" ] || [ -z "$message" ]; then
+        lh_log_msg "ERROR" "lh_send_notification: Unvollständige Parameter (type, title, message erforderlich)"
+        return 1
+    fi
+    
+    # Urgency automatisch setzen, falls nicht angegeben
+    if [ -z "$urgency" ]; then
+        case "$notification_type" in
+            "success") urgency="normal" ;;
+            "error") urgency="critical" ;;
+            "warning") urgency="normal" ;;
+            "info") urgency="low" ;;
+            *) urgency="normal" ;;
+        esac
+    fi
+    
+    lh_log_msg "DEBUG" "Versuche Desktop-Benachrichtigung zu senden: [$notification_type] $title - $message"
+    
+    # Target User Info ermitteln (nutzt das bestehende Framework)
+    if ! lh_get_target_user_info; then
+        lh_log_msg "WARN" "Konnte Target-User-Info nicht ermitteln, Desktop-Benachrichtigung wird übersprungen"
+        return 1
+    fi
+    
+    local target_user="${LH_TARGET_USER_INFO[TARGET_USER]}"
+    if [ -z "$target_user" ] || [ "$target_user" = "root" ]; then
+        lh_log_msg "WARN" "Kein gültiger Target-User für Desktop-Benachrichtigung gefunden (User: '$target_user')"
+        return 1
+    fi
+    
+    lh_log_msg "DEBUG" "Sende Benachrichtigung als User: $target_user"
+    
+    # Icon basierend auf Typ setzen
+    local icon=""
+    case "$notification_type" in
+        "success") icon="dialog-information" ;;
+        "error") icon="dialog-error" ;;
+        "warning") icon="dialog-warning" ;;
+        "info") icon="dialog-information" ;;
+        *) icon="dialog-information" ;;
+    esac
+    
+    # Verschiedene Benachrichtigungsmethoden versuchen
+    local notification_sent=false
+    
+    # 1. notify-send versuchen (am häufigsten verfügbar)
+    if lh_run_command_as_target_user "command -v notify-send >/dev/null 2>&1"; then
+        lh_log_msg "DEBUG" "Verwende notify-send für Desktop-Benachrichtigung"
+        
+        local notify_cmd="notify-send"
+        notify_cmd="$notify_cmd --urgency='$urgency'"
+        notify_cmd="$notify_cmd --expire-time=10000"  # 10 Sekunden
+        if [ -n "$icon" ]; then
+            notify_cmd="$notify_cmd --icon='$icon'"
+        fi
+        # Escape quotes in title and message for shell execution
+        local escaped_title=$(printf '%q' "$title")
+        local escaped_message=$(printf '%q' "$message")
+        notify_cmd="$notify_cmd $escaped_title $escaped_message"
+        
+        if lh_run_command_as_target_user "$notify_cmd"; then
+            lh_log_msg "INFO" "Desktop-Benachrichtigung erfolgreich über notify-send gesendet"
+            notification_sent=true
+        else
+            lh_log_msg "WARN" "notify-send-Benachrichtigung fehlgeschlagen"
+        fi
+    fi
+    
+    # 2. zenity versuchen (falls notify-send nicht funktioniert hat)
+    if [ "$notification_sent" = false ] && lh_run_command_as_target_user "command -v zenity >/dev/null 2>&1"; then
+        lh_log_msg "DEBUG" "Verwende zenity für Desktop-Benachrichtigung"
+        
+        local escaped_text=$(printf '%q' "$title: $message")
+        local zenity_cmd="zenity --notification --text=$escaped_text"
+        
+        if lh_run_command_as_target_user "$zenity_cmd"; then
+            lh_log_msg "INFO" "Desktop-Benachrichtigung erfolgreich über zenity gesendet"
+            notification_sent=true
+        else
+            lh_log_msg "WARN" "zenity-Benachrichtigung fehlgeschlagen"
+        fi
+    fi
+    
+    # 3. kdialog versuchen (für KDE-Umgebungen)
+    if [ "$notification_sent" = false ] && lh_run_command_as_target_user "command -v kdialog >/dev/null 2>&1"; then
+        lh_log_msg "DEBUG" "Verwende kdialog für Desktop-Benachrichtigung"
+        
+        local escaped_text=$(printf '%q' "$title: $message")
+        local kdialog_cmd="kdialog --passivepopup $escaped_text 10"
+        
+        if lh_run_command_as_target_user "$kdialog_cmd"; then
+            lh_log_msg "INFO" "Desktop-Benachrichtigung erfolgreich über kdialog gesendet"
+            notification_sent=true
+        else
+            lh_log_msg "WARN" "kdialog-Benachrichtigung fehlgeschlagen"
+        fi
+    fi
+    
+    # 4. osascript versuchen (für macOS, falls das Skript dort läuft)
+    if [ "$notification_sent" = false ] && lh_run_command_as_target_user "command -v osascript >/dev/null 2>&1"; then
+        lh_log_msg "DEBUG" "Verwende osascript für Desktop-Benachrichtigung (macOS)"
+        
+        local escaped_title=$(printf '%q' "$title")
+        local escaped_message=$(printf '%q' "$message")
+        local osascript_cmd="osascript -e 'display notification $escaped_message with title $escaped_title'"
+        
+        if lh_run_command_as_target_user "$osascript_cmd"; then
+            lh_log_msg "INFO" "Desktop-Benachrichtigung erfolgreich über osascript gesendet"
+            notification_sent=true
+        else
+            lh_log_msg "WARN" "osascript-Benachrichtigung fehlgeschlagen"
+        fi
+    fi
+    
+    if [ "$notification_sent" = false ]; then
+        lh_log_msg "WARN" "Keine funktionierende Desktop-Benachrichtigung gefunden"
+        lh_log_msg "INFO" "Verfügbare Benachrichtigungstools prüfen: notify-send, zenity, kdialog"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Hilfsfunktion: Prüft verfügbare Desktop-Benachrichtigungstools und bietet Installation an
+# Rückgabe: 0 wenn mindestens ein Tool verfügbar ist, 1 sonst
+function lh_check_notification_tools() {
+    local tools_available=false
+    local available_tools=()
+    local missing_tools=()
+    
+    lh_log_msg "INFO" "Prüfe verfügbare Desktop-Benachrichtigungstools..."
+    
+    # Target User ermitteln für die Prüfung
+    if ! lh_get_target_user_info; then
+        lh_log_msg "WARN" "Konnte Target-User nicht ermitteln - prüfe Tools als aktueller User"
+    fi
+    
+    # Prüfe notify-send
+    if lh_run_command_as_target_user "command -v notify-send >/dev/null 2>&1"; then
+        echo -e "${LH_COLOR_SUCCESS}✓ notify-send verfügbar${LH_COLOR_RESET}"
+        available_tools+=("notify-send")
+        tools_available=true
+    else
+        echo -e "${LH_COLOR_WARNING}✗ notify-send nicht verfügbar${LH_COLOR_RESET}"
+        missing_tools+=("libnotify-bin/libnotify")
+    fi
+    
+    # Prüfe zenity
+    if lh_run_command_as_target_user "command -v zenity >/dev/null 2>&1"; then
+        echo -e "${LH_COLOR_SUCCESS}✓ zenity verfügbar${LH_COLOR_RESET}"
+        available_tools+=("zenity")
+        tools_available=true
+    else
+        echo -e "${LH_COLOR_WARNING}✗ zenity nicht verfügbar${LH_COLOR_RESET}"
+        missing_tools+=("zenity")
+    fi
+    
+    # Prüfe kdialog
+    if lh_run_command_as_target_user "command -v kdialog >/dev/null 2>&1"; then
+        echo -e "${LH_COLOR_SUCCESS}✓ kdialog verfügbar${LH_COLOR_RESET}"
+        available_tools+=("kdialog")
+        tools_available=true
+    else
+        echo -e "${LH_COLOR_WARNING}✗ kdialog nicht verfügbar${LH_COLOR_RESET}"
+        missing_tools+=("kdialog")
+    fi
+    
+    # Zusammenfassung
+    echo ""
+    if [ "$tools_available" = true ]; then
+        echo -e "${LH_COLOR_SUCCESS}Desktop-Benachrichtigungen sind verfügbar über: ${available_tools[*]}${LH_COLOR_RESET}"
+        
+        # Test-Benachrichtigung anbieten
+        if lh_confirm_action "Möchten Sie eine Test-Benachrichtigung senden?" "n"; then
+            lh_send_notification "info" "Little Linux Helper" "Test-Benachrichtigung erfolgreich!"
+        fi
+    else
+        echo -e "${LH_COLOR_WARNING}Keine Desktop-Benachrichtigungstools gefunden.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Fehlende Tools: ${missing_tools[*]}${LH_COLOR_RESET}"
+        
+        if lh_confirm_action "Möchten Sie Benachrichtigungstools installieren?" "y"; then
+            case $LH_PKG_MANAGER in
+                pacman|yay)
+                    $LH_SUDO_CMD $LH_PKG_MANAGER -S --noconfirm libnotify zenity
+                    ;;
+                apt)
+                    $LH_SUDO_CMD apt update && $LH_SUDO_CMD apt install -y libnotify-bin zenity
+                    ;;
+                dnf)
+                    $LH_SUDO_CMD dnf install -y libnotify zenity
+                    ;;
+                *)
+                    echo -e "${LH_COLOR_WARNING}Automatische Installation für $LH_PKG_MANAGER nicht verfügbar.${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}Bitte installieren Sie manuell: libnotify-bin/libnotify und zenity${LH_COLOR_RESET}"
+                    ;;
+            esac
+            
+            # Nach Installation erneut prüfen
+            echo -e "${LH_COLOR_INFO}Prüfe erneut nach Installation...${LH_COLOR_RESET}"
+            lh_check_notification_tools
+            return $?
+        fi
+    fi
+    
+    if [ "$tools_available" = true ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 # Gibt einen formatierten Header für Menüs oder Sektionen aus
 # $1: Titel des Headers
 function lh_print_header() {
@@ -732,4 +956,7 @@ function lh_finalize_initialization() {
     export LH_COLOR_RESET LH_COLOR_BLACK LH_COLOR_RED LH_COLOR_GREEN LH_COLOR_YELLOW LH_COLOR_BLUE LH_COLOR_MAGENTA LH_COLOR_CYAN LH_COLOR_WHITE
     export LH_COLOR_BOLD_BLACK LH_COLOR_BOLD_RED LH_COLOR_BOLD_GREEN LH_COLOR_BOLD_YELLOW LH_COLOR_BOLD_BLUE LH_COLOR_BOLD_MAGENTA LH_COLOR_BOLD_CYAN LH_COLOR_BOLD_WHITE
     export LH_COLOR_HEADER LH_COLOR_MENU_NUMBER LH_COLOR_MENU_TEXT LH_COLOR_PROMPT LH_COLOR_SUCCESS LH_COLOR_ERROR LH_COLOR_WARNING LH_COLOR_INFO LH_COLOR_SEPARATOR
+    # Exportiere Benachrichtigungsfunktionen (machen die Funktionen in Sub-Shells verfügbar)
+    export -f lh_send_notification
+    export -f lh_check_notification_tools
 }
