@@ -682,7 +682,7 @@ delete_btrfs_backups() {
     echo -e "${LH_COLOR_PROMPT}Für welches Subvolume möchten Sie Backups löschen?${LH_COLOR_RESET}"
     for i in "${!subvols[@]}"; do
         local subvol="${subvols[i]}"
-        local count=$(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" 2>/dev/null | wc -l)
+        local count=$(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" 2>/dev/null | grep -v '\.backup_complete$' | wc -l)
         echo -e "  ${LH_COLOR_MENU_NUMBER}$((i+1)).${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$subvol${LH_COLOR_RESET} ${LH_COLOR_INFO}($count Snapshots)${LH_COLOR_RESET}"
     done
     echo -e "  ${LH_COLOR_MENU_NUMBER}$((${#subvols[@]}+1)).${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Alle Subvolumes${LH_COLOR_RESET}"
@@ -890,78 +890,117 @@ check_backup_integrity() {
     local status="OK"
     
     # 1. Marker-Datei prüfen (neben dem Snapshot)
+    local marker_is_valid=false
     local marker_file="${snapshot_path}.backup_complete"
     if [ ! -f "$marker_file" ]; then
         issues+=("Keine Abschluss-Markierung")
         status="UNVOLLSTÄNDIG"
     else
         # Marker-Datei validieren
-        if ! grep -q "BACKUP_COMPLETED=" "$marker_file" || \
-           ! grep -q "BACKUP_TIMESTAMP=" "$marker_file"; then
+        if grep -q "BACKUP_COMPLETED=" "$marker_file" && \
+           grep -q "BACKUP_TIMESTAMP=" "$marker_file"; then
+            marker_is_valid=true
+        else
             issues+=("Ungültige Abschluss-Markierung")
             status="VERDÄCHTIG"
         fi
     fi
     
     # 2. Log-Datei prüfen
-    if [ -f "$LH_BACKUP_LOG" ]; then
-        local success_pattern="Snapshot erfolgreich übertragen.*$snapshot_name"
-        if ! grep -q "$success_pattern" "$LH_BACKUP_LOG"; then
-            issues+=("Kein Erfolgs-Eintrag im Log")
-            if [ "$status" = "OK" ]; then
-                status="VERDÄCHTIG"
-            fi
+    # Diese Prüfung ist sekundär. Ein fehlender Log-Eintrag im *aktuellen* Log ist nur ein Hinweis.
+    # Der Status wird dadurch nicht auf "VERDÄCHTIG" gesetzt, wenn der Marker gültig war.
+    if [ -f "$LH_BACKUP_LOG" ] && ! grep -q "Snapshot erfolgreich übertragen.*$snapshot_name" "$LH_BACKUP_LOG"; then
+        issues+=("Kein Erfolgs-Eintrag im aktuellen Log")
+        # Nur wenn der Marker nicht gültig war UND der Status nicht schon schlimmer ist,
+        # kann dies den Status auf VERDÄCHTIG setzen/belassen.
+        if [ "$marker_is_valid" = false ] && [ "$status" != "UNVOLLSTÄNDIG" ] && [ "$status" != "BESCHÄDIGT" ]; then
+            status="VERDÄCHTIG"
         fi
     fi
     
     # 3. BTRFS-Snapshot-Integrität prüfen
+    # Diese Prüfung sollte nach dem Marker und Log kommen, da sie den Status überschreiben kann.
     if ! btrfs subvolume show "$snapshot_path" >/dev/null 2>&1; then
         issues+=("BTRFS-Snapshot beschädigt")
-        status="BESCHÄDIGT"
+        status="BESCHÄDIGT" # Höchste Priorität
     fi
     
     # 4. Größenvergleich (nur wenn mehrere Snapshots vorhanden)
-    local subvol_dir="$(dirname "$snapshot_path")"
-    local other_snapshots=($(ls -1 "$subvol_dir" | grep -v "^$(basename "$snapshot_path")$" | head -3))
-    
-    if [ ${#other_snapshots[@]} -gt 0 ]; then
-        local current_size=$(du -sb "$snapshot_path" 2>/dev/null | cut -f1)
-        local avg_size=0
-        local count=0
+    # Diese Prüfung sollte den Status nur auf VERDÄCHTIG setzen, wenn er vorher OK war und der Marker gültig.
+    if [ "$status" = "OK" ] && [ "$marker_is_valid" = true ]; then
+        local subvol_dir="$(dirname "$snapshot_path")"
+        # Nur Snapshots im selben Subvolume-Verzeichnis berücksichtigen, die dem Namensmuster entsprechen
+        # und keine Markerdateien sind. `find` ist hier robuster als `ls`.
+        local other_snapshots_paths=()
+        # Finde Verzeichnisse, die dem Snapshot-Muster entsprechen, aber nicht der aktuelle Snapshot sind
+        while IFS= read -r -d $'\0' other_snap_path; do
+            other_snapshots_paths+=("$other_snap_path")
+        done < <(find "$subvol_dir" -maxdepth 1 -type d -name "${subvol}-20*" ! -path "$snapshot_path" -print0)
+
         
-        for other in "${other_snapshots[@]}"; do
-            local other_path="$subvol_dir/$other"
-            if [ -d "$other_path" ]; then
-                local other_size=$(du -sb "$other_path" 2>/dev/null | cut -f1)
-                if [ -n "$other_size" ] && [ "$other_size" -gt 0 ]; then
-                    avg_size=$((avg_size + other_size))
-                    ((count++))
-                fi
-            fi
-        done
-        
-        if [ $count -gt 0 ]; then
-            avg_size=$((avg_size / count))
-            # Wenn aktueller Snapshot weniger als 50% der durchschnittlichen Größe hat
-            local min_size=$((avg_size / 2))
-            if [ "$current_size" -lt "$min_size" ]; then
-                issues+=("Ungewöhnlich klein ($(du -sh "$snapshot_path" | cut -f1) vs. Ø $(echo $avg_size | numfmt --to=iec-i)B)")
-                if [ "$status" = "OK" ]; then
-                    status="VERDÄCHTIG"
+        if [ ${#other_snapshots_paths[@]} -gt 0 ]; then
+            local current_size_str=$(du -sb "$snapshot_path" 2>/dev/null)
+            local current_size=$(echo "$current_size_str" | cut -f1)
+            
+            if [ -n "$current_size" ]; then # Nur fortfahren, wenn current_size ermittelt werden konnte
+                local avg_size=0
+                local count=0
+                
+                # Nimm bis zu 3 andere Snapshots für den Durchschnitt
+                local sample_snapshots=()
+                for (( i=0; i<${#other_snapshots_paths[@]} && i<3; i++ )); do
+                    sample_snapshots+=("${other_snapshots_paths[i]}")
+                done
+
+                for other_path in "${sample_snapshots[@]}"; do
+                    if [ -d "$other_path" ]; then # Sicherstellen, dass es ein Verzeichnis ist
+                        local other_size_str=$(du -sb "$other_path" 2>/dev/null)
+                        local other_size=$(echo "$other_size_str" | cut -f1)
+                        if [ -n "$other_size" ] && [ "$other_size" -gt 0 ]; then
+                            avg_size=$((avg_size + other_size))
+                            ((count++))
+                        fi
+                    fi
+                done
+                
+                if [ $count -gt 0 ]; then
+                    avg_size=$((avg_size / count))
+                    local min_size=$((avg_size / 2)) # 50% Schwelle
+
+                    if [ "$current_size" -lt "$min_size" ] && [ "$avg_size" -gt 0 ]; then # avg_size > 0 um Fehlalarme bei sehr kleinen Snapshots zu vermeiden
+                        local current_size_hr=$(echo "$current_size_str" | awk '{print $1}' | numfmt --to=iec-i --suffix=B 2>/dev/null || echo "${current_size}B")
+                        local avg_size_hr=$(numfmt --to=iec-i --suffix=B --padding=5 "$avg_size" 2>/dev/null || echo "${avg_size}B")
+                        issues+=("Ungewöhnlich klein ($current_size_hr vs. Ø $avg_size_hr)")
+                        # Status nur ändern, wenn er vorher OK war (und Marker gültig)
+                        status="VERDÄCHTIG"
+                    fi
                 fi
             fi
         fi
     fi
     
     # 5. Zeitstempel-Plausibilität prüfen
-    local snapshot_time=$(stat -c %Y "$snapshot_path" 2>/dev/null)
-    local current_time=$(date +%s)
-    local time_diff=$((current_time - snapshot_time))
-    
-    # Wenn Snapshot während der letzten 30 Minuten erstellt wurde, aber keine Marker-Datei hat
-    if [ $time_diff -lt 1800 ] && [ ! -f "$marker_file" ]; then
-        if [ "$status" = "OK" ]; then
-            status="WIRD_ERSTELLT"
+    # Diese Prüfung sollte den Status nur auf WIRD_ERSTELLT setzen,
+    # wenn der Marker fehlt und der Status nicht schon BESCHÄDIGT ist.
+    if [ "$marker_is_valid" = false ] && [ "$status" != "BESCHÄDIGT" ]; then
+        local snapshot_time=$(stat -c %Y "$snapshot_path" 2>/dev/null)
+        if [ -n "$snapshot_time" ]; then
+            local current_time=$(date +%s)
+            local time_diff=$((current_time - snapshot_time))
+            
+            # Wenn Snapshot während der letzten 30 Minuten erstellt wurde und keine (gültige) Marker-Datei hat
+            if [ $time_diff -lt 1800 ]; then # 30 Minuten
+                status="VERDÄCHTIG"
+                status="WIRD_ERSTELLT"
+                # Entferne "Keine Abschluss-Markierung" wenn es jetzt als "WIRD_ERSTELLT" gilt
+                local temp_issues=()
+                for issue in "${issues[@]}"; do
+                    if [ "$issue" != "Keine Abschluss-Markierung" ]; then
+                        temp_issues+=("$issue")
+                    fi
+                done
+                issues=("${temp_issues[@]}")
+            fi
         fi
     fi
     
@@ -2069,7 +2108,7 @@ show_backup_status() {
         local btrfs_count=0
         for subvol in @ @home; do
             if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" ]; then
-                local count=$(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" 2>/dev/null | wc -l)
+                local count=$(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" 2>/dev/null | grep -v '\.backup_complete$' | wc -l)
                 echo -e "  ${LH_COLOR_INFO}$subvol:${LH_COLOR_RESET} $count Snapshots"
                 btrfs_count=$((btrfs_count + count))
             fi
