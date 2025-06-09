@@ -21,8 +21,8 @@ Dieses Projekt steht unter der MIT-Lizenz. Weitere Informationen findest du in d
 <details>
 <summary>❗ Bekannte Probleme und Einschränkungen</summary>
 
-## Bekannte Probleme und Einschränkungen
 Hier ist eine Liste von bekannten Problemen, Einschränkungen oder Verhaltensweisen, die dir bei der Nutzung der Skripte auffallen könnten.
+
 ### Backups (mod_backup.sh):
 * BTRFS-Backup: Das Skript konnte nur auf den letzten Snapshot von Timeshift zugreifen, wenn Timeshift gerade lief. Das Skript ist jedoch darauf ausgelegt, bei Bedarf einen eigenen, unabhängigen Snapshot zu erstellen. Aktuell verwende ich Snapper statt Timeshift, weshalb ich das nicht weiter testen kann und selbst auch den unabhänigen Snapshot nutze. Evtl baue ich den Anteil auch noch aus.
 * das Backup hat keine Fortschritsanzeige (eher ein schönheitsfehler)
@@ -32,8 +32,8 @@ Hier ist eine Liste von bekannten Problemen, Einschränkungen oder Verhaltenswei
 </details>
 
 ## Funktionen
-
 Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Zugriff auf folgende Module:
+
 
 <details>
 <summary>🔄 Wiederherstellung & Neustarts (<code>mod_restarts.sh</code>)</summary>
@@ -92,7 +92,6 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
 <details>
 <summary>💻 Systemdiagnose & Analyse</summary>
 
-* **Systemdiagnose & Analyse**:
     * **Systeminformationen anzeigen (`mod_system_info.sh`)**:
         * Anzeige von Betriebssystem- und Kernel-Details.
         * CPU-Informationen.
@@ -130,7 +129,7 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
 
 <details>
 <summary>🛠️ Wartung & Sicherheit</summary>
-* **Wartung & Sicherheit**:
+
     * **Paketverwaltung & Updates (`mod_packages.sh`)**:
         * Systemaktualisierung (unterstützt pacman, apt, dnf, yay).
         * Aktualisierung alternativer Paketmanager (Flatpak, Snap, Nix).
@@ -150,7 +149,7 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
 
 <details>
 <summary>✨ Spezialfunktionen</summary>
-* **Spezialfunktionen**:
+
     * Sammeln wichtiger Debug-Informationen in einer Datei.
 </details>
 
