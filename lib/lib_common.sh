@@ -23,7 +23,7 @@ LH_CONFIG_DIR="$LH_ROOT_DIR/config"
 LH_BACKUP_CONFIG_FILE="$LH_CONFIG_DIR/backup.conf"
 
 # Die aktuelle Log-Datei wird bei Initialisierung gesetzt
-LH_LOG_FILE=""
+LH_LOG_FILE="${LH_LOG_FILE:-}" # Stellt sicher, dass sie existiert, aber überschreibt sie nicht, wenn sie bereits von außen gesetzt/exportiert wurde.
 
 # Enthält 'sudo', wenn Root-Rechte benötigt werden und das Skript nicht als Root läuft
 LH_SUDO_CMD=""
@@ -52,7 +52,7 @@ LH_TEMP_SNAPSHOT_DIR=""
 LH_TIMESHIFT_BASE_DIR=""
 LH_RETENTION_BACKUP=""
 LH_BACKUP_LOG_BASENAME="" # Der konfigurierte Basisname für die Backup-Logdatei
-LH_BACKUP_LOG=""          # Voller Pfad zur Backup-Logdatei (mit Zeitstempel)
+LH_BACKUP_LOG="${LH_BACKUP_LOG:-}"          # Voller Pfad zur Backup-Logdatei (mit Zeitstempel)
 
 
 # Farben für die Ausgabe
@@ -130,19 +130,32 @@ declare -A package_names_dnf=(
 # Funktion zum Initialisieren des Loggings
 function lh_initialize_logging() {
     # Prüfen, ob der Log-Ordner existiert, falls nicht, erstelle ihn
-    if [ ! -d "$LH_LOG_DIR" ]; then
-        mkdir -p "$LH_LOG_DIR"
+    if [ -z "$LH_LOG_FILE" ]; then # Nur initialisieren, wenn LH_LOG_FILE noch nicht gesetzt/leer ist
+        if [ ! -d "$LH_LOG_DIR" ]; then
+            if ! mkdir -p "$LH_LOG_DIR"; then
+                echo "FEHLER: Konnte Log-Verzeichnis nicht erstellen: $LH_LOG_DIR" >&2
+                LH_LOG_FILE="" 
+                return 1
+            fi
+        fi
+
+        LH_LOG_FILE="$LH_LOG_DIR/$(date '+%y%m%d-%H%M')_maintenance_script.log"
+
+        if ! touch "$LH_LOG_FILE"; then
+            echo "FEHLER: Konnte Log-Datei nicht erstellen: $LH_LOG_FILE" >&2
+            LH_LOG_FILE="" 
+            return 1
+        fi
+        lh_log_msg "INFO" "Logging initialisiert. Log-Datei: $LH_LOG_FILE"
+    else
+        # Wenn LH_LOG_FILE gesetzt ist, sicherstellen, dass die Datei noch existiert
+        if [ ! -f "$LH_LOG_FILE" ] && [ -n "$LH_LOG_DIR" ] && [ -d "$(dirname "$LH_LOG_FILE")" ]; then
+             if ! touch "$LH_LOG_FILE"; then
+                lh_log_msg "WARN" "Konnte existierende Log-Datei nicht erneut berühren/erstellen: $LH_LOG_FILE"
+             fi
+        fi
+        lh_log_msg "DEBUG" "Logging bereits initialisiert. Verwende Log-Datei: $LH_LOG_FILE"
     fi
-
-    # Log-Datei definieren mit dem gewünschten Format
-    LH_LOG_FILE="$LH_LOG_DIR/$(date '+%y%m%d-%H%M')_maintenance_script.log"
-
-    # Log-Datei erstellen, falls sie nicht existiert, und Berechtigungen setzen
-    if [ ! -f "$LH_LOG_FILE" ]; then
-        touch "$LH_LOG_FILE"
-    fi
-
-    lh_log_msg "INFO" "Logging initialisiert. Log-Datei: $LH_LOG_FILE"
 }
 
 # Funktion zum Laden der Backup-Konfiguration
@@ -173,7 +186,8 @@ function lh_load_backup_config() {
 
     # Zeitstempel dem Basis-Log-Dateinamen voranstellen
     LH_BACKUP_LOG="$LH_LOG_DIR/$(date '+%y%m%d-%H%M')_$LH_BACKUP_LOG_BASENAME"
-    lh_log_msg "INFO" "Backup-Logdatei: $LH_BACKUP_LOG"
+    # Die Backup-Logdatei wird erst bei der ersten Verwendung durch lh_backup_log() tatsächlich erstellt.
+    lh_log_msg "INFO" "Backup-Logdatei konfiguriert als: $LH_BACKUP_LOG"
 }
 
 # Funktion zum Speichern der Backup-Konfiguration
@@ -241,14 +255,26 @@ function lh_check_root_privileges() {
 function lh_backup_log() {
     local level="$1"
     local message="$2"
-    local backup_log="${LH_LOG_DIR}/backup.log"
-    
-    # Backup-Log erstellen falls nicht vorhanden
-    if [ ! -f "$backup_log" ]; then
-        touch "$backup_log"
+
+    if [ -z "$LH_BACKUP_LOG" ]; then
+        lh_log_msg "ERROR" "LH_BACKUP_LOG ist nicht definiert. Backup-Nachricht kann nicht geloggt werden: $message"
+        # Fallback auf Hauptlog, falls LH_BACKUP_LOG nicht gesetzt ist
+        lh_log_msg "$level" "(Backup-Fallback) $message"
+        return 1
     fi
-    
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" | tee -a "$backup_log"
+
+    # Sicherstellen, dass die Backup-Logdatei existiert (doppelte Prüfung schadet nicht)
+    local backup_log_dir
+    backup_log_dir=$(dirname "$LH_BACKUP_LOG")
+    if [ ! -d "$backup_log_dir" ]; then
+        # Versuche, das Log-Verzeichnis zu erstellen, falls es nicht existiert
+        mkdir -p "$backup_log_dir" || lh_log_msg "WARN" "Konnte Backup-Logverzeichnis $backup_log_dir nicht erstellen."
+    fi
+    if [ ! -f "$LH_BACKUP_LOG" ]; then
+        touch "$LH_BACKUP_LOG" || lh_log_msg "WARN" "Konnte Backup-Logdatei $LH_BACKUP_LOG nicht erstellen/berühren."
+    fi
+
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" | tee -a "$LH_BACKUP_LOG"
 }
 
 # Funktion zum Überprüfen der Dateisystem-Art
