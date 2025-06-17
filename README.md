@@ -3,7 +3,12 @@
 ## Beschreibung
 
 Little Linux Helper ist eine Sammlung von Bash-Skripten, die entwickelt wurden, um verschiedene Systemadministrations-, Diagnose- und Wartungsaufgaben unter Linux zu vereinfachen. Es bietet ein menügeführtes Interface für einfachen Zugriff auf eine Vielzahl von Werkzeugen und Funktionen.
-Meine Umgebung ist i.d.R. Arch, entsprechend kann es unter anderen Distributionen noch unbekannte Probleme geben, auch wenn ich versuche, alles kompatibel zu halten.
+
+Eine detailliertere technische englische Dokumentation der einzelnen Module und Kernkomponenten befindet sich im `docs`-Verzeichnis, 
+diese wurde mitunter erstellt um einer KI den kontext eines modules bzw einer Datei zu geben ohne dieses selbst komplett lesen zu müssen und kontext zusparen.
+Die `docs/PROJECT_DESCRIPTION.md` enthält alle Infomationen zu `lib/lib_common.sh` und `help_master.sh` die benötigt werden um ein neues modul zu erstellen.
+
+Meine Umgebung ist i.d.R. Arch (hauptsystem) oder Debian (diverse Dienste auf meinem Proxmox - daher auch die docker anteile), entsprechend kann es unter anderen Distributionen noch unbekannte Probleme geben, auch wenn ich versuche, alles kompatibel zu halten.
 
 <details>
 <summary>⚠️ Wichtige Hinweise zur Nutzung</summary>
@@ -24,13 +29,13 @@ Dieses Projekt steht unter der MIT-Lizenz. Weitere Informationen findest du in d
 <summary>❗ Bekannte Probleme und Einschränkungen</summary>
 
 Hier ist eine Liste von bekannten Problemen, Einschränkungen oder Verhaltensweisen, die dir bei der Nutzung der Skripte auffallen könnten.
-
 * **Backups (`mod_backup.sh`):**
-    * **BTRFS-Backup:** Das Skript konnte nur auf den letzten Snapshot von Timeshift zugreifen, wenn Timeshift gerade lief. Das Skript ist jedoch darauf ausgelegt, bei Bedarf einen eigenen, unabhängigen Snapshot zu erstellen. Aktuell verwende ich Snapper statt Timeshift, weshalb ich das nicht weiter testen kann und selbst auch den unabhängigen Snapshot nutze. Evtl. baue ich den Anteil auch noch aus.
+    * **BTRFS-Backup & Timeshift:** Das Skript versucht, den aktuellsten Timeshift-Snapshot als Basis zu nutzen (aus `LH_TIMESHIFT_BASE_DIR`). Schlägt dies fehl oder ist Timeshift nicht konfiguriert, wird ein unabhängiger Snapshot erstellt. Eine frühere Beobachtung, dass Timeshift aktiv laufen muss, konnte nicht weiter verifiziert werden, da ich nun Snapper/Btrfs-Assistent verwende und damit die unabhängigen Snapshots nutze.
+    Dieser unabhänige Snapshot wird bei abbruch per Strg + 'C' aufgeräumt oder alternativ bei erneuten laden des modules. 
     * Das Backup hat keine Fortschrittsanzeige (eher ein Schönheitsfehler).
     * Für das Backup nutze ich i.d.R. die BTRFS-basierende Funktion, die anderen sind wesentlich weniger getestet.
 * **Erweiterte Log-Analyse (`scripts/advanced_log_analyzer.py`):**
-    * Dieses Skript ist kaum getestet.
+    * Dieses Skript ist weniger intensiv getestet und hat bekannte Einschränkungen bezüglich Log-Format-Erkennung, Zeichenkodierung und der Komplexität seiner regulären Ausdrücke (Details siehe `docs/advanced_log_analyzer.md`).
 
 </details>
 
