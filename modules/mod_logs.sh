@@ -17,20 +17,18 @@ lh_detect_package_manager
 function logs_last_minutes_current() {
     lh_print_header "Logs der letzten X Minuten (aktueller Boot)"
 
-    local minutes_prompt
-    minutes_prompt="$(echo -e "${LH_COLOR_PROMPT}Geben Sie die Anzahl der Minuten ein ${LH_COLOR_MENU_NUMBER}[30]${LH_COLOR_PROMPT}:${LH_COLOR_RESET} ")"
-    read -p "$minutes_prompt" minutes
+    local minutes_str
+    local minutes_default="30"
+    local prompt_text="Geben Sie die Anzahl der Minuten ein ${LH_COLOR_MENU_NUMBER}[$minutes_default]${LH_COLOR_PROMPT}:${LH_COLOR_RESET} "
 
+    minutes_str=$(lh_ask_for_input "$prompt_text" "^[0-9]*$" "Ungültige Eingabe. Bitte geben Sie eine Zahl ein.")
+    local minutes=${minutes_str:-$minutes_default} # Apply default if empty
 
-    # Wenn leer, Standardwert verwenden
-    if [ -z "$minutes" ]; then
-        minutes=30
-    fi
-
-    # Sicherstellen, dass minutes eine Zahl ist
-    if ! [[ "$minutes" =~ ^[0-9]+$ ]]; then
+    # Final validation for the (possibly defaulted) value, assuming minutes must be positive
+    if ! [[ "$minutes" =~ ^[0-9]+$ ]] || [ "$minutes" -lt 1 ]; then
+        lh_log_msg "WARN" "Ungültige oder leere Minuteneingabe für aktuellen Boot, Standard ($minutes_default) wird verwendet."
         echo -e "${LH_COLOR_WARNING}Ungültige Eingabe. Es werden die letzten 30 Minuten angezeigt.${LH_COLOR_RESET}"
-        minutes=30
+        minutes=$minutes_default
     fi
 
     if command -v journalctl >/dev/null 2>&1; then
@@ -100,12 +98,17 @@ function logs_last_minutes_previous() {
         return 1
     fi
 
-    local minutes=$(lh_ask_for_input "Geben Sie die Anzahl der Minuten ein" "30")
+    local minutes_str
+    local minutes_default="30"
+    local prompt_text="Geben Sie die Anzahl der Minuten ein ${LH_COLOR_MENU_NUMBER}[$minutes_default]${LH_COLOR_PROMPT}:${LH_COLOR_RESET} "
 
-    # Sicherstellen, dass minutes eine Zahl ist
-    if ! [[ "$minutes" =~ ^[0-9]+$ ]]; then
+    minutes_str=$(lh_ask_for_input "$prompt_text" "^[0-9]*$" "Ungültige Eingabe. Bitte geben Sie eine Zahl ein.")
+    local minutes=${minutes_str:-$minutes_default}
+
+    if ! [[ "$minutes" =~ ^[0-9]+$ ]] || [ "$minutes" -lt 1 ]; then
+        lh_log_msg "WARN" "Ungültige oder leere Minuteneingabe für vorherigen Boot, Standard ($minutes_default) wird verwendet."
         echo -e "${LH_COLOR_WARNING}Ungültige Eingabe. Es werden die letzten 30 Minuten angezeigt.${LH_COLOR_RESET}"
-        minutes=30
+        minutes=$minutes_default
     fi
 
     # Ermitteln der Start- und Endzeit des vorherigen Bootvorgangs
@@ -207,54 +210,39 @@ function logs_specific_service() {
             journalctl_time_opts+=("-b")
             ;;
         3)
-            # KORREKTUR: Ersetzen des problematischen lh_ask_for_input durch eine eigene Leseschleife
-            local hours_val
             local hours_default="24"
-            local hours_prompt # Wird unten gesetzt
-            local hours # Variable für den validierten Wert
+            local hours_str
+            local hours_prompt="Geben Sie die Anzahl der Stunden ein ${LH_COLOR_MENU_NUMBER}[$hours_default]${LH_COLOR_PROMPT}:${LH_COLOR_RESET} "
+            hours_str=$(lh_ask_for_input "$hours_prompt" "^[0-9]*$" "Ungültige Eingabe. Bitte geben Sie eine nicht-negative Zahl ein.")
+            local hours=${hours_str:-$hours_default}
 
-            hours_prompt="$(echo -e "${LH_COLOR_PROMPT}Geben Sie die Anzahl der Stunden ein ${LH_COLOR_MENU_NUMBER}[$hours_default]${LH_COLOR_PROMPT}:${LH_COLOR_RESET} ")"
-            while true; do
-                read -r -p "$hours_prompt" hours_val
-                # Wenn die Eingabe leer ist, Standardwert verwenden
-                if [ -z "$hours_val" ]; then
-                    hours_val="$hours_default"
-                fi
-                # Überprüfen, ob es eine positive Ganzzahl ist
-                if [[ "$hours_val" =~ ^[0-9]+$ ]] && [ "$hours_val" -ge 0 ]; then # Erlaube 0 Stunden, falls sinnvoll
-                    hours="$hours_val" # Gültige Zahl
-                    break # Schleife verlassen
-                else
-                    echo -e "${LH_COLOR_WARNING}Ungültige Eingabe. Bitte geben Sie eine nicht-negative Zahl ein.${LH_COLOR_RESET}"
-                    # Die Schleife wird fortgesetzt und die Frage erneut gestellt
-                fi
-            done
+            if ! [[ "$hours" =~ ^[0-9]+$ ]] || [ "$hours" -lt 0 ]; then # Allow 0 hours
+                lh_log_msg "WARN" "Ungültige oder leere Stundeneingabe für Service-Logs, Standard ($hours_default) wird verwendet."
+                echo -e "${LH_COLOR_WARNING}Ungültige Eingabe. Es werden $hours_default Stunden verwendet.${LH_COLOR_RESET}"
+                hours=$hours_default
+            fi
             journalctl_time_opts+=("--since" "$hours hours ago")
             ;;
         4)
-            local days_val
             local days_default="7"
-            local days_prompt="Geben Sie die Anzahl der Tage ein [$days_default]: "
-            local days # Variable für den validierten Wert
+            local days_str
+            local days_prompt="Geben Sie die Anzahl der Tage ein ${LH_COLOR_MENU_NUMBER}[$days_default]${LH_COLOR_PROMPT}:${LH_COLOR_RESET} "
+            days_str=$(lh_ask_for_input "$days_prompt" "^[0-9]*$" "Ungültige Eingabe. Bitte geben Sie eine nicht-negative Zahl ein.")
+            local days=${days_str:-$days_default}
 
-            while true; do
-                read -r -p "$days_prompt" days_val
-                days_prompt="$(echo -e "${LH_COLOR_PROMPT}Geben Sie die Anzahl der Tage ein ${LH_COLOR_MENU_NUMBER}[$days_default]${LH_COLOR_PROMPT}:${LH_COLOR_RESET} ")"
-                if [ -z "$days_val" ]; then
-                    days_val="$days_default"
-                fi
-
-                if [[ "$days_val" =~ ^[0-9]+$ ]] && [ "$days_val" -ge 0 ]; then # Erlaube 0 Tage
-                    days="$days_val"
-                    break
-                else
-                    echo -e "${LH_COLOR_WARNING}Ungültige Eingabe. Bitte geben Sie eine nicht-negative Zahl ein.${LH_COLOR_RESET}"
-                fi
-            done
+            if ! [[ "$days" =~ ^[0-9]+$ ]] || [ "$days" -lt 0 ]; then # Allow 0 days
+                lh_log_msg "WARN" "Ungültige oder leere Tageseingabe für Service-Logs, Standard ($days_default) wird verwendet."
+                echo -e "${LH_COLOR_WARNING}Ungültige Eingabe. Es werden $days_default Tage verwendet.${LH_COLOR_RESET}"
+                days=$days_default
+            fi
             journalctl_time_opts+=("--since" "$days days ago")
             ;;
         *)
-            lh_log_msg "INFO" "Zeige alle Logs für $service_name oder ungültige Zeitoption gewählt."
+            if [[ -n "$service_name" ]]; then # Nur loggen, wenn ein Service-Name existiert
+                lh_log_msg "INFO" "Zeige alle Logs für $service_name (Standard oder ungültige Zeitoption gewählt)."
+            else
+                lh_log_msg "WARN" "Kein Service-Name angegeben oder ungültige Zeitoption gewählt."
+            fi
             ;;
     esac
 
@@ -383,26 +371,18 @@ function logs_show_dmesg() {
 
     case $dmesg_option in
         2)
-            local lines_val
             local lines_default="50"
-            local lines_prompt="$(echo -e "${LH_COLOR_PROMPT}Geben Sie die Anzahl der Zeilen ein ${LH_COLOR_MENU_NUMBER}[$lines_default]${LH_COLOR_PROMPT}:${LH_COLOR_RESET} ")"
+            local lines_str
+            local lines_prompt="Geben Sie die Anzahl der Zeilen ein ${LH_COLOR_MENU_NUMBER}[$lines_default]${LH_COLOR_PROMPT}:${LH_COLOR_RESET} "
 
-            while true; do
-                read -r -p "$lines_prompt" lines_val
-                # Wenn die Eingabe leer ist, Standardwert verwenden
-                if [ -z "$lines_val" ]; then
-                    lines_val="$lines_default"
-                fi
+            lines_str=$(lh_ask_for_input "$lines_prompt" "^[0-9]*$" "Ungültige Eingabe. Bitte geben Sie eine positive Zahl ein.")
+            lines=${lines_str:-$lines_default} # lines ist hier schon deklariert
 
-                # Überprüfen, ob es eine positive Ganzzahl ist
-                if [[ "$lines_val" =~ ^[0-9]+$ ]] && [ "$lines_val" -gt 0 ]; then
-                    lines="$lines_val" # Gültige Zahl
-                    break # Schleife verlassen
-                else
-                    echo -e "${LH_COLOR_WARNING}Ungültige Eingabe. Bitte geben Sie eine positive Zahl ein.${LH_COLOR_RESET}"
-                    # Die Schleife wird fortgesetzt und die Frage erneut gestellt
-                fi
-            done
+            if ! [[ "$lines" =~ ^[0-9]+$ ]] || [ "$lines" -le 0 ]; then # Must be > 0
+                lh_log_msg "WARN" "Ungültige oder leere Zeileneingabe für dmesg, Standard ($lines_default) wird verwendet."
+                echo -e "${LH_COLOR_WARNING}Ungültige Eingabe. Es werden die letzten $lines_default Zeilen angezeigt.${LH_COLOR_RESET}"
+                lines=$lines_default
+            fi
 
             echo -e "${LH_COLOR_INFO}Letzte $lines Zeilen der dmesg-Ausgabe:${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
