@@ -800,22 +800,6 @@ function lh_send_notification() {
         fi
     fi
     
-    # 4. osascript versuchen (für macOS, falls das Skript dort läuft)
-    if [ "$notification_sent" = false ] && lh_run_command_as_target_user "command -v osascript >/dev/null 2>&1"; then
-        lh_log_msg "DEBUG" "Verwende osascript für Desktop-Benachrichtigung (macOS)"
-        
-        local escaped_title=$(printf '%q' "$title")
-        local escaped_message=$(printf '%q' "$message")
-        local osascript_cmd="osascript -e 'display notification $escaped_message with title $escaped_title'"
-        
-        if lh_run_command_as_target_user "$osascript_cmd"; then
-            lh_log_msg "INFO" "Desktop-Benachrichtigung erfolgreich über osascript gesendet"
-            notification_sent=true
-        else
-            lh_log_msg "WARN" "osascript-Benachrichtigung fehlgeschlagen"
-        fi
-    fi
-    
     if [ "$notification_sent" = false ]; then
         lh_log_msg "WARN" "Keine funktionierende Desktop-Benachrichtigung gefunden"
         lh_log_msg "INFO" "Verfügbare Benachrichtigungstools prüfen: notify-send, zenity, kdialog"
