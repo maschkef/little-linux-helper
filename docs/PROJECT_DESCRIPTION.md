@@ -1,8 +1,9 @@
 ## Project Description: Little Linux Helper
 
-This document describes the core components of the "Little Linux Helper" project, based on the files `/home/tux/Desktop/little-linux-helper/little-linux-helper/help_master.sh` and `/home/tux/Desktop/little-linux-helper/little-linux-helper/lib/lib_common.sh`. It aims to enable developers to understand the structure, global variables, and available functions to extend or modify the project without needing to study the source code of the described files in detail.
-
-### 1. The Main File: `/home/tux/Desktop/little-linux-helper/little-linux-helper/help_master.sh`
+This document describes the core components of the "Little Linux Helper" project, based on the files `help_master.sh` and `lib_common.sh`. It aims to enable developers and ai to understand the structure, global variables, and available functions to extend or modify the project without needing to study the source code of the described files in detail.
+The primary goal of this project is to be as compatible as possible across a wide range of Linux distributions. Compatibility with other operating systems like macOS or native Windows is not a target; however, functionality within Windows Subsystem for Linux (WSL) environments is desirable where reasonably achievable.
+ 
+### 1. The Main File: `help_master.sh`
 
 `help_master.sh` is the main entry script for the Little Linux Helper. It is responsible for initializing the environment, loading common functions, and presenting the main menu through which the various helper modules are accessed.
 
@@ -43,13 +44,13 @@ After initialization, the script enters an infinite loop that displays the main 
     *   **Dependencies (Library):** `lh_print_header`, `lh_log_msg`, `lh_confirm_action`.
     *   **Dependencies (System Commands):** `date`, `hostname`, `whoami`, `cat`, `uname`, `lscpu`, `grep`, `free`, `df`, `journalctl`, `tail`, `ps`, `ip`, `ss`, `netstat`, `less`.
     *   **Side Effects:**
-        - Creates a file in the `$LH_LOG_DIR` directory with a name based on date and hostname (format: `debug_report_HOSTNAME_YYMMDD-HHMM.txt`).
+        - Creates a file in the `$LH_LOG_DIR` directory with a name based on date and hostname (format: `debug_report_HOSTNAME_YYYYMMDD-HHMM.txt`).
         - Writes various system information (OS, kernel, CPU, memory, disk), package manager info, log excerpts (system, Xorg), running processes, network info, and desktop environment info into this file.
         - Outputs status messages to the console and the main log (`$LH_LOG_FILE`).
         - Optionally offers the user to view the created file with `less` (`lh_confirm_action`).
     *   **Usage:** Called directly from the main menu.
 
-### 2. The Library File: `/home/tux/Desktop/little-linux-helper/little-linux-helper/lib/lib_common.sh`
+### 2. The Library File: `lib/lib_common.sh`
 
 `lib_common.sh` contains a collection of global variables and reusable functions that can be used by `help_master.sh` and all module scripts. It serves as a central hub for common logic and configuration.
 
@@ -62,13 +63,14 @@ After initialization, the script enters an infinite loop that displays the main 
 The following variables are defined in `lib_common.sh`. Those marked as "Exported" are made available to module scripts because `help_master.sh` calls `lh_finalize_initialization` (which exports them) before running the modules as sub-processes. Modules inherit these exported variables. Other global variables (not explicitly exported) become available within modules when they `source lib_common.sh`.
 
 - `LH_ROOT_DIR`: Absolute path to the project's main directory. Dynamically determined if not already set.
+- `LH_LOG_DIR_BASE`: Absolute path to the base log directory (e.g., `$LH_ROOT_DIR/logs`).
 - `LH_LOG_DIR`: Absolute path to the current monthly log directory (e.g., `$LH_ROOT_DIR/logs/2025-06`).
 - `LH_CONFIG_DIR`: Absolute path to the configuration directory (`$LH_ROOT_DIR/config`).
 - `LH_BACKUP_CONFIG_FILE`: Absolute path to the backup configuration file (`$LH_CONFIG_DIR/backup.conf`).
 - `LH_LOG_FILE`: Absolute path to the current main log file. Set by `lh_initialize_logging`.
 - `LH_SUDO_CMD`: Contains the string 'sudo' if the script is not run as root, otherwise empty. Set by `lh_check_root_privileges`.
 - `LH_PKG_MANAGER`: The detected primary package manager (e.g., 'pacman', 'apt', 'dnf'). Set by `lh_detect_package_manager`.
-- `LH_ALT_PKG_MANAGERS`: An array of detected alternative package managers (e.g., 'flatpak', 'snap'). Set by `lh_detect_alternative_managers`. (Exported as an array, accessible in modules)
+ `LH_ALT_PKG_MANAGERS`: An array of detected alternative package managers (e.g., 'flatpak', 'snap'). Set by `lh_detect_alternative_managers`. (Modules should call `lh_detect_alternative_managers()` after sourcing `lib_common.sh` to ensure this array is correctly populated in their context, see Section 3.)
 - `LH_TARGET_USER_INFO`: An associative array storing information about the target user for GUI interactions. Populated by `lh_get_target_user_info`. Contains keys like `TARGET_USER`, `USER_DISPLAY`, `USER_XDG_RUNTIME_DIR`, `USER_DBUS_SESSION_BUS_ADDRESS`, `USER_XAUTHORITY`.
 - `LH_BACKUP_ROOT_DEFAULT`: Default value for the root directory of backups.
 - `LH_BACKUP_DIR_DEFAULT`: Default value for the backup subdirectory (relative to `LH_BACKUP_ROOT`).
@@ -140,7 +142,7 @@ The following variables are defined in `lib_common.sh`. Those marked as "Exporte
     *   **Parameters:**
         - `$1` (`level`): The log level (e.g., "INFO", "WARN", "ERROR", "DEBUG").
         - `$2` (`message`): The actual log message.
-    *   **Dependencies:** `date`, `echo`, `tee`.
+    *   **Dependencies:** `date`, `echo`.
     *   **Side Effects:**
         - Formats the message with a timestamp and level.
         - Outputs the formatted message to standard output (console).
@@ -247,7 +249,7 @@ The following variables are defined in `lib_common.sh`. Those marked as "Exporte
 
 *   `lh_get_target_user_info()`
     *   **Purpose:** Determines information about the user of the active graphical session (desktop user) to execute commands in their context.
-    *   **Dependencies:** `loginctl`, `sudo`, `ps`, `grep`, `awk`, `head`, `cut`, `id`, `env`, `who`, `lh_log_msg`.
+    *   **Dependencies:** `loginctl`, `sudo`, `ps`, `grep`, `awk`, `head`, `cut`, `id`, `env`, `who`, `sed`, `basename`, `tr`, `cat`, `lh_log_msg`.
     *   **Side Effects:**
         - Populates the global associative array `LH_TARGET_USER_INFO` with the keys `TARGET_USER`, `USER_DISPLAY`, `USER_XDG_RUNTIME_DIR`, `USER_DBUS_SESSION_BUS_ADDRESS`, `USER_XAUTHORITY`.
         - Uses various methods (loginctl, SUDO_USER, USER, ps, who) to find the user.
@@ -272,7 +274,7 @@ The following variables are defined in `lib_common.sh`. Those marked as "Exporte
         - `$2` (`title`): The title of the notification.
         - `$3` (`message`): The body text of the notification.
         - `$4` (`urgency`): Optional. Urgency level ("low", "normal", "critical"). If omitted, it's inferred from the type.
-    *   **Dependencies:** `lh_get_target_user_info`, `lh_run_command_as_target_user`. System commands like `notify-send`, `zenity`, or `kdialog`.
+    *   **Dependencies:** `lh_get_target_user_info`, `lh_run_command_as_target_user`. System commands like `notify-send`, `zenity`, `kdialog`.
     *   **Return Value:** Returns 0 on success, 1 on failure (e.g., no target user or no notification tool found).
     *   **Side Effects:** Tries to send a notification using available tools (`notify-send`, `zenity`, `kdialog`) in the context of the target user. Logs the success or failure.
     *   **Usage:** To provide non-interactive feedback to the desktop user about the result of a long-running or background task.
@@ -326,8 +328,10 @@ Global variables set and exported by `help_master.sh` (e.g., `LH_ROOT_DIR`, `LH_
 
 However, for variables like `LH_PKG_MANAGER` and the array `LH_ALT_PKG_MANAGERS`, which are determined by detection functions (`lh_detect_package_manager`, `lh_detect_alternative_managers`), there's a subtlety. If a module sources `lib_common.sh` (which is standard practice to access library functions), this can affect how these specific variables are seen. Sourcing might re-declare them (potentially as empty) as defined in `lib_common.sh`'s global scope, shadowing any inherited values.
 
-Therefore, to ensure `LH_PKG_MANAGER` and `LH_ALT_PKG_MANAGERS` are correctly populated and available within a module's execution context, **modules should explicitly call `lh_detect_package_manager()` and `lh_detect_alternative_managers()` respectively, immediately after sourcing `lib_common.sh`.** This pattern is the recommended approach for all modules needing these variables. This makes the module self-sufficient in setting up these particular configurations, avoiding potential issues with variable shadowing or complex array exports.
-
+Therefore, to ensure these variables are correctly populated within a module's execution context:
+- Modules needing `LH_PKG_MANAGER` (e.g., for package installation prompts via `lh_check_command` or direct package manager interactions) should explicitly call `lh_detect_package_manager()` immediately after sourcing `lib_common.sh`.
+- Modules needing `LH_ALT_PKG_MANAGERS` (e.g., for interacting with Flatpak, Snap, etc.) should explicitly call `lh_detect_alternative_managers()` immediately after sourcing `lib_common.sh`.
+This makes the module self-sufficient in setting up these specific configurations as needed, avoiding potential issues with variable shadowing or complex array exports.
 Variables defined only within a function in `lib_common.sh` (without `export`) are only visible within that function.
 
 ### 4. External Dependencies (System Commands)
@@ -337,16 +341,16 @@ The project uses a number of standard Linux commands. Some of the most important
 - `date`: For timestamps in logs and filenames.
 - `mkdir`, `touch`, `rm`: For filesystem operations (creating/deleting directories/files).
 - `echo`, `printf`: For output to the console and files.
-- `tee`: For simultaneous output to console and file (for logging).
+- `tee`: For simultaneous output to console and file (used in `lh_backup_log`).
 - `df`, `ls`, `sort`, `tail`, `head`, `find`: For filesystem and file operations, listing, sorting, filtering.
-- `awk`, `cut`, `grep`, `tr`: For text processing and parsing command outputs.
+- `awk`, `cut`, `grep`, `tr`, `sed`, `basename`: For text processing and parsing command outputs.
 - `command -v`: For checking if a command exists.
 - `ps`: For listing running processes.
 - `ip`, `ss`, `netstat`: For network information.
 - `journalctl`: For reading the systemd journal.
 - `less`: For viewing text files.
 - `read`: For reading user input.
-- `uname`, `lscpu`, `free`, `cat`: For general system information.
+- `uname`, `lscpu`, `free`, `cat` (e.g. for `/etc/os-release`, `/proc/*`): For general system information.
 - `id`: For retrieving user IDs.
 - `env`: For displaying environment variables.
 - `basename`, `dirname`, `pwd`, `cd`: For path manipulations.
@@ -354,7 +358,6 @@ The project uses a number of standard Linux commands. Some of the most important
 - Package manager commands (`pacman`, `yay`, `apt`, `dnf`) and alternative managers (`flatpak`, `snap`, `nix-env`, `appimagetool`): For package management and detection.
 - `loginctl`: For querying session information (requires root privileges).
 - **Notification tools:** `notify-send` (from `libnotify` or similar), `zenity`, `kdialog` for desktop notifications.
-
 It is important to ensure these commands are available on the target system, or to use the `lh_check_command` or `lh_check_notification_tools` functions to check dependencies and offer installation if necessary.
 
 This document should provide a solid foundation for understanding the functionality of `help_master.sh` and `lib_common.sh` and for starting to develop further modules or adapt existing functions.
