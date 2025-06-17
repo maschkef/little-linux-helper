@@ -1,3 +1,12 @@
+<!--
+File: docs/mod_restarts.md
+Copyright (c) 2025 wuldorf
+SPDX-License-Identifier: MIT
+
+This project is part of the 'little-linux-helper' collection.
+Licensed under the MIT License. See the LICENSE file in the project root for more information.
+-->
+
 ## Module Description: `mod_restarts.sh`
 
 This document describes the `mod_restarts.sh` module of the "Little Linux Helper" project. It is intended for developers who need to understand its functionality for interaction or extension, without needing to delve into the source code.

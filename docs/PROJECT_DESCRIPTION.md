@@ -1,3 +1,12 @@
+<!--
+File: docs/PROJECT_DESCRIPTION.md
+Copyright (c) 2025 wuldorf
+SPDX-License-Identifier: MIT
+
+This project is part of the 'little-linux-helper' collection.
+Licensed under the MIT License. See the LICENSE file in the project root for more information.
+-->
+
 ## Project Description: Little Linux Helper
 
 This document describes the core components of the "Little Linux Helper" project, based on the files `help_master.sh` and `lib_common.sh`. It aims to enable developers and ai to understand the structure, global variables, and available functions to extend or modify the project without needing to study the source code of the described files in detail.
@@ -364,13 +373,8 @@ This document should provide a solid foundation for understanding the functional
 
 ### 5. Licensing
 
-The "Little Linux Helper" project is licensed under the MIT License.
-
-**Copyright (c) 2025 wuldorf**
-**SPDX-License-Identifier: MIT**
-
-This project is part of the 'little-linux-helper' collection.
-Licensed under the MIT License. See the `LICENSE` file in the project root for more information.
+The "Little Linux Helper" project is licensed under the MIT License. Full license text can be found in the `LICENSE` file in the project root.
+Each source file within this project should also include a license header as described below.
 
 **Guideline for New Files:**
 All new source code files (shell scripts, documentation, etc.) contributed to this project should include a license header at the beginning of the file, similar to the one found in existing scripts. This header should clearly state:

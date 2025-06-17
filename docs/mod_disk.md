@@ -1,3 +1,12 @@
+<!--
+File: docs/mod_disk.md
+Copyright (c) 2025 wuldorf
+SPDX-License-Identifier: MIT
+
+This project is part of the 'little-linux-helper' collection.
+Licensed under the MIT License. See the LICENSE file in the project root for more information.
+-->
+
 ## Module: `modules/mod_disk.sh` - Disk Utilities and Analysis
 
 **1. Purpose:**
