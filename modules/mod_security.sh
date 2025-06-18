@@ -555,15 +555,41 @@ function docker_check_default_passwords() {
     
     echo -e "${LH_COLOR_INFO}Prüfe Default-Passwörter in: $(basename "$compose_file")${LH_COLOR_RESET}"
     
-    # Konvertiere Pattern-String zu Array
-    IFS=',' read -ra PATTERNS <<< "$LH_DOCKER_DEFAULT_PATTERNS_EFFECTIVE"
-    
     local found_defaults=false
-    for pattern in "${PATTERNS[@]}"; do
-        if [ -n "$pattern" ] && grep -q "$pattern" "$compose_file"; then
-            echo -e "${LH_COLOR_ERROR}⚠ Standard-Passwort gefunden: $pattern${LH_COLOR_RESET}"
-            found_defaults=true
+
+    # Trenne die Patterns an Kommas
+    IFS=',' read -ra DEFAULT_PATTERNS_ARRAY <<< "$LH_DOCKER_DEFAULT_PATTERNS_EFFECTIVE"
+
+    for pattern_entry in "${DEFAULT_PATTERNS_ARRAY[@]}"; do
+        if [ -z "$pattern_entry" ]; then
+            continue
         fi
+
+        # Trenne VARIABLE=REGEX_PATTERN
+        local var_name="${pattern_entry%%=*}"
+        local value_regex="${pattern_entry#*=}"
+
+        if [ -z "$var_name" ] || [ -z "$value_regex" ]; then
+            lh_log_msg "WARN" "Ungültiger Eintrag in CFG_LH_DOCKER_DEFAULT_PATTERNS: '$pattern_entry'"
+            continue
+        fi
+
+        # Suche nach Zeilen, die die Variable definieren (z.B. VAR_NAME: wert oder VAR_NAME=wert)
+        # Extrahiere den Wert nach dem Doppelpunkt oder Gleichheitszeichen, trimme Leerzeichen und Anführungszeichen
+        local found_lines
+        found_lines=$(grep -E "^\s*${var_name}\s*[:=]\s*.*" "$compose_file" || true)
+
+        while IFS= read -r line; do
+            # Extrahiere den Wert. Entferne führende/nachfolgende Leerzeichen und Anführungszeichen.
+            local actual_value
+            actual_value=$(echo "$line" | sed -E "s/^\s*${var_name}\s*[:=]\s*//; s/^\s*['\"]?//; s/['\"]?\s*$//")
+            
+            # Prüfe, ob der extrahierte Wert auf das Regex-Muster passt
+            if [[ "$actual_value" =~ $value_regex ]]; then
+                echo -e "${LH_COLOR_ERROR}⚠ Standard-Passwort/Wert gefunden für Variable '${LH_COLOR_PROMPT}${var_name}${LH_COLOR_ERROR}' (Wert: '${LH_COLOR_PROMPT}${actual_value}${LH_COLOR_ERROR}' passt auf Regex '${LH_COLOR_PROMPT}${value_regex}${LH_COLOR_ERROR}')${LH_COLOR_RESET}"
+                found_defaults=true
+            fi
+        done <<< "$found_lines"
     done
     
     if $found_defaults; then
