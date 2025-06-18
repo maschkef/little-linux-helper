@@ -225,6 +225,23 @@ Das Skript versucht, den verwendeten Paketmanager (pacman, yay, apt, dnf) automa
 
 </details>
 
+## Konfiguration
+
+<details>
+<summary>⚙️ Konfigurationsdateien</summary>
+
+Little Linux Helper verwendet Konfigurationsdateien, um bestimmte Aspekte seines Verhaltens anzupassen. Diese Dateien befinden sich im Verzeichnis `config/`.
+
+Beim ersten Start des Hauptskripts (`help_master.sh`) werden automatisch Standard-Konfigurationsdateien erstellt, falls diese noch nicht vorhanden sind. Dies geschieht, indem Vorlagedateien mit der Endung `.example` (z.B. `backup.conf.example`) in ihre aktiven Gegenstücke ohne das Suffix (z.B. `backup.conf`) kopiert werden.
+
+**Wichtig:** Sie werden beim ersten Erstellen einer Konfigurationsdatei darauf hingewiesen. Es wird empfohlen, diese neu erstellten `.conf`-Dateien zu überprüfen und gegebenenfalls an Ihre spezifischen Bedürfnisse anzupassen.
+
+Aktuell werden Konfigurationsdateien für folgende Module verwendet:
+*   **Backup & Wiederherstellung (`mod_backup.sh`)**: Einstellungen für Backup-Pfade, Aufbewahrungsrichtlinien etc. (`config/backup.conf`).
+*   **Docker Security Überprüfung (`mod_security.sh`)**: Einstellungen für Suchpfade, zu überspringende Warnungen etc. (`config/docker_security.conf`).
+
+</details>
+
 ## Module Übersicht
 
 <details>
