@@ -154,6 +154,24 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
     * Firewall-Status prüfen (UFW, firewalld, iptables).
     * Prüfung auf Sicherheits-Updates.
     * Überprüfung von Kennwort-Richtlinien und Benutzerkonten.
+    * **Docker Security Überprüfung**:
+        * Analysiert Docker-Compose Dateien (`docker-compose.yml`, `compose.yml`) auf häufige Sicherheitsprobleme.
+        * Der Suchpfad für Compose-Dateien, die Suchtiefe und auszuschließende Verzeichnisse sind konfigurierbar.
+        * Bietet eine interaktive Konfiguration des Suchpfads, falls der aktuelle Pfad ungültig ist oder geändert werden soll.
+        * Führt eine Reihe von Prüfungen durch, darunter:
+            * Fehlen von Update-Management-Labels (z.B. für Diun, Watchtower).
+            * Unsichere Berechtigungen für `.env`-Dateien.
+            * Zu offene Berechtigungen für Verzeichnisse, die Compose-Dateien enthalten.
+            * Verwendung von `:latest`-Image-Tags oder Images ohne spezifische Versionierung. (In der `config/docker_security.conf` im standard deaktiviert)
+            * Konfiguration von Containern mit `privileged: true`.
+            * Einbindung kritischer Host-Pfade als Volumes (z.B. `/`, `/etc`, `/var/run/docker.sock`).
+            * Auf `0.0.0.0` exponierte Ports, die Dienste für alle Netzwerkschnittstellen verfügbar machen.
+            * Verwendung potenziell gefährlicher Linux-Capabilities (z.B. `SYS_ADMIN`, `NET_ADMIN`).
+            * Deaktivierte Sicherheitsoptionen wie `apparmor:unconfined` oder `seccomp:unconfined`.
+            * Vorkommen von bekannten Standardpasswörtern in Umgebungsvariablen.
+            * Direkte Einbettung sensitiver Daten (z.B. API-Keys, Tokens) anstelle von Umgebungsvariablen.
+        * Optional kann eine Liste der aktuell laufenden Docker-Container angezeigt werden. (In der `config/docker_security.conf` im standard deaktiviert)
+        * Stellt eine Zusammenfassung der gefundenen potenziellen Probleme mit Empfehlungen bereit.
 
 </details>
 

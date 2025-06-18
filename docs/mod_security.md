@@ -21,7 +21,8 @@ This module provides a suite of tools for performing various security checks on 
     *   `lh_log_msg`: For logging module actions and errors.
     *   `lh_confirm_action`: For obtaining yes/no confirmation from the user.
     *   `lh_check_command`: Used to verify the presence of essential external commands (e.g., `ss`, `nmap`, `rkhunter`, `chkrootkit`, `passwd`), offering to install them if missing.
-    *   Color variables (e.g., `LH_COLOR_INFO`, `LH_COLOR_ERROR`, `LH_COLOR_PROMPT`, `LH_COLOR_SEPARATOR`): For styled terminal output.
+    *   `lh_ask_for_input`: For prompting user for specific text input (used in Docker path configuration).
+    *   Color variables (e.g., `LH_COLOR_INFO`, `LH_COLOR_ERROR`, `LH_COLOR_PROMPT`, `LH_COLOR_SEPARATOR`, `LH_COLOR_HEADER`, `LH_COLOR_MENU_ITEM`, `LH_COLOR_SUCCESS`, `LH_COLOR_WARNING`): For styled terminal output.
     *   Global variables: Accesses `LH_SUDO_CMD` (for privileged operations) and `LH_PKG_MANAGER`.
 *   **Key System Commands:** `ss`, `nmap`, `journalctl`, `grep`, `tail`, `lastb`, `rkhunter`, `chkrootkit`, `ufw`, `firewall-cmd`, `iptables`, `pacman`, `apt`, `dnf`, `yay`, `passwd`, `wc`, `command -v`, `read`.
 
@@ -123,12 +124,59 @@ This is the entry point and main interactive loop of the module. It displays a s
     *   **Dependencies (system):** `grep`, `passwd`.
     *   **Special Considerations:** Requires `passwd` command (checked via `lh_check_command`). Relies on common paths for policy files. `$LH_SUDO_CMD` is used for `passwd -S -a`.
 
+*   **`security_check_docker()`**
+    *   **Purpose:** Performs a comprehensive security audit of Docker configurations, focusing on Docker Compose files.
+    *   **Interaction:**
+        *   Checks if Docker is installed (via `lh_check_command`, offers installation).
+        *   Loads Docker-specific configuration from `$LH_CONFIG_DIR/docker_security.conf`.
+        *   Validates the configured search path for Docker Compose files (`CFG_LH_DOCKER_COMPOSE_ROOT`). If the path is invalid or the user wishes to change it, it prompts for a new path and saves it to the configuration file.
+        *   Displays current configuration settings (search path, depth, exclusions).
+        *   Searches for Docker Compose files (`docker-compose.yml`, `compose.yml`) within the configured path and depth.
+        *   For each found Compose file, it performs a series of security checks.
+        *   Provides a summary of found issues and a detailed breakdown per directory.
+        *   Optionally checks and lists running Docker containers if `CFG_LH_DOCKER_CHECK_RUNNING` is true.
+    *   **Mechanism:**
+        *   Uses internal helper functions for configuration management:
+            *   `_docker_load_config()`: Loads settings from `docker_security.conf`, applying defaults if values are missing.
+            *   `_docker_save_config()`: Saves updated settings (like the search path) back to `docker_security.conf`.
+            *   `docker_validate_and_configure_path()`: Manages the interactive validation and setting of the Docker Compose search path.
+        *   `docker_find_compose_files()`: Locates Docker Compose files (typically `docker-compose.yml` or `compose.yml`) based on the configured `search_root`, `max_depth` (from `CFG_LH_DOCKER_SEARCH_DEPTH`), and exclusion patterns. It combines a list of standard hardcoded directory exclusions (e.g., `.git`, `node_modules`, `.cache`, `venv`, `__pycache__`) with user-configured exclusions from `CFG_LH_DOCKER_EXCLUDE_DIRS`. Uses `find` with dynamically generated arguments, including the use of `eval` to handle the complex command structure.
+        *   `docker_should_skip_warning()`: Checks if a specific warning type (defined in `CFG_LH_DOCKER_SKIP_WARNINGS`) should be ignored.
+        *   A series of `docker_check_*` functions perform individual security audits on each Compose file:
+            *   `docker_check_update_labels()`: Checks for Diun/Watchtower update management labels.
+            *   `docker_check_env_permissions()`: Checks permissions of `.env` files in the Compose file's directory (recommends 600, offers to fix).
+            *   `docker_check_directory_permissions()`: Checks permissions of the Compose file's directory (warns on 777, 776, 766).
+            *   `docker_check_latest_images()`: Warns if images use `:latest` tag or no tag.
+            *   `docker_check_privileged_containers()`: Warns if `privileged: true` is used.
+            *   `docker_check_host_volumes()`: Warns if critical host paths (e.g., `/`, `/etc`, `/var/run/docker.sock`) are mounted.
+            *   `docker_check_exposed_ports()`: Warns if ports are exposed to `0.0.0.0`.
+            *   `docker_check_capabilities()`: Warns about dangerous capabilities like `SYS_ADMIN`, `SYS_PTRACE`.
+            *   `docker_check_security_opt()`: Warns if security options like AppArmor or Seccomp are set to `unconfined`.
+            *   `docker_check_default_passwords()`: Checks for common default password patterns (defined in `CFG_LH_DOCKER_DEFAULT_PATTERNS`).
+            *   `docker_check_sensitive_data()`: Looks for hardcoded API keys or tokens.
+        *   `docker_check_running_containers()`: If enabled, uses `$LH_SUDO_CMD docker ps` to list running containers.
+        *   Uses `grep`, `stat`, `find`, `sed`, `wc` for various checks and data extraction.
+    *   **Dependencies (internal):** `lh_print_header`, `lh_check_command` (for `docker`), `lh_confirm_action`, `lh_ask_for_input`, `_docker_load_config`, `_docker_save_config`, `docker_validate_and_configure_path`, `docker_find_compose_files`, `docker_should_skip_warning`, and all `docker_check_*` sub-functions.
+    *   **Dependencies (system):** `docker`, `find`, `grep`, `stat`, `sed`, `wc`, `dirname`, `basename`.
+    *   **Configuration File:** `$LH_CONFIG_DIR/docker_security.conf` stores:
+        *   `CFG_LH_DOCKER_COMPOSE_ROOT`: Search path for Docker Compose files.
+        *   `CFG_LH_DOCKER_EXCLUDE_DIRS`: Comma-separated list of directory names to exclude from search.
+        *   `CFG_LH_DOCKER_SEARCH_DEPTH`: Maximum depth for `find` command.
+        *   `CFG_LH_DOCKER_SKIP_WARNINGS`: Comma-separated list of warning types to suppress.
+        *   `CFG_LH_DOCKER_CHECK_RUNNING`: Boolean (`true`/`false`) to enable/disable checking running containers.
+        *   `CFG_LH_DOCKER_DEFAULT_PATTERNS`: Comma-separated list of `VARIABLE=value` patterns for default password checks.
+    *   **Special Considerations:**
+        *   The effectiveness of checks depends on the accuracy of patterns and the structure of Docker Compose files.
+        *   Some checks (like `.env` permission correction) offer to perform actions using `$LH_SUDO_CMD`.
+        *   The `eval` command is used in `docker_find_compose_files` to construct a complex `find` command; paths are sourced from configuration or validated user input.
+
 **5. Special Considerations for the Module:**
 *   **Sudo Usage:** Most functions in this module require root privileges for accessing logs, running scanners, managing firewalls, or querying system states. These commands are prefixed with `$LH_SUDO_CMD`.
 *   **Command Availability:** The module uses `lh_check_command` to verify the existence of critical external tools and offers to install them if missing and if `lh_check_command` supports installation for the detected package manager.
 *   **User Interaction:** The module is interactive, using `read` for menu choices and `lh_confirm_action` for yes/no questions, guiding the user through the checks.
 *   **Output Formatting:** Uses `echo -e` with color variables (`LH_COLOR_*`) and separators for readable output.
 *   **Portability:** While it aims for broad compatibility by checking for different tools and log files, behavior might vary slightly across different Linux distributions, especially concerning log file paths and package manager specifics.
+*   **Docker Security:** The Docker security checks rely on a separate configuration file (`docker_security.conf`) and perform a series of grep-based and file-system checks. They are not a replacement for dedicated container security scanning tools but provide a good first-pass audit.
 
 ---
 *This document provides a technical overview for interacting with the `mod_security.sh` module. It assumes the `lib_common.sh` library is available and functional.*
