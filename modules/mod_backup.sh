@@ -137,13 +137,19 @@ check_btrfs_support() {
 # Globale Variable für aktuellen temporären Snapshot
 CURRENT_TEMP_SNAPSHOT=""
 
+# Globale Variable für Startzeit des Backups
+BACKUP_START_TIME=""
+
 # BTRFS Backup Hauptfunktion
 btrfs_backup() {
     lh_print_header "BTRFS Snapshot Backup"
     
     # Signal-Handler für sauberes Aufräumen bei Unterbrechung
     trap cleanup_on_exit INT TERM EXIT
-    
+
+    # Startzeit erfassen
+    BACKUP_START_TIME=$(date +%s)
+
     # BTRFS-Unterstützung prüfen
     local btrfs_supported=$(check_btrfs_support)
     if [ "$btrfs_supported" = "false" ]; then
@@ -220,6 +226,92 @@ btrfs_backup() {
         done
     fi
         
+    # Speicherplatzprüfung
+    backup_log_msg "INFO" "Prüfe verfügbaren Speicherplatz auf $LH_BACKUP_ROOT..."
+    local available_space_bytes
+    available_space_bytes=$(df --output=avail -B1 "$LH_BACKUP_ROOT" 2>/dev/null | tail -n1)
+
+    local numfmt_avail=false
+    if command -v numfmt >/dev/null 2>&1; then
+        numfmt_avail=true
+    fi
+
+    format_bytes_for_display() {
+        if [ "$numfmt_avail" = true ]; then
+            numfmt --to=iec-i --suffix=B "$1"
+        else
+            echo "${1}B"
+        fi
+    }
+
+    if ! [[ "$available_space_bytes" =~ ^[0-9]+$ ]]; then
+        backup_log_msg "WARN" "Konnte verfügbaren Speicherplatz auf $LH_BACKUP_ROOT nicht ermitteln."
+        echo -e "${LH_COLOR_WARNING}WARNUNG: Konnte verfügbaren Speicherplatz auf $LH_BACKUP_ROOT nicht zuverlässig ermitteln.${LH_COLOR_RESET}"
+        if ! lh_confirm_action "Trotzdem mit dem Backup fortfahren?" "n"; then
+            backup_log_msg "INFO" "Backup wegen unklarem Speicherplatz abgebrochen."
+            echo -e "${LH_COLOR_INFO}Backup abgebrochen.${LH_COLOR_RESET}"
+            trap - INT TERM EXIT # Trap für btrfs_backup zurücksetzen
+            return 1
+        fi
+    else
+        local required_space_bytes=0
+        local estimated_size_val
+        # Erstelle eine Liste von Ausschlussoptionen für du
+        local exclude_opts_array=()
+
+        # Standard-Ausschlüsse für du, um Pseudo-Dateisysteme und Caches zu ignorieren
+        exclude_opts_array+=("--exclude=/proc")
+        exclude_opts_array+=("--exclude=/sys")
+        exclude_opts_array+=("--exclude=/dev")
+        exclude_opts_array+=("--exclude=/run") # Beinhaltet oft temporäre Mounts, Timeshift temp
+        exclude_opts_array+=("--exclude=/tmp") # Sollte auch LH_TEMP_SNAPSHOT_DIR abdecken, wenn darunter
+        exclude_opts_array+=("--exclude=/mnt") # Typische temporäre Mountpunkte
+        exclude_opts_array+=("--exclude=/media") # Typische temporäre Mountpunkte für Wechselmedien
+        exclude_opts_array+=("--exclude=/var/cache")
+        exclude_opts_array+=("--exclude=/var/tmp")
+        exclude_opts_array+=("--exclude=/lost+found")
+
+        if [ -n "$LH_BACKUP_ROOT" ] && [ "$LH_BACKUP_ROOT" != "/" ]; then # Avoid excluding everything if LH_BACKUP_ROOT is /
+            exclude_opts_array+=("--exclude=$LH_BACKUP_ROOT")
+        fi
+        # Schließe alle Verzeichnisse namens '.snapshots' aus, um eine Überbewertung der Größe
+        # durch BTRFS-Snapshots (z.B. von Snapper) zu vermeiden.
+        exclude_opts_array+=("--exclude=.snapshots")
+        # Schließe auch das temporäre Snapshot-Verzeichnis des Skripts selbst explizit aus, falls es nicht bereits durch andere Regeln (z.B. /tmp) abgedeckt ist
+        exclude_opts_array+=("--exclude=$LH_TEMP_SNAPSHOT_DIR")
+
+        # Optionen für die Root-Größenberechnung: /home ausschließen, da es separat berechnet wird.
+        local root_exclude_opts_array=("${exclude_opts_array[@]}" "--exclude=/home")
+
+        backup_log_msg "INFO" "Ermittle Größe von '/' (exkl. Standard-Pfade, Backup-Ziel, .snapshot-Verzeichnisse, /home und temp. Snapshots)..."
+        estimated_size_val=$(du -sb "${root_exclude_opts_array[@]}" / 2>/dev/null | awk '{print $1}')
+        if [[ "$estimated_size_val" =~ ^[0-9]+$ ]]; then required_space_bytes=$((required_space_bytes + estimated_size_val)); else backup_log_msg "WARN" "Größe von '/' konnte nicht ermittelt werden."; fi
+        backup_log_msg "INFO" "Ermittle Größe von '/home' (exkl. Standard-Pfade, Backup-Ziel, .snapshot-Verzeichnisse und temp. Snapshots)..."
+        estimated_size_val=$(du -sb "${exclude_opts_array[@]}" /home 2>/dev/null | awk '{print $1}')
+        if [[ "$estimated_size_val" =~ ^[0-9]+$ ]]; then required_space_bytes=$((required_space_bytes + estimated_size_val)); else backup_log_msg "WARN" "Größe von '/home' konnte nicht ermittelt werden."; fi
+        
+        local margin_percentage=120 # 20% Marge für BTRFS
+        local required_with_margin=$((required_space_bytes * margin_percentage / 100))
+
+        local available_hr=$(format_bytes_for_display "$available_space_bytes")
+        local required_hr=$(format_bytes_for_display "$required_with_margin")
+
+        backup_log_msg "INFO" "Verfügbarer Speicher: $available_hr. Geschätzter Bedarf (mit Marge für @ und @home): $required_hr."
+
+        if [ "$available_space_bytes" -lt "$required_with_margin" ]; then
+            echo -e "${LH_COLOR_WARNING}WARNUNG: Möglicherweise nicht genügend Speicherplatz auf dem Backup-Ziel ($LH_BACKUP_ROOT).${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Verfügbar: $available_hr, Benötigt (geschätzt für @ und @home): $required_hr.${LH_COLOR_RESET}"
+            if ! lh_confirm_action "Trotzdem mit dem Backup fortfahren?" "n"; then
+                backup_log_msg "INFO" "Backup wegen geringem Speicherplatz abgebrochen."
+                echo -e "${LH_COLOR_INFO}Backup abgebrochen.${LH_COLOR_RESET}"
+                trap - INT TERM EXIT # Trap für btrfs_backup zurücksetzen
+                return 1
+            fi
+        else
+            echo -e "${LH_COLOR_INFO}Ausreichend Speicherplatz auf $LH_BACKUP_ROOT vorhanden ($available_hr).${LH_COLOR_RESET}"
+        fi
+    fi
+
     # Backup-Verzeichnis sicherstellen
     $LH_SUDO_CMD mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
     if [ $? -ne 0 ]; then
@@ -344,6 +436,7 @@ btrfs_backup() {
     # Trap zurücksetzen
     trap - INT TERM EXIT
     
+    local end_time=$(date +%s)
     echo -e "${LH_COLOR_SEPARATOR}----------------------------------------${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SUCCESS}Backup-Session abgeschlossen: $timestamp${LH_COLOR_RESET}"
     backup_log_msg "INFO" "BTRFS Backup-Session abgeschlossen"
@@ -355,6 +448,14 @@ btrfs_backup() {
     echo -e "  ${LH_COLOR_INFO}Quell-System:${LH_COLOR_RESET} $(hostname)"
     echo -e "  ${LH_COLOR_INFO}Backup-Ziel:${LH_COLOR_RESET} $LH_BACKUP_ROOT$LH_BACKUP_DIR"
     echo -e "  ${LH_COLOR_INFO}Verarbeitete Subvolumes:${LH_COLOR_RESET} ${subvolumes[*]}"
+
+    # Geschätzte Gesamtgröße der erstellten Snapshots (kann bei BTRFS variieren)
+    local total_btrfs_size=$(du -sh "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | cut -f1 || echo "?")
+    echo -e "  ${LH_COLOR_INFO}Geschätzte Gesamtgröße:${LH_COLOR_RESET} $total_btrfs_size"
+
+    # Dauer berechnen
+    local duration=$((end_time - BACKUP_START_TIME))
+    echo -e "  ${LH_COLOR_INFO}Dauer:${LH_COLOR_RESET} $(printf '%02dh %02dm %02ds' $((duration/3600)) $((duration%3600/60)) $((duration%60)))${LH_COLOR_RESET}"
     
     # Fehlerprüfung
     if grep -q "ERROR" "$LH_BACKUP_LOG"; then # Check for errors in the current session's log entries
@@ -1095,7 +1196,16 @@ cleanup_problematic_backups() {
 # TAR Backup Funktion mit verbesserter Logik
 tar_backup() {
     lh_print_header "TAR Archiv Backup"
-    
+
+    # Startzeit erfassen
+    BACKUP_START_TIME=$(date +%s)
+
+    # TAR installieren falls nötig
+    if ! lh_check_command "tar" true; then
+        echo -e "${LH_COLOR_ERROR}TAR ist nicht installiert und konnte nicht installiert werden.${LH_COLOR_RESET}"
+        return 1
+    fi
+
     # Backup-Ziel überprüfen und ggf. für diese Sitzung anpassen
     echo "Das aktuell konfigurierte Backup-Ziel ist: $LH_BACKUP_ROOT"
     local change_backup_root_for_session=false
@@ -1147,14 +1257,7 @@ tar_backup() {
             fi
         done
     fi
-        
-    # Backup-Verzeichnis erstellen
-    $LH_SUDO_CMD mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
-    if [ $? -ne 0 ]; then
-        backup_log_msg "ERROR" "Konnte Backup-Verzeichnis nicht erstellen"
-        return 1
-    fi
-    
+
     # Verzeichnisse für Backup auswählen
     echo -e "${LH_COLOR_PROMPT}Welche Verzeichnisse sollen gesichert werden?${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Nur /home${LH_COLOR_RESET}"
@@ -1166,8 +1269,11 @@ tar_backup() {
     read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option (1-5): ${LH_COLOR_RESET}")" choice
     
     local backup_dirs=()
-    local exclude_list="--exclude=/proc --exclude=/sys --exclude=/tmp --exclude=/dev --exclude=/mnt --exclude=/media --exclude=/run --exclude=/var/cache --exclude=/var/tmp"
-    
+    # Standard-Ausschlüsse
+    local exclude_list_base="--exclude=/proc --exclude=/sys --exclude=/tmp --exclude=/dev --exclude=/mnt --exclude=/media --exclude=/run --exclude=/var/cache --exclude=/var/tmp"
+    # Konfigurierte Ausschlüsse hinzufügen
+    local exclude_list="$exclude_list_base $(echo "$LH_TAR_EXCLUDES" | sed 's/\S\+/--exclude=&/g')"
+        
     case $choice in
         1) backup_dirs=("/home") ;;
         2) backup_dirs=("/etc") ;;
@@ -1175,6 +1281,10 @@ tar_backup() {
         4) 
             backup_dirs=("/")
             exclude_list="$exclude_list --exclude=/lost+found --exclude=/var/lib/lxcfs --exclude=/.snapshots* --exclude=/swapfile"
+            # Backup-Ziel ausschließen, falls es unter / liegt
+            if [ -n "$LH_BACKUP_ROOT" ] && [[ "$LH_BACKUP_ROOT" == /* ]]; then
+                 exclude_list="$exclude_list --exclude=$LH_BACKUP_ROOT"
+            fi
             ;;
         5)
             echo -e "${LH_COLOR_PROMPT}Geben Sie die Verzeichnisse getrennt durch Leerzeichen ein:${LH_COLOR_RESET}"
@@ -1186,9 +1296,81 @@ tar_backup() {
             return 1
             ;;
     esac
+    # Ensure backup_dirs is not empty before proceeding to space check
+    if [ ${#backup_dirs[@]} -eq 0 ]; then
+        echo -e "${LH_COLOR_ERROR}Keine Verzeichnisse zum Sichern ausgewählt.${LH_COLOR_RESET}"
+        return 1
+    fi
+
+    # Speicherplatzprüfung
+    backup_log_msg "INFO" "Prüfe verfügbaren Speicherplatz auf $LH_BACKUP_ROOT..."
+    local available_space_bytes
+    available_space_bytes=$(df --output=avail -B1 "$LH_BACKUP_ROOT" 2>/dev/null | tail -n1)
+
+    local numfmt_avail=false
+    if command -v numfmt >/dev/null 2>&1; then
+        numfmt_avail=true
+    fi
+
+    format_bytes_for_display() {
+        if [ "$numfmt_avail" = true ]; then
+            numfmt --to=iec-i --suffix=B "$1"
+        else
+            echo "${1}B"
+        fi
+    }
+
+    if ! [[ "$available_space_bytes" =~ ^[0-9]+$ ]]; then
+        backup_log_msg "WARN" "Konnte verfügbaren Speicherplatz auf $LH_BACKUP_ROOT nicht ermitteln."
+        echo -e "${LH_COLOR_WARNING}WARNUNG: Konnte verfügbaren Speicherplatz auf $LH_BACKUP_ROOT nicht zuverlässig ermitteln.${LH_COLOR_RESET}"
+        if ! lh_confirm_action "Trotzdem mit dem Backup fortfahren?" "n"; then
+            backup_log_msg "INFO" "Backup wegen unklarem Speicherplatz abgebrochen."
+            echo -e "${LH_COLOR_INFO}Backup abgebrochen.${LH_COLOR_RESET}"
+            return 1
+        fi
+    else
+        local required_space_bytes=0
+        local estimated_size_val
+        for dir_to_backup in "${backup_dirs[@]}"; do
+            # Exclude backup root if dir_to_backup is / or contains it
+            local du_exclude_opt=""
+            if [ -n "$LH_BACKUP_ROOT" ] && [ "$LH_BACKUP_ROOT" != "/" ] && [[ "$dir_to_backup" == "/" || "$LH_BACKUP_ROOT" == "$dir_to_backup"* ]]; then
+                du_exclude_opt="--exclude=$LH_BACKUP_ROOT"
+            fi
+            estimated_size_val=$(du -sb $du_exclude_opt "$dir_to_backup" 2>/dev/null | awk '{print $1}')
+            if [[ "$estimated_size_val" =~ ^[0-9]+$ ]]; then required_space_bytes=$((required_space_bytes + estimated_size_val)); else backup_log_msg "WARN" "Größe von '$dir_to_backup' konnte nicht ermittelt werden."; fi
+        done
+        
+        local margin_percentage=110 # 10% Marge für TAR
+        local required_with_margin=$((required_space_bytes * margin_percentage / 100))
+
+        local available_hr=$(format_bytes_for_display "$available_space_bytes")
+        local required_hr=$(format_bytes_for_display "$required_with_margin")
+
+        backup_log_msg "INFO" "Verfügbarer Speicher: $available_hr. Geschätzter Bedarf (mit Marge für ausgewählte Verzeichnisse): $required_hr."
+
+        if [ "$available_space_bytes" -lt "$required_with_margin" ]; then
+            echo -e "${LH_COLOR_WARNING}WARNUNG: Möglicherweise nicht genügend Speicherplatz auf dem Backup-Ziel ($LH_BACKUP_ROOT).${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Verfügbar: $available_hr, Benötigt (geschätzt für ausgewählte Verzeichnisse): $required_hr.${LH_COLOR_RESET}"
+            if ! lh_confirm_action "Trotzdem mit dem Backup fortfahren?" "n"; then
+                backup_log_msg "INFO" "Backup wegen geringem Speicherplatz abgebrochen."
+                echo -e "${LH_COLOR_INFO}Backup abgebrochen.${LH_COLOR_RESET}"
+                return 1
+            fi
+        else
+            echo -e "${LH_COLOR_INFO}Ausreichend Speicherplatz auf $LH_BACKUP_ROOT vorhanden ($available_hr).${LH_COLOR_RESET}"
+        fi
+    fi
+
+    # Backup-Verzeichnis erstellen
+    $LH_SUDO_CMD mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
+    if [ $? -ne 0 ]; then
+        backup_log_msg "ERROR" "Konnte Backup-Verzeichnis nicht erstellen"
+        return 1
+    fi
     
     # Zusätzliche Ausschlüsse abfragen
-    if [ "$choice" -ne 1 ] && [ "$choice" -ne 2 ]; then
+    if [ ${#backup_dirs[@]} -gt 0 ]; then # Frage immer, wenn Verzeichnisse ausgewählt wurden
         if lh_confirm_action "Möchten Sie zusätzliche Ausschlüsse angeben?" "n"; then
             echo -e "${LH_COLOR_PROMPT}Geben Sie zusätzliche Pfade zum Ausschließen ein (getrennt durch Leerzeichen):${LH_COLOR_RESET}"
             read -r -p "$(echo -e "${LH_COLOR_PROMPT}Eingabe: ${LH_COLOR_RESET}")" additional_excludes
@@ -1206,7 +1388,7 @@ tar_backup() {
     backup_log_msg "INFO" "Starte TAR-Backup nach $tar_file"
     
     # Verwende ein temporäres Skript für die exclude-Liste
-    local exclude_file="/tmp/tar_excludes_$$"
+    local exclude_file="/tmp/tar_excludes_$$_$(date +%s)" # Eindeutiger Name
     echo "$exclude_list" | tr ' ' '\n' | sed 's/--exclude=//' | grep -v '^$' > "$exclude_file"
     
     # TAR-Backup ausführen
@@ -1219,15 +1401,26 @@ tar_backup() {
     
     # Temporäre Dateien aufräumen
     rm -f "$exclude_file"
+
+    local end_time=$(date +%s)
     
     # Ergebnisse auswerten
     if [ $tar_status -eq 0 ]; then
         backup_log_msg "INFO" "TAR-Backup erfolgreich erstellt: $tar_file"
         echo -e "${LH_COLOR_SUCCESS}TAR-Backup erfolgreich erstellt!${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}Datei:${LH_COLOR_RESET} $tar_file"
+
+        # Prüfsumme erstellen
+        backup_log_msg "INFO" "Erstelle SHA256 Prüfsumme für $tar_file"
+        if sha256sum "$tar_file" > "$tar_file.sha256"; then
+            echo -e "${LH_COLOR_INFO}Prüfsumme erstellt:${LH_COLOR_RESET} $(basename "$tar_file.sha256")"
+            backup_log_msg "INFO" "SHA256 Prüfsumme erfolgreich erstellt."
+        else
+            echo -e "${LH_COLOR_WARNING}WARNUNG: Konnte Prüfsumme nicht erstellen.${LH_COLOR_RESET}"
+            backup_log_msg "WARN" "Konnte SHA256 Prüfsumme nicht erstellen für $tar_file."
+        fi
         
         local file_size=$(du -sh "$tar_file" | cut -f1)
-        echo -e "${LH_COLOR_INFO}Größe:${LH_COLOR_RESET} $file_size"
         
         # Desktop-Benachrichtigung für Erfolg
         lh_send_notification "success" \
@@ -1245,7 +1438,16 @@ tar_backup() {
         
         return 1
     fi
-    
+
+    # Zusammenfassung
+    echo ""
+    echo -e "${LH_COLOR_HEADER}ZUSAMMENFASSUNG:${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_INFO}Zeitstempel:${LH_COLOR_RESET} $timestamp"
+    echo -e "  ${LH_COLOR_INFO}Gesicherte Verzeichnisse:${LH_COLOR_RESET} ${backup_dirs[*]}"
+    echo -e "  ${LH_COLOR_INFO}Archivdatei:${LH_COLOR_RESET} $(basename "$tar_file")"
+    echo -e "  ${LH_COLOR_INFO}Größe:${LH_COLOR_RESET} $file_size"
+    local duration=$((end_time - BACKUP_START_TIME)); echo -e "  ${LH_COLOR_INFO}Dauer:${LH_COLOR_RESET} $(printf '%02dh %02dm %02ds' $((duration/3600)) $((duration%3600/60)) $((duration%60)))${LH_COLOR_RESET}"
+
     # Temporäre Log-Datei einbinden
     if [ -f "$LH_BACKUP_LOG.tmp" ]; then
         cat "$LH_BACKUP_LOG.tmp" >> "$LH_BACKUP_LOG"
@@ -1265,7 +1467,10 @@ tar_backup() {
 # RSYNC Backup Funktion mit verbesserter Logik
 rsync_backup() {
     lh_print_header "RSYNC Backup"
-    
+
+    # Startzeit erfassen
+    BACKUP_START_TIME=$(date +%s)
+
     # Rsync installieren falls nötig
     if ! lh_check_command "rsync" true; then
         echo -e "${LH_COLOR_ERROR}Rsync ist nicht installiert und konnte nicht installiert werden.${LH_COLOR_RESET}"
@@ -1323,7 +1528,118 @@ rsync_backup() {
             fi
         done
     fi
+
+    # Dry-Run Option
+    local dry_run=false
+    echo ""
+    if lh_confirm_action "Möchten Sie einen Probelauf (Dry-Run) durchführen?" "n"; then
+        dry_run=true
+        echo -e "${LH_COLOR_INFO}RSYNC wird im Probelauf-Modus ausgeführt. Es werden KEINE Dateien kopiert oder gelöscht.${LH_COLOR_RESET}"
+        backup_log_msg "INFO" "RSYNC Dry-Run aktiviert."
+    fi
+
+    # Verzeichnisse für Backup auswählen (MOVED UP)
+    echo ""
+    echo -e "${LH_COLOR_PROMPT}Welche Verzeichnisse sollen gesichert werden?${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Nur /home${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Gesamtes System (außer temporäre Dateien)${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Benutzerdefiniert${LH_COLOR_RESET}"
+    
+    read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option (1-3): ${LH_COLOR_RESET}")" choice
+    
+    local source_dirs=()
+    # Standard-Ausschlüsse
+    local exclude_options_base="--exclude=/proc --exclude=/sys --exclude=/tmp --exclude=/dev --exclude=/mnt --exclude=/media --exclude=/run --exclude=/var/cache --exclude=/var/tmp"
+    # Konfigurierte Ausschlüsse hinzufügen
+    local exclude_options="$exclude_options_base $(echo "$LH_RSYNC_EXCLUDES" | sed 's/\S\+/--exclude=&/g')"
         
+    case $choice in
+        1) 
+            source_dirs=("/home")
+            ;;
+        2) 
+            source_dirs=("/")
+            exclude_options="$exclude_options --exclude=/lost+found --exclude=/var/lib/lxcfs --exclude=/.snapshots* --exclude=/swapfile"
+            # Backup-Ziel ausschließen, falls es unter / liegt
+            if [ -n "$LH_BACKUP_ROOT" ] && [[ "$LH_BACKUP_ROOT" == /* ]]; then
+                 exclude_options="$exclude_options --exclude=$LH_BACKUP_ROOT"
+            fi
+            ;;
+        3)
+            echo -e "${LH_COLOR_PROMPT}Geben Sie das Quellverzeichnis ein:${LH_COLOR_RESET}"
+            read -r -p "$(echo -e "${LH_COLOR_PROMPT}Eingabe: ${LH_COLOR_RESET}")" custom_source
+            source_dirs=("$custom_source")
+            ;;
+        *) 
+            echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
+            return 1
+            ;;
+    esac
+    if [ ${#source_dirs[@]} -eq 0 ]; then
+        echo -e "${LH_COLOR_ERROR}Keine Quellverzeichnisse ausgewählt.${LH_COLOR_RESET}"
+        return 1
+    fi
+
+    # Speicherplatzprüfung
+    backup_log_msg "INFO" "Prüfe verfügbaren Speicherplatz auf $LH_BACKUP_ROOT..."
+    local available_space_bytes
+    available_space_bytes=$(df --output=avail -B1 "$LH_BACKUP_ROOT" 2>/dev/null | tail -n1)
+
+    local numfmt_avail=false
+    if command -v numfmt >/dev/null 2>&1; then
+        numfmt_avail=true
+    fi
+
+    format_bytes_for_display() {
+        if [ "$numfmt_avail" = true ]; then
+            numfmt --to=iec-i --suffix=B "$1"
+        else
+            echo "${1}B"
+        fi
+    }
+
+    if ! [[ "$available_space_bytes" =~ ^[0-9]+$ ]]; then
+        backup_log_msg "WARN" "Konnte verfügbaren Speicherplatz auf $LH_BACKUP_ROOT nicht ermitteln."
+        echo -e "${LH_COLOR_WARNING}WARNUNG: Konnte verfügbaren Speicherplatz auf $LH_BACKUP_ROOT nicht zuverlässig ermitteln.${LH_COLOR_RESET}"
+        if ! lh_confirm_action "Trotzdem mit dem Backup fortfahren?" "n"; then
+            backup_log_msg "INFO" "Backup wegen unklarem Speicherplatz abgebrochen."
+            echo -e "${LH_COLOR_INFO}Backup abgebrochen.${LH_COLOR_RESET}"
+            return 1
+        fi
+    else
+        local required_space_bytes=0
+        local estimated_size_val
+        for dir_to_backup in "${source_dirs[@]}"; do # source_dirs is now populated
+            # Exclude backup root if dir_to_backup is / or contains it
+            local du_exclude_opt=""
+            if [ -n "$LH_BACKUP_ROOT" ] && [ "$LH_BACKUP_ROOT" != "/" ] && [[ "$dir_to_backup" == "/" || "$LH_BACKUP_ROOT" == "$dir_to_backup"* ]]; then
+                du_exclude_opt="--exclude=$LH_BACKUP_ROOT"
+            fi
+            estimated_size_val=$(du -sb $du_exclude_opt "$dir_to_backup" 2>/dev/null | awk '{print $1}')
+            if [[ "$estimated_size_val" =~ ^[0-9]+$ ]]; then required_space_bytes=$((required_space_bytes + estimated_size_val)); else backup_log_msg "WARN" "Größe von '$dir_to_backup' konnte nicht ermittelt werden."; fi
+        done
+        
+        local margin_percentage=110 # 10% Marge für RSYNC (für Vollbackup)
+        local required_with_margin=$((required_space_bytes * margin_percentage / 100))
+
+        local available_hr=$(format_bytes_for_display "$available_space_bytes")
+        local required_hr=$(format_bytes_for_display "$required_with_margin")
+
+        backup_log_msg "INFO" "Verfügbarer Speicher: $available_hr. Geschätzter Bedarf (mit Marge für ausgewählte Verzeichnisse): $required_hr."
+
+        if [ "$available_space_bytes" -lt "$required_with_margin" ]; then
+            echo -e "${LH_COLOR_WARNING}WARNUNG: Möglicherweise nicht genügend Speicherplatz auf dem Backup-Ziel ($LH_BACKUP_ROOT).${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Verfügbar: $available_hr, Benötigt (geschätzt für ausgewählte Verzeichnisse): $required_hr.${LH_COLOR_RESET}"
+            if ! lh_confirm_action "Trotzdem mit dem Backup fortfahren?" "n"; then
+                backup_log_msg "INFO" "Backup wegen geringem Speicherplatz abgebrochen."
+                echo -e "${LH_COLOR_INFO}Backup abgebrochen.${LH_COLOR_RESET}"
+                return 1
+            fi
+        else
+            echo -e "${LH_COLOR_INFO}Ausreichend Speicherplatz auf $LH_BACKUP_ROOT vorhanden ($available_hr).${LH_COLOR_RESET}"
+        fi
+    fi
+
     # Backup-Verzeichnis erstellen
     $LH_SUDO_CMD mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
     if [ $? -ne 0 ]; then
@@ -1337,37 +1653,6 @@ rsync_backup() {
     echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Inkrementelles Backup (nur Änderungen)${LH_COLOR_RESET}"
     
     read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option (1-2): ${LH_COLOR_RESET}")" backup_type
-    
-    # Verzeichnisse für Backup auswählen
-    echo ""
-    echo -e "${LH_COLOR_PROMPT}Welche Verzeichnisse sollen gesichert werden?${LH_COLOR_RESET}"
-    echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Nur /home${LH_COLOR_RESET}"
-    echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Gesamtes System (außer temporäre Dateien)${LH_COLOR_RESET}"
-    echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Benutzerdefiniert${LH_COLOR_RESET}"
-    
-    read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option (1-3): ${LH_COLOR_RESET}")" choice
-    
-    local source_dirs=()
-    local exclude_options="--exclude=/proc --exclude=/sys --exclude=/tmp --exclude=/dev --exclude=/mnt --exclude=/media --exclude=/run --exclude=/var/cache --exclude=/var/tmp"
-    
-    case $choice in
-        1) 
-            source_dirs=("/home")
-            ;;
-        2) 
-            source_dirs=("/")
-            exclude_options="$exclude_options --exclude=/lost+found --exclude=/var/lib/lxcfs --exclude=/.snapshots* --exclude=/swapfile"
-            ;;
-        3)
-            echo -e "${LH_COLOR_PROMPT}Geben Sie das Quellverzeichnis ein:${LH_COLOR_RESET}"
-            read -r -p "$(echo -e "${LH_COLOR_PROMPT}Eingabe: ${LH_COLOR_RESET}")" custom_source
-            source_dirs=("$custom_source")
-            ;;
-        *) 
-            echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
-            return 1
-            ;;
-    esac
     
     # Zusätzliche Ausschlüsse
     if lh_confirm_action "Möchten Sie zusätzliche Ausschlüsse angeben?" "n"; then
@@ -1388,10 +1673,15 @@ rsync_backup() {
     backup_log_msg "INFO" "Starte RSYNC-Backup nach $rsync_dest"
     
     # RSYNC ausführen
-    local rsync_options="-avxHS --numeric-ids --inplace --no-whole-file"
+    local rsync_options="-avxHS --numeric-ids --no-whole-file" # --inplace kann bei Dry-Run stören
     
+    if [ "$dry_run" = true ]; then
+        rsync_options="$rsync_options --dry-run"
+    fi
+        
     if [ "$backup_type" = "1" ]; then
         # Vollbackup
+        echo -e "${LH_COLOR_INFO}Erstelle Vollbackup...${LH_COLOR_RESET}"
         backup_log_msg "INFO" "Erstelle Vollbackup mit RSYNC"
         $LH_SUDO_CMD rsync $rsync_options $exclude_options "${source_dirs[@]}" "$rsync_dest/" 2>"$LH_BACKUP_LOG.tmp"
         local rsync_status=$?
@@ -1405,16 +1695,21 @@ rsync_backup() {
             backup_log_msg "INFO" "Verwende $last_backup als Basis für inkrementelles Backup"
         fi
         
+        echo -e "${LH_COLOR_INFO}Erstelle inkrementelles Backup...${LH_COLOR_RESET}"
         $LH_SUDO_CMD rsync $rsync_options $exclude_options $link_dest "${source_dirs[@]}" "$rsync_dest/" 2>"$LH_BACKUP_LOG.tmp" # Corrected variable
         local rsync_status=$?
     fi
+
+    local end_time=$(date +%s)
     
     # Ergebnisse auswerten
+    # Bei Dry-Run ist der Status immer 0, es sei denn, es gibt Syntaxfehler etc.
+    # Wir prüfen hier auf 0, aber die Meldung muss Dry-Run berücksichtigen.
     if [ $rsync_status -eq 0 ]; then
-        backup_log_msg "INFO" "RSYNC-Backup erfolgreich erstellt: $rsync_dest"
-        echo -e "${LH_COLOR_SUCCESS}RSYNC-Backup erfolgreich erstellt!${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}Backup:${LH_COLOR_RESET} $rsync_dest"
-        
+        backup_log_msg "INFO" "RSYNC-Backup erfolgreich erstellt: $rsync_dest"   
+        local success_msg="RSYNC-Backup erfolgreich erstellt!"
+        if [ "$dry_run" = true ]; then success_msg="RSYNC-Probelauf erfolgreich abgeschlossen!"; fi
+    
         local backup_size=$(du -sh "$rsync_dest" | cut -f1)
         echo -e "${LH_COLOR_INFO}Größe:${LH_COLOR_RESET} $backup_size"
         
@@ -1425,17 +1720,26 @@ rsync_backup() {
         fi
         
         # Desktop-Benachrichtigung für Erfolg
-        lh_send_notification "success" \
-            "✅ RSYNC Backup erfolgreich" \
-            "$backup_type_desc abgeschlossen\nVerzeichnis: $(basename "$rsync_dest")\nGröße: $backup_size\nZeitpunkt: $timestamp"
+        if [ "$dry_run" = false ]; then
+            lh_send_notification "success" \
+                "✅ RSYNC Backup erfolgreich" \
+                "$backup_type_desc abgeschlossen\nVerzeichnis: $(basename "$rsync_dest")\nGröße: $backup_size\nZeitpunkt: $timestamp"
+        else
+             lh_send_notification "info" \
+                "✅ RSYNC Probelauf abgeschlossen" \
+                "$backup_type_desc Probelauf\nVerzeichnis: $(basename "$rsync_dest")\nZeitpunkt: $timestamp"
+        fi
         
     else
         backup_log_msg "ERROR" "RSYNC-Backup fehlgeschlagen (Exit-Code: $rsync_status)"
         echo -e "${LH_COLOR_ERROR}Fehler beim Erstellen des RSYNC-Backups.${LH_COLOR_RESET}"
         
         # Desktop-Benachrichtigung für Fehler
+        local error_title="❌ RSYNC Backup fehlgeschlagen"
+        if [ "$dry_run" = true ]; then error_title="❌ RSYNC Probelauf fehlgeschlagen"; fi
+
         lh_send_notification "error" \
-            "❌ RSYNC Backup fehlgeschlagen" \
+            "$error_title" \
             "Exit-Code: $rsync_status\nZeitpunkt: $timestamp\nSiehe Log für Details: $(basename "$LH_BACKUP_LOG")"
         
         return 1
@@ -1446,6 +1750,16 @@ rsync_backup() {
         cat "$LH_BACKUP_LOG.tmp" >> "$LH_BACKUP_LOG"
         rm -f "$LH_BACKUP_LOG.tmp"
     fi
+
+    # Zusammenfassung
+    echo ""
+    echo -e "${LH_COLOR_HEADER}ZUSAMMENFASSUNG:${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_INFO}Zeitstempel:${LH_COLOR_RESET} $timestamp"
+    echo -e "  ${LH_COLOR_INFO}Gesicherte Verzeichnisse:${LH_COLOR_RESET} ${source_dirs[*]}"
+    echo -e "  ${LH_COLOR_INFO}Backup-Zielverzeichnis:${LH_COLOR_RESET} $(basename "$rsync_dest")"
+    echo -e "  ${LH_COLOR_INFO}Größe:${LH_COLOR_RESET} $backup_size"
+    local duration=$((end_time - BACKUP_START_TIME)); echo -e "  ${LH_COLOR_INFO}Dauer:${LH_COLOR_RESET} $(printf '%02dh %02dm %02ds' $((duration/3600)) $((duration%3600/60)) $((duration%60)))${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_INFO}Modus:${LH_COLOR_RESET} $(if [ "$dry_run" = true ]; then echo "Probelauf (Dry-Run)"; else echo "Echtlauf"; fi)${LH_COLOR_RESET}"
     
     # Alte Backups aufräumen
     backup_log_msg "INFO" "Räume alte RSYNC-Backups auf"
@@ -1899,6 +2213,19 @@ configure_backup() {
             fi
         fi
         
+        # TAR Ausschlüsse ändern
+        echo ""
+        echo -e "${LH_COLOR_PROMPT}Zusätzliche TAR-Ausschlüsse (Leerzeichen getrennt):${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Aktuell:${LH_COLOR_RESET} $LH_TAR_EXCLUDES"
+        if lh_confirm_action "Ändern?" "n"; then
+            local new_tar_excludes=$(lh_ask_for_input "Neue Ausschlüsse eingeben (z.B. /pfad/a /pfad/b)")
+            # Entferne führende/nachfolgende Leerzeichen
+            new_tar_excludes=$(echo "$new_tar_excludes" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            LH_TAR_EXCLUDES="$new_tar_excludes"
+            echo -e "${LH_COLOR_INFO}Neue TAR-Ausschlüsse:${LH_COLOR_RESET} $LH_TAR_EXCLUDES"
+            changed=true
+        fi
+        
         # Weitere Parameter könnten hier hinzugefügt werden (z.B. LH_BACKUP_LOG_BASENAME)
         if [ "$changed" = true ]; then
             echo ""
@@ -1907,6 +2234,7 @@ configure_backup() {
             echo -e "  ${LH_COLOR_INFO}Backup-Verzeichnis:${LH_COLOR_RESET} $LH_BACKUP_DIR"
             echo -e "  ${LH_COLOR_INFO}Temporäre Snapshots:${LH_COLOR_RESET} $LH_TEMP_SNAPSHOT_DIR"
             echo -e "  ${LH_COLOR_INFO}Retention:${LH_COLOR_RESET} $LH_RETENTION_BACKUP"
+            echo -e "  ${LH_COLOR_INFO}TAR-Ausschlüsse:${LH_COLOR_RESET} $LH_TAR_EXCLUDES"
             if lh_confirm_action "Möchten Sie diese Konfiguration dauerhaft speichern?" "y"; then
                 lh_save_backup_config # Funktion aus lib_common.sh
                 echo "Konfiguration wurde in $LH_BACKUP_CONFIG_FILE gespeichert."
