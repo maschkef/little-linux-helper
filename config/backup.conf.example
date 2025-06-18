@@ -5,7 +5,7 @@
 # Beispiel: "/mnt/externe_festplatte" oder "/srv/backups"
 CFG_LH_BACKUP_ROOT="/run/media/tux/hdd_3tb/"
 
-# kannCFG_LH_BACKUP_DIR:
+# CFG_LH_BACKUP_DIR:
 # Der Name des Unterverzeichnisses innerhalb von CFG_LH_BACKUP_ROOT, in dem die eigentlichen Backup-Daten landen.
 # Muss mit einem "/" beginnen. Beispiel: "/mein_system_backup"
 CFG_LH_BACKUP_DIR="/backups"
