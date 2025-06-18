@@ -30,8 +30,7 @@ Dieses Projekt steht unter der MIT-Lizenz. Weitere Informationen findest du in d
 
 Hier ist eine Liste von bekannten Problemen, Einschränkungen oder Verhaltensweisen, die dir bei der Nutzung der Skripte auffallen könnten.
 * **Backups (`mod_backup.sh`):**
-    * **BTRFS-Backup & Timeshift:** Das Skript versucht, den aktuellsten Timeshift-Snapshot als Basis zu nutzen (aus `LH_TIMESHIFT_BASE_DIR`). Schlägt dies fehl oder ist Timeshift nicht konfiguriert, wird ein unabhängiger Snapshot erstellt. Eine frühere Beobachtung, dass Timeshift aktiv laufen muss, konnte nicht weiter verifiziert werden, da ich nun Snapper/Btrfs-Assistent verwende und damit die unabhängigen Snapshots nutze.
-    Dieser unabhängige Snapshot wird bei Abbruch per Strg + 'C' aufgeräumt oder alternativ bei erneutem Laden des Moduls.
+    * **BTRFS-Backup:** 
     * Das Backup hat keine Fortschrittsanzeige (eher ein Schönheitsfehler).
     * Für das Backup nutze ich i.d.R. die BTRFS-basierende Funktion, die anderen sind wesentlich weniger getestet.
 * **Erweiterte Log-Analyse (`scripts/advanced_log_analyzer.py`):**
@@ -57,8 +56,7 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
 <summary>💾 Backup & Wiederherstellung (<code>mod_backup.sh</code>)</summary>
 
 * **BTRFS Snapshot Backup**:
-    * Erstellt Snapshots von `@` und `@home` Subvolumes.
-    * Nutzt vorhandene Timeshift-Snapshots oder erstellt direkte Snapshots.
+    * Erstellt direkte Snapshots von `@` und `@home` Subvolumes.
     * Überträgt Snapshots zu einem konfigurierbaren Backup-Ziel.
     * Implementiert eine konfigurierbare Aufbewahrungsrichtlinie (Retention).
     * Bietet zusätzliche Funktionen:
@@ -92,8 +90,8 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
     * Möglichkeit, ein separates `btrfs-recovery.sh` Skript für komplexere BTRFS-Wiederherstellungen auszuführen.
 * **Backup-Status und -Konfiguration**:
     * Anzeige des aktuellen Backup-Status (Online/Offline, freier Speicherplatz, vorhandene Backups, neueste Backups, Gesamtgröße).
-    * Anzeige und Änderung der Backup-Konfiguration (Zielpfad, Verzeichnis, Retention, temporäres Snapshot-Verzeichnis, Timeshift-Basisverzeichnis). Die Konfiguration kann temporär (nur für die aktuelle Sitzung) oder dauerhaft gespeichert werden.
-    * Umfasst jetzt die Möglichkeit, den Speicherort für temporäre BTRFS-Snapshots (`LH_TEMP_SNAPSHOT_DIR`) und das Basisverzeichnis für Timeshift (`LH_TIMESHIFT_BASE_DIR`) zu konfigurieren.
+    * Anzeige und Änderung der Backup-Konfiguration (Zielpfad, Verzeichnis, Retention, temporäres Snapshot-Verzeichnis). Die Konfiguration kann temporär (nur für die aktuelle Sitzung) oder dauerhaft gespeichert werden.
+    * Umfasst die Möglichkeit, den Speicherort für temporäre BTRFS-Snapshots (`LH_TEMP_SNAPSHOT_DIR`) zu konfigurieren.
 
 </details>
 
@@ -208,7 +206,7 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
     * `pacman-contrib` (für `paccache` auf Arch-basierten Systemen, falls nicht vorhanden)
     * `expac` (für kürzlich installierte Pakete auf Arch-basierten Systemen)
 
-Das Skript versucht, den verwendeten Paketmanager (pacman, yay, apt, dnf) automatisch zu erkennen. Es erkennt auch alternative Paketmanager wie Flatpak, Snap und Nix.
+Das Skript versucht, den verwendeten Paketmanager (pacman, yay, apt, dnf) automatisch zu erkennen. Es erkennt auch alternative Paketmanager wie Flatpak, Snap, Nix und AppImage.
 
 </details>
 

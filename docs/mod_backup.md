@@ -15,7 +15,7 @@ This module provides comprehensive backup and restore functionalities, primarily
 **2. Initialization & Dependencies:**
 *   **Library Source:** The module begins by sourcing the common library: `source "$(dirname "$0")/../lib/lib_common.sh"`.
 *   **Package Manager Detection:** It calls `lh_detect_package_manager()` to set up `LH_PKG_MANAGER` for potential package installations (e.g., `btrfs-progs`, `rsync`).
-*   **Backup Configuration:** It loads backup-specific configurations by calling `lh_load_backup_config`. This function is expected to populate variables like `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_TIMESHIFT_BASE_DIR`, `LH_RETENTION_BACKUP`, and `LH_BACKUP_LOG`.
+*   **Backup Configuration:** It loads backup-specific configurations by calling `lh_load_backup_config`. This function is expected to populate variables like `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_RETENTION_BACKUP`, and `LH_BACKUP_LOG`.
 *   **Core Library Functions Used:**
     *   `lh_log_msg`: For general logging to the main log file.
     *   `lh_print_header`: For displaying section titles.
@@ -82,12 +82,10 @@ This is the entry point and main interactive loop for the backup module. It pres
         *   Verifies `$LH_BACKUP_ROOT`. If invalid or user desires, prompts for a new backup root for the session using `lh_ask_for_input`, with options to create the directory.
         *   Ensures backup target (`$LH_BACKUP_ROOT$LH_BACKUP_DIR`) and temporary snapshot (`$LH_TEMP_SNAPSHOT_DIR`) directories exist, creating them if necessary.
         *   Calls `cleanup_orphaned_temp_snapshots()`.
-        *   Detects Timeshift: Checks `$LH_TIMESHIFT_BASE_DIR` for Timeshift backup directories. If multiple are found, it selects the most recent one based on `stat -c %Y`. Verifies if "@" and "@home" subvolumes exist within the Timeshift snapshot.
         *   Iterates through a predefined list of subvolumes (`@`, `@home`).
         *   For each subvolume:
             *   Sets `CURRENT_TEMP_SNAPSHOT`.
-            *   If Timeshift is available and has a snapshot for the subvolume, creates a read-only snapshot from the Timeshift snapshot (`btrfs subvolume snapshot -r`).
-            *   If Timeshift snapshot creation fails or Timeshift is not used, falls back to `create_direct_snapshot()`.
+            *   Calls `create_direct_snapshot()` to create a read-only snapshot.
             *   Creates the target directory for the subvolume in the backup location.
             *   Currently implements full backups: `btrfs send "$snapshot_path" | btrfs receive "$backup_subvol_dir"`. (Note: Inkremental logic is stubbed but not fully implemented).
             *   Calls `create_backup_marker()` upon successful transfer.
@@ -219,7 +217,7 @@ This is the entry point and main interactive loop for the backup module. It pres
 *   **`configure_backup()`**
     *   **Purpose:** Allows viewing and modifying backup configuration settings.
     *   **Interaction:**
-        *   Displays current values of `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_TIMESHIFT_BASE_DIR`, `LH_RETENTION_BACKUP`, `LH_BACKUP_LOG`.
+        *   Displays current values of `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_RETENTION_BACKUP`, `LH_BACKUP_LOG`.
         *   Prompts if user wants to change configuration.
         *   If yes, individually prompts for new values for `LH_BACKUP_ROOT`, `LH_BACKUP_DIR` (ensuring leading `/`), `LH_TEMP_SNAPSHOT_DIR`, and `LH_RETENTION_BACKUP`.
         *   If changes were made, displays updated configuration and asks if user wants to save them permanently using `lh_save_backup_config` (which should write to `$LH_BACKUP_CONFIG_FILE`).
@@ -238,8 +236,7 @@ This is the entry point and main interactive loop for the backup module. It pres
 *   **Root Privileges:** Many operations, especially those involving `btrfs` commands, creating/deleting snapshots, and writing to system locations during restore, require root privileges. The script often checks `$EUID` and prompts for `sudo` if necessary.
 *   **Configuration Persistence:** Backup settings are loaded via `lh_load_backup_config` and can be saved via `lh_save_backup_config`. The exact location of the configuration file (`$LH_BACKUP_CONFIG_FILE`) is managed by `lib_common.sh`.
 *   **Error Handling:** The script uses `backup_log_msg` for logging errors. Return codes from critical commands are checked. Some functions like `safe_cleanup_temp_snapshot` implement retries. User-facing error messages are printed with `LH_COLOR_ERROR`.
-*   **Temporary Snapshots:** BTRFS backups utilize a temporary snapshot directory (`$LH_TEMP_SNAPSHOT_DIR`). Cleanup mechanisms (`cleanup_on_exit`, `cleanup_orphaned_temp_snapshots`, `safe_cleanup_temp_snapshot`) are in place to manage these.
-*   **Timeshift Integration:** The BTRFS backup function attempts to leverage existing Timeshift snapshots as a source if available, potentially speeding up the initial snapshot creation.
++*   **Temporary Snapshots:** BTRFS backups utilize a temporary snapshot directory (`$LH_TEMP_SNAPSHOT_DIR`). Cleanup mechanisms (`cleanup_on_exit`, `cleanup_orphaned_temp_snapshots`, `safe_cleanup_temp_snapshot`) are in place to manage these.
 *   **Backup Markers:** BTRFS backups use `.backup_complete` marker files to indicate a successful transfer and store metadata. These are used by `check_backup_integrity`.
 *   **Inkremental Backups (BTRFS):** The `btrfs_backup` function has comments indicating intent for incremental backups (`btrfs send -p`), but the current implementation primarily performs full sends. The `rsync_backup` function *does* support incremental backups using `--link-dest`.
 *   **Restore Risks:** Restore operations, especially for BTRFS subvolumes and TAR/RSYNC to original locations, are inherently risky and involve overwriting data. The script provides warnings. Restoring the root BTRFS subvolume (`@`) is correctly identified as an operation requiring a live/recovery environment.

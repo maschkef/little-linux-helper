@@ -15,11 +15,6 @@ CFG_LH_BACKUP_DIR="/backups"
 # Dieses Verzeichnis sollte auf einem BTRFS-Volume liegen, idealerweise auf dem System selbst, wenn möglich.
 CFG_LH_TEMP_SNAPSHOT_DIR="/.snapshots_backup"
 
-# CFG_LH_TIMESHIFT_BASE_DIR:
-# Der Basispfad, unter dem Timeshift seine Snapshots speichert.
-# Wird verwendet, um existierende Timeshift-Snapshots als Quelle für Backups zu nutzen, falls verfügbar.
-CFG_LH_TIMESHIFT_BASE_DIR="/run/timeshift"
-
 # CFG_LH_RETENTION_BACKUP:
 # Die Anzahl der aufzubewahrenden Backup-Versionen (z.B. 10 bedeutet, dass die 10 neuesten Backups behalten werden).
 CFG_LH_RETENTION_BACKUP="10"

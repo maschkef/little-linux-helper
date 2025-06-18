@@ -137,94 +137,6 @@ check_btrfs_support() {
 # Globale Variable für aktuellen temporären Snapshot
 CURRENT_TEMP_SNAPSHOT=""
 
-# Hilfsfunktion: Aufräumen bei Unterbrechung
-cleanup_on_exit() {
-    local exit_code=$?
-    
-    if [ -n "$CURRENT_TEMP_SNAPSHOT" ]; then
-        backup_log_msg "WARN" "Räume temporären Snapshot aufgrund von Unterbrechung auf: $CURRENT_TEMP_SNAPSHOT"
-        echo -e "${LH_COLOR_WARNING}Räume temporären Snapshot auf...${LH_COLOR_RESET}"
-        if [ -d "$CURRENT_TEMP_SNAPSHOT" ]; then
-            btrfs subvolume delete "$CURRENT_TEMP_SNAPSHOT" 2>/dev/null || true
-        fi
-    fi
-    
-    # Trap zurücksetzen
-    trap - INT TERM EXIT
-    
-    if [ $exit_code -ne 0 ]; then
-        backup_log_msg "ERROR" "Backup wurde durch Signal unterbrochen (Exit-Code: $exit_code)"
-        echo -e "${LH_COLOR_ERROR}Backup wurde unterbrochen.${LH_COLOR_RESET}"
-    fi
-    
-    exit $exit_code
-}
-
-# Hilfsfunktion: Aufräumen verwaister temporärer Snapshots
-cleanup_orphaned_temp_snapshots() {
-    backup_log_msg "INFO" "Prüfe auf verwaiste temporäre Snapshots"
-    
-    if [ ! -d "$LH_TEMP_SNAPSHOT_DIR" ]; then
-        return 0
-    fi
-    
-    local orphaned_count=0
-    for snapshot_path in "$LH_TEMP_SNAPSHOT_DIR"/*; do
-        if [ -d "$snapshot_path" ]; then
-            # Prüfe ob es sich um einen BTRFS-Subvolume handelt
-            if btrfs subvolume show "$snapshot_path" >/dev/null 2>&1; then
-                local snapshot_name=$(basename "$snapshot_path")
-                backup_log_msg "WARN" "Verwaister temporärer Snapshot gefunden: $snapshot_name"
-                echo -e "${LH_COLOR_WARNING}Entferne verwaisten temporären Snapshot: $snapshot_name${LH_COLOR_RESET}"
-                
-                if btrfs subvolume delete "$snapshot_path" 2>/dev/null; then
-                    backup_log_msg "INFO" "Verwaister Snapshot erfolgreich entfernt: $snapshot_name"
-                    orphaned_count=$((orphaned_count + 1))
-                else
-                    backup_log_msg "ERROR" "Fehler beim Entfernen von verwaistem Snapshot: $snapshot_name"
-                fi
-            fi
-        fi
-    done
-    
-    if [ $orphaned_count -gt 0 ]; then
-        backup_log_msg "INFO" "Insgesamt $orphaned_count verwaiste temporäre Snapshots entfernt"
-    else
-        backup_log_msg "INFO" "Keine verwaisten temporären Snapshots gefunden"
-    fi
-}
-
-# Hilfsfunktion: Sicheres Aufräumen eines temporären Snapshots + Marker
-safe_cleanup_temp_snapshot() {
-    local snapshot_path="$1"
-    local snapshot_name="$(basename "$snapshot_path")"
-    if [ -d "$snapshot_path" ]; then
-        backup_log_msg "INFO" "Räume temporären Snapshot auf: $snapshot_path"
-        # Temporäre Snapshots sollten keine .backup_complete Marker haben,
-        # da diese nur für finale Backups im Zielverzeichnis erstellt werden.
-        # Das Löschen eines Markers hier ist daher nicht notwendig.
-        # Mehrere Versuche für robustes Löschen
-        local max_attempts=3
-        local attempt=1
-        
-        while [ $attempt -le $max_attempts ]; do
-            if btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1; then
-                backup_log_msg "INFO" "Temporärer Snapshot erfolgreich gelöscht: $snapshot_name"
-                return 0
-            else
-                backup_log_msg "WARN" "Versuch $attempt/$max_attempts zum Löschen von $snapshot_name fehlgeschlagen"
-                if [ $attempt -lt $max_attempts ]; then
-                    sleep 2
-                fi
-                ((attempt++))
-            fi
-        done
-        
-        backup_log_msg "ERROR" "Konnte temporären Snapshot nicht löschen: $snapshot_path"
-        return 1
-    fi
-}
-
 # BTRFS Backup Hauptfunktion
 btrfs_backup() {
     lh_print_header "BTRFS Snapshot Backup"
@@ -329,60 +241,7 @@ btrfs_backup() {
     # Aufräumen verwaister temporärer Snapshots
     cleanup_orphaned_temp_snapshots
     
-    # Timeshift-Erkennung
-    local timeshift_available=false
-    local timeshift_snapshot_dir=""
-    
-    backup_log_msg "INFO" "Prüfe auf Timeshift-Snapshots"
-    
-    # Suche nach Timeshift-Verzeichnissen
-    if [ -d "$LH_TIMESHIFT_BASE_DIR" ]; then
-        local timeshift_dirs=()
-        for ts_dir in "$LH_TIMESHIFT_BASE_DIR"/*/backup; do
-            if [ -d "$ts_dir" ]; then
-                timeshift_dirs+=("$ts_dir")
-            fi
-        done
-        
-        # Falls Timeshift-Verzeichnisse gefunden wurden
-        if [ ${#timeshift_dirs[@]} -gt 0 ]; then
-            timeshift_available=true
-            
-            if [ ${#timeshift_dirs[@]} -eq 1 ]; then
-                timeshift_snapshot_dir="${timeshift_dirs[0]}"
-                backup_log_msg "INFO" "Einzelnes Timeshift-Verzeichnis gefunden: $timeshift_snapshot_dir"
-            else
-                # Das neueste auswählen
-                backup_log_msg "INFO" "Mehrere Timeshift-Verzeichnisse gefunden, wähle das neueste"
-                local most_recent=""
-                local latest_time=0
-                
-                for dir in "${timeshift_dirs[@]}"; do
-                    local dir_time=$(stat -c %Y "$dir")
-                    if [ "$dir_time" -gt "$latest_time" ]; then
-                        latest_time=$dir_time
-                        most_recent=$dir
-                    fi
-                done
-                
-                timeshift_snapshot_dir="$most_recent"
-                backup_log_msg "INFO" "Neuestes Timeshift-Verzeichnis: $timeshift_snapshot_dir"
-            fi
-            
-            # Verfügbarkeit der Subvolumes prüfen
-            local subvolumes=("@" "@home")
-            for subvol in "${subvolumes[@]}"; do
-                if [ ! -d "$timeshift_snapshot_dir/$subvol" ]; then
-                    backup_log_msg "WARN" "Kein Timeshift-Snapshot für $subvol gefunden"
-                    timeshift_available=false
-                fi
-            done
-        fi
-    fi
-    
-    if [ "$timeshift_available" = "false" ]; then
-        backup_log_msg "INFO" "Keine Timeshift-Snapshots gefunden, verwende direkte Snapshots"
-    fi
+    backup_log_msg "INFO" "Verwende direkte Snapshots für das Backup."
     
     # Timestamp für diese Backup-Session
     local timestamp=$(date +%Y-%m-%d_%H-%M-%S)
@@ -404,33 +263,13 @@ btrfs_backup() {
         # Globale Variable für Cleanup bei Unterbrechung
         CURRENT_TEMP_SNAPSHOT="$snapshot_path"
         
-        # Snapshot erstellen
-        if [ "$timeshift_available" = "true" ] && [ -d "$timeshift_snapshot_dir/$subvol" ]; then
-            # Von Timeshift-Snapshot erstellen
-            backup_log_msg "INFO" "Erstelle read-only Snapshot von Timeshift für $subvol"
-            btrfs subvolume snapshot -r "$timeshift_snapshot_dir/$subvol" "$snapshot_path"
-            
-            if [ $? -ne 0 ]; then
-                backup_log_msg "ERROR" "Fehler beim Erstellen des Timeshift-basierten Snapshots für $subvol"
-                # Direkte Snapshot als Fallback
-                backup_log_msg "INFO" "Versuche direkten Snapshot als Fallback"
-                create_direct_snapshot "$subvol" "$timestamp"
-                if [ $? -ne 0 ]; then
-                    echo -e "${LH_COLOR_ERROR}Fehler bei $subvol, überspringe dieses Subvolume.${LH_COLOR_RESET}"
-                    CURRENT_TEMP_SNAPSHOT=""
-                    continue
-                fi
-            else
-                backup_log_msg "INFO" "Snapshot erfolgreich erstellt: $snapshot_path"
-            fi
-        else
-            # Direkten Snapshot erstellen
-            create_direct_snapshot "$subvol" "$timestamp"
-            if [ $? -ne 0 ]; then
-                echo -e "${LH_COLOR_ERROR}Fehler bei $subvol, überspringe dieses Subvolume.${LH_COLOR_RESET}"
-                CURRENT_TEMP_SNAPSHOT=""
-                continue
-            fi
+        # Direkten Snapshot erstellen
+        create_direct_snapshot "$subvol" "$timestamp"
+        if [ $? -ne 0 ]; then
+            # create_direct_snapshot gibt bereits eine Fehlermeldung aus und loggt
+            echo -e "${LH_COLOR_ERROR}Fehler beim Erstellen des direkten Snapshots für $subvol, überspringe dieses Subvolume.${LH_COLOR_RESET}"
+            CURRENT_TEMP_SNAPSHOT="" # Sicherstellen, dass kein Cleanup versucht wird für einen nicht erstellten Snapshot
+            continue
         fi
         
         # Backup-Verzeichnis für dieses Subvolume vorbereiten
@@ -458,7 +297,7 @@ btrfs_backup() {
             btrfs send "$snapshot_path" | btrfs receive "$backup_subvol_dir"
             local send_status=$?
         else
-            backup_log_msg "INFO" "Kein vorheriges Backup gefunden, sende vollständigen Snapshot"
+            backup_log_msg "INFO" "Kein vorheriges Backup gefunden, sende vollständigen Snapshot (derzeit kein inkrementelles Backup implementiert)" 
             btrfs send "$snapshot_path" | btrfs receive "$backup_subvol_dir"
             local send_status=$?
         fi
@@ -1993,11 +1832,10 @@ restore_rsync() {
 configure_backup() {
     lh_print_header "Backup Konfiguration"
     
-    echo -e "${LH_COLOR_INFO}Aktuelle Konfiguration:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}Aktuelle Konfiguration (gespeichert in $LH_BACKUP_CONFIG_FILE):${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_INFO}Backup-Ziel (LH_BACKUP_ROOT):${LH_COLOR_RESET} $LH_BACKUP_ROOT"
     echo -e "  ${LH_COLOR_INFO}Backup-Verzeichnis (LH_BACKUP_DIR):${LH_COLOR_RESET} $LH_BACKUP_DIR (relativ zum Backup-Ziel)"
     echo -e "  ${LH_COLOR_INFO}Temporäre Snapshots (LH_TEMP_SNAPSHOT_DIR):${LH_COLOR_RESET} $LH_TEMP_SNAPSHOT_DIR"
-    echo -e "  ${LH_COLOR_INFO}Timeshift-Basis (LH_TIMESHIFT_BASE_DIR):${LH_COLOR_RESET} $LH_TIMESHIFT_BASE_DIR"
     echo -e "  ${LH_COLOR_INFO}Retention (LH_RETENTION_BACKUP):${LH_COLOR_RESET} $LH_RETENTION_BACKUP Backups"
     echo -e "  ${LH_COLOR_INFO}Log-Datei (LH_BACKUP_LOG):${LH_COLOR_RESET} $LH_BACKUP_LOG (Dateiname: $(basename "$LH_BACKUP_LOG"))"
     echo ""
@@ -2035,7 +1873,7 @@ configure_backup() {
             fi
         fi
 
-        # Temporäres Snapshot-Verzeichnis ändern
+        # Temporäres Snapshot-Verzeichnis ändern (wird für BTRFS-Backups benötigt)
         echo ""
         echo -e "${LH_COLOR_PROMPT}Temporäres Snapshot-Verzeichnis (absoluter Pfad):${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}Aktuell:${LH_COLOR_RESET} $LH_TEMP_SNAPSHOT_DIR"
@@ -2048,7 +1886,7 @@ configure_backup() {
             fi
         fi
 
-        # Retention ändern
+        # Retention ändern (Anzahl der zu behaltenden Backups pro Typ/Subvolume)
         echo ""
         echo -e "${LH_COLOR_PROMPT}Anzahl zu behaltender Backups:${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}Aktuell:${LH_COLOR_RESET} $LH_RETENTION_BACKUP"
@@ -2061,7 +1899,7 @@ configure_backup() {
             fi
         fi
         
-        # Weitere Parameter könnten hier hinzugefügt werden (LH_TIMESHIFT_BASE_DIR, LH_BACKUP_LOG_FILENAME)
+        # Weitere Parameter könnten hier hinzugefügt werden (z.B. LH_BACKUP_LOG_BASENAME)
         if [ "$changed" = true ]; then
             echo ""
             echo -e "${LH_COLOR_HEADER}=== Aktualisierte Konfiguration (für diese Sitzung) ===${LH_COLOR_RESET}"
