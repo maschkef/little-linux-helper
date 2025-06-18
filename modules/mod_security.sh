@@ -686,37 +686,7 @@ function docker_validate_and_configure_path() {
     return 0
 }
 
-# Neue Funktion: Check Mode konfigurieren
-function docker_configure_check_mode() {
-    echo -e "${LH_COLOR_INFO}Aktueller Prüfmodus: ${LH_COLOR_PROMPT}$LH_DOCKER_CHECK_MODE_EFFECTIVE${LH_COLOR_RESET}"
-    echo ""
-    echo -e "${LH_COLOR_PROMPT}Verfügbare Prüfmodi:${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}running - Nur Docker-Compose Dateien von laufenden Containern prüfen (empfohlen)${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}all     - Alle Docker-Compose Dateien im konfigurierten Verzeichnis prüfen${LH_COLOR_RESET}"
-    echo ""
-    
-    if lh_confirm_action "Möchten Sie den Prüfmodus ändern?" "n"; then
-        echo ""
-        read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie einen Modus (1=running, 2=all): ${LH_COLOR_RESET}")" mode_choice
-        
-        case $mode_choice in
-            1)
-                LH_DOCKER_CHECK_MODE_EFFECTIVE="running"
-                _docker_save_config
-                echo -e "${LH_COLOR_SUCCESS}Prüfmodus geändert zu: running${LH_COLOR_RESET}"
-                ;;
-            2)
-                LH_DOCKER_CHECK_MODE_EFFECTIVE="all"
-                _docker_save_config
-                echo -e "${LH_COLOR_SUCCESS}Prüfmodus geändert zu: all${LH_COLOR_RESET}"
-                ;;
-            *)
-                echo -e "${LH_COLOR_INFO}Prüfmodus bleibt unverändert: $LH_DOCKER_CHECK_MODE_EFFECTIVE${LH_COLOR_RESET}"
-                ;;
-        esac
-        echo ""
-    fi
-}
+
 
 # Hauptfunktion: Docker Security Check
 function security_check_docker() {
@@ -732,9 +702,6 @@ function security_check_docker() {
     if ! _docker_load_config; then
         return 1 # Abbruch, wenn Konfig nicht geladen werden konnte
     fi
-    
-    # Check Mode konfigurieren
-    docker_configure_check_mode
     
     # Pfad validieren und konfigurieren (nur wenn "all" mode)
     if [ "$LH_DOCKER_CHECK_MODE_EFFECTIVE" = "all" ]; then
