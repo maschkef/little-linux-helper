@@ -24,6 +24,7 @@ CFG_LH_DOCKER_SKIP_WARNINGS=""
 CFG_LH_DOCKER_CHECK_RUNNING=""
 CFG_LH_DOCKER_DEFAULT_PATTERNS=""
 CFG_LH_DOCKER_CHECK_MODE=""
+CFG_LH_DOCKER_ACCEPTED_WARNINGS=""
 
 # Funktion zum Laden der Docker-Konfiguration
 function _docker_load_config() {
@@ -43,6 +44,7 @@ function _docker_load_config() {
         echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_CHECK_RUNNING"
         echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_DEFAULT_PATTERNS"
         echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_CHECK_MODE"
+        echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_ACCEPTED_WARNINGS"
         return 1
     fi
     
@@ -55,6 +57,7 @@ function _docker_load_config() {
     LH_DOCKER_CHECK_RUNNING_EFFECTIVE="${CFG_LH_DOCKER_CHECK_RUNNING:-true}"
     LH_DOCKER_DEFAULT_PATTERNS_EFFECTIVE="${CFG_LH_DOCKER_DEFAULT_PATTERNS:-PASSWORD=password,MYSQL_ROOT_PASSWORD=root,POSTGRES_PASSWORD=postgres,ADMIN_PASSWORD=admin,POSTGRES_PASSWORD=password,MYSQL_PASSWORD=password,REDIS_PASSWORD=password}"
     LH_DOCKER_CHECK_MODE_EFFECTIVE="${CFG_LH_DOCKER_CHECK_MODE:-running}"
+    LH_DOCKER_ACCEPTED_WARNINGS_EFFECTIVE="${CFG_LH_DOCKER_ACCEPTED_WARNINGS:-}"
     return 0
 }
 
@@ -74,6 +77,7 @@ function _docker_save_config() {
         "CFG_LH_DOCKER_CHECK_RUNNING"
         "CFG_LH_DOCKER_DEFAULT_PATTERNS"
         "CFG_LH_DOCKER_CHECK_MODE"
+        "CFG_LH_DOCKER_ACCEPTED_WARNINGS"
     )
 
     local current_var_name
@@ -121,6 +125,37 @@ function docker_should_skip_warning() {
     else
         return 1 # Nicht überspringen
     fi
+}
+
+# Hilfsfunktion: Prüfen ob eine spezifische Warnung für ein Verzeichnis akzeptiert wurde
+function _docker_is_warning_accepted() {
+    local compose_dir="$1"
+    local warning_type="$2"
+    local accepted_entry
+
+    if [ -z "$LH_DOCKER_ACCEPTED_WARNINGS_EFFECTIVE" ]; then
+        return 1 # Nicht akzeptiert (keine akzeptierten Warnungen definiert)
+    fi
+
+    IFS=',' read -ra ACCEPTED_ARRAY <<< "$LH_DOCKER_ACCEPTED_WARNINGS_EFFECTIVE"
+    for accepted_entry in "${ACCEPTED_ARRAY[@]}"; do
+        # Leerzeichen am Anfang und Ende des Eintrags entfernen
+        accepted_entry=$(echo "$accepted_entry" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        if [ -z "$accepted_entry" ]; then continue; fi
+
+        local accepted_dir="${accepted_entry%%:*}"
+        local accepted_type="${accepted_entry#*:}"
+
+        # Leerzeichen von Verzeichnis und Typ entfernen
+        accepted_dir=$(echo "$accepted_dir" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        accepted_type=$(echo "$accepted_type" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+        if [ "$compose_dir" == "$accepted_dir" ] && [ "$warning_type" == "$accepted_type" ]; then
+            lh_log_msg "DEBUG" "Warnung '$warning_type' für Verzeichnis '$compose_dir' ist explizit akzeptiert."
+            return 0 # Akzeptiert
+        fi
+    done
+    return 1 # Nicht akzeptiert
 }
 
 # Hilfsfunktion: Docker Compose Dateien finden (optimiert)
@@ -821,18 +856,26 @@ function security_check_docker() {
             echo ""
             
             # Verzeichnisberechtigungen prüfen
-            if ! docker_check_directory_permissions "$compose_dir"; then
-                ((total_issues++))
-                ((issue_counts_by_type["dir-permissions"]++))
-                local dir_perms=$(stat -c "%a" "$compose_dir" 2>/dev/null)
-                current_dir_issue_messages+=("🔒 Verzeichnisberechtigungen: $dir_perms (zu offen)")
-                if [[ "$dir_perms" =~ ^77[0-9]$ ]]; then
-                    current_dir_critical_issues+=("🚨 KRITISCH: Verzeichnis $compose_dir hat sehr offene Berechtigung: $dir_perms")
+            # Verzeichnisberechtigungen prüfen
+            local dir_perms_issue_code=0
+            docker_check_directory_permissions "$compose_dir" || dir_perms_issue_code=$?
+            if [ $dir_perms_issue_code -ne 0 ]; then # Ein Problem wurde von der Prüffunktion gefunden
+                local dir_perms # Erneut Berechtigungen holen für die Logik hier
+                dir_perms=$(stat -c "%a" "$compose_dir" 2>/dev/null)
+                if _docker_is_warning_accepted "$compose_dir" "dir-permissions"; then
+                    echo -e "${LH_COLOR_SUCCESS}    ↳ Akzeptiert: Verzeichnisberechtigungen $dir_perms für $compose_dir sind gemäß Konfiguration zugelassen.${LH_COLOR_RESET}"
+                    current_dir_issue_messages+=("✅ Akzeptiert: Verzeichnisberechtigungen $dir_perms")
+                else
+                    ((total_issues++))
+                    ((issue_counts_by_type["dir-permissions"]++))
+                    current_dir_issue_messages+=("🔒 Verzeichnisberechtigungen: $dir_perms (zu offen)")
+                    if [[ "$dir_perms" == "777" ]] || [[ "$dir_perms" == "776" ]] || [[ "$dir_perms" == "766" ]]; then
+                        current_dir_critical_issues+=("🚨 KRITISCH: Verzeichnis $compose_dir hat sehr offene Berechtigung: $dir_perms")
+                    fi
                 fi
             fi
             echo ""
-            
-            # .env Dateiberechtigungen prüfen
+
             local env_permission_issues=()
             if ! docker_check_env_permissions "$compose_dir"; then
                 ((total_issues++))
@@ -852,54 +895,88 @@ function security_check_docker() {
             echo ""
             
             # Update-Labels prüfen
-            if ! docker_check_update_labels "$compose_file"; then
-                ((total_issues++))
-                ((issue_counts_by_type["update-labels"]++))
-                current_dir_issue_messages+=("📦 Update-Management: Keine Diun/Watchtower Labels")
+            local update_labels_issue_code=0
+            docker_check_update_labels "$compose_file" || update_labels_issue_code=$?
+            if [ $update_labels_issue_code -ne 0 ]; then
+                if _docker_is_warning_accepted "$compose_dir" "update-labels"; then
+                    echo -e "${LH_COLOR_SUCCESS}    ↳ Akzeptiert: Fehlende Update-Management Labels für $(basename "$compose_file") sind gemäß Konfiguration zugelassen.${LH_COLOR_RESET}"
+                    current_dir_issue_messages+=("✅ Akzeptiert: Fehlende Update-Management Labels")
+                else
+                    ((total_issues++))
+                    ((issue_counts_by_type["update-labels"]++))
+                    current_dir_issue_messages+=("📦 Update-Management: Keine Diun/Watchtower Labels")
+                fi
             fi
             echo ""
             
             # Latest-Images prüfen
             local latest_image_details=()
-            if ! docker_check_latest_images "$compose_file"; then
-                ((total_issues++))
-                ((issue_counts_by_type["latest-images"]++))
-                # Sammle spezifische Latest-Images
-                while IFS= read -r line; do
-                    if [[ "$line" =~ image:[[:space:]]*([^:]+)(:latest)?[[:space:]]*$ ]]; then
-                        local image_name=$(echo "$line" | sed -E 's/.*image:[[:space:]]*([^:]+).*/\1/')
-                        latest_image_details+=("$image_name")
-                    fi
-                done < <(grep -E "image:\s*[^:]+$|image:\s*[^:]+:latest" "$compose_file" || true)
-                current_dir_issue_messages+=("🏷️  Latest-Images: ${latest_image_details[*]}")
+            local latest_images_issue_code=0
+            docker_check_latest_images "$compose_file" || latest_images_issue_code=$?
+            if [ $latest_images_issue_code -ne 0 ]; then
+                if _docker_is_warning_accepted "$compose_dir" "latest-images"; then
+                    echo -e "${LH_COLOR_SUCCESS}    ↳ Akzeptiert: Verwendung von Latest-Images für $(basename "$compose_file") ist gemäß Konfiguration zugelassen.${LH_COLOR_RESET}"
+                    current_dir_issue_messages+=("✅ Akzeptiert: Latest-Image Verwendung")
+                else
+                    ((total_issues++))
+                    ((issue_counts_by_type["latest-images"]++))
+                    while IFS= read -r line; do
+                        if [[ "$line" =~ image:[[:space:]]*([^:]+)(:latest)?[[:space:]]*$ ]]; then
+                            local image_name=$(echo "$line" | sed -E 's/.*image:[[:space:]]*([^:]+).*/\1/')
+                            latest_image_details+=("$image_name")
+                        fi
+                    done < <(grep -E "image:\s*[^:]+$|image:\s*[^:]+:latest" "$compose_file" || true)
+                    current_dir_issue_messages+=("🏷️  Latest-Images: ${latest_image_details[*]}")
+                fi
             fi
             echo ""
             
             # Privilegierte Container prüfen
-            if ! docker_check_privileged_containers "$compose_file"; then
-                ((total_issues++))
-                ((issue_counts_by_type["privileged"]++))
-                current_dir_critical_issues+=("🚨 KRITISCH: Privilegierte Container gefunden")
-                current_dir_issue_messages+=("⚠️  Privilegierte Container: 'privileged: true' verwendet")
+            local privileged_issue_code=0
+            docker_check_privileged_containers "$compose_file" || privileged_issue_code=$?
+            if [ $privileged_issue_code -ne 0 ]; then
+                if _docker_is_warning_accepted "$compose_dir" "privileged"; then
+                    echo -e "${LH_COLOR_SUCCESS}    ↳ Akzeptiert: 'privileged: true' für $(basename "$compose_file") ist gemäß Konfiguration zugelassen.${LH_COLOR_RESET}"
+                    current_dir_issue_messages+=("✅ Akzeptiert: Privilegierte Container ('privileged: true')")
+                else
+                    ((total_issues++))
+                    ((issue_counts_by_type["privileged"]++))
+                    current_dir_critical_issues+=("🚨 KRITISCH: Privilegierte Container in $(basename "$compose_file")")
+                    current_dir_issue_messages+=("⚠️  Privilegierte Container: 'privileged: true' verwendet")
+                fi
             fi
             echo ""
             
             # Host-Volumes prüfen
             local host_volume_details=()
-            if ! docker_check_host_volumes "$compose_file"; then
-                ((total_issues++))
-                ((issue_counts_by_type["host-volumes"]++))
-                # Sammle spezifische kritische Pfade
-                local critical_paths=("/" "/etc" "/var/run/docker.sock" "/proc" "/sys" "/boot" "/dev" "/host")
-                for path in "${critical_paths[@]}"; do
-                    if grep -qE "^\s*-\s+[\"']?${path}[\"']?:" "$compose_file" || \
-                       grep -qE "source:\s*[\"']?${path}[\"']?" "$compose_file"; then
-                        host_volume_details+=("$path")
+            local host_volumes_issue_code=0
+            docker_check_host_volumes "$compose_file" || host_volumes_issue_code=$?
+            if [ $host_volumes_issue_code -ne 0 ]; then
+                if _docker_is_warning_accepted "$compose_dir" "host-volumes"; then
+                    echo -e "${LH_COLOR_SUCCESS}    ↳ Akzeptiert: Host-Volume Mounts für $(basename "$compose_file") sind gemäß Konfiguration zugelassen.${LH_COLOR_RESET}"
+                    current_dir_issue_messages+=("✅ Akzeptiert: Host-Volume Mounts")
+                else
+                    ((total_issues++))
+                    ((issue_counts_by_type["host-volumes"]++))
+                    local critical_paths_check=("/" "/etc" "/var/run/docker.sock" "/proc" "/sys" "/boot" "/dev" "/host") # Renamed to avoid conflict
+                    for path_check in "${critical_paths_check[@]}"; do
+                        if grep -qE "^\s*-\s+[\"']?${path_check}[\"']?:" "$compose_file" || \
+                           grep -qE "^\s*-\s+[\"']?${path_check}[\"']?\s*$" "$compose_file" || \
+                           grep -qE "source:\s*[\"']?${path_check}[\"']?" "$compose_file"; then
+                            host_volume_details+=("$path_check")
+                        fi
+                    done
+                    current_dir_issue_messages+=("💾 Host-Volumes: ${host_volume_details[*]}")
+                    local is_critical_mount=false
+                    for mounted_path in "${host_volume_details[@]}"; do
+                        if [[ "$mounted_path" == "/" ]] || [[ "$mounted_path" == "/var/run/docker.sock" ]] || [[ "$mounted_path" == "/etc" ]] || [[ "$mounted_path" == "/proc" ]] || [[ "$mounted_path" == "/sys" ]]; then
+                            is_critical_mount=true
+                            break
+                        fi
+                    done
+                    if $is_critical_mount; then
+                        current_dir_critical_issues+=("🚨 KRITISCH: Sehr sensible Host-Pfade gemountet in $(basename "$compose_file"): ${host_volume_details[*]}")
                     fi
-                done
-                current_dir_issue_messages+=("💾 Host-Volumes: ${host_volume_details[*]}")
-                if [[ " ${host_volume_details[*]} " =~ " / " ]] || [[ " ${host_volume_details[*]} " =~ " /var/run/docker.sock " ]]; then
-                    current_dir_critical_issues+=("🚨 KRITISCH: Sehr sensible Host-Pfade gemountet: ${host_volume_details[*]}")
                 fi
             fi
             echo ""
