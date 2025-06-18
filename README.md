@@ -31,7 +31,7 @@ Dieses Projekt steht unter der MIT-Lizenz. Weitere Informationen findest du in d
 Hier ist eine Liste von bekannten Problemen, Einschränkungen oder Verhaltensweisen, die dir bei der Nutzung der Skripte auffallen könnten.
 * **Backups (`mod_backup.sh`):**
     * **BTRFS-Backup & Timeshift:** Das Skript versucht, den aktuellsten Timeshift-Snapshot als Basis zu nutzen (aus `LH_TIMESHIFT_BASE_DIR`). Schlägt dies fehl oder ist Timeshift nicht konfiguriert, wird ein unabhängiger Snapshot erstellt. Eine frühere Beobachtung, dass Timeshift aktiv laufen muss, konnte nicht weiter verifiziert werden, da ich nun Snapper/Btrfs-Assistent verwende und damit die unabhängigen Snapshots nutze.
-    Dieser unabhänige Snapshot wird bei abbruch per Strg + 'C' aufgeräumt oder alternativ bei erneuten laden des modules. 
+    Dieser unabhängige Snapshot wird bei Abbruch per Strg + 'C' aufgeräumt oder alternativ bei erneutem Laden des Moduls.
     * Das Backup hat keine Fortschrittsanzeige (eher ein Schönheitsfehler).
     * Für das Backup nutze ich i.d.R. die BTRFS-basierende Funktion, die anderen sind wesentlich weniger getestet.
 * **Erweiterte Log-Analyse (`scripts/advanced_log_analyzer.py`):**
@@ -142,7 +142,7 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
 * **Paketverwaltung & Updates (`mod_packages.sh`)**:
     * Systemaktualisierung (unterstützt pacman, apt, dnf, yay).
     * Aktualisierung alternativer Paketmanager (Flatpak, Snap, Nix).
-    * Suchen und Entfernen von Waisenpaketen.
+    * Suchen und Entfernen von verwaisten Paketen.
     * Bereinigung des Paket-Caches.
     * Suchen und Installieren von Paketen.
     * Anzeigen installierter Pakete (inkl. alternativer Quellen).
@@ -162,15 +162,15 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
             * Fehlen von Update-Management-Labels (z.B. für Diun, Watchtower).
             * Unsichere Berechtigungen für `.env`-Dateien.
             * Zu offene Berechtigungen für Verzeichnisse, die Compose-Dateien enthalten.
-            * Verwendung von `:latest`-Image-Tags oder Images ohne spezifische Versionierung. (In der `config/docker_security.conf` im standard deaktiviert)
+            * Verwendung von `:latest`-Image-Tags oder Images ohne spezifische Versionierung. (In der `config/docker_security.conf.example` im standard deaktiviert.)
             * Konfiguration von Containern mit `privileged: true`.
-            * Einbindung kritischer Host-Pfade als Volumes (z.B. `/`, `/etc`, `/var/run/docker.sock`).
+            * Einbindung kritischer Host-Pfade als Volumes (z.B. `/`, `/etc`, `/var/run/docker.sock`). (Wird derzeit nicht in der zusammenfassung mit ausgegeben.)
             * Auf `0.0.0.0` exponierte Ports, die Dienste für alle Netzwerkschnittstellen verfügbar machen.
             * Verwendung potenziell gefährlicher Linux-Capabilities (z.B. `SYS_ADMIN`, `NET_ADMIN`).
             * Deaktivierte Sicherheitsoptionen wie `apparmor:unconfined` oder `seccomp:unconfined`.
             * Vorkommen von bekannten Standardpasswörtern in Umgebungsvariablen.
-            * Direkte Einbettung sensitiver Daten (z.B. API-Keys, Tokens) anstelle von Umgebungsvariablen.
-        * Optional kann eine Liste der aktuell laufenden Docker-Container angezeigt werden. (In der `config/docker_security.conf` im standard deaktiviert)
+            * Direkte Einbettung sensitiver Daten (z.B. API-Keys, Tokens) anstelle von Umgebungsvariablen. (funktioniert aktuell nicht wirklich)
+        * Optional kann eine Liste der aktuell laufenden Docker-Container angezeigt werden. (In der `config/docker_security.conf.example` im standard deaktiviert.)
         * Stellt eine Zusammenfassung der gefundenen potenziellen Probleme mit Empfehlungen bereit.
 
 </details>
@@ -204,7 +204,7 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
     * `lm-sensors` (für Temperatur- und Sensorwerte)
     * `nmap` (optional, für lokalen Port-Scan)
     * **Desktop-Benachrichtigungen:** `libnotify` (stellt `notify-send` bereit), `zenity` oder `kdialog`.
-    * Python 3 (typischerweise als `python3`-Kommando; für erweiterte Log-Analyse)
+    * Python 3 (typischerweise als `python` oder `python3`-Kommando; für erweiterte Log-Analyse)
     * `pacman-contrib` (für `paccache` auf Arch-basierten Systemen, falls nicht vorhanden)
     * `expac` (für kürzlich installierte Pakete auf Arch-basierten Systemen)
 
@@ -234,7 +234,7 @@ Little Linux Helper verwendet Konfigurationsdateien, um bestimmte Aspekte seines
 
 Beim ersten Start des Hauptskripts (`help_master.sh`) werden automatisch Standard-Konfigurationsdateien erstellt, falls diese noch nicht vorhanden sind. Dies geschieht, indem Vorlagedateien mit der Endung `.example` (z.B. `backup.conf.example`) in ihre aktiven Gegenstücke ohne das Suffix (z.B. `backup.conf`) kopiert werden.
 
-**Wichtig:** Sie werden beim ersten Erstellen einer Konfigurationsdatei darauf hingewiesen. Es wird empfohlen, diese neu erstellten `.conf`-Dateien zu überprüfen und gegebenenfalls an Ihre spezifischen Bedürfnisse anzupassen.
+**Wichtig:** Du wirst beim ersten Erstellen einer Konfigurationsdatei darauf hingewiesen. Es wird empfohlen, diese neu erstellten `.conf`-Dateien zu überprüfen und gegebenenfalls an deine spezifischen Bedürfnisse anzupassen.
 
 Aktuell werden Konfigurationsdateien für folgende Module verwendet:
 *   **Backup & Wiederherstellung (`mod_backup.sh`)**: Einstellungen für Backup-Pfade, Aufbewahrungsrichtlinien etc. (`config/backup.conf`).
@@ -277,6 +277,6 @@ Das Projekt ist in Module unterteilt, um die Funktionalität zu organisieren:
 Alle Aktionen werden in Log-Dateien protokolliert, um die Nachverfolgung und Fehlerbehebung zu  erleichtern.
 
 * **Speicherort:** Die Log-Dateien werden im Unterverzeichnis `logs` innerhalb des Projektverzeichnisses erstellt . Um die Übersichtlichkeit zu wahren, wird für jeden Monat ein eigener Unterordner angelegt (z.B. `logs/2025-06 `).
-* **Dateinamen:** Allgemeine Logdateien erhalten einen Zeitstempel, wann das Skript gestartet wurde. Backup-spezifische Protok olle werden ebenfalls mit einem Zeitstempel versehen, um jede Backup-Sitzung separat zu erfassen.
+* **Dateinamen:** Allgemeine Logdateien erhalten einen Zeitstempel, wann das Skript gestartet wurde. Backup-spezifische Protokolle werden ebenfalls mit einem Zeitstempel versehen, um jede Backup-Sitzung separat zu erfassen.
 
 </details>
