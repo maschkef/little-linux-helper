@@ -46,7 +46,6 @@ declare -A LH_TARGET_USER_INFO
 LH_BACKUP_ROOT_DEFAULT="/run/media/tux/hdd_3tb/"
 LH_BACKUP_DIR_DEFAULT="/backups" # Relativ zu LH_BACKUP_ROOT
 LH_TEMP_SNAPSHOT_DIR_DEFAULT="/.snapshots_backup" # Absoluter Pfad
-LH_TIMESHIFT_BASE_DIR_DEFAULT="/run/timeshift"    # Absoluter Pfad
 LH_RETENTION_BACKUP_DEFAULT=10
 LH_BACKUP_LOG_BASENAME_DEFAULT="backup.log" # Basisname für die Backup-Logdatei
 
@@ -54,7 +53,6 @@ LH_BACKUP_LOG_BASENAME_DEFAULT="backup.log" # Basisname für die Backup-Logdatei
 LH_BACKUP_ROOT=""
 LH_BACKUP_DIR=""
 LH_TEMP_SNAPSHOT_DIR=""
-LH_TIMESHIFT_BASE_DIR=""
 LH_RETENTION_BACKUP=""
 LH_BACKUP_LOG_BASENAME="" # Der konfigurierte Basisname für die Backup-Logdatei
 LH_BACKUP_LOG="${LH_BACKUP_LOG:-}"          # Voller Pfad zur Backup-Logdatei (mit Zeitstempel)
@@ -168,7 +166,6 @@ function lh_load_backup_config() {
     LH_BACKUP_ROOT="$LH_BACKUP_ROOT_DEFAULT"
     LH_BACKUP_DIR="$LH_BACKUP_DIR_DEFAULT"
     LH_TEMP_SNAPSHOT_DIR="$LH_TEMP_SNAPSHOT_DIR_DEFAULT"
-    LH_TIMESHIFT_BASE_DIR="$LH_TIMESHIFT_BASE_DIR_DEFAULT"
     LH_RETENTION_BACKUP="$LH_RETENTION_BACKUP_DEFAULT"
     LH_BACKUP_LOG_BASENAME="$LH_BACKUP_LOG_BASENAME_DEFAULT"
 
@@ -178,14 +175,14 @@ function lh_load_backup_config() {
         local temp_backup_root=""
         source "$LH_BACKUP_CONFIG_FILE"
         # Weise die geladenen Werte zu, falls sie in der Config-Datei gesetzt wurden
-        LH_BACKUP_ROOT="${CFG_LH_BACKUP_ROOT:-$LH_BACKUP_ROOT}"
-        LH_BACKUP_DIR="${CFG_LH_BACKUP_DIR:-$LH_BACKUP_DIR}"
-        LH_TEMP_SNAPSHOT_DIR="${CFG_LH_TEMP_SNAPSHOT_DIR:-$LH_TEMP_SNAPSHOT_DIR}"
-        LH_TIMESHIFT_BASE_DIR="${CFG_LH_TIMESHIFT_BASE_DIR:-$LH_TIMESHIFT_BASE_DIR}"
-        LH_RETENTION_BACKUP="${CFG_LH_RETENTION_BACKUP:-$LH_RETENTION_BACKUP}"
-        LH_BACKUP_LOG_BASENAME="${CFG_LH_BACKUP_LOG_BASENAME:-$LH_BACKUP_LOG_BASENAME}"
+        LH_BACKUP_ROOT="${CFG_LH_BACKUP_ROOT:-$LH_BACKUP_ROOT_DEFAULT}"
+        LH_BACKUP_DIR="${CFG_LH_BACKUP_DIR:-$LH_BACKUP_DIR_DEFAULT}"
+        LH_TEMP_SNAPSHOT_DIR="${CFG_LH_TEMP_SNAPSHOT_DIR:-$LH_TEMP_SNAPSHOT_DIR_DEFAULT}"
+        LH_RETENTION_BACKUP="${CFG_LH_RETENTION_BACKUP:-$LH_RETENTION_BACKUP_DEFAULT}"
+        LH_BACKUP_LOG_BASENAME="${CFG_LH_BACKUP_LOG_BASENAME:-$LH_BACKUP_LOG_BASENAME_DEFAULT}"
     else
-        lh_log_msg "INFO" "Keine Backup-Konfigurationsdatei gefunden ($LH_BACKUP_CONFIG_FILE). Verwende Standardwerte."
+        lh_log_msg "INFO" "Keine Backup-Konfigurationsdatei ($LH_BACKUP_CONFIG_FILE) gefunden. Verwende interne Standardwerte."
+        # Die Arbeitsvariablen behalten die oben initialisierten Standardwerte.
     fi
 
     # Backup-Logdatei im monatlichen Unterordner (LH_LOG_DIR) erstellen.
@@ -201,7 +198,6 @@ function lh_save_backup_config() {
     echo "CFG_LH_BACKUP_ROOT=\"$LH_BACKUP_ROOT\"" >> "$LH_BACKUP_CONFIG_FILE"
     echo "CFG_LH_BACKUP_DIR=\"$LH_BACKUP_DIR\"" >> "$LH_BACKUP_CONFIG_FILE"
     echo "CFG_LH_TEMP_SNAPSHOT_DIR=\"$LH_TEMP_SNAPSHOT_DIR\"" >> "$LH_BACKUP_CONFIG_FILE"
-    echo "CFG_LH_TIMESHIFT_BASE_DIR=\"$LH_TIMESHIFT_BASE_DIR\"" >> "$LH_BACKUP_CONFIG_FILE"
     echo "CFG_LH_RETENTION_BACKUP=\"$LH_RETENTION_BACKUP\"" >> "$LH_BACKUP_CONFIG_FILE"
     echo "CFG_LH_BACKUP_LOG_BASENAME=\"$LH_BACKUP_LOG_BASENAME\"" >> "$LH_BACKUP_CONFIG_FILE"
     lh_log_msg "INFO" "Backup-Konfiguration gespeichert in $LH_BACKUP_CONFIG_FILE"
@@ -935,7 +931,7 @@ function lh_finalize_initialization() {
     export LH_PKG_MANAGER
     export LH_ALT_PKG_MANAGERS
     # Exportiere auch die Backup-Konfigurationsvariablen, damit sie in Sub-Shells (Modulen) verfügbar sind
-    export LH_BACKUP_ROOT LH_BACKUP_DIR LH_TEMP_SNAPSHOT_DIR LH_TIMESHIFT_BASE_DIR LH_RETENTION_BACKUP LH_BACKUP_LOG_BASENAME LH_BACKUP_LOG
+    export LH_BACKUP_ROOT LH_BACKUP_DIR LH_TEMP_SNAPSHOT_DIR LH_RETENTION_BACKUP LH_BACKUP_LOG_BASENAME LH_BACKUP_LOG
     # Exportiere Farbvariablen
     export LH_COLOR_RESET LH_COLOR_BLACK LH_COLOR_RED LH_COLOR_GREEN LH_COLOR_YELLOW LH_COLOR_BLUE LH_COLOR_MAGENTA LH_COLOR_CYAN LH_COLOR_WHITE
     export LH_COLOR_BOLD_BLACK LH_COLOR_BOLD_RED LH_COLOR_BOLD_GREEN LH_COLOR_BOLD_YELLOW LH_COLOR_BOLD_BLUE LH_COLOR_BOLD_MAGENTA LH_COLOR_BOLD_CYAN LH_COLOR_BOLD_WHITE
