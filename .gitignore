@@ -1,1 +1,3 @@
 logs/
+# Lokale Konfigurationsdateien ignorieren
+config/*.conf

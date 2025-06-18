@@ -19,7 +19,35 @@ export LH_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Bibliothek mit gemeinsamen Funktionen laden
 source "$LH_ROOT_DIR/lib/lib_common.sh"
 
+# Funktion zum Sicherstellen, dass Konfigurationsdateien existieren
+function lh_ensure_config_files_exist() {
+    local config_dir="$LH_ROOT_DIR/config"
+    local template_suffix=".example"
+    local template_config_file
+    local actual_config_file
+    local config_file_base
+
+    # Durchsuche das Konfigurationsverzeichnis nach allen .example-Dateien
+    for template_config_file in "$config_dir"/*"$template_suffix"; do
+        # Extrahiere den Basisdateinamen ohne .example
+        config_file_base=$(basename "$template_config_file" "$template_suffix")
+        local actual_config_file="$config_dir/$config_file_base"
+
+        if [ ! -f "$actual_config_file" ]; then
+            if [ -f "$template_config_file" ]; then
+                cp "$template_config_file" "$actual_config_file"
+                echo -e "${LH_COLOR_INFO}Hinweis: Die Konfigurationsdatei '$config_file_base' wurde aus der Vorlage '${config_file_base}${template_suffix}' erstellt.${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}Bitte überprüfen und passen Sie ggf. '$actual_config_file' an Ihre Bedürfnisse an.${LH_COLOR_RESET}"
+            else
+                lh_log_msg "WARN" "Konfigurationsdatei '$actual_config_file' nicht gefunden und keine Vorlagedatei '$template_config_file' vorhanden."
+                echo -e "${LH_COLOR_WARNING}Warnung: Konfigurationsdatei '$actual_config_file' nicht gefunden und keine Vorlagedatei '$template_config_file' vorhanden.${LH_COLOR_RESET}"
+            fi
+        fi
+    done
+}
+
 # Initialisierungen
+lh_ensure_config_files_exist # Sicherstellen, dass Konfigurationsdateien vorhanden sind
 lh_initialize_logging
 lh_check_root_privileges
 lh_detect_package_manager
