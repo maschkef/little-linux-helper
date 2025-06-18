@@ -23,6 +23,7 @@ CFG_LH_DOCKER_SEARCH_DEPTH=""
 CFG_LH_DOCKER_SKIP_WARNINGS=""
 CFG_LH_DOCKER_CHECK_RUNNING=""
 CFG_LH_DOCKER_DEFAULT_PATTERNS=""
+CFG_LH_DOCKER_CHECK_MODE=""
 
 # Funktion zum Laden der Docker-Konfiguration
 function _docker_load_config() {
@@ -41,6 +42,7 @@ function _docker_load_config() {
         echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_SKIP_WARNINGS"
         echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_CHECK_RUNNING"
         echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_DEFAULT_PATTERNS"
+        echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_CHECK_MODE"
         return 1
     fi
     
@@ -52,6 +54,7 @@ function _docker_load_config() {
     LH_DOCKER_SKIP_WARNINGS_EFFECTIVE="${CFG_LH_DOCKER_SKIP_WARNINGS:-}"
     LH_DOCKER_CHECK_RUNNING_EFFECTIVE="${CFG_LH_DOCKER_CHECK_RUNNING:-true}"
     LH_DOCKER_DEFAULT_PATTERNS_EFFECTIVE="${CFG_LH_DOCKER_DEFAULT_PATTERNS:-PASSWORD=password,MYSQL_ROOT_PASSWORD=root,POSTGRES_PASSWORD=postgres,ADMIN_PASSWORD=admin,POSTGRES_PASSWORD=password,MYSQL_PASSWORD=password,REDIS_PASSWORD=password}"
+    LH_DOCKER_CHECK_MODE_EFFECTIVE="${CFG_LH_DOCKER_CHECK_MODE:-running}"
     return 0
 }
 
@@ -70,6 +73,7 @@ function _docker_save_config() {
         "CFG_LH_DOCKER_SKIP_WARNINGS"
         "CFG_LH_DOCKER_CHECK_RUNNING"
         "CFG_LH_DOCKER_DEFAULT_PATTERNS"
+        "CFG_LH_DOCKER_CHECK_MODE"
     )
 
     local current_var_name
@@ -170,6 +174,99 @@ function docker_find_compose_files() {
     
     # Führe Suche aus
     eval "$find_cmd" 2>/dev/null
+}
+
+# Neue Funktion: Nur Compose-Dateien von laufenden Containern finden
+function docker_find_running_compose_files() {
+    echo -e "${LH_COLOR_INFO}Ermittle Docker-Compose Dateien von laufenden Containern...${LH_COLOR_RESET}"
+    
+    if ! command -v docker >/dev/null 2>&1; then
+        echo -e "${LH_COLOR_ERROR}Docker ist nicht verfügbar.${LH_COLOR_RESET}"
+        return 1
+    fi
+    
+    # Hole alle laufenden Container mit ihren Labels
+    local running_containers
+    running_containers=$($LH_SUDO_CMD docker ps --format "{{.Names}}\t{{.Label \"com.docker.compose.project.working_dir\"}}\t{{.Label \"com.docker.compose.project\"}}" 2>/dev/null)
+    
+    if [ -z "$running_containers" ]; then
+        echo -e "${LH_COLOR_WARNING}Keine laufenden Container gefunden.${LH_COLOR_RESET}"
+        return 1
+    fi
+    
+    local found_compose_files=()
+    local project_dirs=()
+    
+    # Sammle einzigartige Projektverzeichnisse
+    while IFS=$'\t' read -r container_name working_dir project_name; do
+        if [ -n "$working_dir" ] && [ "$working_dir" != "<no value>" ]; then
+            # Prüfe ob das Verzeichnis bereits in der Liste ist
+            local already_added=false
+            for existing_dir in "${project_dirs[@]}"; do
+                if [ "$existing_dir" = "$working_dir" ]; then
+                    already_added=true
+                    break
+                fi
+            done
+            
+            if ! $already_added; then
+                project_dirs+=("$working_dir")
+            fi
+        elif [ -n "$project_name" ] && [ "$project_name" != "<no value>" ]; then
+            # Fallback: Suche nach Projektname im konfigurierten Verzeichnis
+            local potential_dirs
+            potential_dirs=$(find "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE" -maxdepth "$LH_DOCKER_SEARCH_DEPTH_EFFECTIVE" -type d -name "*$project_name*" 2>/dev/null || true)
+            while IFS= read -r potential_dir; do
+                if [ -n "$potential_dir" ]; then
+                    local already_added=false
+                    for existing_dir in "${project_dirs[@]}"; do
+                        if [ "$existing_dir" = "$potential_dir" ]; then
+                            already_added=true
+                            break
+                        fi
+                    done
+                    
+                    if ! $already_added; then
+                        project_dirs+=("$potential_dir")
+                    fi
+                fi
+            done <<< "$potential_dirs"
+        fi
+    done <<< "$running_containers"
+    
+    # Suche nach Compose-Dateien in den gefundenen Verzeichnissen
+    for project_dir in "${project_dirs[@]}"; do
+        if [ -d "$project_dir" ]; then
+            # Suche nach docker-compose.yml oder compose.yml im Projektverzeichnis
+            if [ -f "$project_dir/docker-compose.yml" ]; then
+                found_compose_files+=("$project_dir/docker-compose.yml")
+            elif [ -f "$project_dir/compose.yml" ]; then
+                found_compose_files+=("$project_dir/compose.yml")
+            fi
+        fi
+    done
+    
+    if [ ${#found_compose_files[@]} -eq 0 ]; then
+        echo -e "${LH_COLOR_WARNING}Keine Docker-Compose Dateien für laufende Container gefunden.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Mögliche Gründe:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}• Container wurden nicht mit docker-compose gestartet${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}• Compose-Dateien befinden sich außerhalb des konfigurierten Suchbereichs${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}• Container haben keine entsprechenden Labels${LH_COLOR_RESET}"
+        
+        if lh_confirm_action "Möchten Sie stattdessen alle Compose-Dateien prüfen?" "y"; then
+            docker_find_compose_files "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE"
+            return $?
+        else
+            return 1
+        fi
+    fi
+    
+    # Ausgabe der gefundenen Dateien
+    for compose_file in "${found_compose_files[@]}"; do
+        echo "$compose_file"
+    done
+    
+    return 0
 }
 
 # Sicherheitsprüfung 1: Diun/Watchtower Labels
@@ -510,8 +607,8 @@ function docker_check_sensitive_data() {
     fi
 }
 
-# Sicherheitsprüfung 12: Laufende Container (optional)
-function docker_check_running_containers() {
+# Sicherheitsprüfung 12: Laufende Container (Übersicht)
+function docker_show_running_containers() {
     if [ "$LH_DOCKER_CHECK_RUNNING_EFFECTIVE" != "true" ]; then
         return 0
     fi
@@ -521,14 +618,15 @@ function docker_check_running_containers() {
         return 0
     fi
     
-    echo -e "${LH_COLOR_INFO}Prüfe laufende Container...${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}Übersicht laufende Container:${LH_COLOR_RESET}"
     
     local running_containers
-    running_containers=$($LH_SUDO_CMD docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Ports}}" 2>/dev/null || true)
+    running_containers=$($LH_SUDO_CMD docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Ports}}\t{{.Status}}" 2>/dev/null || true)
     
     if [ -n "$running_containers" ]; then
-        echo -e "${LH_COLOR_INFO}Laufende Container:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}─────────────────────────────────────────────────────────────────${LH_COLOR_RESET}"
         echo "$running_containers"
+        echo -e "${LH_COLOR_SEPARATOR}─────────────────────────────────────────────────────────────────${LH_COLOR_RESET}"
         echo ""
     else
         echo -e "${LH_COLOR_INFO}Keine laufenden Container gefunden${LH_COLOR_RESET}"
@@ -588,6 +686,38 @@ function docker_validate_and_configure_path() {
     return 0
 }
 
+# Neue Funktion: Check Mode konfigurieren
+function docker_configure_check_mode() {
+    echo -e "${LH_COLOR_INFO}Aktueller Prüfmodus: ${LH_COLOR_PROMPT}$LH_DOCKER_CHECK_MODE_EFFECTIVE${LH_COLOR_RESET}"
+    echo ""
+    echo -e "${LH_COLOR_PROMPT}Verfügbare Prüfmodi:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}running - Nur Docker-Compose Dateien von laufenden Containern prüfen (empfohlen)${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}all     - Alle Docker-Compose Dateien im konfigurierten Verzeichnis prüfen${LH_COLOR_RESET}"
+    echo ""
+    
+    if lh_confirm_action "Möchten Sie den Prüfmodus ändern?" "n"; then
+        echo ""
+        read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie einen Modus (1=running, 2=all): ${LH_COLOR_RESET}")" mode_choice
+        
+        case $mode_choice in
+            1)
+                LH_DOCKER_CHECK_MODE_EFFECTIVE="running"
+                _docker_save_config
+                echo -e "${LH_COLOR_SUCCESS}Prüfmodus geändert zu: running${LH_COLOR_RESET}"
+                ;;
+            2)
+                LH_DOCKER_CHECK_MODE_EFFECTIVE="all"
+                _docker_save_config
+                echo -e "${LH_COLOR_SUCCESS}Prüfmodus geändert zu: all${LH_COLOR_RESET}"
+                ;;
+            *)
+                echo -e "${LH_COLOR_INFO}Prüfmodus bleibt unverändert: $LH_DOCKER_CHECK_MODE_EFFECTIVE${LH_COLOR_RESET}"
+                ;;
+        esac
+        echo ""
+    fi
+}
+
 # Hauptfunktion: Docker Security Check
 function security_check_docker() {
     lh_print_header "Docker Security Überprüfung"
@@ -603,48 +733,89 @@ function security_check_docker() {
         return 1 # Abbruch, wenn Konfig nicht geladen werden konnte
     fi
     
-    # Pfad validieren und konfigurieren
-    if ! docker_validate_and_configure_path; then
-        echo -e "${LH_COLOR_ERROR}Keine gültige Pfad-Konfiguration. Abbruch.${LH_COLOR_RESET}"
-        return 1
+    # Check Mode konfigurieren
+    docker_configure_check_mode
+    
+    # Pfad validieren und konfigurieren (nur wenn "all" mode)
+    if [ "$LH_DOCKER_CHECK_MODE_EFFECTIVE" = "all" ]; then
+        if ! docker_validate_and_configure_path; then
+            echo -e "${LH_COLOR_ERROR}Keine gültige Pfad-Konfiguration. Abbruch.${LH_COLOR_RESET}"
+            return 1
+        fi
     fi
     
     # Erklärung der Annahmen
     echo -e "\n${LH_COLOR_INFO}Diese Überprüfung analysiert:${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_INFO}• Docker-Compose Dateien in: $LH_DOCKER_COMPOSE_ROOT_EFFECTIVE${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_INFO}• Suchtiefe: $LH_DOCKER_SEARCH_DEPTH_EFFECTIVE Ebenen${LH_COLOR_RESET}"
-    if [ -n "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE" ]; then
-        echo -e "${LH_COLOR_INFO}• Ausgeschlossene Verzeichnisse: $LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE${LH_COLOR_RESET}"
+    if [ "$LH_DOCKER_CHECK_MODE_EFFECTIVE" = "running" ]; then
+        echo -e "${LH_COLOR_INFO}• Prüfmodus: ${LH_COLOR_PROMPT}NUR LAUFENDE CONTAINER${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}• Docker-Compose Dateien von aktuell laufenden Containern${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}• Fallback-Suchpfad: $LH_DOCKER_COMPOSE_ROOT_EFFECTIVE${LH_COLOR_RESET}"
+    else
+        echo -e "${LH_COLOR_INFO}• Prüfmodus: ${LH_COLOR_PROMPT}ALLE DATEIEN${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}• Docker-Compose Dateien in: $LH_DOCKER_COMPOSE_ROOT_EFFECTIVE${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}• Suchtiefe: $LH_DOCKER_SEARCH_DEPTH_EFFECTIVE Ebenen${LH_COLOR_RESET}"
+        if [ -n "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE" ]; then
+            echo -e "${LH_COLOR_INFO}• Ausgeschlossene Verzeichnisse: $LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE${LH_COLOR_RESET}"
+        fi
     fi
     echo -e "${LH_COLOR_INFO}• Sicherheitseinstellungen und Best Practices${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_INFO}• Dateiberechtigungen und sensitive Daten${LH_COLOR_RESET}"
     echo ""
     
-    # Docker-Compose Dateien finden
+    # Docker-Compose Dateien finden basierend auf Modus
     local compose_files
     
-    # Führe Suche aus
-    compose_files=$(docker_find_compose_files "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")
+    if [ "$LH_DOCKER_CHECK_MODE_EFFECTIVE" = "running" ]; then
+        compose_files=$(docker_find_running_compose_files)
+        local find_result=$?
+        if [ $find_result -ne 0 ]; then
+            return $find_result
+        fi
+    else
+        compose_files=$(docker_find_compose_files "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")
+    fi
     
     if [ -z "$compose_files" ]; then
-        echo -e "${LH_COLOR_WARNING}Keine Docker-Compose Dateien gefunden in: $LH_DOCKER_COMPOSE_ROOT_EFFECTIVE${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}Möglicherweise müssen Sie:${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}• Einen anderen Suchpfad konfigurieren${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}• Die Suchtiefe erhöhen (aktuell: $LH_DOCKER_SEARCH_DEPTH_EFFECTIVE)${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}• Ausschlüsse überprüfen: $LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE${LH_COLOR_RESET}"
+        if [ "$LH_DOCKER_CHECK_MODE_EFFECTIVE" = "running" ]; then
+            echo -e "${LH_COLOR_WARNING}Keine Docker-Compose Dateien von laufenden Containern gefunden.${LH_COLOR_RESET}"
+        else
+            echo -e "${LH_COLOR_WARNING}Keine Docker-Compose Dateien gefunden in: $LH_DOCKER_COMPOSE_ROOT_EFFECTIVE${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Möglicherweise müssen Sie:${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}• Einen anderen Suchpfad konfigurieren${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}• Die Suchtiefe erhöhen (aktuell: $LH_DOCKER_SEARCH_DEPTH_EFFECTIVE)${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}• Ausschlüsse überprüfen: $LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE${LH_COLOR_RESET}"
+        fi
         echo -e "${LH_COLOR_INFO}Konfigurationsdatei: $LH_DOCKER_CONFIG_FILE${LH_COLOR_RESET}"
         return 1
     fi
     
     local file_count
     file_count=$(echo "$compose_files" | wc -l)
-    echo -e "${LH_COLOR_SUCCESS}$file_count Docker-Compose Datei(en) gefunden${LH_COLOR_RESET}"
+    if [ "$LH_DOCKER_CHECK_MODE_EFFECTIVE" = "running" ]; then
+        echo -e "${LH_COLOR_SUCCESS}$file_count Docker-Compose Datei(en) von laufenden Containern gefunden${LH_COLOR_RESET}"
+    else
+        echo -e "${LH_COLOR_SUCCESS}$file_count Docker-Compose Datei(en) gefunden${LH_COLOR_RESET}"
+    fi
     echo ""
     
-    # Sicherheitsprüfungen durchführen
     local total_issues=0
     local current_file=1
     declare -A detailed_issues_by_dir # Assoziatives Array für detaillierte Probleme pro Verzeichnis
+    declare -A issue_counts_by_type   # Zähler für verschiedene Issue-Typen
+    declare -A critical_issues_by_dir # Kritische Probleme getrennt von Empfehlungen
+    
+    # Initialisiere Zähler
+    issue_counts_by_type["dir-permissions"]=0
+    issue_counts_by_type["env-permissions"]=0
+    issue_counts_by_type["update-labels"]=0
+    issue_counts_by_type["latest-images"]=0
+    issue_counts_by_type["privileged"]=0
+    issue_counts_by_type["host-volumes"]=0
+    issue_counts_by_type["exposed-ports"]=0
+    issue_counts_by_type["capabilities"]=0
+    issue_counts_by_type["security-opt"]=0
+    issue_counts_by_type["default-passwords"]=0
+    issue_counts_by_type["sensitive-data"]=0
     
     while IFS= read -r compose_file; do
         if [ -f "$compose_file" ]; then
@@ -653,79 +824,160 @@ function security_check_docker() {
             
             echo -e "${LH_COLOR_HEADER}=== Datei $current_file/$file_count: $compose_file ===${LH_COLOR_RESET}"
             local current_dir_issue_messages=() # Array für Nachrichten dieses Verzeichnisses
+            local current_dir_critical_issues=() # Array für kritische Probleme
             echo ""
             
             # Verzeichnisberechtigungen prüfen
             if ! docker_check_directory_permissions "$compose_dir"; then
                 ((total_issues++))
-                current_dir_issue_messages+=("Verzeichnisberechtigungen: Empfehlung/Warnung (siehe Details oben)")
+                ((issue_counts_by_type["dir-permissions"]++))
+                local dir_perms=$(stat -c "%a" "$compose_dir" 2>/dev/null)
+                current_dir_issue_messages+=("🔒 Verzeichnisberechtigungen: $dir_perms (zu offen)")
+                if [[ "$dir_perms" =~ ^77[0-9]$ ]]; then
+                    current_dir_critical_issues+=("🚨 KRITISCH: Verzeichnis $compose_dir hat sehr offene Berechtigung: $dir_perms")
+                fi
             fi
             echo ""
             
             # .env Dateiberechtigungen prüfen
+            local env_permission_issues=()
             if ! docker_check_env_permissions "$compose_dir"; then
                 ((total_issues++))
-                current_dir_issue_messages+=("Berechtigungen für .env Dateien: Empfehlung/Warnung (siehe Details oben)")
+                ((issue_counts_by_type["env-permissions"]++))
+                # Sammle spezifische .env Probleme
+                local env_files=$(find "$compose_dir" -maxdepth 1 -name ".env*" 2>/dev/null)
+                while IFS= read -r env_file; do
+                    if [ -f "$env_file" ]; then
+                        local perms=$(stat -c "%a" "$env_file" 2>/dev/null)
+                        if [ "$perms" != "600" ]; then
+                            env_permission_issues+=("$(basename "$env_file"): $perms")
+                        fi
+                    fi
+                done <<< "$env_files"
+                current_dir_issue_messages+=("🔐 .env Berechtigungen: ${env_permission_issues[*]}")
             fi
             echo ""
             
-            # Compose-Datei Sicherheitsprüfungen
+            # Update-Labels prüfen
             if ! docker_check_update_labels "$compose_file"; then
                 ((total_issues++))
-                current_dir_issue_messages+=("Update-Management Labels: Empfehlung/Warnung (siehe Details oben)")
+                ((issue_counts_by_type["update-labels"]++))
+                current_dir_issue_messages+=("📦 Update-Management: Keine Diun/Watchtower Labels")
             fi
             echo ""
             
+            # Latest-Images prüfen
+            local latest_image_details=()
             if ! docker_check_latest_images "$compose_file"; then
                 ((total_issues++))
-                current_dir_issue_messages+=("Verwendung von Latest-Images: Empfehlung/Warnung (siehe Details oben)")
+                ((issue_counts_by_type["latest-images"]++))
+                # Sammle spezifische Latest-Images
+                while IFS= read -r line; do
+                    if [[ "$line" =~ image:[[:space:]]*([^:]+)(:latest)?[[:space:]]*$ ]]; then
+                        local image_name=$(echo "$line" | sed -E 's/.*image:[[:space:]]*([^:]+).*/\1/')
+                        latest_image_details+=("$image_name")
+                    fi
+                done < <(grep -E "image:\s*[^:]+$|image:\s*[^:]+:latest" "$compose_file" || true)
+                current_dir_issue_messages+=("🏷️  Latest-Images: ${latest_image_details[*]}")
             fi
             echo ""
             
+            # Privilegierte Container prüfen
             if ! docker_check_privileged_containers "$compose_file"; then
                 ((total_issues++))
-                current_dir_issue_messages+=("Privilegierte Container: Empfehlung/Warnung (siehe Details oben)")
+                ((issue_counts_by_type["privileged"]++))
+                current_dir_critical_issues+=("🚨 KRITISCH: Privilegierte Container gefunden")
+                current_dir_issue_messages+=("⚠️  Privilegierte Container: 'privileged: true' verwendet")
             fi
             echo ""
             
+            # Host-Volumes prüfen
+            local host_volume_details=()
             if ! docker_check_host_volumes "$compose_file"; then
                 ((total_issues++))
-                current_dir_issue_messages+=("Host-Volume Mounts: Empfehlung/Warnung (siehe Details oben)")
+                ((issue_counts_by_type["host-volumes"]++))
+                # Sammle spezifische kritische Pfade
+                local critical_paths=("/" "/etc" "/var/run/docker.sock" "/proc" "/sys" "/boot" "/dev" "/host")
+                for path in "${critical_paths[@]}"; do
+                    if grep -qE "^\s*-\s+[\"']?${path}[\"']?:" "$compose_file" || \
+                       grep -qE "source:\s*[\"']?${path}[\"']?" "$compose_file"; then
+                        host_volume_details+=("$path")
+                    fi
+                done
+                current_dir_issue_messages+=("💾 Host-Volumes: ${host_volume_details[*]}")
+                if [[ " ${host_volume_details[*]} " =~ " / " ]] || [[ " ${host_volume_details[*]} " =~ " /var/run/docker.sock " ]]; then
+                    current_dir_critical_issues+=("🚨 KRITISCH: Sehr sensible Host-Pfade gemountet: ${host_volume_details[*]}")
+                fi
             fi
             echo ""
             
+            # Exponierte Ports prüfen
             if ! docker_check_exposed_ports "$compose_file"; then
                 ((total_issues++))
-                current_dir_issue_messages+=("Exponierte Ports: Empfehlung/Warnung (siehe Details oben)")
+                ((issue_counts_by_type["exposed-ports"]++))
+                current_dir_issue_messages+=("🌐 Exponierte Ports: 0.0.0.0 Bindung gefunden")
             fi
             echo ""
             
+            # Capabilities prüfen
+            local dangerous_cap_details=()
             if ! docker_check_capabilities "$compose_file"; then
                 ((total_issues++))
-                current_dir_issue_messages+=("Gefährliche Capabilities: Empfehlung/Warnung (siehe Details oben)")
+                ((issue_counts_by_type["capabilities"]++))
+                local dangerous_caps="SYS_ADMIN SYS_PTRACE SYS_MODULE NET_ADMIN"
+                for cap in $dangerous_caps; do
+                    if grep -q "cap_add:.*$cap\|cap_add:\s*-\s*$cap" "$compose_file"; then
+                        dangerous_cap_details+=("$cap")
+                    fi
+                done
+                current_dir_issue_messages+=("🔧 Gefährliche Capabilities: ${dangerous_cap_details[*]}")
+                if [[ " ${dangerous_cap_details[*]} " =~ " SYS_ADMIN " ]]; then
+                    current_dir_critical_issues+=("🚨 KRITISCH: SYS_ADMIN Capability gewährt")
+                fi
             fi
             echo ""
             
+            # Security-Opt prüfen
             if ! docker_check_security_opt "$compose_file"; then
                 ((total_issues++))
-                current_dir_issue_messages+=("Deaktivierte Security-Optionen: Empfehlung/Warnung (siehe Details oben)")
+                ((issue_counts_by_type["security-opt"]++))
+                current_dir_critical_issues+=("🚨 KRITISCH: Sicherheitsmaßnahmen deaktiviert (AppArmor/Seccomp)")
+                current_dir_issue_messages+=("🛡️  Security-Opt: AppArmor/Seccomp deaktiviert")
             fi
             echo ""
             
+            # Default-Passwörter prüfen
+            local password_details=()
             if ! docker_check_default_passwords "$compose_file"; then
                 ((total_issues++))
-                current_dir_issue_messages+=("Standard-Passwörter: Empfehlung/Warnung (siehe Details oben)")
+                ((issue_counts_by_type["default-passwords"]++))
+                # Sammle gefundene Standard-Passwörter
+                IFS=',' read -ra PATTERNS <<< "$LH_DOCKER_DEFAULT_PATTERNS_EFFECTIVE"
+                for pattern in "${PATTERNS[@]}"; do
+                    if [ -n "$pattern" ] && grep -q "$pattern" "$compose_file"; then
+                        password_details+=("${pattern%%=*}")
+                    fi
+                done
+                current_dir_critical_issues+=("🚨 KRITISCH: Standard-Passwörter: ${password_details[*]}")
+                current_dir_issue_messages+=("🔑 Standard-Passwörter: ${password_details[*]}")
             fi
             echo ""
             
+            # Sensitive Daten prüfen
             if ! docker_check_sensitive_data "$compose_file"; then
                 ((total_issues++))
-                current_dir_issue_messages+=("Sensitive Daten in Compose-Datei: Empfehlung/Warnung (siehe Details oben)")
+                ((issue_counts_by_type["sensitive-data"]++))
+                current_dir_critical_issues+=("🚨 KRITISCH: Sensitive Daten direkt in Compose-Datei")
+                current_dir_issue_messages+=("🔐 Sensitive Daten: API-Keys/Tokens direkt eingebettet")
             fi
             echo ""
 
+            # Speichere Issues für diese Verzeichnis
             if [ ${#current_dir_issue_messages[@]} -gt 0 ]; then
                 detailed_issues_by_dir["$compose_dir"]=$(printf '%s\n' "${current_dir_issue_messages[@]}")
+            fi
+            if [ ${#current_dir_critical_issues[@]} -gt 0 ]; then
+                critical_issues_by_dir["$compose_dir"]=$(printf '%s\n' "${current_dir_critical_issues[@]}")
             fi
             
             echo -e "${LH_COLOR_SEPARATOR}─────────────────────────────────────────${LH_COLOR_RESET}"
@@ -735,49 +987,183 @@ function security_check_docker() {
         fi
     done <<< "$compose_files"
     
-    # Laufende Container prüfen
-    docker_check_running_containers
+    # Laufende Container anzeigen (falls aktiviert)
+    docker_show_running_containers
     echo ""
     
-    # Zusammenfassung
-    echo -e "${LH_COLOR_HEADER}=== Zusammenfassung ===${LH_COLOR_RESET}"
-    if [ $total_issues -eq 0 ]; then
-        echo -e "${LH_COLOR_SUCCESS}✓ Keine Sicherheitsprobleme gefunden!${LH_COLOR_RESET}"
-    else
-        echo -e "${LH_COLOR_WARNING}⚠ $total_issues potentielle Sicherheitsprobleme gefunden${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}Bitte überprüfe die Empfehlungen oben${LH_COLOR_RESET}"
-    fi
+    # ZUSAMMENFASSUNG
+    echo -e "${LH_COLOR_HEADER}=== 📊 SICHERHEITS-ANALYSE ZUSAMMENFASSUNG ===${LH_COLOR_RESET}"
     echo ""
-
-    # Neue detaillierte Zusammenfassung nach Verzeichnis
-    echo -e "${LH_COLOR_HEADER}=== Detaillierte Zusammenfassung nach Verzeichnis ===${LH_COLOR_RESET}"
-    if [ ${#detailed_issues_by_dir[@]} -eq 0 ]; then
-        if [ $total_issues -gt 0 ]; then
-             echo -e "${LH_COLOR_INFO}Obwohl Probleme gefunden wurden, konnten sie für diese Zusammenfassung keinen spezifischen Verzeichnissen zugeordnet werden.${LH_COLOR_RESET}"
+    
+    # Gesamtstatistik
+    if [ $total_issues -eq 0 ]; then
+        echo -e "${LH_COLOR_SUCCESS}✅ AUSGEZEICHNET: Keine Sicherheitsprobleme gefunden!${LH_COLOR_RESET}"
+        if [ "$LH_DOCKER_CHECK_MODE_EFFECTIVE" = "running" ]; then
+            echo -e "${LH_COLOR_SUCCESS}   Ihre laufenden Docker-Container folgen den Sicherheits-Best-Practices.${LH_COLOR_RESET}"
         else
-            echo -e "${LH_COLOR_SUCCESS}Keine Verzeichnisse mit spezifischen Empfehlungen/Warnungen gefunden.${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_SUCCESS}   Ihre Docker-Infrastruktur folgt den Sicherheits-Best-Practices.${LH_COLOR_RESET}"
         fi
     else
-        local first_dir_summary=true
-        for dir_path in "${!detailed_issues_by_dir[@]}"; do
-            if ! $first_dir_summary; then echo ""; fi # Leerzeile zwischen Verzeichnissen
-            first_dir_summary=false
-
-            echo -e "${LH_COLOR_INFO}Verzeichnis: ${LH_COLOR_PROMPT}${dir_path}${LH_COLOR_RESET}"
-            printf '%s\n' "${detailed_issues_by_dir[$dir_path]}" | while IFS= read -r issue_item; do
-                echo -e "  - ${LH_COLOR_WARNING}$issue_item${LH_COLOR_RESET}"
-            done
+        echo -e "${LH_COLOR_WARNING}⚠️  GEFUNDEN: $total_issues Sicherheitsprobleme in $file_count Compose-Datei(en)${LH_COLOR_RESET}"
+        
+        # Kritische Issues hervorheben
+        local critical_count=0
+        for dir_path in "${!critical_issues_by_dir[@]}"; do
+            critical_count=$((critical_count + $(echo "${critical_issues_by_dir[$dir_path]}" | wc -l)))
         done
+        
+        if [ $critical_count -gt 0 ]; then
+            echo -e "${LH_COLOR_ERROR}🚨 KRITISCH: $critical_count kritische Sicherheitsprobleme erfordern sofortige Aufmerksamkeit!${LH_COLOR_RESET}"
+        fi
+    fi
+    echo ""
+    
+    # Kategorisierte Problemübersicht
+    if [ $total_issues -gt 0 ]; then
+        echo -e "${LH_COLOR_INFO}📋 PROBLEMKATEGORIEN:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}┌─────────────────────────────────────────┬───────┐${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}│ Problem-Typ                             │ Anzahl│${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}├─────────────────────────────────────────┼───────┤${LH_COLOR_RESET}"
+        
+        # Sortiere nach Schweregrad
+        local critical_types=("default-passwords" "sensitive-data" "security-opt" "privileged")
+        local warning_types=("host-volumes" "capabilities" "env-permissions" "dir-permissions")
+        local info_types=("exposed-ports" "latest-images" "update-labels")
+        
+        for type in "${critical_types[@]}"; do
+            if [ ${issue_counts_by_type[$type]} -gt 0 ]; then
+                case $type in
+                    "default-passwords") echo -e "${LH_COLOR_ERROR}│ 🔑 Standard-Passwörter                  │   ${issue_counts_by_type[$type]}   │${LH_COLOR_RESET}" ;;
+                    "sensitive-data")    echo -e "${LH_COLOR_ERROR}│ 🔐 Sensitive Daten in Dateien          │   ${issue_counts_by_type[$type]}   │${LH_COLOR_RESET}" ;;
+                    "security-opt")      echo -e "${LH_COLOR_ERROR}│ 🛡️  Deaktivierte Sicherheitsmaßnahmen   │   ${issue_counts_by_type[$type]}   │${LH_COLOR_RESET}" ;;
+                    "privileged")        echo -e "${LH_COLOR_ERROR}│ ⚠️  Privilegierte Container             │   ${issue_counts_by_type[$type]}   │${LH_COLOR_RESET}" ;;
+                esac
+            fi
+        done
+        
+        for type in "${warning_types[@]}"; do
+            if [ ${issue_counts_by_type[$type]} -gt 0 ]; then
+                case $type in
+                    "host-volumes")      echo -e "${LH_COLOR_WARNING}│ 💾 Kritische Host-Volume Mounts        │   ${issue_counts_by_type[$type]}   │${LH_COLOR_RESET}" ;;
+                    "capabilities")      echo -e "${LH_COLOR_WARNING}│ 🔧 Gefährliche Capabilities            │   ${issue_counts_by_type[$type]}   │${LH_COLOR_RESET}" ;;
+                    "env-permissions")   echo -e "${LH_COLOR_WARNING}│ 🔒 .env Dateiberechtigungen            │   ${issue_counts_by_type[$type]}   │${LH_COLOR_RESET}" ;;
+                    "dir-permissions")   echo -e "${LH_COLOR_WARNING}│ 🔒 Verzeichnisberechtigungen           │   ${issue_counts_by_type[$type]}   │${LH_COLOR_RESET}" ;;
+                esac
+            fi
+        done
+        
+        for type in "${info_types[@]}"; do
+            if [ ${issue_counts_by_type[$type]} -gt 0 ]; then
+                case $type in
+                    "exposed-ports")     echo -e "${LH_COLOR_INFO}│ 🌐 Exponierte Ports                    │   ${issue_counts_by_type[$type]}   │${LH_COLOR_RESET}" ;;
+                    "latest-images")     echo -e "${LH_COLOR_INFO}│ 🏷️  Latest-Image Verwendung            │   ${issue_counts_by_type[$type]}   │${LH_COLOR_RESET}" ;;
+                    "update-labels")     echo -e "${LH_COLOR_INFO}│ 📦 Fehlende Update-Management Labels   │   ${issue_counts_by_type[$type]}   │${LH_COLOR_RESET}" ;;
+                esac
+            fi
+        done
+        
+        echo -e "${LH_COLOR_SEPARATOR}└─────────────────────────────────────────┴───────┘${LH_COLOR_RESET}"
+        echo ""
     fi
     
-    echo ""
-    echo -e "${LH_COLOR_INFO}Aktuelle Konfiguration:${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_INFO}• Suchpfad: $LH_DOCKER_COMPOSE_ROOT_EFFECTIVE${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_INFO}• Suchtiefe: $LH_DOCKER_SEARCH_DEPTH_EFFECTIVE Ebenen${LH_COLOR_RESET}"
-    if [ -n "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE" ]; then
-        echo -e "${LH_COLOR_INFO}• Ausschlüsse: $LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE${LH_COLOR_RESET}"
+    # Kritische Issues Details
+    if [ ${#critical_issues_by_dir[@]} -gt 0 ]; then
+        echo -e "${LH_COLOR_ERROR}🚨 KRITISCHE SICHERHEITSPROBLEME (Sofortige Maßnahmen erforderlich):${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}═══════════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
+        for dir_path in "${!critical_issues_by_dir[@]}"; do
+            echo -e "${LH_COLOR_ERROR}📁 $dir_path${LH_COLOR_RESET}"
+            printf '%s\n' "${critical_issues_by_dir[$dir_path]}" | while IFS= read -r critical_item; do
+                echo -e "   $critical_item"
+            done
+            echo ""
+        done
+        echo -e "${LH_COLOR_SEPARATOR}═══════════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
+        echo ""
     fi
-    echo -e "${LH_COLOR_INFO}• Konfigurationsdatei: $LH_DOCKER_CONFIG_FILE${LH_COLOR_RESET}"
+    
+    # Detaillierte Probleme nach Verzeichnis
+    if [ ${#detailed_issues_by_dir[@]} -gt 0 ]; then
+        echo -e "${LH_COLOR_INFO}📋 DETAILLIERTE PROBLEME NACH VERZEICHNIS:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}───────────────────────────────────────────────────────────────────${LH_COLOR_RESET}"
+        local dir_number=1
+        for dir_path in "${!detailed_issues_by_dir[@]}"; do
+            echo -e "${LH_COLOR_INFO}📁 Verzeichnis $dir_number: ${LH_COLOR_PROMPT}$dir_path${LH_COLOR_RESET}"
+            printf '%s\n' "${detailed_issues_by_dir[$dir_path]}" | while IFS= read -r issue_item; do
+                echo -e "   $issue_item"
+            done
+            if [ $dir_number -lt ${#detailed_issues_by_dir[@]} ]; then
+                echo ""
+            fi
+            ((dir_number++))
+        done
+        echo -e "${LH_COLOR_SEPARATOR}───────────────────────────────────────────────────────────────────${LH_COLOR_RESET}"
+        echo ""
+    fi
+    
+    # Handlungsempfehlungen
+    if [ $total_issues -gt 0 ]; then
+        echo -e "${LH_COLOR_INFO}🎯 NÄCHSTE SCHRITTE (Priorisiert):${LH_COLOR_RESET}"
+        
+        local step=1
+        if [ ${issue_counts_by_type["default-passwords"]} -gt 0 ]; then
+            echo -e "${LH_COLOR_ERROR}   $step. 🔑 SOFORT: Standard-Passwörter durch sichere ersetzen${LH_COLOR_RESET}"
+            ((step++))
+        fi
+        
+        if [ ${issue_counts_by_type["sensitive-data"]} -gt 0 ]; then
+            echo -e "${LH_COLOR_ERROR}   $step. 🔐 SOFORT: Sensitive Daten in Umgebungsvariablen auslagern${LH_COLOR_RESET}"
+            ((step++))
+        fi
+        
+        if [ ${issue_counts_by_type["security-opt"]} -gt 0 ]; then
+            echo -e "${LH_COLOR_ERROR}   $step. 🛡️  SOFORT: Sicherheitsmaßnahmen (AppArmor/Seccomp) aktivieren${LH_COLOR_RESET}"
+            ((step++))
+        fi
+        
+        if [ ${issue_counts_by_type["privileged"]} -gt 0 ]; then
+            echo -e "${LH_COLOR_WARNING}   $step. ⚠️  HOCH: Privilegierte Container durch spezifische Capabilities ersetzen${LH_COLOR_RESET}"
+            ((step++))
+        fi
+        
+        if [ ${issue_counts_by_type["env-permissions"]} -gt 0 ]; then
+            echo -e "${LH_COLOR_WARNING}   $step. 🔒 HOCH: .env Dateiberechtigungen auf 600 setzen (chmod 600)${LH_COLOR_RESET}"
+            ((step++))
+        fi
+        
+        if [ ${issue_counts_by_type["host-volumes"]} -gt 0 ]; then
+            echo -e "${LH_COLOR_WARNING}   $step. 💾 MITTEL: Host-Volume Mounts überprüfen und minimieren${LH_COLOR_RESET}"
+            ((step++))
+        fi
+        
+        if [ ${issue_counts_by_type["exposed-ports"]} -gt 0 ]; then
+            echo -e "${LH_COLOR_INFO}   $step. 🌐 MITTEL: Port-Exposition auf localhost begrenzen (127.0.0.1:port)${LH_COLOR_RESET}"
+            ((step++))
+        fi
+        
+        if [ ${issue_counts_by_type["latest-images"]} -gt 0 ]; then
+            echo -e "${LH_COLOR_INFO}   $step. 🏷️  NIEDRIG: Spezifische Image-Versionen verwenden${LH_COLOR_RESET}"
+            ((step++))
+        fi
+        
+        if [ ${issue_counts_by_type["update-labels"]} -gt 0 ]; then
+            echo -e "${LH_COLOR_INFO}   $step. 📦 NIEDRIG: Update-Management Labels hinzufügen${LH_COLOR_RESET}"
+            ((step++))
+        fi
+        echo ""
+    fi
+    
+    # Konfigurationsinformationen
+    echo -e "${LH_COLOR_INFO}⚙️  AKTUELLE KONFIGURATION:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}   • Prüfmodus: ${LH_COLOR_PROMPT}$LH_DOCKER_CHECK_MODE_EFFECTIVE${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}   • Analysierte Dateien: $file_count Docker-Compose Datei(en)${LH_COLOR_RESET}"
+    if [ "$LH_DOCKER_CHECK_MODE_EFFECTIVE" = "all" ]; then
+        echo -e "${LH_COLOR_INFO}   • Suchpfad: $LH_DOCKER_COMPOSE_ROOT_EFFECTIVE${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}   • Suchtiefe: $LH_DOCKER_SEARCH_DEPTH_EFFECTIVE Ebenen${LH_COLOR_RESET}"
+        if [ -n "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE" ]; then
+            echo -e "${LH_COLOR_INFO}   • Ausschlüsse: $LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE${LH_COLOR_RESET}"
+        fi
+    fi
+    echo -e "${LH_COLOR_INFO}   • Konfigurationsdatei: $LH_DOCKER_CONFIG_FILE${LH_COLOR_RESET}"
     
     return 0
 }
