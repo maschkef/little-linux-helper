@@ -1382,44 +1382,108 @@ cleanup_problematic_backups() {
     return 0
 }
 
+# Funktion zum Prüfen und Reparieren des .snapshots-Verzeichnisses (Snapper/Timeshift)
+check_and_fix_snapshots() {
+    lh_print_header ".snapshots prüfen/reparieren (Snapper/Timeshift)"
+    echo -e "${LH_COLOR_INFO}Dieses Tool prüft, ob das .snapshots-Subvolume für Snapper/Timeshift korrekt vorhanden ist und versucht, es ggf. zu reparieren.${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}Nach einer Wiederherstellung kann es vorkommen, dass .snapshots fehlt oder Snapper/Timeshift Fehler melden.${LH_COLOR_RESET}"
+    echo ""
+
+    # Prüfe, ob Snapper oder Timeshift installiert ist
+    local snapper_installed=false
+    local timeshift_installed=false
+    if command -v snapper >/dev/null 2>&1; then snapper_installed=true; fi
+    if command -v timeshift >/dev/null 2>&1; then timeshift_installed=true; fi
+
+    if [ "$snapper_installed" = false ] && [ "$timeshift_installed" = false ]; then
+        echo -e "${LH_COLOR_WARNING}Weder Snapper noch Timeshift sind installiert. Keine Prüfung notwendig.${LH_COLOR_RESET}"
+        return 0
+    fi
+
+    # Prüfe, ob .snapshots Subvolume existiert
+    local snapshots_path="/ .snapshots"
+    if [ -d "/.snapshots" ]; then
+        if btrfs subvolume show "/.snapshots" >/dev/null 2>&1; then
+            echo -e "${LH_COLOR_SUCCESS}.snapshots-Subvolume ist vorhanden und gültig.${LH_COLOR_RESET}"
+        else
+            echo -e "${LH_COLOR_ERROR}.snapshots existiert, ist aber kein gültiges BTRFS-Subvolume!${LH_COLOR_RESET}"
+            if lh_confirm_action ".snapshots als BTRFS-Subvolume neu anlegen? (Achtung: vorhandene Daten werden gelöscht)" "n"; then
+                rm -rf "/.snapshots"
+                btrfs subvolume create "/.snapshots"
+                echo -e "${LH_COLOR_SUCCESS}.snapshots-Subvolume wurde neu erstellt.${LH_COLOR_RESET}"
+            fi
+        fi
+    else
+        echo -e "${LH_COLOR_WARNING}.snapshots-Verzeichnis fehlt.${LH_COLOR_RESET}"
+        if lh_confirm_action ".snapshots-Subvolume jetzt anlegen?" "y"; then
+            btrfs subvolume create "/.snapshots"
+            echo -e "${LH_COLOR_SUCCESS}.snapshots-Subvolume wurde erstellt.${LH_COLOR_RESET}"
+        fi
+    fi
+
+    # Snapper-Konfiguration prüfen
+    if [ "$snapper_installed" = true ]; then
+        if [ -f "/etc/snapper/configs/root" ]; then
+            echo -e "${LH_COLOR_INFO}Snapper-Konfiguration für root gefunden.${LH_COLOR_RESET}"
+            snapper -c root list 2>&1 | grep -E "^#|^Type|^Num" || true
+        else
+            echo -e "${LH_COLOR_WARNING}Keine Snapper-Konfiguration für root gefunden (/etc/snapper/configs/root).${LH_COLOR_RESET}"
+        fi
+    fi
+
+    # Timeshift-Konfiguration prüfen
+    if [ "$timeshift_installed" = true ]; then
+        if [ -d "/etc/timeshift" ]; then
+            echo -e "${LH_COLOR_INFO}Timeshift-Konfiguration gefunden.${LH_COLOR_RESET}"
+            timeshift --list 2>&1 | head -n 10 || true
+        else
+            echo -e "${LH_COLOR_WARNING}Keine Timeshift-Konfiguration gefunden.${LH_COLOR_RESET}"
+        fi
+    fi
+
+    echo -e "${LH_COLOR_SUCCESS}Prüfung abgeschlossen. Bei weiteren Problemen bitte Snapper/Timeshift-Dokumentation konsultieren.${LH_COLOR_RESET}"
+}
+
 main_menu() {
     while true; do
         lh_print_header "BTRFS Backup Modul"
-        
         lh_print_menu_item 1 "Backup durchführen"
         lh_print_menu_item 2 "Backup-Konfiguration anzeigen/ändern"
         lh_print_menu_item 3 "Backup-Status anzeigen"
         lh_print_menu_item 4 "BTRFS Backups manuell löschen"
         lh_print_menu_item 5 "Problematische Backups bereinigen"
         lh_print_menu_item 6 "Wiederherstellung ~ ungetestet! - NICHT VERWENDEN!"
+        lh_print_menu_item 7 ".snapshots prüfen/reparieren (Snapper/Timeshift)"
         lh_print_menu_item 0 "Zurück"
         echo ""
 
         read -p "$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option: ${LH_COLOR_RESET}")" option
 
         case $option in
-            1) 
+            1)
                 btrfs_backup
                 ;;
-            2) 
+            2)
                 configure_backup
                 ;;
             3)
                 show_backup_status
                 ;;
-            4) 
+            4)
                 delete_btrfs_backups
                 ;;
-            5) 
+            5)
                 cleanup_problematic_backups
                 ;;
             6)
                 bash "$LH_ROOT_DIR/modules/mod_btrfs_restore.sh"
                 ;;
-            0)
-                return 0 
+            7)
+                check_and_fix_snapshots
                 ;;
-
+            0)
+                return 0
+                ;;
             *)
                 echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
                 ;;
