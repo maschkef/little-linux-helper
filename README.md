@@ -8,7 +8,7 @@ Eine detailliertere technische englische Dokumentation der einzelnen Module und 
 diese wurde mitunter erstellt um einer KI den kontext eines modules bzw einer Datei zu geben ohne dieses selbst komplett lesen zu müssen und kontext zusparen.
 Die `docs/PROJECT_DESCRIPTION.md` enthält alle Infomationen zu `lib/lib_common.sh` und `help_master.sh` die benötigt werden um ein neues modul zu erstellen.
 
-Meine Umgebung ist i.d.R. Arch (hauptsystem) oder Debian (diverse Dienste auf meinem Proxmox - daher auch die docker anteile), entsprechend kann es unter anderen Distributionen noch unbekannte Probleme geben, auch wenn ich versuche, alles kompatibel zu halten.
+Meine Umgebung ist i.d.R. Arch (hauptsystem) oder Debian (diverse Dienste auf meinem Proxmox - daher auch die docker-Anteile), entsprechend kann es unter anderen Distributionen noch unbekannte Probleme geben, auch wenn ich versuche, alles kompatibel zu halten.
 
 <details>
 <summary>⚠️ Wichtige Hinweise zur Nutzung</summary>
@@ -29,10 +29,8 @@ Dieses Projekt steht unter der MIT-Lizenz. Weitere Informationen findest du in d
 <summary>❗ Bekannte Probleme und Einschränkungen</summary>
 
 Hier ist eine Liste von bekannten Problemen, Einschränkungen oder Verhaltensweisen, die dir bei der Nutzung der Skripte auffallen könnten.
-* **Backups (`mod_backup.sh`):**
-    * **BTRFS-Backup:** 
-    * Das Backup hat keine Fortschrittsanzeige (eher ein Schönheitsfehler).
-    * Für das Backup nutze ich i.d.R. die BTRFS-basierende Funktion, die anderen sind wesentlich weniger getestet.
+* **Backups:**
+    * **BTRFS-Backup:** Die BTRFS-Backup- und Restore-Funktionen sind jetzt in den Modulen `mod_btrfs_backup.sh` und `mod_btrfs_restore.sh` ausgelagert. Die anderen Backup-Methoden (TAR, RSYNC) sind weniger intensiv getestet.
 * **Erweiterte Log-Analyse (`scripts/advanced_log_analyzer.py`):**
     * Dieses Skript ist weniger intensiv getestet und hat bekannte Einschränkungen bezüglich Log-Format-Erkennung, Zeichenkodierung und der Komplexität seiner regulären Ausdrücke (Details siehe `docs/advanced_log_analyzer.md`).
 
@@ -53,45 +51,25 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
 </details>
 
 <details>
-<summary>💾 Backup & Wiederherstellung (<code>mod_backup.sh</code>)</summary>
+<summary>💾 Backup & Wiederherstellung</summary>
 
-* **BTRFS Snapshot Backup**:
-    * Erstellt direkte Snapshots von `@` und `@home` Subvolumes.
-    * Überträgt Snapshots zu einem konfigurierbaren Backup-Ziel.
-    * Implementiert eine konfigurierbare Aufbewahrungsrichtlinie (Retention).
-    * Bietet zusätzliche Funktionen:
-        * **Integritätsprüfung:** Überprüft die Vollständigkeit und Konsistenz von BTRFS-Backups durch Analyse von Metadaten, Log-Dateien und Marker-Dateien. Erkennt unvollständige, beschädigte oder verdächtige Backups.
-        * **Manuelles Löschen:** Ermöglicht das gezielte Löschen einzelner oder mehrerer BTRFS-Snapshots mit einer Vorschau der zu löschenden Elemente. Unterstützt verschiedene Auswahlmethoden (einzeln, nach Aufbewahrungsfrist, nach Alter, alle).
-        * **Automatische Bereinigung problematischer Backups:** Sucht nach Backups mit Integritätsproblemen und bietet die Möglichkeit, diese automatisch zu entfernen.
-        * **Detaillierte Statusanzeige:** Zeigt den Status vorhandener Backups an, inklusive Datum, Größe und Integritätsstatus (OK, unvollständig, verdächtig, beschädigt). Listet erkannte Probleme auf.
-        * **Temporäre Snapshots:** Verwendet temporäre Snapshots während des Backup-Prozesses, die nach Abschluss (oder bei Abbruch) automatisch bereinigt werden.
-        * **Backup-Marker:** Erstellt Marker-Dateien, um erfolgreiche Backup-Durchläufe zu kennzeichnen und wichtige Metadaten zu speichern (Zeitstempel, Subvolume, Größe, Host).
-        * **Erweiterte Fehlermeldungen:** Gibt detailliertere Fehlermeldungen aus, z.B. wenn temporäre Snapshots nicht gelöscht werden können oder verwaiste Snapshots gefunden werden.
-        * **Desktop-Benachrichtigungen:** Sendet Benachrichtigungen über den Erfolg oder Misserfolg von Backup-Vorgängen.
-    * Erfordert Root-Rechte und `btrfs-progs`.
-* **TAR Archiv Backup**:
-    * Erstellt komprimierte TAR-Archive (`.tar.gz`).
-    * Auswahlmöglichkeiten für zu sichernde Verzeichnisse (`/home`, `/etc`, gesamtes System, benutzerdefiniert).
-    * Konfigurierbare Ausschlusslisten.
-    * Implementiert eine konfigurierbare Aufbewahrungsrichtlinie.
-* **RSYNC Backup**:
-    * Führt Backups mit `rsync` durch.
-    * Optionen für Voll- oder inkrementelle Backups.
-    * Auswahlmöglichkeiten für Quellverzeichnisse.
-    * Konfigurierbare Ausschlusslisten.
-    * Nutzt Hardlinks für inkrementelle Backups zur Speicherplatzersparnis (`--link-dest`).
-    * Implementiert eine konfigurierbare Aufbewahrungsrichtlinie.
-    * Nutzt temporäre Logdateien, um TAR- und RSYNC-spezifische Meldungen vom Hauptprotokoll zu trennen und die Fehlersuche zu vereinfachen.
-* **Wiederherstellung**:
-    * Menügesteuerte Wiederherstellung für BTRFS, TAR und RSYNC Backups.
-    * BTRFS-Wiederherstellung für `@home` (überschreibt aktuelles `/home`, erstellt Backup).
-    * TAR-Wiederherstellung an ursprünglichen Ort, temporäres Verzeichnis oder benutzerdefinierten Pfad.
-    * RSYNC-Wiederherstellung an ursprünglichen Ort, temporäres Verzeichnis oder benutzerdefinierten Pfad.
-    * Möglichkeit, ein separates `btrfs-recovery.sh` Skript für komplexere BTRFS-Wiederherstellungen auszuführen.
+* **BTRFS Snapshot Backup & Restore** (`mod_btrfs_backup.sh`, `mod_btrfs_restore.sh`):
+    * Erstellung und Verwaltung von Snapshots der Subvolumes `@` und `@home`.
+    * Übertragung der Snapshots zum Backup-Ziel mittels `btrfs send/receive`.
+    * Integrierte Integritätsprüfung, Marker-Dateien, automatische Bereinigung, manuelles und automatisches Löschen, Statusanzeige und Desktop-Benachrichtigungen.
+    * Wiederherstellung kompletter Systeme, einzelner Subvolumes oder einzelner Ordner aus Snapshots – mit Dry-Run-Unterstützung.
+    * Ausführliche technische Beschreibung: siehe `docs/mod_btrfs_backup.md` und `docs/mod_btrfs_restore.md`.
+* **TAR Archiv Backup & Restore** (`mod_backup.sh`):
+    * Erstellung komprimierter TAR-Archive (`.tar.gz`) von ausgewählten Verzeichnissen.
+    * Konfigurierbare Ausschlusslisten und Aufbewahrungsrichtlinien.
+    * Wiederherstellung an ursprünglichen Ort, temporäres Verzeichnis oder benutzerdefinierten Pfad.
+* **RSYNC Backup & Restore** (`mod_backup.sh`):
+    * Backups mit `rsync` (Voll- oder inkrementell, mit Hardlinks für Speicherersparnis).
+    * Auswahl von Quellverzeichnissen und Ausschlusslisten.
+    * Wiederherstellung an ursprünglichen Ort, temporäres Verzeichnis oder benutzerdefinierten Pfad.
 * **Backup-Status und -Konfiguration**:
     * Anzeige des aktuellen Backup-Status (Online/Offline, freier Speicherplatz, vorhandene Backups, neueste Backups, Gesamtgröße).
-    * Anzeige und Änderung der Backup-Konfiguration (Zielpfad, Verzeichnis, Retention, temporäres Snapshot-Verzeichnis). Die Konfiguration kann temporär (nur für die aktuelle Sitzung) oder dauerhaft gespeichert werden.
-    * Umfasst die Möglichkeit, den Speicherort für temporäre BTRFS-Snapshots (`LH_TEMP_SNAPSHOT_DIR`) zu konfigurieren.
+    * Anzeige und Änderung der Backup-Konfiguration (Zielpfad, Verzeichnis, Retention, temporäres Snapshot-Verzeichnis).
 
 </details>
 
@@ -235,7 +213,7 @@ Beim ersten Start des Hauptskripts (`help_master.sh`) werden automatisch Standar
 **Wichtig:** Du wirst beim ersten Erstellen einer Konfigurationsdatei darauf hingewiesen. Es wird empfohlen, diese neu erstellten `.conf`-Dateien zu überprüfen und gegebenenfalls an deine spezifischen Bedürfnisse anzupassen.
 
 Aktuell werden Konfigurationsdateien für folgende Module verwendet:
-*   **Backup & Wiederherstellung (`mod_backup.sh`)**: Einstellungen für Backup-Pfade, Aufbewahrungsrichtlinien etc. (`config/backup.conf`).
+*   **Backup & Wiederherstellung (`mod_backup.sh`, `mod_btrfs_backup.sh`, `mod_btrfs_restore.sh`)**: Einstellungen für Backup-Pfade, Aufbewahrungsrichtlinien etc. (`config/backup.conf`).
 *   **Docker Security Überprüfung (`mod_security.sh`)**: Einstellungen für Suchpfade, zu überspringende Warnungen etc. (`config/docker_security.conf`).
 
 </details>
@@ -243,7 +221,6 @@ Aktuell werden Konfigurationsdateien für folgende Module verwendet:
 ## Module Übersicht
 
 <details>
-
 <summary>📦 Module Übersicht</summary>
 
 Das Projekt ist in Module unterteilt, um die Funktionalität zu organisieren:
@@ -257,24 +234,25 @@ Das Projekt ist in Module unterteilt, um die Funktionalität zu organisieren:
     * Komplexe Logik zur Ermittlung des aktiven Desktop-Ben utzers.
     * Die Fähigkeit, **Desktop-Benachrichtigungen** an den Benutzer zu senden.
 * **`modules/mod_restarts.sh`**: Bietet Optionen zum Neustarten von Diensten und der Desktop-Umgebung.
-* **`modules/mod_backup.sh `**: Stellt Backup- und Wiederherstellungsfunktionen mittels BTRFS, TAR und RSYNC bereit.
+* **`modules/mod_backup.sh`**: Stellt Backup- und Restore-Funktionen mittels TAR und RSYNC bereit.
+* **`modules/mod_btrfs_backup.sh`**: BTRFS-spezifische Backup-Funktionen (Snapshots, Transfer, Integritätsprüfung, Marker, Bereinigung, Status, uvm.).
+* **`modules/mod_btrfs_restore.sh`**: BTRFS-spezifische Restore-Funktionen (komplettes System, einzelne Subvolumes, Ordner und Dry-Run).
 * **`modules/mod_system_info.sh`**: Zeigt detaillierte Systeminformationen an.
-* **`modules/mod_disk.sh`**: Enthält Werk zeuge zur Festplattenanalyse und -wartung.
-* **`modules/mod_logs.sh`**: Bietet verschiedene Funktionen zur Analyse von System - und Anwendungsprotokollen.
-* **`modules/mod_packages.sh`**: Hilft bei der Paketverwaltung, Systemaktualisierungen  und der Bereinigung.
-* **`modules/mod_security.sh`**: Führt grundlegende Sicherheitsüberprüfungen durch.
+* **`modules/mod_disk.sh`**: Werkzeuge zur Festplattenanalyse und -wartung.
+* **`modules/mod_logs.sh`**: Analyse von System- und Anwendungsprotokollen.
+* **`modules/mod_packages.sh`**: Paketverwaltung, Systemaktualisierung, Bereinigung.
+* **`modules/mod_security.sh`**: Sicherheitsüberprüfungen, Docker-Security, Netzwerk, Rootkit-Check.
 
-</details >
+</details>
 
 ## Protokollierung
 
 <details>
+<summary>📜 Protokollierung (Logging)</summary>
 
-<summary >📜 Protokollierung (Logging)</summary>
+Alle Aktionen werden in Log-Dateien protokolliert, um die Nachverfolgung und Fehlerbehebung zu erleichtern.
 
-Alle Aktionen werden in Log-Dateien protokolliert, um die Nachverfolgung und Fehlerbehebung zu  erleichtern.
-
-* **Speicherort:** Die Log-Dateien werden im Unterverzeichnis `logs` innerhalb des Projektverzeichnisses erstellt . Um die Übersichtlichkeit zu wahren, wird für jeden Monat ein eigener Unterordner angelegt (z.B. `logs/2025-06 `).
-* **Dateinamen:** Allgemeine Logdateien erhalten einen Zeitstempel, wann das Skript gestartet wurde. Backup-spezifische Protokolle werden ebenfalls mit einem Zeitstempel versehen, um jede Backup-Sitzung separat zu erfassen.
+* **Speicherort:** Die Log-Dateien werden im Unterverzeichnis `logs` innerhalb des Projektverzeichnisses erstellt. Für jeden Monat wird ein eigener Unterordner angelegt (z.B. `logs/2025-06`).
+* **Dateinamen:** Allgemeine Logdateien erhalten einen Zeitstempel, wann das Skript gestartet wurde. Backup- und Restore-spezifische Protokolle werden ebenfalls mit einem Zeitstempel versehen, um jede Sitzung separat zu erfassen.
 
 </details>
