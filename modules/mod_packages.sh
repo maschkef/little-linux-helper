@@ -39,8 +39,14 @@ function pkg_system_update() {
             lh_log_msg "INFO" "Systemaktualisierung mit garuda-update erfolgreich abgeschlossen."
             echo -e "${LH_COLOR_SUCCESS}Systemaktualisierung erfolgreich abgeschlossen.${LH_COLOR_RESET}"
             
-            # Da garuda-update auch alternative Pakete (flatpak, etc.) behandelt und eine eigene Bereinigung hat,
-            # können wir hier die weiteren Schritte anbieten und die Funktion dann beenden.
+            # Bietet an, auch alternative Paketmanager zu aktualisieren.
+            for alt_manager in "${LH_ALT_PKG_MANAGERS[@]}"; do
+                echo ""
+                if lh_confirm_action "Möchten Sie auch $alt_manager-Pakete aktualisieren?" "n"; then
+                    pkg_update_alternative "$alt_manager" "$auto_confirm"
+                fi
+            done
+
             if lh_confirm_action "Möchten Sie nach nicht mehr benötigten Paketen suchen?" "y"; then
                 pkg_find_orphans
             fi
