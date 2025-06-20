@@ -18,6 +18,70 @@ lh_detect_alternative_managers
 function pkg_system_update() {
     lh_print_header "Systemaktualisierung"
 
+    local auto_confirm=false
+    if lh_confirm_action "Soll die Aktualisierung ohne weitere Bestätigung durchgeführt werden?" "n"; then
+        auto_confirm=true
+    fi
+
+    # Spezifische Logik für Garuda Linux, falls 'garuda-update' existiert
+    if command -v garuda-update >/dev/null 2>&1; then
+        echo -e "${LH_COLOR_INFO}Spezialbehandlung für Garuda Linux: 'garuda-update' wird verwendet.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Beginne mit der Aktualisierung...${LH_COLOR_RESET}"
+
+        if $auto_confirm; then
+            garuda-update --noconfirm
+        else
+            garuda-update
+        fi
+        local garuda_update_status=$?
+
+        if [ $garuda_update_status -eq 0 ]; then
+            lh_log_msg "INFO" "Systemaktualisierung mit garuda-update erfolgreich abgeschlossen."
+            echo -e "${LH_COLOR_SUCCESS}Systemaktualisierung erfolgreich abgeschlossen.${LH_COLOR_RESET}"
+            
+            # Da garuda-update auch alternative Pakete (flatpak, etc.) behandelt und eine eigene Bereinigung hat,
+            # können wir hier die weiteren Schritte anbieten und die Funktion dann beenden.
+            if lh_confirm_action "Möchten Sie nach nicht mehr benötigten Paketen suchen?" "y"; then
+                pkg_find_orphans
+            fi
+            return 0 # Erfolgreich beendet
+        else
+            lh_log_msg "WARN" "garuda-update fehlgeschlagen (Code: $garuda_update_status). Versuche Fallback auf Standard-Paketmanager."
+            echo -e "${LH_COLOR_WARNING}Warnung: 'garuda-update' ist fehlgeschlagen. Versuche Fallback...${LH_COLOR_RESET}"
+            # Fährt mit dem regulären Update-Prozess fort
+        fi
+    fi
+
+    # Spezifische Logik für immutable Distros wie Fedora Silverblue
+    if command -v rpm-ostree >/dev/null 2>&1; then
+        echo -e "${LH_COLOR_INFO}Spezialbehandlung für immutable Distribution (rpm-ostree) wird verwendet.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Beginne mit der Aktualisierung...${LH_COLOR_RESET}"
+
+        $LH_SUDO_CMD rpm-ostree upgrade
+        local rpm_ostree_status=$?
+
+        if [ $rpm_ostree_status -eq 0 ]; then
+            lh_log_msg "INFO" "Systemaktualisierung mit rpm-ostree erfolgreich abgeschlossen."
+            echo -e "${LH_COLOR_SUCCESS}Systemaktualisierung erfolgreich abgeschlossen.${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Ein Neustart ist erforderlich, um das Update anzuwenden.${LH_COLOR_RESET}"
+
+            # Schleife durch alle erkannten alternativen Paketmanager, da rpm-ostree diese nicht abdeckt
+            for alt_manager in "${LH_ALT_PKG_MANAGERS[@]}"; do
+                echo ""
+                if lh_confirm_action "Möchten Sie auch $alt_manager-Pakete aktualisieren?" "n"; then
+                    pkg_update_alternative "$alt_manager" "$auto_confirm"
+                fi
+            done
+
+            # Kein pkg_find_orphans für rpm-ostree, da es anders funktioniert.
+            return 0 # Erfolgreich beendet
+        else
+            lh_log_msg "ERROR" "rpm-ostree upgrade fehlgeschlagen (Code: $rpm_ostree_status)."
+            echo -e "${LH_COLOR_ERROR}Fehler: 'rpm-ostree upgrade' ist fehlgeschlagen.${LH_COLOR_RESET}"
+            return 1 # Kein Fallback möglich/sinnvoll
+        fi
+    fi
+
     if [ -z "$LH_PKG_MANAGER" ]; then
         lh_log_msg "ERROR" "Kein unterstützter Paketmanager gefunden."
         echo -e "${LH_COLOR_ERROR}Fehler: Kein unterstützter Paketmanager gefunden.${LH_COLOR_RESET}"
@@ -25,11 +89,6 @@ function pkg_system_update() {
     fi
 
     echo -e "${LH_COLOR_INFO}Es wird die Systemaktualisierung mit $LH_PKG_MANAGER durchgeführt.${LH_COLOR_RESET}"
-
-    local auto_confirm=false
-    if lh_confirm_action "Soll die Aktualisierung ohne weitere Bestätigung durchgeführt werden?" "n"; then
-        auto_confirm=true
-    fi
     echo -e "${LH_COLOR_INFO}Beginne mit der Aktualisierung...${LH_COLOR_RESET}"
 
     case $LH_PKG_MANAGER in
@@ -55,6 +114,16 @@ function pkg_system_update() {
                 $LH_SUDO_CMD dnf upgrade --refresh -y
             else
                 $LH_SUDO_CMD dnf upgrade --refresh
+            fi
+            ;;
+        zypper)
+            echo -e "${LH_COLOR_INFO}Aktualisiere Paketquellen...${LH_COLOR_RESET}"
+            if $auto_confirm; then
+                $LH_SUDO_CMD zypper --non-interactive refresh
+                $LH_SUDO_CMD zypper --non-interactive up
+            else
+                $LH_SUDO_CMD zypper refresh
+                $LH_SUDO_CMD zypper up
             fi
             ;;
         yay)
