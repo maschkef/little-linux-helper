@@ -9,8 +9,6 @@
 #
 # zukünfiges Modul zur Wiederherstellung von BTRFS-Snapshots, die per 'btrfs send/receive' erstellt wurden.
 
-!/bin/bash
-#
 # BTRFS Snapshot Recovery Script (Live-Linux optimized)
 # This script restores data from BTRFS snapshots created by the backup script
 #
