@@ -14,6 +14,12 @@ source "$(dirname "$0")/../lib/lib_common.sh"
 lh_detect_package_manager
 lh_load_backup_config
 
+# Prüfen, ob btrfs verfügbar ist
+if ! lh_check_command "btrfs" "true"; then
+    echo -e "${LH_COLOR_ERROR}BTRFS-Tools sind nicht verfügbar. Dieses Modul erfordert btrfs-progs.${LH_COLOR_RESET}"
+    exit 1
+fi
+
 # Funktion zum Logging mit Backup-spezifischen Nachrichten
 backup_log_msg() {
     local level="$1"
