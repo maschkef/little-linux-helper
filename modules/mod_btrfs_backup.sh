@@ -1414,13 +1414,7 @@ main_menu() {
                 cleanup_problematic_backups
                 ;;
             6)
-                echo -e "${LH_COLOR_BOLD_RED}WARNUNG: Die Wiederherstellung sollte NUR aus einer Live-Umgebung (z.B. Live-USB) durchgeführt werden!${LH_COLOR_RESET}"
-                echo -e "${LH_COLOR_WARNING}Das Ausführen auf dem laufenden System kann zu Datenverlust und einem nicht mehr startbaren System führen!${LH_COLOR_RESET}"
-                if lh_confirm_action "Achtung: Das Wiederherstellungs-Skript ist ungetestet und kann zu Datenverlust führen! Möchten Sie es wirklich ausführen?" "n"; then
-                    bash "$LH_ROOT_DIR/modules/mod_btrfs_restore.sh"
-                else
-                    echo -e "${LH_COLOR_INFO}Wiederherstellung abgebrochen.${LH_COLOR_RESET}"
-                fi
+                bash "$LH_ROOT_DIR/modules/mod_btrfs_restore.sh"
                 ;;
             0)
                 return 0 
