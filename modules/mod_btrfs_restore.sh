@@ -269,6 +269,7 @@ perform_subvolume_restore() {
 
     restore_log_msg "SUCCESS" "Subvolume '$subvol_to_restore' erfolgreich als '$target_subvol_name' wiederhergestellt."
     echo -e "${LH_COLOR_SUCCESS}Subvolume '$subvol_to_restore' erfolgreich wiederhergestellt.${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}Hinweis: Prüfen Sie nach dem Restore ggf. das Subvolume /.snapshots, falls Sie Snapper oder Timeshift nutzen.\nNutzen Sie dazu die Option '.snapshots prüfen/reparieren' im BTRFS-Backup-Modul!${LH_COLOR_RESET}"
     return 0
 }
 
@@ -461,7 +462,7 @@ restore_folder_from_snapshot() {
     fi
 }
 
-# --- Live-Umgebungs-Check (aus alter Version übernommen) ---
+# --- Live-Umgebungs-Check ---
 lh_check_live_environment() {
     # Prüft, ob das Skript in einer Live-Umgebung läuft
     if [ -d "/run/archiso" ] || [ -f "/etc/calamares" ] || [ -d "/live" ]; then
