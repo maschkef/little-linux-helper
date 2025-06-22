@@ -1398,8 +1398,11 @@ backup_menu() {
 }
 
 # Start module
-lh_log_msg "DEBUG" "=== Starting mod_backup.sh module ==="
-lh_log_msg "DEBUG" "Module called with parameters: $*"
-lh_log_msg "DEBUG" "Environment: USER=$(whoami), HOME=$HOME, PWD=$PWD"
-backup_menu
-exit $?
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    lh_log_msg "DEBUG" "=== Starting mod_backup.sh module ==="
+    lh_log_msg "DEBUG" "Module called with parameters: $*"
+    lh_log_msg "DEBUG" "Environment: USER=$(whoami), HOME=$HOME, PWD=$PWD"
+    backup_menu
+    lh_log_msg "DEBUG" "=== Backup menu returned, exiting module ==="
+    exit $?
+fi
