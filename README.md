@@ -1,8 +1,7 @@
 # Little Linux Helper
 
 > **⚠️ Documentation Status Notice:**
-> 1. **Documentation Update Needed**: The documentation (including this README.md) needs to be updated to reflect recent changes and improvements.
-> 2. **Docker Security Module Issue**: The module `mod_docker_security.sh` is not fully functional. The old working version (German only) is included as `modules/mod_security_old.sh` but is not integrated into the menu structure.
+> - **Documentation Update Needed**: The documentation (including this README.md) needs to be updated to reflect recent changes and improvements.
 
 ## Description
 
