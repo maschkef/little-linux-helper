@@ -1,0 +1,101 @@
+# config/docker.conf
+# Copyright (c) 2025 wuldorf
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the 'little-linux-helper' collection.
+# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+#
+# Little Linux Helper - Docker Security Configuration
+
+# CFG_LH_DOCKER_COMPOSE_ROOT:
+# The absolute path to the root directory where Docker-Compose projects should be searched.
+# Only used when CFG_LH_DOCKER_CHECK_MODE="all".
+CFG_LH_DOCKER_COMPOSE_ROOT="/opt/containers" # Note: My docker setup is usually created according to goneuland.de guides (german), hence this folder.
+
+# CFG_LH_DOCKER_CHECK_MODE:
+# Determines which Docker-Compose files should be checked.
+# Available options:
+# - running: Only check Docker-Compose files of currently running containers (default, recommended)
+# - all:     Check all Docker-Compose files in the configured directory
+CFG_LH_DOCKER_CHECK_MODE="running"
+
+# CFG_LH_DOCKER_SKIP_WARNINGS:
+# Comma-separated list of warnings that should be skipped
+# Available options:
+# - update-labels: Skip checking for Diun/Watchtower labels
+# - env-permissions: Skip .env file permissions
+# - dir-permissions: Skip directory permissions  
+# - latest-images: Skip latest image warnings
+# - privileged: Skip privileged container warnings
+# - host-volumes: Skip host volume mount notices
+# - exposed-ports: Skip exposed port warnings
+# - capabilities: Skip dangerous capabilities warnings
+# - security-opt: Skip security-opt disable warnings
+# - default-passwords: Skip default password checks
+# - sensitive-data: Skip sensitive data checks
+CFG_LH_DOCKER_SKIP_WARNINGS="latest-images"
+
+# CFG_LH_DOCKER_CHECK_RUNNING:
+# Should an overview of running containers be displayed? (true/false)
+# When 'true', 'docker ps' will be executed to show running containers in the summary
+CFG_LH_DOCKER_CHECK_RUNNING="false"
+
+# CFG_LH_DOCKER_DEFAULT_PATTERNS:
+# Comma-separated list of regex patterns for insecure default values
+# These patterns are searched in Docker-Compose files
+# Format: VARIABLE=regex_for_value,OTHER_VAR=other_regex
+# The script must interpret the part after '=' as a regular expression.
+# Examples for regex patterns:
+#   ^$                                      - Empty string
+#   ^(password|admin|root)$                 - One of the values "password", "admin", "root" (case-sensitive)
+#   ^(?i)(password|admin|root)$             - Same as above, but case-insensitive (if supported by regex engine)
+#   ^(test|example|dummy|changeme|passwort)$ - Typical placeholders or weak passwords.
+#
+# The following comprehensive regex pattern is used for most password and key variables.
+# It detects empty values and a wide range of common insecure passwords/keys (case-insensitive).
+COMMON_WEAK_PASSWORD_REGEX="^(|(?i)(password|passwort|secret|geheim|admin|root|123456|12345678|qwerty|asdfgh|test|example|dummy|changeme|changeit|default|standard|pass|pwd|key|token|secretkey|apikey|mysql|postgres|mongo|redis|guest|mariadb|p[a@]\$\$w[o0]rd|r[o0]{2}t|adm[i1]n|geheim123|masterkey|masterpassword|yourpassword|your_password|temp|tmp|toor|rootpass|adminpass|user|username|login|access|secret_token|api_token|private_key|privatekey))$"
+COMMON_PLACEHOLDER_KEY_REGEX="^(|(?i)(test|example|dummy|changeme|placeholder|your_api_key|your_secret_key|your_token|temp_key|temp_secret|temp_token|AKIAIOSFODNN7EXAMPLE|some[Rr]andom[Ss]tring|base64:.*))$"
+
+CFG_LH_DOCKER_DEFAULT_PATTERNS="PASSWORD=${COMMON_WEAK_PASSWORD_REGEX},"\
+"MYSQL_ROOT_PASSWORD=${COMMON_WEAK_PASSWORD_REGEX},"\
+"MYSQL_PASSWORD=${COMMON_WEAK_PASSWORD_REGEX},"\
+"POSTGRES_PASSWORD=${COMMON_WEAK_PASSWORD_REGEX},"\
+"ADMIN_PASSWORD=${COMMON_WEAK_PASSWORD_REGEX},"\
+"REDIS_PASSWORD=${COMMON_WEAK_PASSWORD_REGEX},"\
+"MONGO_INITDB_ROOT_PASSWORD=${COMMON_WEAK_PASSWORD_REGEX},"\
+"RABBITMQ_DEFAULT_PASS=${COMMON_WEAK_PASSWORD_REGEX},"\
+"ELASTIC_PASSWORD=${COMMON_WEAK_PASSWORD_REGEX},"\
+"GF_SECURITY_ADMIN_PASSWORD=${COMMON_WEAK_PASSWORD_REGEX},"\
+"KEYCLOAK_ADMIN_PASSWORD=${COMMON_WEAK_PASSWORD_REGEX},"\
+"API_KEY=${COMMON_PLACEHOLDER_KEY_REGEX},"\
+"SECRET_KEY=${COMMON_PLACEHOLDER_KEY_REGEX},"\
+"TOKEN=${COMMON_PLACEHOLDER_KEY_REGEX},"\
+"APP_KEY=${COMMON_PLACEHOLDER_KEY_REGEX}"
+
+# CFG_LH_DOCKER_ACCEPTED_WARNINGS:
+# Comma-separated list of specific warnings that are accepted for certain directories.
+# Format is: "/path/to/project:warning_type,/other/path:other_warning_type"
+# Example: CFG_LH_DOCKER_ACCEPTED_WARNINGS="/opt/containers/glances:privileged,/opt/containers/photoprism:security-opt"
+# Valid warning types are: privileged, security-opt, default-passwords, sensitive-data,
+# host-volumes, dir-permissions, capabilities, env-permissions, update-labels, latest-images, exposed-ports.
+CFG_LH_DOCKER_ACCEPTED_WARNINGS="" 
+
+
+# CFG_LH_DOCKER_EXCLUDE_DIRS:
+# Comma-separated list of directory names (not paths) that should be skipped when
+# searching for Docker-Compose files. These names are checked relative
+# to each searched directory.
+# Only used when CFG_LH_DOCKER_CHECK_MODE="all".
+CFG_LH_DOCKER_EXCLUDE_DIRS="docker,.docker_archive,node_modules,.git,.cache,venv,__pycache__" # Note: "docker" and ".docker_archive" are only specific to my environment
+
+# CFG_LH_DOCKER_SEARCH_DEPTH:
+# Maximum depth for searching Docker-Compose files.
+# Default value is 3 if not set in configuration.
+# Only used when CFG_LH_DOCKER_CHECK_MODE="all".
+CFG_LH_DOCKER_SEARCH_DEPTH="3"
+
+# Example for extended configuration:
+# CFG_LH_DOCKER_CHECK_MODE="all"
+# CFG_LH_DOCKER_SKIP_WARNINGS="latest-images,host-volumes"
+# CFG_LH_DOCKER_CHECK_RUNNING="false"
+# CFG_LH_DOCKER_DEFAULT_PATTERNS="API_KEY=test,SECRET=secret,TOKEN=token"

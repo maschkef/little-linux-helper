@@ -1,98 +1,101 @@
 #!/bin/bash
 #
-# little-linux-helper/modules/mod_btrfs_restore.sh
+# modules/mod_btrfs_restore.sh
 # Copyright (c) 2025 wuldorf
 # SPDX-License-Identifier: MIT
 #
 # This script is part of the 'little-linux-helper' collection.
 # Licensed under the MIT License. See the LICENSE file in the project root for more information.
 #
-# Modul zur Wiederherstellung von BTRFS-Snapshots.
-# WARNUNG: Dieses Skript führt destruktive Operationen aus. Nur aus einer Live-Umgebung verwenden!
+# Module for restoring BTRFS snapshots.
+# WARNING: This script performs destructive operations. Use only from a live environment!
 
-# --- Initialisierung ---
-# Laden der gemeinsamen Bibliothek und Konfigurationen
+# --- Initialization ---
+# Load common library and configurations
 source "$(dirname "$0")/../lib/lib_common.sh"
 lh_detect_package_manager
 lh_load_backup_config
 
-# --- Globale Variablen für dieses Modul ---
-# Diese Variablen werden interaktiv im Setup-Prozess gesetzt.
-BACKUP_ROOT=""          # Pfad zum Einhängepunkt des Backup-Mediums
-TARGET_ROOT=""          # Pfad zum Einhängepunkt des Ziel-Systems
-TEMP_SNAPSHOT_DIR=""    # Temporäres Verzeichnis für die Wiederherstellung auf dem Zielsystem
-DRY_RUN=false           # Wenn true, werden keine Änderungen vorgenommen
+# Load backup-specific translations
+lh_load_language_module "backup"
 
-# --- Dediziertes Restore-Logging ---
-# Funktion zum Logging mit Restore-spezifischen Nachrichten
+# --- Global variables for this module ---
+# These variables are set interactively during the setup process.
+BACKUP_ROOT=""          # Path to the backup medium mount point
+TARGET_ROOT=""          # Path to the target system mount point
+TEMP_SNAPSHOT_DIR=""    # Temporary directory for restoration on the target system
+DRY_RUN=false           # If true, no changes will be made
+
+# --- Dedicated restore logging ---
+# Function for logging with restore-specific messages
 restore_log_msg() {
     local level="$1"
     local message="$2"
 
-    # Auch in Standard-Log schreiben (lh_log_msg gibt bereits auf der Konsole aus)
+    # Also write to standard log (lh_log_msg already outputs to console)
     lh_log_msg "$level" "$message"
 
-    # Zusätzlich in Restore-spezifisches Log.
-    # Die Variable LH_RESTORE_LOG wird beim Start des Skripts definiert.
+    # Additionally write to restore-specific log.
+    # The LH_RESTORE_LOG variable is defined when the script starts.
     if [ -n "$LH_RESTORE_LOG" ] && [ ! -f "$LH_RESTORE_LOG" ]; then
-        touch "$LH_RESTORE_LOG" || echo "WARN (mod_restore): Konnte Restore-Logdatei $LH_RESTORE_LOG nicht erstellen." >&2
+        touch "$LH_RESTORE_LOG" || echo "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_WARN_CREATE')" "$LH_RESTORE_LOG")" >&2
     fi
     echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$LH_RESTORE_LOG"
 }
 
-# --- Hilfsfunktionen für die Wiederherstellung ---
+# --- Helper functions for restoration ---
 
-# Funktion zum sicheren Entfernen des 'read-only'-Flags eines wiederhergestellten Subvolumes
+# Function to safely remove the 'read-only' flag from a restored subvolume
 fix_readonly_subvolume() {
     local subvol_path="$1"
     local subvol_name="$2"
 
-    restore_log_msg "INFO" "Prüfe read-only Status von $subvol_name..."
+    restore_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_CHECKING_READONLY')" "$subvol_name")"
 
     local ro_status
     ro_status=$(btrfs property get "$subvol_path" ro 2>/dev/null | cut -d= -f2)
 
     if [ "$ro_status" = "true" ]; then
-        restore_log_msg "WARN" "Subvolume $subvol_name ist read-only."
-        echo -e "${LH_COLOR_INFO}Versuche, es auf read-write zu setzen...${LH_COLOR_RESET}"
+        restore_log_msg "WARN" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_SUBVOL_READONLY')" "$subvol_name")"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_TRY_SET_READWRITE')${LH_COLOR_RESET}"
 
         if [ "$DRY_RUN" = "false" ]; then
             if btrfs property set -f "$subvol_path" ro false; then
-                restore_log_msg "INFO" "Subvolume $subvol_name erfolgreich auf read-write gesetzt."
-                echo -e "${LH_COLOR_SUCCESS}Erfolgreich auf read-write gesetzt.${LH_COLOR_RESET}"
+                restore_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_SET_READWRITE_SUCCESS')" "$subvol_name")"
+                echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_RESTORE_SET_READWRITE_SUCCESS')${LH_COLOR_RESET}"
             else
-                restore_log_msg "ERROR" "Fehler beim Setzen von $subvol_name auf read-write."
-                echo -e "${LH_COLOR_ERROR}Fehler beim Setzen auf read-write. Dies kann zu Problemen führen.${LH_COLOR_RESET}"
+                restore_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_SET_READWRITE_ERROR')" "$subvol_name")"
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_SET_READWRITE_ERROR')${LH_COLOR_RESET}"
                 return 1
             fi
         else
-            echo -e "${LH_COLOR_INFO}[DRY RUN] Würde '$subvol_path' auf read-write setzen.${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_RESTORE_DRY_RUN_WOULD_SET')" "$subvol_path")${LH_COLOR_RESET}"
         fi
     else
-        restore_log_msg "INFO" "Subvolume $subvol_name ist bereits read-write."
+        restore_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_SUBVOL_READWRITE')" "$subvol_name")"
     fi
     return 0
 }
 
-# --- Manuelle Checkpoints für kritische Schritte ---
+# --- Manual checkpoints for critical steps ---
 pause_for_manual_check() {
     local context_msg="$1"
-    echo -e "${LH_COLOR_BOLD_YELLOW}================ MANUELLER CHECKPOINT ================${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_BOLD_YELLOW}$(lh_msg 'BTRFS_RESTORE_MANUAL_CHECKPOINT')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_WARNING}$context_msg${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_INFO}Bitte prüfen Sie die Situation und bestätigen Sie, dass Sie fortfahren möchten.${LH_COLOR_RESET}"
-    read -n 1 -s -r -p "Drücken Sie eine beliebige Taste, um fortzufahren ..."
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_CHECK_SITUATION')${LH_COLOR_RESET}"
+    read -n 1 -s -r -p "$(lh_msg 'BTRFS_RESTORE_PRESS_KEY')"
     echo ""
 }
 
-# --- Child-Snapshot-Handling vor Subvolume-Operationen ---
+# --- Child snapshot handling before subvolume operations ---
 backup_or_delete_child_snapshots() {
     local parent_path="$1"
     local parent_name="$2"
-    # --- Manueller Checkpoint vor Child-Snapshot-Handling ---
-    pause_for_manual_check "Sie sind dabei, Child-Snapshots von '$parent_name' zu sichern oder zu löschen.\n\nBitte stellen Sie sicher, dass Sie alle wichtigen Daten gesichert haben. Nachfolgende Operationen können zu Datenverlust führen, falls Child-Snapshots gelöscht werden.\n\nSie können jetzt in einer zweiten Shell die Situation prüfen (z.B. mit 'btrfs subvolume list ...')."
+    # --- Manual checkpoint before child snapshot handling ---
+    pause_for_manual_check "$(printf "$(lh_msg 'BTRFS_RESTORE_CHILD_CHECKPOINT_MSG')" "$parent_name")"
     local backup_dir="$BACKUP_ROOT$LH_BACKUP_DIR/.child_snapshot_backups/${parent_name}_$(date +%Y-%m-%d_%H-%M-%S)"
     local child_snapshots=()
-    # Suche nach Child-Snapshots (max. 2 Ebenen tiefer, z.B. Timeshift, .snapshots)
+    # Search for child snapshots (max. 2 levels deep, e.g. Timeshift, .snapshots)
     if [ -d "$parent_path/.snapshots" ]; then
         while IFS= read -r -d '' snapshot; do
             child_snapshots+=("$snapshot")
@@ -106,197 +109,197 @@ backup_or_delete_child_snapshots() {
     if [ ${#child_snapshots[@]} -eq 0 ]; then
         return 0
     fi
-    echo -e "${LH_COLOR_WARNING}Es wurden ${#child_snapshots[@]} Child-Snapshots unter $parent_name gefunden:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_RESTORE_CHILD_SNAPSHOTS_FOUND')" "${#child_snapshots[@]}" "$parent_name")${LH_COLOR_RESET}"
     for snap in "${child_snapshots[@]}"; do
         echo -e "  ${LH_COLOR_INFO}$snap${LH_COLOR_RESET}"
     done
-    echo -e "${LH_COLOR_PROMPT}Wie möchten Sie fortfahren?${LH_COLOR_RESET}"
-    lh_print_menu_item 1 "Alle Child-Snapshots sichern (empfohlen)"
-    lh_print_menu_item 2 "Alle Child-Snapshots löschen"
-    lh_print_menu_item 0 "Abbrechen"
+    echo -e "${LH_COLOR_PROMPT}$(lh_msg 'BTRFS_RESTORE_HOW_TO_PROCEED')${LH_COLOR_RESET}"
+    lh_print_menu_item 1 "$(lh_msg 'BTRFS_RESTORE_BACKUP_ALL_SNAPSHOTS')"
+    lh_print_menu_item 2 "$(lh_msg 'BTRFS_RESTORE_DELETE_ALL_SNAPSHOTS')"
+    lh_print_menu_item 0 "$(lh_msg 'BTRFS_RESTORE_ABORT')"
     local action
-    action=$(lh_ask_for_input "Option wählen:" "^[0-2]$" "Ungültige Auswahl.")
+    action=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_OPTION_SELECT')" "^[0-2]$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
     case $action in
         1)
-            echo -e "${LH_COLOR_INFO}Sichere Child-Snapshots nach $backup_dir ...${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_RESTORE_BACKING_UP_SNAPSHOTS')" "$backup_dir")${LH_COLOR_RESET}"
             mkdir -p "$backup_dir"
             for snap in "${child_snapshots[@]}"; do
                 local snap_name
                 snap_name=$(basename "$snap")
                 if [ "$DRY_RUN" = "false" ]; then
                     if btrfs subvolume show "$snap" | grep -q "Parent uuid"; then
-                        # Parent-Chain sichern (vereinfachte Annahme: keine komplexe Chain)
+                        # Secure parent chain (simplified assumption: no complex chain)
                         btrfs send "$snap" -f "$backup_dir/${snap_name}.img"
                     else
                         btrfs send "$snap" -f "$backup_dir/${snap_name}.img"
                     fi
                 else
-                    echo -e "${LH_COLOR_INFO}[DRY RUN] Würde $snap nach $backup_dir/${snap_name}.img sichern.${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_RESTORE_DRY_RUN_WOULD_BACKUP')" "$snap" "$backup_dir" "$snap_name")${LH_COLOR_RESET}"
                 fi
             done
-            echo -e "${LH_COLOR_SUCCESS}Alle Child-Snapshots wurden gesichert.${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_RESTORE_ALL_SNAPSHOTS_BACKED_UP')${LH_COLOR_RESET}"
             ;;
         2)
             for snap in "${child_snapshots[@]}"; do
                 if [ "$DRY_RUN" = "false" ]; then
                     btrfs subvolume delete "$snap"
                 else
-                    echo -e "${LH_COLOR_INFO}[DRY RUN] Würde $snap löschen.${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_RESTORE_DRY_RUN_WOULD_DELETE')" "$snap")${LH_COLOR_RESET}"
                 fi
             done
-            echo -e "${LH_COLOR_SUCCESS}Alle Child-Snapshots wurden gelöscht.${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_RESTORE_ALL_SNAPSHOTS_DELETED')${LH_COLOR_RESET}"
             ;;
         0|*)
-            echo -e "${LH_COLOR_WARNING}Abgebrochen. Subvolume-Operation wird nicht fortgesetzt.${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_RESTORE_OPERATION_ABORTED')${LH_COLOR_RESET}"
             return 1
             ;;
     esac
     return 0
 }
 
-# Sichere Handhabung des Ersetzens eines existierenden Subvolumes durch Umbenennung
+# Safe handling of replacing an existing subvolume by renaming
 safe_subvolume_replacement() {
     local existing_subvol="$1"
     local subvol_name="$2"
     local timestamp="$3"
 
-    restore_log_msg "INFO" "Bereite das Ersetzen von Subvolume '$subvol_name' vor."
+    restore_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_PREPARING_REPLACEMENT')" "$subvol_name")"
 
     if btrfs subvolume show "$existing_subvol" >/dev/null 2>&1; then
-        restore_log_msg "WARN" "Existierendes Subvolume gefunden: $existing_subvol"
-        echo -e "${LH_COLOR_WARNING}Ein existierendes Subvolume '$subvol_name' wurde unter $existing_subvol gefunden.${LH_COLOR_RESET}"
+        restore_log_msg "WARN" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_EXISTING_SUBVOL_FOUND')" "$existing_subvol")"
+        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_RESTORE_EXISTING_SUBVOL_FOUND')" "$subvol_name" "$existing_subvol")${LH_COLOR_RESET}"
 
-        # Kritischer Checkpoint vor Child-Snapshot-Handling
-        pause_for_manual_check "Vor dem Umgang mit Child-Snapshots und dem Ersetzen von $subvol_name ($existing_subvol). Hier können Sie z.B. mit 'btrfs subvolume list' oder 'lsblk' den aktuellen Zustand prüfen."
+        # Critical checkpoint before child snapshot handling
+        pause_for_manual_check "$(printf "$(lh_msg 'BTRFS_RESTORE_CHILD_CHECKPOINT_REPLACEMENT')" "$subvol_name" "$existing_subvol")"
 
-        # Child-Snapshot-Handling
+        # Child snapshot handling
         if ! backup_or_delete_child_snapshots "$existing_subvol" "$subvol_name"; then
-            restore_log_msg "ERROR" "Child-Snapshot-Handling abgebrochen."
+            restore_log_msg "ERROR" "$(lh_msg 'BTRFS_RESTORE_LOG_CHILD_HANDLING_ABORTED')"
             return 1
         fi
         local backup_name="${existing_subvol}_backup_$timestamp"
-        echo -e "${LH_COLOR_INFO}Das existierende Subvolume wird umbenannt zu:${LH_COLOR_RESET} $backup_name"
-        if lh_confirm_action "Existierendes Subvolume '$subvol_name' für ein Backup umbenennen?" "y"; then
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_RENAME_EXISTING')${LH_COLOR_RESET} $backup_name"
+        if lh_confirm_action "$(printf "$(lh_msg 'BTRFS_RESTORE_CONFIRM_RENAME')" "$subvol_name")" "y"; then
             if [ "$DRY_RUN" = "false" ]; then
                 if ! mv "$existing_subvol" "$backup_name"; then
-                    restore_log_msg "ERROR" "Konnte existierendes Subvolume nicht umbenennen."
-                    echo -e "${LH_COLOR_ERROR}FEHLER: Umbenennen des existierenden Subvolumes fehlgeschlagen.${LH_COLOR_RESET}"
+                    restore_log_msg "ERROR" "$(lh_msg 'BTRFS_RESTORE_LOG_RENAME_ERROR')"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_RENAME_ERROR')${LH_COLOR_RESET}"
                     return 1
                 fi
-                restore_log_msg "INFO" "Existierendes Subvolume erfolgreich umbenannt zu $backup_name."
-                echo -e "${LH_COLOR_SUCCESS}Backup erstellt: $backup_name${LH_COLOR_RESET}"
+                restore_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_RENAME_SUCCESS')" "$backup_name")"
+                echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'BTRFS_RESTORE_BACKUP_CREATED')" "$backup_name")${LH_COLOR_RESET}"
             else
-                echo -e "${LH_COLOR_INFO}[DRY RUN] Würde umbenennen: $existing_subvol -> $backup_name${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_RESTORE_DRY_RUN_WOULD_RENAME')" "$existing_subvol" "$backup_name")${LH_COLOR_RESET}"
             fi
         else
-            restore_log_msg "ERROR" "Benutzer hat das Umbenennen abgebrochen. Wiederherstellung nicht möglich."
-            echo -e "${LH_COLOR_ERROR}Wiederherstellung abgebrochen. Das existierende Subvolume wurde nicht angetastet.${LH_COLOR_RESET}"
+            restore_log_msg "ERROR" "$(lh_msg 'BTRFS_RESTORE_LOG_USER_ABORTED_RENAME')"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_RESTORE_ABORTED_UNTOUCHED')${LH_COLOR_RESET}"
             return 1
         fi
     else
-        restore_log_msg "INFO" "Kein existierendes Subvolume '$subvol_name' gefunden. Fahre mit der Wiederherstellung fort."
+        restore_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_NO_EXISTING_SUBVOL')" "$subvol_name")"
     fi
     return 0
 }
 
-# Kernfunktion zur Wiederherstellung eines einzelnen Subvolumes
+# Core function for restoring a single subvolume
 perform_subvolume_restore() {
-    local subvol_to_restore="$1"    # z.B. '@' oder '@home'
-    local snapshot_to_use="$2"      # z.B. '@-2025-06-20_10-00-00'
-    local target_subvol_name="$3"   # z.B. '@' oder '@home'
+    local subvol_to_restore="$1"    # e.g. '@' or '@home'
+    local snapshot_to_use="$2"      # e.g. '@-2025-06-20_10-00-00'
+    local target_subvol_name="$3"   # e.g. '@' or '@home'
 
     local source_snapshot_path="$BACKUP_ROOT$LH_BACKUP_DIR/$subvol_to_restore/$snapshot_to_use"
     
     if [ ! -d "$source_snapshot_path" ]; then
-        restore_log_msg "ERROR" "Snapshot-Pfad nicht gefunden: $source_snapshot_path"
-        echo -e "${LH_COLOR_ERROR}FEHLER: Der ausgewählte Snapshot existiert nicht.${LH_COLOR_RESET}"
+        restore_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_SNAPSHOT_NOT_FOUND')" "$source_snapshot_path")"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_SNAPSHOT_NOT_EXISTS')${LH_COLOR_RESET}"
         return 1
     fi
 
     local timestamp
     timestamp=$(date +%Y-%m-%d_%H-%M-%S)
 
-    # Existierendes Subvolume auf dem Zielsystem sicher handhaben
+    # Handle existing subvolume on target system safely
     local target_subvol_path="$TARGET_ROOT/$target_subvol_name"
     if ! safe_subvolume_replacement "$target_subvol_path" "$target_subvol_name" "$timestamp"; then
         return 1
     fi
 
-    # --- Manueller Checkpoint vor Restore ---
-    pause_for_manual_check "Sie sind dabei, das Subvolume '$subvol_to_restore' aus dem Snapshot '$snapshot_to_use' auf das Ziel '$target_subvol_path' zurückzuspielen.\n\nWARNUNG: Alle Daten im Ziel-Subvolume werden überschrieben!\n\nBitte prüfen Sie, ob das Ziel korrekt ist und Sie alle wichtigen Daten gesichert haben.\n\nSie können jetzt in einer zweiten Shell die Situation prüfen (z.B. mit 'ls', 'btrfs subvolume list ...')."
+    # --- Manual checkpoint before restore ---
+    pause_for_manual_check "$(printf "$(lh_msg 'BTRFS_RESTORE_RESTORE_CHECKPOINT')" "$subvol_to_restore" "$snapshot_to_use" "$target_subvol_path")"
 
-    # Snapshot vom Backup-Medium empfangen
+    # Receive snapshot from backup medium
     local snapshot_size
     snapshot_size=$(du -sh "$source_snapshot_path" 2>/dev/null | cut -f1)
-    restore_log_msg "INFO" "Empfange Snapshot '$snapshot_to_use' (Größe: $snapshot_size)..."
-    echo -e "${LH_COLOR_INFO}Empfange Snapshot... (Größe: $snapshot_size). Dies kann einige Zeit dauern.${LH_COLOR_RESET}"
+    restore_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_RECEIVING_SNAPSHOT')" "$snapshot_to_use" "$snapshot_size")"
+    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_RESTORE_RECEIVING_SNAPSHOT')" "$snapshot_size")${LH_COLOR_RESET}"
 
     if [ "$DRY_RUN" = "false" ]; then
-        # Das temporäre Verzeichnis wird auf dem Ziel-Dateisystem benötigt
+        # The temporary directory is needed on the target filesystem
         mkdir -p "$TEMP_SNAPSHOT_DIR"
         if ! btrfs send "$source_snapshot_path" | btrfs receive "$TEMP_SNAPSHOT_DIR"; then
-            restore_log_msg "ERROR" "Fehler beim Empfangen des Snapshots via 'btrfs receive'."
-            echo -e "${LH_COLOR_ERROR}FEHLER: Empfangen des Snapshots fehlgeschlagen.${LH_COLOR_RESET}"
+            restore_log_msg "ERROR" "$(lh_msg 'BTRFS_RESTORE_LOG_RECEIVE_ERROR')"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_RECEIVE_ERROR')${LH_COLOR_RESET}"
             return 1
         fi
     else
-        echo -e "${LH_COLOR_INFO}[DRY RUN] Würde Snapshot empfangen: $source_snapshot_path${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_RESTORE_DRY_RUN_WOULD_RECEIVE')" "$source_snapshot_path")${LH_COLOR_RESET}"
     fi
 
-    # Empfangenen Snapshot an den Zielort verschieben
-    restore_log_msg "INFO" "Verschiebe Snapshot an Zielort: $target_subvol_path"
-    echo -e "${LH_COLOR_INFO}Verschiebe wiederhergestelltes Subvolume an den Zielort...${LH_COLOR_RESET}"
+    # Move received snapshot to target location
+    restore_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_MOVING_SNAPSHOT')" "$target_subvol_path")"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_MOVING_SNAPSHOT')${LH_COLOR_RESET}"
     
     if [ "$DRY_RUN" = "false" ]; then
         if ! mv "$TEMP_SNAPSHOT_DIR/$snapshot_to_use" "$target_subvol_path"; then
-            restore_log_msg "ERROR" "Fehler beim Verschieben des Snapshots nach '$target_subvol_path'."
-            echo -e "${LH_COLOR_ERROR}FEHLER: Verschieben des wiederhergestellten Subvolumes fehlgeschlagen.${LH_COLOR_RESET}"
-            # Versuch, aufzuräumen
+            restore_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_MOVE_ERROR')" "$target_subvol_path")"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_MOVE_ERROR')${LH_COLOR_RESET}"
+            # Attempt to clean up
             btrfs subvolume delete "$TEMP_SNAPSHOT_DIR/$snapshot_to_use" 2>/dev/null
             return 1
         fi
     else
-        echo -e "${LH_COLOR_INFO}[DRY RUN] Würde verschieben: $TEMP_SNAPSHOT_DIR/$snapshot_to_use -> $target_subvol_path${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_RESTORE_DRY_RUN_WOULD_MOVE')" "$TEMP_SNAPSHOT_DIR/$snapshot_to_use" "$target_subvol_path")${LH_COLOR_RESET}"
     fi
 
-    # Read-only-Flag korrigieren
+    # Fix read-only flag
     if ! fix_readonly_subvolume "$target_subvol_path" "$target_subvol_name"; then
-        echo -e "${LH_COLOR_WARNING}WARNUNG: Das read-only Flag konnte nicht korrigiert werden. Manuelle Prüfung empfohlen.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_RESTORE_READONLY_FIX_WARNING')${LH_COLOR_RESET}"
     fi
 
-    # Nach dem Restore: Child-Snapshots zurückspielen, falls vorhanden
-    restore_child_snapshots_menu "$target_subvol_name" "$target_subvol_path"
+    # After restore: restore child snapshots if available
+    # restore_child_snapshots_menu "$target_subvol_name" "$target_subvol_path"  # TODO: Implement child snapshot restore menu
 
-    restore_log_msg "SUCCESS" "Subvolume '$subvol_to_restore' erfolgreich als '$target_subvol_name' wiederhergestellt."
-    echo -e "${LH_COLOR_SUCCESS}Subvolume '$subvol_to_restore' erfolgreich wiederhergestellt.${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_INFO}Hinweis: Prüfen Sie nach dem Restore ggf. das Subvolume /.snapshots, falls Sie Snapper oder Timeshift nutzen.\nNutzen Sie dazu die Option '.snapshots prüfen/reparieren' im BTRFS-Backup-Modul!${LH_COLOR_RESET}"
+    restore_log_msg "SUCCESS" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_RESTORE_SUCCESS')" "$subvol_to_restore" "$target_subvol_name")"
+    echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'BTRFS_RESTORE_RESTORE_SUCCESS')" "$subvol_to_restore")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_SNAPSHOTS_HINT')${LH_COLOR_RESET}"
     return 0
 }
 
-# --- Menü-Funktionen ---
+# --- Menu functions ---
 
-# Menü zur Auswahl des zu wiederherstellenden Subvolumes oder Systems
+# Menu for selecting the subvolume or system to restore
 select_restore_type_and_snapshot() {
-    lh_print_header "Wiederherstellungsart und Snapshot auswählen"
+    lh_print_header "$(lh_msg 'BTRFS_RESTORE_SELECT_TYPE_HEADER')"
 
-    # Verfügbare Subvolume-Typen im Backup finden (@, @home)
+    # Find available subvolume types in backup (@, @home)
     local available_subvols=()
     if [ -d "$BACKUP_ROOT$LH_BACKUP_DIR/@" ]; then available_subvols+=("@") ; fi
     if [ -d "$BACKUP_ROOT$LH_BACKUP_DIR/@home" ]; then available_subvols+=("@home") ; fi
 
     if [ ${#available_subvols[@]} -eq 0 ]; then
-        echo -e "${LH_COLOR_WARNING}Keine BTRFS-Backup-Subvolumes (@, @home) im Backup-Verzeichnis gefunden.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_RESTORE_NO_SUBVOLS_FOUND')${LH_COLOR_RESET}"
         return 1
     fi
     
-    # Menüoptionen anzeigen
-    echo -e "${LH_COLOR_PROMPT}Was möchten Sie wiederherstellen?${LH_COLOR_RESET}"
-    lh_print_menu_item 1 "Komplettes System (@ und @home)"
-    lh_print_menu_item 2 "Nur System-Subvolume (@)"
-    lh_print_menu_item 3 "Nur Home-Subvolume (@home)"
+    # Display menu options
+    echo -e "${LH_COLOR_PROMPT}$(lh_msg 'BTRFS_RESTORE_WHAT_TO_RESTORE')${LH_COLOR_RESET}"
+    lh_print_menu_item 1 "$(lh_msg 'BTRFS_RESTORE_COMPLETE_SYSTEM')"
+    lh_print_menu_item 2 "$(lh_msg 'BTRFS_RESTORE_SYSTEM_ONLY')"
+    lh_print_menu_item 3 "$(lh_msg 'BTRFS_RESTORE_HOME_ONLY')"
     
     local choice
-    choice=$(lh_ask_for_input "Wählen Sie eine Option:" "^[1-3]$" "Ungültige Auswahl.")
+    choice=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_OPTION')" "^[1-3]$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
     if [ -z "$choice" ]; then return 1; fi
 
     local subvol_to_list_snapshots=""
@@ -305,18 +308,18 @@ select_restore_type_and_snapshot() {
         3) subvol_to_list_snapshots="@home" ;;
     esac
 
-    # Snapshots für das ausgewählte Subvolume auflisten
+    # List snapshots for the selected subvolume
     local snapshots=()
     snapshots=($(ls -1d "$BACKUP_ROOT$LH_BACKUP_DIR/$subvol_to_list_snapshots/"* 2>/dev/null | grep -v '\.backup_complete$' | sort -r))
     
     if [ ${#snapshots[@]} -eq 0 ]; then
-        echo -e "${LH_COLOR_WARNING}Keine Snapshots für '$subvol_to_list_snapshots' gefunden.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_RESTORE_NO_SNAPSHOTS_FOUND')" "$subvol_to_list_snapshots")${LH_COLOR_RESET}"
         return 1
     fi
 
     echo ""
-    lh_print_header "Snapshot für '$subvol_to_list_snapshots' auswählen"
-    printf "%-4s %-30s %-18s %-10s\n" "Nr." "Snapshot-Name" "Erstellt am" "Größe"
+    lh_print_header "$(printf "$(lh_msg 'BTRFS_RESTORE_SELECT_SNAPSHOT_HEADER')" "$subvol_to_list_snapshots")"
+    printf "%-4s %-30s %-18s %-10s\n" "$(lh_msg 'BTRFS_RESTORE_TABLE_NR')" "$(lh_msg 'BTRFS_RESTORE_TABLE_SNAPSHOT_NAME')" "$(lh_msg 'BTRFS_RESTORE_TABLE_CREATED_AT')" "$(lh_msg 'BTRFS_RESTORE_TABLE_SIZE')"
     printf "%-4s %-30s %-18s %-10s\n" "----" "------------------------------" "------------------" "----------"
     for i in "${!snapshots[@]}"; do
         local snapshot_path="${snapshots[i]}"
@@ -334,30 +337,30 @@ select_restore_type_and_snapshot() {
     done
 
     local snap_choice
-    snap_choice=$(lh_ask_for_input "Wählen Sie einen Snapshot (Nr.):" "^[0-9]+$" "Ungültige Auswahl.")
+    snap_choice=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_SNAPSHOT_NR')" "^[0-9]+$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
     if [ -z "$snap_choice" ] || [ "$snap_choice" -lt 1 ] || [ "$snap_choice" -gt ${#snapshots[@]} ]; then
-        echo -e "${LH_COLOR_ERROR}Ungültige Snapshot-Auswahl.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_INVALID_SNAPSHOT_SELECTION')${LH_COLOR_RESET}"
         return 1
     fi
     
     local selected_snapshot_name
     selected_snapshot_name=$(basename "${snapshots[$((snap_choice-1))]}")
 
-    # Bestätigung und Ausführung
+    # Confirmation and execution
     echo ""
-    echo -e "${LH_COLOR_BOLD_RED}=== FINALE BESTÄTIGUNG ===${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_WARNING}Sie sind dabei, Daten auf dem Zielsystem unwiderruflich zu überschreiben.${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_INFO}Quelle: ${LH_COLOR_RESET}$BACKUP_ROOT$LH_BACKUP_DIR"
-    echo -e "${LH_COLOR_INFO}Ziel:   ${LH_COLOR_RESET}$TARGET_ROOT"
+    echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_RESTORE_FINAL_CONFIRMATION')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_RESTORE_IRREVERSIBLE_WARNING')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_SOURCE_LABEL')${LH_COLOR_RESET}$BACKUP_ROOT$LH_BACKUP_DIR"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_TARGET_LABEL')${LH_COLOR_RESET}$TARGET_ROOT"
     
     case $choice in
         1)
             local base_timestamp=${selected_snapshot_name#@-}
             local home_snapshot_name="@home-$base_timestamp"
-            echo -e "${LH_COLOR_INFO}Aktion: ${LH_COLOR_RESET}Komplettes System wiederherstellen"
-            echo -e "${LH_COLOR_INFO}  mit Root-Snapshot: ${LH_COLOR_RESET}$selected_snapshot_name"
-            echo -e "${LH_COLOR_INFO}  und Home-Snapshot: ${LH_COLOR_RESET}$home_snapshot_name"
-            if lh_confirm_action "Möchten Sie das komplette System wirklich wiederherstellen?" "n"; then
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_ACTION_COMPLETE_SYSTEM')${LH_COLOR_RESET}$(lh_msg 'BTRFS_RESTORE_RESTORE_COMPLETE_SYSTEM')"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_WITH_ROOT_SNAPSHOT')${LH_COLOR_RESET}$selected_snapshot_name"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_AND_HOME_SNAPSHOT')${LH_COLOR_RESET}$home_snapshot_name"
+            if lh_confirm_action "$(lh_msg 'BTRFS_RESTORE_CONFIRM_COMPLETE_RESTORE')" "n"; then
                 perform_subvolume_restore "@" "$selected_snapshot_name" "@"
                 if [ $? -eq 0 ]; then
                     perform_subvolume_restore "@home" "$home_snapshot_name" "@home"
@@ -365,47 +368,47 @@ select_restore_type_and_snapshot() {
             fi
             ;;
         2)
-            echo -e "${LH_COLOR_INFO}Aktion: ${LH_COLOR_RESET}Nur Subvolume '@' wiederherstellen"
-            echo -e "${LH_COLOR_INFO}  mit Snapshot: ${LH_COLOR_RESET}$selected_snapshot_name"
-            if lh_confirm_action "Möchten Sie das Subvolume '@' wirklich wiederherstellen?" "n"; then
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_ACTION_COMPLETE_SYSTEM')${LH_COLOR_RESET}$(lh_msg 'BTRFS_RESTORE_ACTION_SYSTEM_ONLY')"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_WITH_SNAPSHOT')${LH_COLOR_RESET}$selected_snapshot_name"
+            if lh_confirm_action "$(lh_msg 'BTRFS_RESTORE_CONFIRM_SYSTEM_RESTORE')" "n"; then
                 perform_subvolume_restore "@" "$selected_snapshot_name" "@"
             fi
             ;;
         3)
-            echo -e "${LH_COLOR_INFO}Aktion: ${LH_COLOR_RESET}Nur Subvolume '@home' wiederherstellen"
-            echo -e "${LH_COLOR_INFO}  mit Snapshot: ${LH_COLOR_RESET}$selected_snapshot_name"
-            if lh_confirm_action "Möchten Sie das Subvolume '@home' wirklich wiederherstellen?" "n"; then
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_ACTION_COMPLETE_SYSTEM')${LH_COLOR_RESET}$(lh_msg 'BTRFS_RESTORE_ACTION_HOME_ONLY')"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_WITH_SNAPSHOT')${LH_COLOR_RESET}$selected_snapshot_name"
+            if lh_confirm_action "$(lh_msg 'BTRFS_RESTORE_CONFIRM_HOME_RESTORE')" "n"; then
                 perform_subvolume_restore "@home" "$selected_snapshot_name" "@home"
             fi
             ;;
     esac
 }
 
-# --- Restore eines einzelnen Ordners aus einem Snapshot ---
+# --- Restore a single folder from a snapshot ---
 restore_folder_from_snapshot() {
-    lh_print_header "Ordner aus Snapshot wiederherstellen"
-    # Subvolume wählen
+    lh_print_header "$(lh_msg 'BTRFS_RESTORE_FOLDER_HEADER')"
+    # Select subvolume
     local subvol_choice
-    echo -e "${LH_COLOR_PROMPT}Wählen Sie das Quell-Subvolume:${LH_COLOR_RESET}"
-    lh_print_menu_item 1 "@ (System)"
-    lh_print_menu_item 2 "@home (Home)"
-    subvol_choice=$(lh_ask_for_input "Nummer wählen:" "^[1-2]$" "Ungültige Auswahl.")
+    echo -e "${LH_COLOR_PROMPT}$(lh_msg 'BTRFS_RESTORE_SELECT_SOURCE_SUBVOL')${LH_COLOR_RESET}"
+    lh_print_menu_item 1 "$(lh_msg 'BTRFS_RESTORE_SYSTEM_LABEL')"
+    lh_print_menu_item 2 "$(lh_msg 'BTRFS_RESTORE_HOME_LABEL')"
+    subvol_choice=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_NUMBER')" "^[1-2]$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
     local subvol_name
     case $subvol_choice in
         1) subvol_name="@";;
         2) subvol_name="@home";;
-        *) echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"; return 1;;
+        *) echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_INVALID_SELECTION')${LH_COLOR_RESET}"; return 1;;
     esac
-    # Snapshots auflisten
+    # List snapshots
     local snapshots=()
     snapshots=($(ls -1d "$BACKUP_ROOT$LH_BACKUP_DIR/$subvol_name/"* 2>/dev/null | grep -v '\.backup_complete$' | sort -r))
     if [ ${#snapshots[@]} -eq 0 ]; then
-        echo -e "${LH_COLOR_WARNING}Keine Snapshots für '$subvol_name' gefunden.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_RESTORE_NO_SNAPSHOTS_FOUND')" "$subvol_name")${LH_COLOR_RESET}"
         return 1
     fi
     echo ""
-    lh_print_header "Snapshot auswählen"
-    printf "%-4s %-30s %-18s %-10s\n" "Nr." "Snapshot-Name" "Erstellt am" "Größe"
+    lh_print_header "$(printf "$(lh_msg 'BTRFS_RESTORE_SELECT_SNAPSHOT_HEADER')" "$subvol_name")"
+    printf "%-4s %-30s %-18s %-10s\n" "$(lh_msg 'BTRFS_RESTORE_TABLE_NR')" "$(lh_msg 'BTRFS_RESTORE_TABLE_SNAPSHOT_NAME')" "$(lh_msg 'BTRFS_RESTORE_TABLE_CREATED_AT')" "$(lh_msg 'BTRFS_RESTORE_TABLE_SIZE')"
     printf "%-4s %-30s %-18s %-10s\n" "----" "------------------------------" "------------------" "----------"
     for i in "${!snapshots[@]}"; do
         local snapshot_path="${snapshots[i]}"
@@ -418,70 +421,70 @@ restore_folder_from_snapshot() {
         printf "%-4s %-30s %-18s %-10s\n" "$((i+1))" "$snapshot_name" "$created_at" "$snapshot_size"
     done
     local snap_choice
-    snap_choice=$(lh_ask_for_input "Wählen Sie einen Snapshot (Nr.):" "^[0-9]+$" "Ungültige Auswahl.")
+    snap_choice=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_SNAPSHOT_NR')" "^[0-9]+$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
     if [ -z "$snap_choice" ] || [ "$snap_choice" -lt 1 ] || [ "$snap_choice" -gt ${#snapshots[@]} ]; then
-        echo -e "${LH_COLOR_ERROR}Ungültige Snapshot-Auswahl.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_INVALID_SNAPSHOT_SELECTION')${LH_COLOR_RESET}"
         return 1
     fi
     local selected_snapshot_name
     selected_snapshot_name=$(basename "${snapshots[$((snap_choice-1))]}")
-    # Ordnerpfad abfragen
+    # Query folder path
     local folder_path
-    folder_path=$(lh_ask_for_input "Pfad des wiederherzustellenden Ordners (z.B. /etc oder /user/test):")
+    folder_path=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_FOLDER_PATH_PROMPT')")
     if [ -z "$folder_path" ]; then
-        echo -e "${LH_COLOR_ERROR}Kein Pfad angegeben.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_NO_PATH_GIVEN')${LH_COLOR_RESET}"
         return 1
     fi
-    # Quell- und Zielpfad bestimmen
+    # Determine source and target path
     local source_snapshot_path="$BACKUP_ROOT$LH_BACKUP_DIR/$subvol_name/$selected_snapshot_name$folder_path"
     local target_folder_path="$TARGET_ROOT/$subvol_name$folder_path"
-    # Prüfen, ob Quellordner existiert
+    # Check if source folder exists
     if [ ! -e "$source_snapshot_path" ]; then
-        echo -e "${LH_COLOR_ERROR}Der Ordner $folder_path existiert im Snapshot nicht.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'BTRFS_RESTORE_FOLDER_NOT_IN_SNAPSHOT')" "$folder_path")${LH_COLOR_RESET}"
         return 1
     fi
-    # Zielordner ggf. sichern
+    # Backup target folder if necessary
     if [ -e "$target_folder_path" ]; then
         local backup_path="${target_folder_path}_backup_$(date +%Y-%m-%d_%H-%M-%S)"
-        if lh_confirm_action "Zielordner existiert bereits. Backup anlegen unter $backup_path?" "y"; then
+        if lh_confirm_action "$(printf "$(lh_msg 'BTRFS_RESTORE_TARGET_EXISTS_BACKUP')" "$backup_path")" "y"; then
             if [ "$DRY_RUN" = "false" ]; then
                 mv "$target_folder_path" "$backup_path"
             else
-                echo -e "${LH_COLOR_INFO}[DRY RUN] Würde $target_folder_path nach $backup_path verschieben.${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_RESTORE_DRY_RUN_WOULD_MOVE_FOLDER')" "$target_folder_path" "$backup_path")${LH_COLOR_RESET}"
             fi
         fi
     fi
-    # Zielverzeichnis anlegen
+    # Create target directory
     if [ "$DRY_RUN" = "false" ]; then
         mkdir -p "$(dirname "$target_folder_path")"
         cp -a "$source_snapshot_path" "$target_folder_path"
-        echo -e "${LH_COLOR_SUCCESS}Ordner $folder_path erfolgreich wiederhergestellt.${LH_COLOR_RESET}"
-        restore_log_msg "SUCCESS" "Ordner $folder_path aus $selected_snapshot_name wiederhergestellt."
+        echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'BTRFS_RESTORE_FOLDER_RESTORED_SUCCESS')" "$folder_path")${LH_COLOR_RESET}"
+        restore_log_msg "SUCCESS" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_FOLDER_RESTORED')" "$folder_path" "$selected_snapshot_name")"
     else
-        echo -e "${LH_COLOR_INFO}[DRY RUN] Würde $source_snapshot_path nach $target_folder_path kopieren.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_RESTORE_DRY_RUN_WOULD_COPY')" "$source_snapshot_path" "$target_folder_path")${LH_COLOR_RESET}"
     fi
 }
 
-# --- Live-Umgebungs-Check ---
+# --- Live environment check ---
 lh_check_live_environment() {
-    # Prüft, ob das Skript in einer Live-Umgebung läuft
+    # Check if the script is running in a live environment
     if [ -d "/run/archiso" ] || [ -f "/etc/calamares" ] || [ -d "/live" ]; then
-        echo -e "${LH_COLOR_SUCCESS}Live-Linux-Umgebung erkannt – geeignet für Recovery-Operationen.${LH_COLOR_RESET}"
-        restore_log_msg "INFO" "Live-Umgebung erkannt."
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_RESTORE_LIVE_ENV_DETECTED')${LH_COLOR_RESET}"
+        restore_log_msg "INFO" "$(lh_msg 'BTRFS_RESTORE_LOG_LIVE_ENV')"
     else
-        echo -e "${LH_COLOR_WARNING}WARNUNG: Sie scheinen NICHT in einer Live-Umgebung zu sein!${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_WARNING}Recovery-Operationen sind sicherer aus einer Live-Umgebung (z.B. Live-USB).${LH_COLOR_RESET}"
-        if ! lh_confirm_action "Trotzdem fortfahren? (NICHT EMPFOHLEN)" "n"; then
-            restore_log_msg "INFO" "Benutzer hat abgebrochen, da keine Live-Umgebung erkannt wurde."
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_RESTORE_NOT_LIVE_WARNING')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_RESTORE_LIVE_SAFER_WARNING')${LH_COLOR_RESET}"
+        if ! lh_confirm_action "$(lh_msg 'BTRFS_RESTORE_CONTINUE_NOT_RECOMMENDED')" "n"; then
+            restore_log_msg "INFO" "$(lh_msg 'BTRFS_RESTORE_LOG_USER_ABORTED_NO_LIVE')"
             exit 0
         fi
     fi
 }
 
-# --- Automatische Erkennung von Backup- und Ziel-Drives ---
+# --- Automatic detection of backup and target drives ---
 lh_detect_backup_drives() {
     local drives=()
-    # Suche nach gemounteten Geräten mit Backup-Verzeichnis
+    # Search for mounted devices with backup directory
     while IFS= read -r mountpoint; do
         if [ -d "$mountpoint$LH_BACKUP_DIR" ]; then
             drives+=("$mountpoint")
@@ -500,63 +503,63 @@ lh_detect_target_drives() {
     echo "${drives[@]}"
 }
 
-# --- Setup-Funktion zur Auswahl von Quell- und Ziel-Laufwerk
+# --- Setup function for selecting source and target drives
 setup_recovery_environment() {
-    lh_print_header "Setup der Wiederherstellungsumgebung"
+    lh_print_header "$(lh_msg 'BTRFS_RESTORE_SETUP_HEADER')"
 
-    # Schritt 1: Backup-Quelle automatisch erkennen
-    echo -e "${LH_COLOR_INFO}Suche nach möglichen Backup-Laufwerken...${LH_COLOR_RESET}"
+    # Step 1: Automatically detect backup source
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_SEARCHING_BACKUP_DRIVES')${LH_COLOR_RESET}"
     local backup_drives=( $(lh_detect_backup_drives) )
     local backup_root_path=""
     if [ ${#backup_drives[@]} -gt 0 ]; then
-        echo -e "${LH_COLOR_PROMPT}Wählen Sie ein Backup-Laufwerk aus:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_PROMPT}$(lh_msg 'BTRFS_RESTORE_SELECT_BACKUP_DRIVE')${LH_COLOR_RESET}"
         for i in "${!backup_drives[@]}"; do
             lh_print_menu_item $((i+1)) "${backup_drives[$i]}"
         done
-        lh_print_menu_item 0 "Manuell eingeben"
+        lh_print_menu_item 0 "$(lh_msg 'BTRFS_RESTORE_MANUAL_INPUT')"
         local sel
-        sel=$(lh_ask_for_input "Nummer wählen:" "^[0-9]+$" "Ungültige Auswahl.")
+        sel=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_NUMBER')" "^[0-9]+$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
         if [ "$sel" = "0" ]; then
-            backup_root_path=$(lh_ask_for_input "Bitte geben Sie den Pfad zum Einhängepunkt des Backup-Mediums an (z.B. /mnt/backup)")
+            backup_root_path=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_BACKUP_MOUNT_PROMPT')")
         elif [ "$sel" -ge 1 ] && [ "$sel" -le ${#backup_drives[@]} ]; then
             backup_root_path="${backup_drives[$((sel-1))]}"
         fi
     else
-        backup_root_path=$(lh_ask_for_input "Bitte geben Sie den Pfad zum Einhängepunkt des Backup-Mediums an (z.B. /mnt/backup)")
+        backup_root_path=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_BACKUP_MOUNT_PROMPT')")
     fi
     if [ -z "$backup_root_path" ] || [ ! -d "$backup_root_path$LH_BACKUP_DIR" ]; then
-        echo -e "${LH_COLOR_ERROR}FEHLER: Das Backup-Verzeichnis '$backup_root_path$LH_BACKUP_DIR' wurde nicht gefunden.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'BTRFS_RESTORE_BACKUP_DIR_NOT_FOUND')" "$backup_root_path" "$LH_BACKUP_DIR")${LH_COLOR_RESET}"
         return 1
     fi
     BACKUP_ROOT="$backup_root_path"
-    restore_log_msg "INFO" "Backup-Quelle gesetzt auf: $BACKUP_ROOT"
-    echo -e "${LH_COLOR_SUCCESS}Backup-Quelle erfolgreich gefunden.${LH_COLOR_RESET}"
+    restore_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_BACKUP_SOURCE_SET')" "$BACKUP_ROOT")"
+    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_RESTORE_BACKUP_SOURCE_SUCCESS')${LH_COLOR_RESET}"
 
-    # Schritt 2: Zielsystem automatisch erkennen
-    echo -e "${LH_COLOR_INFO}Suche nach möglichen Ziel-Laufwerken (BTRFS)...${LH_COLOR_RESET}"
+    # Step 2: Automatically detect target system
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_SEARCHING_TARGET_DRIVES')${LH_COLOR_RESET}"
     local target_drives=( $(lh_detect_target_drives) )
     local target_root_path=""
     if [ ${#target_drives[@]} -gt 0 ]; then
-        echo -e "${LH_COLOR_PROMPT}Wählen Sie ein Ziel-Laufwerk aus:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_PROMPT}$(lh_msg 'BTRFS_RESTORE_SELECT_TARGET_DRIVE')${LH_COLOR_RESET}"
         for i in "${!target_drives[@]}"; do
             lh_print_menu_item $((i+1)) "${target_drives[$i]}"
         done
-        lh_print_menu_item 0 "Manuell eingeben"
+        lh_print_menu_item 0 "$(lh_msg 'BTRFS_RESTORE_MANUAL_INPUT')"
         local sel
-        sel=$(lh_ask_for_input "Nummer wählen:" "^[0-9]+$" "Ungültige Auswahl.")
+        sel=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_NUMBER')" "^[0-9]+$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
         if [ "$sel" = "0" ]; then
-            target_root_path=$(lh_ask_for_input "Bitte geben Sie den Pfad zum Einhängepunkt des Zielsystems an (z.B. /mnt/system)")
+            target_root_path=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_TARGET_MOUNT_PROMPT')")
         elif [ "$sel" -ge 1 ] && [ "$sel" -le ${#target_drives[@]} ]; then
             target_root_path="${target_drives[$((sel-1))]}"
         fi
     else
-        target_root_path=$(lh_ask_for_input "Bitte geben Sie den Pfad zum Einhängepunkt des Zielsystems an (z.B. /mnt/system)")
+        target_root_path=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_TARGET_MOUNT_PROMPT')")
     fi
     if [ -z "$target_root_path" ] || [ ! -d "$target_root_path" ]; then
-        if lh_confirm_action "Das Zielverzeichnis '$target_root_path' existiert nicht. Erstellen?" "n"; then
+        if lh_confirm_action "$(printf "$(lh_msg 'BTRFS_RESTORE_TARGET_NOT_EXISTS_CREATE')" "$target_root_path")" "n"; then
              mkdir -p "$target_root_path"
              if [ $? -ne 0 ]; then
-                echo -e "${LH_COLOR_ERROR}Konnte Zielverzeichnis nicht erstellen.${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_COULD_NOT_CREATE_TARGET')${LH_COLOR_RESET}"
                 return 1
              fi
         else
@@ -564,36 +567,36 @@ setup_recovery_environment() {
         fi
     fi
     TARGET_ROOT="$target_root_path"
-    TEMP_SNAPSHOT_DIR="$TARGET_ROOT/.snapshots_recovery" # Temporäres Verzeichnis definieren
-    restore_log_msg "INFO" "Zielsystem gesetzt auf: $TARGET_ROOT"
-    echo -e "${LH_COLOR_SUCCESS}Zielsystem erfolgreich gesetzt.${LH_COLOR_RESET}"
+    TEMP_SNAPSHOT_DIR="$TARGET_ROOT/.snapshots_recovery" # Define temporary directory
+    restore_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_RESTORE_LOG_TARGET_SET')" "$TARGET_ROOT")"
+    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_RESTORE_TARGET_SUCCESS')${LH_COLOR_RESET}"
     
-    # Dry Run Abfrage
-    if lh_confirm_action "Möchten Sie einen 'Dry Run' durchführen (simuliert ohne Änderungen)?" "y"; then
+    # Dry run query
+    if lh_confirm_action "$(lh_msg 'BTRFS_RESTORE_DRY_RUN_PROMPT')" "y"; then
         DRY_RUN=true
-        echo -e "${LH_COLOR_INFO}Dry Run Modus ist AKTIVIERT.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_DRY_RUN_ACTIVATED')${LH_COLOR_RESET}"
     else
         DRY_RUN=false
-        echo -e "${LH_COLOR_WARNING}Dry Run Modus ist DEAKTIVIERT. Änderungen werden tatsächlich durchgeführt!${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_RESTORE_DRY_RUN_DEACTIVATED')${LH_COLOR_RESET}"
     fi
 
     return 0
 }
 
-# Hauptmenü für das Wiederherstellungs-Modul
+# Main menu for the restore module
 main_menu() {
     while true; do
-        lh_print_header "BTRFS Wiederherstellungs-Modul"
+        lh_print_header "$(lh_msg 'BTRFS_RESTORE_MAIN_HEADER')"
 
-        lh_print_menu_item 1 "Wiederherstellung starten (Subvolume oder System)"
-        lh_print_menu_item 2 "Ordner aus Snapshot wiederherstellen"
-        lh_print_menu_item 3 "Disk-Informationen anzeigen"
-        lh_print_menu_item 4 "Setup erneut durchführen (Pfade ändern)"
-        lh_print_menu_item 0 "Zurück zum Hauptmenü"
+        lh_print_menu_item 1 "$(lh_msg 'BTRFS_RESTORE_MENU_START_RESTORE')"
+        lh_print_menu_item 2 "$(lh_msg 'BTRFS_RESTORE_MENU_FOLDER_RESTORE')"
+        lh_print_menu_item 3 "$(lh_msg 'BTRFS_RESTORE_MENU_DISK_INFO')"
+        lh_print_menu_item 4 "$(lh_msg 'BTRFS_RESTORE_MENU_SETUP_AGAIN')"
+        lh_print_menu_item 0 "$(lh_msg 'BTRFS_RESTORE_MENU_BACK')"
         echo ""
 
         local option
-        option=$(lh_ask_for_input "Wählen Sie eine Option:" "^[0-4]$" "Ungültige Eingabe.")
+        option=$(lh_ask_for_input "$(lh_msg 'CHOOSE_OPTION')" "^[0-4]$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
 
         case $option in
             1)
@@ -603,16 +606,16 @@ main_menu() {
                 restore_folder_from_snapshot
                 ;;
             3)
-                lh_print_header "Disk-Informationen"
-                echo -e "${LH_COLOR_INFO}Block-Geräte und Dateisysteme:${LH_COLOR_RESET}"
+                lh_print_header "$(lh_msg 'BTRFS_RESTORE_DISK_INFO_HEADER')"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_BLOCK_DEVICES')${LH_COLOR_RESET}"
                 lsblk -f
                 echo ""
-                echo -e "${LH_COLOR_INFO}BTRFS Dateisystem-Nutzung:${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_BTRFS_USAGE')${LH_COLOR_RESET}"
                 btrfs filesystem usage /
                 ;;
             4)
                 if ! setup_recovery_environment; then
-                     echo -e "${LH_COLOR_ERROR}Setup fehlgeschlagen. Breche ab.${LH_COLOR_RESET}"
+                     echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_SETUP_FAILED')${LH_COLOR_RESET}"
                      return 1
                 fi
                 ;;
@@ -620,75 +623,74 @@ main_menu() {
                 return 0
                 ;;
             *)
-                echo -e "${LH_COLOR_ERROR}Ungültige Auswahl.${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'BACKUP_INVALID_SELECTION')${LH_COLOR_RESET}"
                 ;;
         esac
 
-        # Pause nach jeder Aktion
-        read -n 1 -s -r -p "$(echo -e "${LH_COLOR_INFO}Drücken Sie eine beliebige Taste, um fortzufahren...${LH_COLOR_RESET}")"
+        # Pause after each action
+        read -n 1 -s -r -p "$(echo -e \"${LH_COLOR_INFO}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}\")"
         echo ""
     done
 }
 
-
-# --- Hauptausführung ---
+# --- Main execution ---
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     
-    # Definiere die Restore-Log-Datei für diesen Lauf
+    # Define the restore log file for this run
     LH_RESTORE_LOG="$LH_LOG_DIR/$(date +%y%m%d-%H%M)_restore.log"
     
-    # Kritische Warnung
+    # Critical warning
     clear
     echo -e "${LH_COLOR_BOLD_RED}===================================================================${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_BOLD_RED}=== ACHTUNG: BTRFS WIEDERHERSTELLUNGS-MODUL                      ===${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_RESTORE_HEADER')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_BOLD_RED}===================================================================${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_WARNING}Dieses Skript führt ${LH_COLOR_BOLD_RED}destruktive Operationen${LH_COLOR_WARNING} auf Ihrem System durch.${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_WARNING}Eine Wiederherstellung überschreibt existierende Daten unwiderruflich.${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_RESTORE_DESTRUCTIVE_WARNING')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_RESTORE_OVERWRITE_WARNING')${LH_COLOR_RESET}"
     echo -e ""
-    echo -e "${LH_COLOR_YELLOW}Es wird ${LH_COLOR_BOLD_YELLOW}DRINGEND EMPFOHLEN${LH_COLOR_YELLOW}, dieses Skript NUR von einer${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_BOLD_YELLOW}Live-Umgebung (z.B. Live-USB) auszuführen${LH_COLOR_YELLOW} und NICHT auf dem${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_BOLD_YELLOW}laufenden System, das Sie wiederherstellen möchten.${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_YELLOW}$(lh_msg 'BTRFS_RESTORE_LIVE_RECOMMEND_1')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_BOLD_YELLOW}$(lh_msg 'BTRFS_RESTORE_LIVE_RECOMMEND_2')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_BOLD_YELLOW}$(lh_msg 'BTRFS_RESTORE_LIVE_RECOMMEND_3')${LH_COLOR_RESET}"
     echo -e ""
 
-    # Root-Rechte prüfen
+    # Check root privileges
     if [ "$EUID" -ne 0 ]; then
-        echo -e "${LH_COLOR_WARNING}Dieses Skript benötigt root-Rechte.${LH_COLOR_RESET}"
-        if lh_confirm_action "Mit sudo erneut starten?" "y"; then
-            restore_log_msg "INFO" "Starte Restore-Modul mit sudo."
-            # Übergibt --dry-run an den neuen Aufruf, falls gesetzt
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_RESTORE_ROOT_REQUIRED')${LH_COLOR_RESET}"
+        if lh_confirm_action "$(lh_msg 'BTRFS_RESTORE_RESTART_WITH_SUDO')" "y"; then
+            restore_log_msg "INFO" "$(lh_msg 'BTRFS_RESTORE_LOG_START_WITH_SUDO')"
+            # Pass --dry-run to the new call if set
             sudo "$0" "$@"
             exit $?
         else
-            restore_log_msg "ERROR" "Benutzer hat sudo-Ausführung abgelehnt."
+            restore_log_msg "ERROR" "$(lh_msg 'BTRFS_RESTORE_LOG_USER_DENIED_SUDO')"
             exit 1
         fi
     fi
 
-    # BTRFS-Tools prüfen
+    # Check BTRFS tools
     if ! lh_check_command "btrfs" "true"; then
-        restore_log_msg "ERROR" "BTRFS-Tools (btrfs-progs) sind nicht installiert und konnten nicht installiert werden."
+        restore_log_msg "ERROR" "$(lh_msg 'BTRFS_RESTORE_LOG_BTRFS_TOOLS_MISSING')"
         exit 1
     fi
 
     lh_check_live_environment
 
-    if ! lh_confirm_action "Haben Sie die Warnung verstanden und möchten fortfahren?" "n"; then
-        restore_log_msg "INFO" "Benutzer hat den Start des Restore-Moduls abgebrochen."
-        echo -e "${LH_COLOR_INFO}Wiederherstellung abgebrochen.${LH_COLOR_RESET}"
+    if ! lh_confirm_action "$(lh_msg 'BTRFS_RESTORE_UNDERSTAND_WARNING')" "n"; then
+        restore_log_msg "INFO" "$(lh_msg 'BTRFS_RESTORE_LOG_USER_ABORTED')"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_ABORTED')${LH_COLOR_RESET}"
         exit 0
     fi
     
-    # Setup durchführen
+    # Perform setup
     if ! setup_recovery_environment; then
-        restore_log_msg "ERROR" "Setup fehlgeschlagen. Das Skript wird beendet."
-        echo -e "${LH_COLOR_ERROR}Setup fehlgeschlagen. Breche ab.${LH_COLOR_RESET}"
+        restore_log_msg "ERROR" "$(lh_msg 'BTRFS_RESTORE_LOG_SETUP_FAILED')"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_SETUP_FAILED')${LH_COLOR_RESET}"
         exit 1
     fi
 
-    # Hauptmenü starten
+    # Start main menu
     main_menu
     
-    restore_log_msg "INFO" "BTRFS Restore-Modul beendet."
-    echo -e "${LH_COLOR_SUCCESS}Wiederherstellungs-Modul beendet.${LH_COLOR_RESET}"
+    restore_log_msg "INFO" "$(lh_msg 'BTRFS_RESTORE_LOG_MODULE_FINISHED')"
+    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_RESTORE_MODULE_FINISHED')${LH_COLOR_RESET}"
 fi
 

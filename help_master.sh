@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# little-linux-helper/help_master.sh
+# help_master.sh
 # Copyright (c) 2025 wuldorf
 # SPDX-License-Identifier: MIT
 #
@@ -36,11 +36,11 @@ function lh_ensure_config_files_exist() {
         if [ ! -f "$actual_config_file" ]; then
             if [ -f "$template_config_file" ]; then
                 cp "$template_config_file" "$actual_config_file"
-                echo -e "${LH_COLOR_INFO}Hinweis: Die Konfigurationsdatei '$config_file_base' wurde aus der Vorlage '${config_file_base}${template_suffix}' erstellt.${LH_COLOR_RESET}"
-                echo -e "${LH_COLOR_INFO}Bitte überprüfen und passen Sie ggf. '$actual_config_file' an Ihre Bedürfnisse an.${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg "CONFIG_FILE_CREATED" "$config_file_base" "${config_file_base}${template_suffix}")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg "CONFIG_FILE_REVIEW" "$actual_config_file")${LH_COLOR_RESET}"
             else
-                lh_log_msg "WARN" "Konfigurationsdatei '$actual_config_file' nicht gefunden und keine Vorlagedatei '$template_config_file' vorhanden."
-                echo -e "${LH_COLOR_WARNING}Warnung: Konfigurationsdatei '$actual_config_file' nicht gefunden und keine Vorlagedatei '$template_config_file' vorhanden.${LH_COLOR_RESET}"
+                lh_log_msg "WARN" "$(lh_msg "LOG_CONFIG_FILE_MISSING" "$actual_config_file" "$template_config_file")"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg "CONFIG_FILE_MISSING" "$actual_config_file" "$template_config_file")${LH_COLOR_RESET}"
             fi
         fi
     done
@@ -48,110 +48,117 @@ function lh_ensure_config_files_exist() {
 
 # Initialisierungen
 lh_ensure_config_files_exist # Sicherstellen, dass Konfigurationsdateien vorhanden sind
+lh_load_general_config        # Lade allgemeine Konfiguration ZUERST (für Log-Level)
 lh_initialize_logging
 lh_check_root_privileges
 lh_detect_package_manager
 lh_detect_alternative_managers
 lh_finalize_initialization
 
+# Mark that initialization is complete to prevent double-initialization in modules
+export LH_INITIALIZED=1
+
+# Load main menu translations
+lh_load_language_module "main_menu"
+
 # Willkommensnachricht
 echo -e "${LH_COLOR_BOLD_YELLOW}╔════════════════════════════════════════════╗${LH_COLOR_RESET}"
-echo -e "${LH_COLOR_BOLD_YELLOW}║           ${LH_COLOR_BOLD_WHITE}Little Linux Helper${LH_COLOR_BOLD_YELLOW}              ║${LH_COLOR_RESET}"
+echo -e "${LH_COLOR_BOLD_YELLOW}║           ${LH_COLOR_BOLD_WHITE}$(lh_msg "WELCOME_TITLE")${LH_COLOR_BOLD_YELLOW}              ║${LH_COLOR_RESET}"
 echo -e "${LH_COLOR_BOLD_YELLOW}╚════════════════════════════════════════════╝${LH_COLOR_RESET}"
 
-lh_log_msg "INFO" "Little Linux Helper gestartet."
+lh_log_msg "INFO" "$(lh_msg "LOG_HELPER_STARTED")"
 
 # Funktion für das Debugbündel
 function create_debug_bundle() {
-    lh_print_header "Debug-Informationen sammeln"
+    lh_print_header "$(lh_msg "DEBUG_HEADER")"
 
     local debug_file="$LH_LOG_DIR/debug_report_$(hostname)_$(date '+%Y%m%d-%H%M').txt"
 
-    lh_log_msg "INFO" "Erstelle Debug-Bericht in: $debug_file"
+    lh_log_msg "INFO" "$(lh_msg "LOG_DEBUG_REPORT_CREATING" "$debug_file")"
 
     # Header für die Debug-Datei
     {
-        echo "===== Little Linux Helper Debug-Bericht ====="
-        echo "Erstellt: $(date)"
-        echo "Hostname: $(hostname)"
-        echo "Benutzer: $(whoami)"
+        echo "===== $(lh_msg "DEBUG_LITTLE_HELPER_REPORT") ====="
+        echo "$(lh_msg "DEBUG_CREATED") $(date)"
+        echo "$(lh_msg "DEBUG_HOSTNAME") $(hostname)"
+        echo "$(lh_msg "DEBUG_USER") $(whoami)"
         echo ""
     } > "$debug_file"
 
     # Systeminformationen sammeln
-    echo "===== Systeminformationen =====" >> "$debug_file"
-    echo "* Betriebssystem:" >> "$debug_file"
+    echo "===== $(lh_msg "DEBUG_SYSTEM_INFO") =====" >> "$debug_file"
+    echo "* $(lh_msg "DEBUG_OS")" >> "$debug_file"
     if [ -f /etc/os-release ]; then
         cat /etc/os-release >> "$debug_file"
     else
-        echo "Konnte /etc/os-release nicht finden." >> "$debug_file"
+        echo "$(lh_msg "DEBUG_OS_RELEASE_NOT_FOUND")" >> "$debug_file"
     fi
     echo "" >> "$debug_file"
 
-    echo "* Kernel-Version:" >> "$debug_file"
+    echo "* $(lh_msg "DEBUG_KERNEL")" >> "$debug_file"
     uname -a >> "$debug_file"
     echo "" >> "$debug_file"
 
-    echo "* CPU-Info:" >> "$debug_file"
+    echo "* $(lh_msg "DEBUG_CPU")" >> "$debug_file"
     lscpu | grep "Model name\|CPU(s)\|CPU MHz" >> "$debug_file"
     echo "" >> "$debug_file"
 
-    echo "* Speichernutzung:" >> "$debug_file"
+    echo "* $(lh_msg "DEBUG_MEMORY")" >> "$debug_file"
     free -h >> "$debug_file"
     echo "" >> "$debug_file"
 
-    echo "* Festplattennutzung:" >> "$debug_file"
+    echo "* $(lh_msg "DEBUG_DISK")" >> "$debug_file"
     df -h >> "$debug_file"
     echo "" >> "$debug_file"
 
     # Paketmanager-Information
-    echo "===== Paketmanager =====" >> "$debug_file"
-    echo "* Standard-Paketmanager: $LH_PKG_MANAGER" >> "$debug_file"
-    echo "* Alternative Paketmanager: ${LH_ALT_PKG_MANAGERS[*]}" >> "$debug_file"
+    echo "===== $(lh_msg "DEBUG_PACKAGE_MANAGER") =====" >> "$debug_file"
+    echo "* $(lh_msg "DEBUG_PRIMARY_PKG_MGR") $LH_PKG_MANAGER" >> "$debug_file"
+    echo "* $(lh_msg "DEBUG_ALT_PKG_MGR") ${LH_ALT_PKG_MANAGERS[*]}" >> "$debug_file"
     echo "" >> "$debug_file"
 
     # Log-Auszüge sammeln
-    echo "===== Wichtige Logs =====" >> "$debug_file"
+    echo "===== $(lh_msg "DEBUG_IMPORTANT_LOGS") =====" >> "$debug_file"
 
-    echo "* Letzte 50 System-Logs:" >> "$debug_file"
+    echo "* $(lh_msg "DEBUG_LAST_SYSTEM_LOGS")" >> "$debug_file"
     if command -v journalctl >/dev/null 2>&1; then
         journalctl -n 50 --no-pager >> "$debug_file" 2>&1
     else
-        echo "journalctl nicht verfügbar." >> "$debug_file"
+        echo "$(lh_msg "DEBUG_JOURNALCTL_NOT_AVAILABLE")" >> "$debug_file"
         if [ -f /var/log/syslog ]; then
             tail -n 50 /var/log/syslog >> "$debug_file" 2>&1
         elif [ -f /var/log/messages ]; then
             tail -n 50 /var/log/messages >> "$debug_file" 2>&1
         else
-            echo "Keine Standard-Logdateien gefunden." >> "$debug_file"
+            echo "$(lh_msg "DEBUG_NO_STANDARD_LOGS")" >> "$debug_file"
         fi
     fi
     echo "" >> "$debug_file"
 
-    echo "* Xorg-Logs:" >> "$debug_file"
+    echo "* $(lh_msg "DEBUG_XORG_LOGS")" >> "$debug_file"
     if [ -f /var/log/Xorg.0.log ]; then
         tail -n 50 /var/log/Xorg.0.log >> "$debug_file" 2>&1
     else
-        echo "Xorg-Logdatei nicht gefunden." >> "$debug_file"
+        echo "$(lh_msg "DEBUG_XORG_LOG_NOT_FOUND")" >> "$debug_file"
     fi
     echo "" >> "$debug_file"
 
-    echo "* Laufende Prozesse:" >> "$debug_file"
+    echo "* $(lh_msg "DEBUG_RUNNING_PROCESSES")" >> "$debug_file"
     ps aux | head -n 20 >> "$debug_file" 2>&1
     echo "" >> "$debug_file"
 
     # Netzwerkinformationen
-    echo "===== Netzwerkinformationen =====" >> "$debug_file"
+    echo "===== $(lh_msg "DEBUG_NETWORK_INFO") =====" >> "$debug_file"
 
-    echo "* Netzwerkschnittstellen:" >> "$debug_file"
+    echo "* $(lh_msg "DEBUG_NETWORK_INTERFACES")" >> "$debug_file"
     ip addr show >> "$debug_file" 2>&1
     echo "" >> "$debug_file"
 
-    echo "* Netzwerkrouten:" >> "$debug_file"
+    echo "* $(lh_msg "DEBUG_NETWORK_ROUTES")" >> "$debug_file"
     ip route show >> "$debug_file" 2>&1
     echo "" >> "$debug_file"
 
-    echo "* Aktive Verbindungen:" >> "$debug_file"
+    echo "* $(lh_msg "DEBUG_ACTIVE_CONNECTIONS")" >> "$debug_file"
     if command -v ss >/dev/null 2>&1; then
         ss -tulpn >> "$debug_file" 2>&1
     else
@@ -160,9 +167,9 @@ function create_debug_bundle() {
     echo "" >> "$debug_file"
 
     # Desktop-Umgebung
-    echo "===== Desktop-Umgebung =====" >> "$debug_file"
+    echo "===== $(lh_msg "DEBUG_DESKTOP_ENV") =====" >> "$debug_file"
 
-    echo "* Aktuelle Desktop-Umgebung:" >> "$debug_file"
+    echo "* $(lh_msg "DEBUG_CURRENT_DESKTOP")" >> "$debug_file"
     # Versuche die Desktop-Umgebung zu ermitteln
     if [ -n "$XDG_CURRENT_DESKTOP" ]; then
         echo "$XDG_CURRENT_DESKTOP" >> "$debug_file" 2>&1
@@ -173,42 +180,43 @@ function create_debug_bundle() {
     fi
     echo "" >> "$debug_file"
 
-    lh_log_msg "INFO" "Debug-Bericht erfolgreich erstellt: $debug_file"
-    echo -e "${LH_COLOR_SUCCESS}Debug-Bericht wurde erstellt: $debug_file${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_INFO}Sie können diese Datei bei der Fehlersuche oder für Support-Anfragen verwenden.${LH_COLOR_RESET}"
+    lh_log_msg "INFO" "$(lh_msg "LOG_DEBUG_REPORT_SUCCESS" "$debug_file")"
+    echo -e "${LH_COLOR_SUCCESS}$(lh_msg "DEBUG_REPORT_CREATED") $debug_file${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg "DEBUG_REPORT_INFO")${LH_COLOR_RESET}"
 
     # Fragen, ob die Datei angezeigt werden soll
-    if lh_confirm_action "Möchten Sie den Bericht jetzt mit 'less' anzeigen?" "n"; then
+    if lh_confirm_action "$(lh_msg "DEBUG_VIEW_REPORT")" "n"; then
         less "$debug_file"
     fi
 }
 
 # Hauptschleife
 while true; do
-    lh_print_header "Little Linux Helper - Hauptmenü"
+    lh_print_header "$(lh_msg "MAIN_MENU_TITLE")"
 
-    echo -e "${LH_COLOR_BOLD_MAGENTA}[Wiederherstellung & Neustarts]${LH_COLOR_RESET}"
-    lh_print_menu_item 1 "Dienste & Desktop Neustart-Optionen"
+    echo -e "${LH_COLOR_BOLD_MAGENTA}$(lh_msg "CATEGORY_RECOVERY")${LH_COLOR_RESET}"
+    lh_print_menu_item 1 "$(lh_msg "MENU_RESTARTS")"
 
-    echo -e "${LH_COLOR_BOLD_MAGENTA}[Systemdiagnose & Analyse]${LH_COLOR_RESET}"
-    lh_print_menu_item 2 "Systeminformationen anzeigen"
-    lh_print_menu_item 3 "Festplatten-Werkzeuge"
-    lh_print_menu_item 4 "Log-Analyse Werkzeuge"
+    echo -e "${LH_COLOR_BOLD_MAGENTA}$(lh_msg "CATEGORY_DIAGNOSIS")${LH_COLOR_RESET}"
+    lh_print_menu_item 2 "$(lh_msg "MENU_SYSTEM_INFO")"
+    lh_print_menu_item 3 "$(lh_msg "MENU_DISK_TOOLS")"
+    lh_print_menu_item 4 "$(lh_msg "MENU_LOG_ANALYSIS")"
 
-    echo -e "${LH_COLOR_BOLD_MAGENTA}[Wartung & Sicherheit]${LH_COLOR_RESET}"
-    lh_print_menu_item 5 "Paketverwaltung & Updates"
-    lh_print_menu_item 6 "Sicherheitsüberprüfungen"
-    lh_print_menu_item 7 "Backup & Wiederherstellung"
+    echo -e "${LH_COLOR_BOLD_MAGENTA}$(lh_msg "CATEGORY_MAINTENANCE")${LH_COLOR_RESET}"
+    lh_print_menu_item 5 "$(lh_msg "MENU_PACKAGE_MGMT")"
+    lh_print_menu_item 6 "$(lh_msg "MENU_SECURITY")"
+    lh_print_menu_item 7 "$(lh_msg "MENU_BACKUP")"
+    lh_print_menu_item 8 "$(lh_msg "MENU_DOCKER")"
 
-    echo -e "${LH_COLOR_BOLD_MAGENTA}[Spezialfunktionen]${LH_COLOR_RESET}"
-    lh_print_menu_item 8 "Wichtige Debug-Infos in Datei sammeln"
+    echo -e "${LH_COLOR_BOLD_MAGENTA}$(lh_msg "CATEGORY_SPECIAL")${LH_COLOR_RESET}"
+    lh_print_menu_item 9 "$(lh_msg "MENU_DEBUG_BUNDLE")"
 
     echo ""
-    lh_print_menu_item 0 "Beenden"
+    lh_print_menu_item 0 "$(lh_msg "EXIT")"
     echo ""
 
     main_option_prompt="" # Initialisierung ohne local oder einfach direkt verwenden
-    main_option_prompt="$(echo -e "${LH_COLOR_PROMPT}Wählen Sie eine Option:${LH_COLOR_RESET} ")"
+    main_option_prompt="$(echo -e "${LH_COLOR_PROMPT}$(lh_msg "CHOOSE_OPTION")${LH_COLOR_RESET} ")"
     read -p "$main_option_prompt" option
 
     case $option in
@@ -231,23 +239,26 @@ while true; do
             bash "$LH_ROOT_DIR/modules/mod_security.sh"
             ;;
         7)
-            bash "$LH_ROOT_DIR/modules/mod_backup.sh"  # NEU
+            bash "$LH_ROOT_DIR/modules/mod_backup.sh"
             ;;
         8)
+            bash "$LH_ROOT_DIR/modules/mod_docker.sh"
+            ;;
+        9)
             create_debug_bundle
             ;;
         0)
-            lh_log_msg "INFO" "Little Linux Helper wird beendet."
-            echo -e "${LH_COLOR_BOLD_GREEN}Auf Wiedersehen!${LH_COLOR_RESET}"
+            lh_log_msg "INFO" "$(lh_msg "LOG_HELPER_STOPPED")"
+            echo -e "${LH_COLOR_BOLD_GREEN}$(lh_msg "GOODBYE")${LH_COLOR_RESET}"
             exit 0
             ;;
         *)
-            lh_log_msg "WARN" "Ungültige Auswahl: $option"
-            echo -e "${LH_COLOR_WARNING}Ungültige Auswahl. Bitte versuchen Sie es erneut.${LH_COLOR_RESET}"
+            lh_log_msg "WARN" "$(lh_msg "LOG_INVALID_SELECTION" "$option")"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg "INVALID_SELECTION")${LH_COLOR_RESET}"
             ;;
     esac
 
     # Kurze Pause, damit Benutzer die Ausgabe lesen kann
-    read -p "$(echo -e "${LH_COLOR_INFO}Drücken Sie eine Taste, um fortzufahren...${LH_COLOR_RESET}")" -n1 -s
+    read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg "PRESS_KEY_CONTINUE")${LH_COLOR_RESET}")" -n1 -s
     echo ""
 done

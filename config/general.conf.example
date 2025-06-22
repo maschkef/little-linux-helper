@@ -1,0 +1,58 @@
+# config/general.conf
+# Copyright (c) 2025 wuldorf
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the 'little-linux-helper' collection.
+# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+#
+# little-linux-helper General Configuration
+
+# =============================================================================
+# LANGUAGE SETTINGS
+# =============================================================================
+
+# Supported languages: 
+# - de (German) - Full translation support
+# - en (English) - Full translation support
+# - es (Spanish) - Library translations only (lib/* files)
+# - fr (French) - Library translations only (lib/* files)
+#
+# Note: Spanish and French are partial implementations primarily for testing.
+# They have basic library translations but fall back to English for modules
+# and main menu items. Full support can be added by translating language files.
+#
+# Set to "auto" to automatically detect from system locale
+# Default: English
+
+CFG_LH_LANG="en"
+
+# =============================================================================
+# LOGGING SETTINGS
+# =============================================================================
+
+# Log level configuration
+# Determines which messages are shown on console and written to log files
+# 
+# Available levels (in order of verbosity):
+# - ERROR: Only critical errors that prevent operation
+# - WARN:  Warnings and errors (recommended for normal use)
+# - INFO:  Informational messages, warnings and errors (default)
+# - DEBUG: All messages including debug information (verbose)
+#
+# Each level includes all levels above it (ERROR < WARN < INFO < DEBUG)
+
+CFG_LH_LOG_LEVEL="INFO"
+
+# Enable/disable console output (true/false)
+# When false, messages are only written to log files
+CFG_LH_LOG_TO_CONSOLE="true"
+
+# Enable/disable file logging (true/false) 
+# When false, messages are only shown on console
+CFG_LH_LOG_TO_FILE="true"
+
+# =============================================================================
+# FUTURE SETTINGS
+# =============================================================================
+# Additional general settings can be added here as the project grows
+# Examples: notification preferences, UI themes, default timeouts, etc.

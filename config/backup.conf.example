@@ -1,25 +1,32 @@
-# Little Linux Helper - Backup Konfiguration
+# config/backup.conf
+# Copyright (c) 2025 wuldorf
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the 'little-linux-helper' collection.
+# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+#
+# Little Linux Helper - Backup Configuration
 
 # CFG_LH_BACKUP_ROOT:
-# Der absolute Pfad zum Wurzelverzeichnis, in dem die Backups gespeichert werden sollen.
-# Beispiel: "/mnt/externe_festplatte" oder "/srv/backups"
+# The absolute path to the root directory where backups should be stored.
+# Example: "/mnt/external_drive" or "/srv/backups"
 CFG_LH_BACKUP_ROOT="/run/media/tux/hdd_3tb/"
 
 # CFG_LH_BACKUP_DIR:
-# Der Name des Unterverzeichnisses innerhalb von CFG_LH_BACKUP_ROOT, in dem die eigentlichen Backup-Daten landen.
-# Muss mit einem "/" beginnen. Beispiel: "/mein_system_backup"
+# The name of the subdirectory within CFG_LH_BACKUP_ROOT where the actual backup data will be stored.
+# Must start with "/". Example: "/my_system_backup"
 CFG_LH_BACKUP_DIR="/backups"
 
 # CFG_LH_TEMP_SNAPSHOT_DIR:
-# Ein absoluter Pfad zu einem temporären Verzeichnis, das für BTRFS-Snapshots während des Backup-Prozesses verwendet wird.
-# Dieses Verzeichnis sollte auf einem BTRFS-Volume liegen, idealerweise auf dem System selbst, wenn möglich.
+# An absolute path to a temporary directory used for BTRFS snapshots during the backup process.
+# This directory should be on a BTRFS volume, ideally on the system itself if possible.
 CFG_LH_TEMP_SNAPSHOT_DIR="/.snapshots_backup"
 
 # CFG_LH_RETENTION_BACKUP:
-# Die Anzahl der aufzubewahrenden Backup-Versionen (z.B. 10 bedeutet, dass die 10 neuesten Backups behalten werden).
+# The number of backup versions to keep (e.g., 10 means the 10 newest backups will be retained).
 CFG_LH_RETENTION_BACKUP="10"
 
 # CFG_LH_BACKUP_LOG_BASENAME:
-# Der Basisname für die Backup-Logdateien. An diesen Namen wird ein Zeitstempel (JJMMTT-HHMM_) vorangestellt.
-# Beispiel: "backup.log" wird zu "240730-1015_backup.log".
+# The base name for backup log files. A timestamp (YYMMDD-HHMM_) will be prepended to this name.
+# Example: "backup.log" becomes "240730-1015_backup.log".
 CFG_LH_BACKUP_LOG_BASENAME="backup.log"

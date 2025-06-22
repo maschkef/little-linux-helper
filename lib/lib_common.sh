@@ -25,7 +25,11 @@ LH_CONFIG_DIR="$LH_ROOT_DIR/config"
 LH_BACKUP_CONFIG_FILE="$LH_CONFIG_DIR/backup.conf"
 
 # Sicherstellen, dass das (monatliche) Log-Verzeichnis existiert
-mkdir -p "$LH_LOG_DIR" || echo "WARNUNG: Konnte initiales Log-Verzeichnis nicht erstellen: $LH_LOG_DIR" >&2
+mkdir -p "$LH_LOG_DIR" || {
+    # Use English fallback before translation system is loaded
+    local msg="${MSG[LIB_WARNING_INITIAL_LOG_DIR]:-WARNING: Could not create initial log directory: %s}"
+    echo "$(printf "$msg" "$LH_LOG_DIR")" >&2
+}
 
 # Die aktuelle Log-Datei wird bei Initialisierung gesetzt
 LH_LOG_FILE="${LH_LOG_FILE:-}" # Stellt sicher, dass sie existiert, aber überschreibt sie nicht, wenn sie bereits von außen gesetzt/exportiert wurde.
@@ -49,6 +53,18 @@ LH_TEMP_SNAPSHOT_DIR_DEFAULT="/.snapshots_backup" # Absoluter Pfad
 LH_RETENTION_BACKUP_DEFAULT=10
 LH_BACKUP_LOG_BASENAME_DEFAULT="backup.log" # Basisname für die Backup-Logdatei
 
+# Internationalization support
+# Note: Default language is now set to English (en) in lh_initialize_i18n()
+# Supported: de (German, full), en (English, full), es (Spanish, lib only), fr (French, lib only)
+LH_LANG_DIR="$LH_ROOT_DIR/lang"
+LH_GENERAL_CONFIG_FILE="$LH_CONFIG_DIR/general.conf"
+declare -A MSG # Global message array
+
+# Logging configuration
+LH_LOG_LEVEL="INFO"           # Default log level
+LH_LOG_TO_CONSOLE="true"      # Enable console output
+LH_LOG_TO_FILE="true"         # Enable file logging
+
 # Aktive Backup-Konfigurationsvariablen
 LH_BACKUP_ROOT=""
 LH_BACKUP_DIR=""
@@ -57,284 +73,12 @@ LH_RETENTION_BACKUP=""
 LH_BACKUP_LOG_BASENAME="" # Der konfigurierte Basisname für die Backup-Logdatei
 LH_BACKUP_LOG="${LH_BACKUP_LOG:-}"          # Voller Pfad zur Backup-Logdatei (mit Zeitstempel)
 
-
-# Farben für die Ausgabe
-LH_COLOR_RESET='\e[0m'
-LH_COLOR_BLACK='\e[0;30m'
-LH_COLOR_RED='\e[0;31m'
-LH_COLOR_GREEN='\e[0;32m'
-LH_COLOR_YELLOW='\e[0;33m'
-LH_COLOR_BLUE='\e[0;34m'
-LH_COLOR_MAGENTA='\e[0;35m'
-LH_COLOR_CYAN='\e[0;36m'
-LH_COLOR_WHITE='\e[0;37m'
-
-LH_COLOR_BOLD_BLACK='\e[1;30m'
-LH_COLOR_BOLD_RED='\e[1;31m'
-LH_COLOR_BOLD_GREEN='\e[1;32m'
-LH_COLOR_BOLD_YELLOW='\e[1;33m'
-LH_COLOR_BOLD_BLUE='\e[1;34m'
-LH_COLOR_BOLD_MAGENTA='\e[1;35m'
-LH_COLOR_BOLD_CYAN='\e[1;36m'
-LH_COLOR_BOLD_WHITE='\e[1;37m'
-
-# Aliase für häufig verwendete Farben
-LH_COLOR_HEADER="${LH_COLOR_BOLD_CYAN}"
-LH_COLOR_MENU_NUMBER="${LH_COLOR_BOLD_YELLOW}"
-LH_COLOR_MENU_TEXT="${LH_COLOR_CYAN}"
-LH_COLOR_PROMPT="${LH_COLOR_BOLD_GREEN}"
-LH_COLOR_SUCCESS="${LH_COLOR_BOLD_GREEN}"
-LH_COLOR_ERROR="${LH_COLOR_BOLD_RED}"
-LH_COLOR_WARNING="${LH_COLOR_BOLD_YELLOW}"
-LH_COLOR_INFO="${LH_COLOR_BOLD_BLUE}"
-LH_COLOR_SEPARATOR="${LH_COLOR_BLUE}"
-
-
-# Mapping von Programmnamen zu Paketnamen für verschiedene Paketmanager
-declare -A package_names_pacman=(
-    ["smartctl"]="smartmontools"
-    ["lsof"]="lsof"
-    ["hdparm"]="hdparm"
-    ["fsck"]="util-linux"
-    ["du"]="coreutils"
-    ["ss"]="iproute2"
-    ["fail2ban-client"]="fail2ban"
-    ["rkhunter"]="rkhunter"
-    ["chkrootkit"]="chkrootkit"
-    ["sensors"]="lm-sensors"
-    ["ncdu"]="ncdu"
-    ["btrfs"]="btrfs-progs"
-    ["rsync"]="rsync"
-    ["tar"]="tar"
-    ["journalctl"]="systemd"
-    ["systemctl"]="systemd"
-    ["loginctl"]="systemd"
-    ["lsblk"]="util-linux"
-    ["mount"]="util-linux"
-    ["umount"]="util-linux"
-    ["lscpu"]="util-linux"
-    ["lspci"]="pciutils"
-    ["lsusb"]="usbutils"
-    ["free"]="procps-ng"
-    ["ps"]="procps-ng"
-    ["top"]="procps-ng"
-    ["htop"]="htop"
-    ["btop"]="btop"
-    ["iotop"]="iotop"
-    ["nmap"]="nmap"
-    ["python3"]="python"
-    ["python"]="python"
-    ["git"]="git"
-    ["notify-send"]="libnotify"
-    ["zenity"]="zenity"
-    ["kdialog"]="kdialog"
-    ["rclone"]="rclone"
-    ["borg"]="borg"
-    ["duplicity"]="duplicity"
-    ["timeshift"]="timeshift"
-    ["expac"]="pacman-contrib"
-    ["paccache"]="pacman-contrib"
-    ["bc"]="bc"
-    ["netstat"]="net-tools"
-    ["who"]="coreutils"
-    ["id"]="coreutils"
-    ["whoami"]="coreutils"
-    ["docker"]="docker"
-    ["hostname"]="inetutils"
-    ["passwd"]="passwd"
-    ["dmesg"]="util-linux"
-    ["numfmt"]="coreutils"
-    ["snapper"]="snapper"
-    ["vmstat"]="procps-ng"
-    ["alsactl"]="alsa-utils"
-    ["pipewire"]="pipewire"
-    ["pipewire-pulse"]="pipewire-pulse"
-    ["wireplumber"]="wireplumber"
-    ["amixer"]="alsa-utils"
-    ["nmcli"]="networkmanager"
-)
-
-declare -A package_names_apt=(
-    ["smartctl"]="smartmontools"
-    ["lsof"]="lsof"
-    ["hdparm"]="hdparm"
-    ["fsck"]="util-linux"
-    ["du"]="coreutils"
-    ["ss"]="iproute2"
-    ["fail2ban-client"]="fail2ban"
-    ["rkhunter"]="rkhunter"
-    ["chkrootkit"]="chkrootkit"
-    ["sensors"]="lm-sensors"
-    ["ncdu"]="ncdu"
-    ["btrfs"]="btrfs-progs"
-    ["rsync"]="rsync"
-    ["tar"]="tar"
-    ["journalctl"]="systemd"
-    ["systemctl"]="systemd"
-    ["loginctl"]="systemd"
-    ["lsblk"]="util-linux"
-    ["mount"]="util-linux"
-    ["umount"]="util-linux"
-    ["lscpu"]="util-linux"
-    ["lspci"]="pciutils"
-    ["lsusb"]="usbutils"
-    ["free"]="procps"
-    ["ps"]="procps"
-    ["top"]="procps"
-    ["htop"]="htop"
-    ["btop"]="btop"
-    ["iotop"]="iotop"
-    ["nmap"]="nmap"
-    ["python3"]="python3"
-    ["python"]="python3"
-    ["git"]="git"
-    ["notify-send"]="libnotify-bin"
-    ["zenity"]="zenity"
-    ["kdialog"]="kdialog"
-    ["rclone"]="rclone"
-    ["borg"]="borgbackup"
-    ["duplicity"]="duplicity"
-    ["timeshift"]="timeshift"
-    ["bc"]="bc"
-    ["netstat"]="net-tools"
-    ["who"]="coreutils"
-    ["id"]="coreutils"
-    ["whoami"]="coreutils"
-    ["docker"]="docker.io"
-    ["hostname"]="hostname"
-    ["passwd"]="passwd"
-    ["dmesg"]="util-linux"
-    ["numfmt"]="coreutils"
-    ["snapper"]="snapper"
-    ["vmstat"]="procps"
-    ["alsactl"]="alsa-utils"
-    ["pipewire"]="pipewire"
-    ["pipewire-pulse"]="pipewire-pulse"
-    ["wireplumber"]="wireplumber"
-    ["amixer"]="alsa-utils"
-    ["nmcli"]="network-manager"
-)
-
-declare -A package_names_dnf=(
-    ["smartctl"]="smartmontools"
-    ["lsof"]="lsof"
-    ["hdparm"]="hdparm"
-    ["fsck"]="util-linux"
-    ["du"]="coreutils"
-    ["ss"]="iproute"
-    ["fail2ban-client"]="fail2ban"
-    ["rkhunter"]="rkhunter"
-    ["chkrootkit"]="chkrootkit"
-    ["sensors"]="lm-sensors"
-    ["ncdu"]="ncdu"
-    ["btrfs"]="btrfs-progs"
-    ["rsync"]="rsync"
-    ["tar"]="tar"
-    ["journalctl"]="systemd"
-    ["systemctl"]="systemd"
-    ["loginctl"]="systemd"
-    ["lsblk"]="util-linux"
-    ["mount"]="util-linux"
-    ["umount"]="util-linux"
-    ["lscpu"]="util-linux"
-    ["lspci"]="pciutils"
-    ["lsusb"]="usbutils"
-    ["free"]="procps-ng"
-    ["ps"]="procps-ng"
-    ["top"]="procps-ng"
-    ["htop"]="htop"
-    ["btop"]="btop"
-    ["iotop"]="iotop"
-    ["nmap"]="nmap"
-    ["python3"]="python3"
-    ["python"]="python3"
-    ["git"]="git"
-    ["notify-send"]="libnotify"
-    ["zenity"]="zenity"
-    ["kdialog"]="kdialog"
-    ["rclone"]="rclone"
-    ["borg"]="borgbackup"
-    ["duplicity"]="duplicity"
-    ["timeshift"]="timeshift"
-    ["bc"]="bc"
-    ["netstat"]="net-tools"
-    ["who"]="coreutils"
-    ["id"]="coreutils"
-    ["whoami"]="coreutils"
-    ["docker"]="docker"
-    ["hostname"]="hostname"
-    ["passwd"]="passwd"
-    ["dmesg"]="util-linux"
-    ["numfmt"]="coreutils"
-    ["snapper"]="snapper"
-    ["vmstat"]="procps-ng"
-    ["alsactl"]="alsa-utils"
-    ["pipewire"]="pipewire"
-    ["pipewire-pulse"]="pipewire-pulse"
-    ["wireplumber"]="wireplumber"
-    ["amixer"]="alsa-utils"
-    ["nmcli"]="NetworkManager"
-)
-
-declare -A package_names_zypper=(
-    ["smartctl"]="smartmontools"
-    ["lsof"]="lsof"
-    ["hdparm"]="hdparm"
-    ["fsck"]="util-linux"
-    ["du"]="coreutils"
-    ["ss"]="iproute2"
-    ["fail2ban-client"]="fail2ban"
-    ["rkhunter"]="rkhunter"
-    ["sensors"]="sensors"
-    ["ncdu"]="ncdu"
-    ["btrfs"]="btrfsprogs"
-    ["rsync"]="rsync"
-    ["tar"]="tar"
-    ["journalctl"]="systemd"
-    ["systemctl"]="systemd"
-    ["loginctl"]="systemd"
-    ["lsblk"]="util-linux"
-    ["mount"]="util-linux"
-    ["umount"]="util-linux"
-    ["lscpu"]="util-linux"
-    ["lspci"]="pciutils"
-    ["lsusb"]="usbutils"
-    ["free"]="procps"
-    ["ps"]="procps"
-    ["top"]="procps"
-    ["htop"]="htop"
-    ["btop"]="btop"
-    ["iotop"]="iotop"
-    ["nmap"]="nmap"
-    ["python3"]="python3"
-    ["python"]="python3"
-    ["git"]="git"
-    ["notify-send"]="libnotify-tools"
-    ["zenity"]="zenity"
-    ["kdialog"]="kdialog"
-    ["rclone"]="rclone"
-    ["borg"]="borgbackup"
-    ["duplicity"]="duplicity"
-    ["timeshift"]="timeshift"
-    ["bc"]="bc"
-    ["netstat"]="net-tools"
-    ["who"]="coreutils"
-    ["id"]="coreutils"
-    ["whoami"]="coreutils"
-    ["docker"]="docker"
-    ["hostname"]="hostname"
-    ["passwd"]="passwd"
-    ["dmesg"]="util-linux"
-    ["numfmt"]="coreutils"
-    ["snapper"]="snapper"
-    ["vmstat"]="procps"
-    ["alsactl"]="alsa-utils"
-    ["pipewire"]="pipewire"
-    ["pipewire-pulse"]="pipewire-pulse"
-    ["wireplumber"]="wireplumber"
-    ["amixer"]="alsa-utils"
-    ["nmcli"]="NetworkManager"
-)
+# Load modular library components
+source "$LH_ROOT_DIR/lib/lib_colors.sh"
+source "$LH_ROOT_DIR/lib/lib_package_mappings.sh"
+source "$LH_ROOT_DIR/lib/lib_i18n.sh"
+source "$LH_ROOT_DIR/lib/lib_ui.sh"
+source "$LH_ROOT_DIR/lib/lib_notifications.sh"
 
 # Funktion zum Initialisieren des Loggings
 function lh_initialize_logging() {
@@ -344,25 +88,39 @@ function lh_initialize_logging() {
     if [ -z "$LH_LOG_FILE" ]; then # Nur initialisieren, wenn LH_LOG_FILE noch nicht gesetzt/leer ist
         if [ ! -d "$LH_LOG_DIR" ]; then
             # Versuche es erneut zu erstellen, falls es aus irgendeinem Grund nicht mehr existiert
-            mkdir -p "$LH_LOG_DIR" || { echo "FEHLER: Konnte Log-Verzeichnis nicht erstellen: $LH_LOG_DIR" >&2; LH_LOG_FILE=""; return 1; }
+            mkdir -p "$LH_LOG_DIR" || { 
+                # Use English fallback before translation system is loaded
+                local msg="${MSG[LIB_LOG_DIR_CREATE_ERROR]:-ERROR: Could not create log directory: %s}"
+                echo "$(printf "$msg" "$LH_LOG_DIR")" >&2
+                LH_LOG_FILE=""
+                return 1
+            }
         fi
 
         LH_LOG_FILE="$LH_LOG_DIR/$(date '+%y%m%d-%H%M')_maintenance_script.log"
 
         if ! touch "$LH_LOG_FILE"; then
-            echo "FEHLER: Konnte Log-Datei nicht erstellen: $LH_LOG_FILE" >&2
+            # Use English fallback before translation system is loaded
+            local msg="${MSG[LIB_LOG_FILE_CREATE_ERROR]:-ERROR: Could not create log file: %s}"
+            echo "$(printf "$msg" "$LH_LOG_FILE")" >&2
             LH_LOG_FILE="" 
             return 1
         fi
-        lh_log_msg "INFO" "Logging initialisiert. Log-Datei: $LH_LOG_FILE"
+        # Use English fallback before translation system is loaded
+        local msg="${MSG[LIB_LOG_INITIALIZED]:-Logging initialized. Log file: %s}"
+        lh_log_msg "INFO" "$(printf "$msg" "$LH_LOG_FILE")"
     else
         # Wenn LH_LOG_FILE gesetzt ist, sicherstellen, dass die Datei noch existiert
         if [ ! -f "$LH_LOG_FILE" ] && [ -n "$LH_LOG_DIR" ] && [ -d "$(dirname "$LH_LOG_FILE")" ]; then
              if ! touch "$LH_LOG_FILE"; then
-                lh_log_msg "WARN" "Konnte existierende Log-Datei nicht erneut berühren/erstellen: $LH_LOG_FILE"
+                # Use English fallback before translation system is loaded
+                local msg="${MSG[LIB_LOG_FILE_TOUCH_ERROR]:-Could not touch existing log file: %s}"
+                lh_log_msg "WARN" "$(printf "$msg" "$LH_LOG_FILE")"
              fi
         fi
-        lh_log_msg "DEBUG" "Logging bereits initialisiert. Verwende Log-Datei: $LH_LOG_FILE"
+        # Use English fallback before translation system is loaded
+        local msg="${MSG[LIB_LOG_ALREADY_INITIALIZED]:-Logging already initialized. Using log file: %s}"
+        lh_log_msg "DEBUG" "$(printf "$msg" "$LH_LOG_FILE")"
     fi
 }
 
@@ -376,7 +134,9 @@ function lh_load_backup_config() {
     LH_BACKUP_LOG_BASENAME="$LH_BACKUP_LOG_BASENAME_DEFAULT"
 
     if [ -f "$LH_BACKUP_CONFIG_FILE" ]; then
-        lh_log_msg "INFO" "Lade Backup-Konfiguration aus $LH_BACKUP_CONFIG_FILE"
+        # Use English fallback before translation system is loaded
+        local msg="${MSG[LIB_BACKUP_CONFIG_LOADED]:-Loading backup configuration from %s}"
+        lh_log_msg "INFO" "$(printf "$msg" "$LH_BACKUP_CONFIG_FILE")"
         # Temporäre Variablen, um $(whoami) korrekt zu expandieren, falls es in der Config steht
         local temp_backup_root=""
         source "$LH_BACKUP_CONFIG_FILE"
@@ -387,14 +147,18 @@ function lh_load_backup_config() {
         LH_RETENTION_BACKUP="${CFG_LH_RETENTION_BACKUP:-$LH_RETENTION_BACKUP_DEFAULT}"
         LH_BACKUP_LOG_BASENAME="${CFG_LH_BACKUP_LOG_BASENAME:-$LH_BACKUP_LOG_BASENAME_DEFAULT}"
     else
-        lh_log_msg "INFO" "Keine Backup-Konfigurationsdatei ($LH_BACKUP_CONFIG_FILE) gefunden. Verwende interne Standardwerte."
+        # Use English fallback before translation system is loaded
+        local msg="${MSG[LIB_BACKUP_CONFIG_NOT_FOUND]:-No backup configuration file (%s) found. Using internal default values.}"
+        lh_log_msg "INFO" "$(printf "$msg" "$LH_BACKUP_CONFIG_FILE")"
         # Die Arbeitsvariablen behalten die oben initialisierten Standardwerte.
     fi
 
     # Backup-Logdatei im monatlichen Unterordner (LH_LOG_DIR) erstellen.
     # LH_LOG_DIR enthält bereits den Pfad zum Monatsordner.
     LH_BACKUP_LOG="$LH_LOG_DIR/$(date '+%y%m%d-%H%M')_$LH_BACKUP_LOG_BASENAME"
-    lh_log_msg "INFO" "Backup-Logdatei konfiguriert als: $LH_BACKUP_LOG"
+    # Use English fallback before translation system is loaded
+    local msg="${MSG[LIB_BACKUP_LOG_CONFIGURED]:-Backup log file configured as: %s}"
+    lh_log_msg "INFO" "$(printf "$msg" "$LH_BACKUP_LOG")"
 }
 
 # Funktion zum Speichern der Backup-Konfiguration
@@ -406,12 +170,20 @@ function lh_save_backup_config() {
     echo "CFG_LH_TEMP_SNAPSHOT_DIR=\"$LH_TEMP_SNAPSHOT_DIR\"" >> "$LH_BACKUP_CONFIG_FILE"
     echo "CFG_LH_RETENTION_BACKUP=\"$LH_RETENTION_BACKUP\"" >> "$LH_BACKUP_CONFIG_FILE"
     echo "CFG_LH_BACKUP_LOG_BASENAME=\"$LH_BACKUP_LOG_BASENAME\"" >> "$LH_BACKUP_CONFIG_FILE"
-    lh_log_msg "INFO" "Backup-Konfiguration gespeichert in $LH_BACKUP_CONFIG_FILE"
+    # Use English fallback before translation system is loaded
+    local msg="${MSG[LIB_BACKUP_CONFIG_SAVED]:-Backup configuration saved in %s}"
+    lh_log_msg "INFO" "$(printf "$msg" "$LH_BACKUP_CONFIG_FILE")"
 }
 # Funktion zum Schreiben in die Log-Datei
 function lh_log_msg() {
     local level="$1"
     local message="$2"
+    
+    # Prüfe, ob diese Nachricht geloggt werden soll (außer bei Initialisierung)
+    if [ -n "${LH_LOG_LEVEL:-}" ] && ! lh_should_log "$level"; then
+        return 0
+    fi
+    
     local timestamp
     timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     local plain_log_msg="$timestamp - [$level] $message"
@@ -434,25 +206,33 @@ function lh_log_msg() {
         color_log_msg="$plain_log_msg"
     fi
 
-    # Farbige Ausgabe auf die Konsole
-    echo -e "$color_log_msg"
+    # Farbige Ausgabe auf die Konsole (nur wenn aktiviert)
+    if [ "${LH_LOG_TO_CONSOLE:-true}" = "true" ]; then
+        echo -e "$color_log_msg"
+    fi
 
-    # Unformatierte Ausgabe in die Log-Datei, wenn definiert
-    if [ -n "$LH_LOG_FILE" ] && [ -f "$LH_LOG_FILE" ]; then
+    # Unformatierte Ausgabe in die Log-Datei, wenn definiert und aktiviert
+    if [ "${LH_LOG_TO_FILE:-true}" = "true" ] && [ -n "$LH_LOG_FILE" ] && [ -f "$LH_LOG_FILE" ]; then
         echo "$plain_log_msg" >> "$LH_LOG_FILE"
-    elif [ -n "$LH_LOG_FILE" ] && [ ! -d "$(dirname "$LH_LOG_FILE")" ]; then
+    elif [ "${LH_LOG_TO_FILE:-true}" = "true" ] && [ -n "$LH_LOG_FILE" ] && [ ! -d "$(dirname "$LH_LOG_FILE")" ]; then
         # Fallback, falls Log-Verzeichnis nicht existiert, aber LH_LOG_FILE gesetzt ist
-        echo "Log-Verzeichnis für $LH_LOG_FILE nicht gefunden." >&2
+        # Use English fallback before translation system is loaded
+        local msg="${MSG[LIB_LOG_DIR_NOT_FOUND]:-Log directory for %s not found.}"
+        echo "$(printf "$msg" "$LH_LOG_FILE")" >&2
     fi
 }
 
 # Überprüfen, ob das Skript mit ausreichenden Berechtigungen ausgeführt wird
 function lh_check_root_privileges() {
     if [ "$EUID" -ne 0 ]; then
-        lh_log_msg "INFO" "Einige Funktionen dieses Skripts erfordern Root-Rechte. Bitte führen Sie das Skript mit 'sudo' aus."
+        # Use English fallback before translation system is loaded
+        local msg="${MSG[LIB_ROOT_PRIVILEGES_NEEDED]:-Some functions of this script require root privileges. Please run the script with 'sudo'.}"
+        lh_log_msg "INFO" "$msg"
         LH_SUDO_CMD='sudo'
     else
-        lh_log_msg "INFO" "Skript läuft mit Root-Rechten."
+        # Use English fallback before translation system is loaded  
+        local msg="${MSG[LIB_ROOT_PRIVILEGES_DETECTED]:-Script is running with root privileges.}"
+        lh_log_msg "INFO" "$msg"
         LH_SUDO_CMD=''
     fi
 }
@@ -463,9 +243,9 @@ function lh_backup_log() {
     local message="$2"
 
     if [ -z "$LH_BACKUP_LOG" ]; then
-        lh_log_msg "ERROR" "LH_BACKUP_LOG ist nicht definiert. Backup-Nachricht kann nicht geloggt werden: $message"
+        lh_log_msg "ERROR" "$(printf "${MSG[LIB_BACKUP_LOG_NOT_DEFINED]:-LH_BACKUP_LOG ist nicht definiert. Backup-Nachricht kann nicht geloggt werden: %s}" "$message")"
         # Fallback auf Hauptlog, falls LH_BACKUP_LOG nicht gesetzt ist
-        lh_log_msg "$level" "(Backup-Fallback) $message"
+        lh_log_msg "$level" "$(printf "${MSG[LIB_BACKUP_LOG_FALLBACK]:-(Backup-Fallback) %s}" "$message")"
         return 1
     fi
 
@@ -474,7 +254,7 @@ function lh_backup_log() {
     backup_log_dir=$(dirname "$LH_BACKUP_LOG") # Dies ist jetzt identisch mit LH_LOG_DIR
     # Das Verzeichnis LH_LOG_DIR (und damit backup_log_dir) sollte bereits existieren.
     if [ ! -f "$LH_BACKUP_LOG" ]; then
-        touch "$LH_BACKUP_LOG" || lh_log_msg "WARN" "Konnte Backup-Logdatei $LH_BACKUP_LOG nicht erstellen/berühren. Verzeichnis: $backup_log_dir"
+        touch "$LH_BACKUP_LOG" || lh_log_msg "WARN" "$(printf "${MSG[LIB_BACKUP_LOG_CREATE_ERROR]:-Konnte Backup-Logdatei %s nicht erstellen/berühren. Verzeichnis: %s}" "$LH_BACKUP_LOG" "$backup_log_dir")"
     fi
 
     echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" | tee -a "$LH_BACKUP_LOG"
@@ -494,7 +274,7 @@ function lh_cleanup_old_backups() {
     
     if [ -d "$backup_dir" ]; then
         ls -1d "$backup_dir"/$pattern 2>/dev/null | sort -r | tail -n +$((retention_count+1)) | while read backup; do
-            lh_log_msg "INFO" "Entferne altes Backup: $backup"
+            lh_log_msg "INFO" "$(printf "${MSG[LIB_CLEANUP_OLD_BACKUP]:-Entferne altes Backup: %s}" "$backup")"
             rm -rf "$backup"
         done
     fi
@@ -511,12 +291,16 @@ function lh_detect_package_manager() {
     elif command -v dnf >/dev/null 2>&1; then
         LH_PKG_MANAGER="dnf"
     else
-        lh_log_msg "WARN" "Kein unterstützter Paketmanager gefunden."
+        # Use English fallback before translation system is loaded
+        local msg="${MSG[LIB_PKG_MANAGER_NOT_FOUND]:-No supported package manager found.}"
+        lh_log_msg "WARN" "$msg"
         LH_PKG_MANAGER=""
     fi
 
     if [ -n "$LH_PKG_MANAGER" ]; then
-        lh_log_msg "INFO" "Erkannter Paketmanager: $LH_PKG_MANAGER"
+        # Use English fallback before translation system is loaded
+        local msg="${MSG[LIB_PKG_MANAGER_DETECTED]:-Detected package manager: %s}"
+        lh_log_msg "INFO" "$(printf "$msg" "$LH_PKG_MANAGER")"
     fi
 }
 
@@ -541,7 +325,9 @@ function lh_detect_alternative_managers() {
         LH_ALT_PKG_MANAGERS+=("appimage")
     fi
 
-    lh_log_msg "INFO" "Erkannte alternative Paketmanager: ${LH_ALT_PKG_MANAGERS[*]}"
+    # Use English fallback before translation system is loaded
+    local msg="${MSG[LIB_ALT_PKG_MANAGERS_DETECTED]:-Detected alternative package managers: %s}"
+    lh_log_msg "INFO" "$(printf "$msg" "${LH_ALT_PKG_MANAGERS[*]}")"
 }
 
 # Mapping eines Programmnamens zum Paketnamen für den aktuellen Paketmanager
@@ -587,19 +373,19 @@ function lh_check_command() {
     if [ "$is_python_script" = "true" ]; then
         # Für Python-Skripte prüfen wir zuerst Python
         if ! command -v python3 >/dev/null 2>&1; then
-            lh_log_msg "ERROR" "Python3 ist nicht installiert, aber für diese Funktion erforderlich."
+            lh_log_msg "ERROR" "${MSG[LIB_PYTHON_NOT_INSTALLED]:-Python3 ist nicht installiert, aber für diese Funktion erforderlich.}"
             if [ "$install_prompt_if_missing" = "true" ] && [ -n "$LH_PKG_MANAGER" ]; then
-                read -p "Möchten Sie Python3 installieren? (y/n): " install_choice
+                read -p "$(printf "${MSG[LIB_INSTALL_PROMPT]:-Möchten Sie '%s' installieren? (y/n): }" "Python3")" install_choice
                 if [[ $install_choice == "y" ]]; then
                     case $LH_PKG_MANAGER in
                         pacman|yay)
-                            $LH_SUDO_CMD $LH_PKG_MANAGER -S --noconfirm python || lh_log_msg "ERROR" "Fehler beim Installieren von Python"
+                            $LH_SUDO_CMD $LH_PKG_MANAGER -S --noconfirm python || lh_log_msg "ERROR" "${MSG[LIB_PYTHON_INSTALL_ERROR]:-Fehler beim Installieren von Python}"
                             ;;
                         apt)
-                            $LH_SUDO_CMD apt update && $LH_SUDO_CMD apt install -y python3 || lh_log_msg "ERROR" "Fehler beim Installieren von Python"
+                            $LH_SUDO_CMD apt update && $LH_SUDO_CMD apt install -y python3 || lh_log_msg "ERROR" "${MSG[LIB_PYTHON_INSTALL_ERROR]:-Fehler beim Installieren von Python}"
                             ;;
                         dnf)
-                            $LH_SUDO_CMD dnf install -y python3 || lh_log_msg "ERROR" "Fehler beim Installieren von Python"
+                            $LH_SUDO_CMD dnf install -y python3 || lh_log_msg "ERROR" "${MSG[LIB_PYTHON_INSTALL_ERROR]:-Fehler beim Installieren von Python}"
                             ;;
                     esac
                 else
@@ -612,7 +398,7 @@ function lh_check_command() {
 
         # Dann das Skript selbst prüfen
         if [ "$command_name" != "true" ] && [ ! -f "$command_name" ]; then
-            lh_log_msg "ERROR" "Python-Skript '$command_name' nicht gefunden."
+            lh_log_msg "ERROR" "$(printf "${MSG[LIB_PYTHON_SCRIPT_NOT_FOUND]:-Python-Skript '%s' nicht gefunden.}" "$command_name")"
             return 1
         fi
 
@@ -621,31 +407,31 @@ function lh_check_command() {
 
     # Für normale Befehle
     if ! command -v "$command_name" >/dev/null 2>&1; then
-        lh_log_msg "WARN" "Das Programm '$command_name' ist nicht installiert."
+        lh_log_msg "WARN" "$(printf "${MSG[LIB_PROGRAM_NOT_INSTALLED]:-Das Programm '%s' ist nicht installiert.}" "$command_name")"
 
         if [ "$install_prompt_if_missing" = "true" ] && [ -n "$LH_PKG_MANAGER" ]; then
             local package_name=$(lh_map_program_to_package "$command_name")
-            read -p "Möchten Sie '$package_name' installieren? (y/n): " install_choice
+            read -p "$(printf "${MSG[LIB_INSTALL_PROMPT]:-Möchten Sie '%s' installieren? (y/n): }" "$package_name")" install_choice
 
             if [[ $install_choice == "y" ]]; then
                 case $LH_PKG_MANAGER in
                     pacman|yay)
-                        $LH_SUDO_CMD $LH_PKG_MANAGER -S --noconfirm "$package_name" || lh_log_msg "ERROR" "Fehler beim Installieren von $package_name"
+                        $LH_SUDO_CMD $LH_PKG_MANAGER -S --noconfirm "$package_name" || lh_log_msg "ERROR" "$(printf "${MSG[LIB_INSTALL_ERROR]:-Fehler beim Installieren von %s}" "$package_name")"
                         ;;
                     apt)
-                        $LH_SUDO_CMD apt update && $LH_SUDO_CMD apt install -y "$package_name" || lh_log_msg "ERROR" "Fehler beim Installieren von $package_name"
+                        $LH_SUDO_CMD apt update && $LH_SUDO_CMD apt install -y "$package_name" || lh_log_msg "ERROR" "$(printf "${MSG[LIB_INSTALL_ERROR]:-Fehler beim Installieren von %s}" "$package_name")"
                         ;;
                     dnf)
-                        $LH_SUDO_CMD dnf install -y "$package_name" || lh_log_msg "ERROR" "Fehler beim Installieren von $package_name"
+                        $LH_SUDO_CMD dnf install -y "$package_name" || lh_log_msg "ERROR" "$(printf "${MSG[LIB_INSTALL_ERROR]:-Fehler beim Installieren von %s}" "$package_name")"
                         ;;
                 esac
 
                 # Prüfen, ob die Installation erfolgreich war
                 if command -v "$command_name" >/dev/null 2>&1; then
-                    lh_log_msg "INFO" "$command_name wurde erfolgreich installiert."
+                    lh_log_msg "INFO" "$(printf "${MSG[LIB_INSTALL_SUCCESS]:-Erfolgreich installiert: %s}" "$command_name")"
                     return 0
                 else
-                    lh_log_msg "ERROR" "$command_name konnte nicht installiert werden."
+                    lh_log_msg "ERROR" "$(printf "${MSG[LIB_INSTALL_FAILED]:-Konnte %s nicht installieren}" "$command_name")"
                     return 1
                 fi
             else
@@ -659,76 +445,12 @@ function lh_check_command() {
     return 0
 }
 
-# Standardfunktion für Ja/Nein-Abfragen
-# $1: Prompt-Nachricht
-# $2: (Optional) Standardauswahl (y/n) - Standard: n
-# Rückgabe: 0 für Ja, 1 für Nein
-function lh_confirm_action() {
-    local prompt_message="$1"
-    local default_choice="${2:-n}"
-    local prompt_suffix=""
-    local response=""
-
-    if [ "$default_choice" = "y" ]; then
-        prompt_suffix="[${LH_COLOR_BOLD_WHITE}Y${LH_COLOR_RESET}/${LH_COLOR_PROMPT}n${LH_COLOR_RESET}]"
-    else
-        prompt_suffix="[${LH_COLOR_PROMPT}y${LH_COLOR_RESET}/${LH_COLOR_BOLD_WHITE}N${LH_COLOR_RESET}]"
-    fi
-
-    read -p "$(echo -e "${LH_COLOR_PROMPT}${prompt_message}${LH_COLOR_RESET} ${prompt_suffix}: ")" response
-
-
-    # Wenn keine Eingabe, verwende Standardauswahl
-    if [ -z "$response" ]; then
-        response="$default_choice"
-    fi
-
-    # Konvertiere zu Kleinbuchstaben
-    response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
-
-    if [[ "$response" == "y" || "$response" == "yes" || "$response" == "j" || "$response" == "ja" ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-# Fragt nach Benutzereingabe und validiert diese optional
-# $1: Prompt-Nachricht
-# $2: (Optional) Validierungs-Regex
-# $3: (Optional) Fehlermeldung bei ungültiger Eingabe
-# Ausgabe: Die eingegebene (und validierte) Zeichenkette
-function lh_ask_for_input() {
-    local prompt_message="$1"
-    local validation_regex="$2"
-    local error_message="${3:-Ungültige Eingabe. Bitte versuchen Sie es erneut.}"
-    local user_input=""
-
-    while true; do
-        read -p "$(echo -e "${LH_COLOR_PROMPT}${prompt_message}${LH_COLOR_RESET}: ")" user_input
-
-        # Wenn kein Regex angegeben, akzeptiere jede Eingabe
-        if [ -z "$validation_regex" ]; then
-            echo "$user_input"
-            return
-        fi
-
-        # Validiere die Eingabe
-        if [[ "$user_input" =~ $validation_regex ]]; then
-            echo "$user_input"
-            return
-        else
-            echo -e "${LH_COLOR_ERROR}${error_message}${LH_COLOR_RESET}"
-        fi
-    done
-}
-
 # Hilfsfunktion zur Ermittlung von Benutzer, Display und Sitzungsvariablen
 # für die Interaktion mit der grafischen Oberfläche
 function lh_get_target_user_info() {
     # Prüfen ob bereits gecached
     if [ -n "${LH_TARGET_USER_INFO[TARGET_USER]}" ]; then
-        lh_log_msg "DEBUG" "Benutze gecachte Benutzerinfos für ${LH_TARGET_USER_INFO[TARGET_USER]}"
+        lh_log_msg "DEBUG" "$(printf "${MSG[LIB_USER_INFO_CACHED]:-Benutze gecachte Benutzerinfos für %s}" "${LH_TARGET_USER_INFO[TARGET_USER]}")"
         return 0
     fi
 
@@ -810,7 +532,7 @@ fi
 
     # Stelle sicher, dass das XDG_RUNTIME_DIR existiert
     if [ ! -d "$USER_XDG_RUNTIME_DIR" ]; then
-        lh_log_msg "WARN" "XDG_RUNTIME_DIR für Benutzer $TARGET_USER konnte nicht ermittelt oder ist ungültig."
+        lh_log_msg "WARN" "$(printf "${MSG[LIB_XDG_RUNTIME_ERROR]:-XDG_RUNTIME_DIR für Benutzer %s konnte nicht ermittelt oder ist ungültig.}" "$TARGET_USER")"
     fi
     
     # DBUS_SESSION_BUS_ADDRESS
@@ -854,7 +576,7 @@ fi
     LH_TARGET_USER_INFO[USER_DBUS_SESSION_BUS_ADDRESS]="$USER_DBUS_SESSION_BUS_ADDRESS"
     LH_TARGET_USER_INFO[USER_XAUTHORITY]="$USER_XAUTHORITY"
 
-    lh_log_msg "INFO" "Benutzerinfos für $TARGET_USER erfolgreich ermittelt."
+    lh_log_msg "INFO" "$(printf "${MSG[LIB_USER_INFO_SUCCESS]:-Benutzerinfos für %s erfolgreich ermittelt.}" "$TARGET_USER")"
     return 0
 }
 
@@ -868,7 +590,7 @@ function lh_run_command_as_target_user() {
     if [ -z "${LH_TARGET_USER_INFO[TARGET_USER]}" ]; then
         lh_get_target_user_info
         if [ $? -ne 0 ]; then
-            lh_log_msg "ERROR" "Konnte keine Benutzerinfos ermitteln. Befehl kann nicht ausgeführt werden."
+            lh_log_msg "ERROR" "${MSG[LIB_USER_INFO_ERROR]:-Konnte keine Benutzerinfos ermitteln. Befehl kann nicht ausgeführt werden.}"
             return 1
         fi
     fi
@@ -880,7 +602,7 @@ function lh_run_command_as_target_user() {
     local USER_XAUTHORITY="${LH_TARGET_USER_INFO[USER_XAUTHORITY]}"
 
     # Debug-Meldung in Log-Datei schreiben, nicht auf STDOUT
-    lh_log_msg "DEBUG" "Führe als Benutzer $TARGET_USER aus: $command_to_run"
+    lh_log_msg "DEBUG" "$(printf "${MSG[LIB_COMMAND_EXECUTION]:-Führe als Benutzer %s aus: %s}" "$TARGET_USER" "$command_to_run")"
 
     # Befehl im Kontext des Zielbenutzers ausführen
     sudo -u "$TARGET_USER" \
@@ -894,258 +616,143 @@ function lh_run_command_as_target_user() {
     return $?
 }
 
-# Sendet eine Desktop-Benachrichtigung an den ermittelten Target User
-# $1: notification_type ("success", "error", "warning", "info")
-# $2: title (Titel der Benachrichtigung)
-# $3: message (Hauptnachricht)
-# $4: (Optional) urgency ("low", "normal", "critical") - wird automatisch gesetzt falls leer
-# Rückgabe: 0 bei Erfolg, 1 bei Fehler
-function lh_send_notification() {
-    local notification_type="$1"
-    local title="$2"
-    local message="$3"
-    local urgency="${4:-}"
-    
-    # Validierung der Parameter
-    if [ -z "$notification_type" ] || [ -z "$title" ] || [ -z "$message" ]; then
-        lh_log_msg "ERROR" "lh_send_notification: Unvollständige Parameter (type, title, message erforderlich)"
-        return 1
-    fi
-    
-    # Urgency automatisch setzen, falls nicht angegeben
-    if [ -z "$urgency" ]; then
-        case "$notification_type" in
-            "success") urgency="normal" ;;
-            "error") urgency="critical" ;;
-            "warning") urgency="normal" ;;
-            "info") urgency="low" ;;
-            *) urgency="normal" ;;
-        esac
-    fi
-    
-    lh_log_msg "DEBUG" "Versuche Desktop-Benachrichtigung zu senden: [$notification_type] $title - $message"
-    
-    # Target User Info ermitteln (nutzt das bestehende Framework)
-    if ! lh_get_target_user_info; then
-        lh_log_msg "WARN" "Konnte Target-User-Info nicht ermitteln, Desktop-Benachrichtigung wird übersprungen"
-        return 1
-    fi
-    
-    local target_user="${LH_TARGET_USER_INFO[TARGET_USER]}"
-    if [ -z "$target_user" ] || [ "$target_user" = "root" ]; then
-        lh_log_msg "WARN" "Kein gültiger Target-User für Desktop-Benachrichtigung gefunden (User: '$target_user')"
-        return 1
-    fi
-    
-    lh_log_msg "DEBUG" "Sende Benachrichtigung als User: $target_user"
-    
-    # Icon basierend auf Typ setzen
-    local icon=""
-    case "$notification_type" in
-        "success") icon="dialog-information" ;;
-        "error") icon="dialog-error" ;;
-        "warning") icon="dialog-warning" ;;
-        "info") icon="dialog-information" ;;
-        *) icon="dialog-information" ;;
-    esac
-    
-    # Verschiedene Benachrichtigungsmethoden versuchen
-    local notification_sent=false
-    
-    # 1. notify-send versuchen (am häufigsten verfügbar)
-    if lh_run_command_as_target_user "command -v notify-send >/dev/null 2>&1"; then
-        lh_log_msg "DEBUG" "Verwende notify-send für Desktop-Benachrichtigung"
-        
-        local notify_cmd="notify-send"
-        notify_cmd="$notify_cmd --urgency='$urgency'"
-        notify_cmd="$notify_cmd --expire-time=10000"  # 10 Sekunden
-        if [ -n "$icon" ]; then
-            notify_cmd="$notify_cmd --icon='$icon'"
-        fi
-        # Escape quotes in title and message for shell execution
-        local escaped_title=$(printf '%q' "$title")
-        local escaped_message=$(printf '%q' "$message")
-        notify_cmd="$notify_cmd $escaped_title $escaped_message"
-        
-        if lh_run_command_as_target_user "$notify_cmd"; then
-            lh_log_msg "INFO" "Desktop-Benachrichtigung erfolgreich über notify-send gesendet"
-            notification_sent=true
-        else
-            lh_log_msg "WARN" "notify-send-Benachrichtigung fehlgeschlagen"
-        fi
-    fi
-    
-    # 2. zenity versuchen (falls notify-send nicht funktioniert hat)
-    if [ "$notification_sent" = false ] && lh_run_command_as_target_user "command -v zenity >/dev/null 2>&1"; then
-        lh_log_msg "DEBUG" "Verwende zenity für Desktop-Benachrichtigung"
-        
-        local escaped_text=$(printf '%q' "$title: $message")
-        local zenity_cmd="zenity --notification --text=$escaped_text"
-        
-        if lh_run_command_as_target_user "$zenity_cmd"; then
-            lh_log_msg "INFO" "Desktop-Benachrichtigung erfolgreich über zenity gesendet"
-            notification_sent=true
-        else
-            lh_log_msg "WARN" "zenity-Benachrichtigung fehlgeschlagen"
-        fi
-    fi
-    
-    # 3. kdialog versuchen (für KDE-Umgebungen)
-    if [ "$notification_sent" = false ] && lh_run_command_as_target_user "command -v kdialog >/dev/null 2>&1"; then
-        lh_log_msg "DEBUG" "Verwende kdialog für Desktop-Benachrichtigung"
-        
-        local escaped_text=$(printf '%q' "$title: $message")
-        local kdialog_cmd="kdialog --passivepopup $escaped_text 10"
-        
-        if lh_run_command_as_target_user "$kdialog_cmd"; then
-            lh_log_msg "INFO" "Desktop-Benachrichtigung erfolgreich über kdialog gesendet"
-            notification_sent=true
-        else
-            lh_log_msg "WARN" "kdialog-Benachrichtigung fehlgeschlagen"
-        fi
-    fi
-    
-    if [ "$notification_sent" = false ]; then
-        lh_log_msg "WARN" "Keine funktionierende Desktop-Benachrichtigung gefunden"
-        lh_log_msg "INFO" "Verfügbare Benachrichtigungstools prüfen: notify-send, zenity, kdialog"
-        return 1
-    fi
-    
-    return 0
-}
-
-# Hilfsfunktion: Prüft verfügbare Desktop-Benachrichtigungstools und bietet Installation an
-# Rückgabe: 0 wenn mindestens ein Tool verfügbar ist, 1 sonst
-function lh_check_notification_tools() {
-    local tools_available=false
-    local available_tools=()
-    local missing_tools=()
-    
-    lh_log_msg "INFO" "Prüfe verfügbare Desktop-Benachrichtigungstools..."
-    
-    # Target User ermitteln für die Prüfung
-    if ! lh_get_target_user_info; then
-        lh_log_msg "WARN" "Konnte Target-User nicht ermitteln - prüfe Tools als aktueller User"
-    fi
-    
-    # Prüfe notify-send
-    if lh_run_command_as_target_user "command -v notify-send >/dev/null 2>&1"; then
-        echo -e "${LH_COLOR_SUCCESS}✓ notify-send verfügbar${LH_COLOR_RESET}"
-        available_tools+=("notify-send")
-        tools_available=true
-    else
-        echo -e "${LH_COLOR_WARNING}✗ notify-send nicht verfügbar${LH_COLOR_RESET}"
-        missing_tools+=("libnotify-bin/libnotify")
-    fi
-    
-    # Prüfe zenity
-    if lh_run_command_as_target_user "command -v zenity >/dev/null 2>&1"; then
-        echo -e "${LH_COLOR_SUCCESS}✓ zenity verfügbar${LH_COLOR_RESET}"
-        available_tools+=("zenity")
-        tools_available=true
-    else
-        echo -e "${LH_COLOR_WARNING}✗ zenity nicht verfügbar${LH_COLOR_RESET}"
-        missing_tools+=("zenity")
-    fi
-    
-    # Prüfe kdialog
-    if lh_run_command_as_target_user "command -v kdialog >/dev/null 2>&1"; then
-        echo -e "${LH_COLOR_SUCCESS}✓ kdialog verfügbar${LH_COLOR_RESET}"
-        available_tools+=("kdialog")
-        tools_available=true
-    else
-        echo -e "${LH_COLOR_WARNING}✗ kdialog nicht verfügbar${LH_COLOR_RESET}"
-        missing_tools+=("kdialog")
-    fi
-    
-    # Zusammenfassung
-    echo ""
-    if [ "$tools_available" = true ]; then
-        echo -e "${LH_COLOR_SUCCESS}Desktop-Benachrichtigungen sind verfügbar über: ${available_tools[*]}${LH_COLOR_RESET}"
-        
-        # Test-Benachrichtigung anbieten
-        if lh_confirm_action "Möchten Sie eine Test-Benachrichtigung senden?" "n"; then
-            lh_send_notification "info" "Little Linux Helper" "Test-Benachrichtigung erfolgreich!"
-        fi
-    else
-        echo -e "${LH_COLOR_WARNING}Keine Desktop-Benachrichtigungstools gefunden.${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}Fehlende Tools: ${missing_tools[*]}${LH_COLOR_RESET}"
-        
-        if lh_confirm_action "Möchten Sie Benachrichtigungstools installieren?" "y"; then
-            case $LH_PKG_MANAGER in
-                pacman|yay)
-                    $LH_SUDO_CMD $LH_PKG_MANAGER -S --noconfirm libnotify zenity
-                    ;;
-                apt)
-                    $LH_SUDO_CMD apt update && $LH_SUDO_CMD apt install -y libnotify-bin zenity
-                    ;;
-                dnf)
-                    $LH_SUDO_CMD dnf install -y libnotify zenity
-                    ;;
-                *)
-                    echo -e "${LH_COLOR_WARNING}Automatische Installation für $LH_PKG_MANAGER nicht verfügbar.${LH_COLOR_RESET}"
-                    echo -e "${LH_COLOR_INFO}Bitte installieren Sie manuell: libnotify-bin/libnotify und zenity${LH_COLOR_RESET}"
-                    ;;
-            esac
-            
-            # Nach Installation erneut prüfen
-            echo -e "${LH_COLOR_INFO}Prüfe erneut nach Installation...${LH_COLOR_RESET}"
-            lh_check_notification_tools
-            return $?
-        fi
-    fi
-    
-    if [ "$tools_available" = true ]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-# Gibt einen formatierten Header für Menüs oder Sektionen aus
-# $1: Titel des Headers
-function lh_print_header() {
-    local title="$1"
-    local length=${#title}
-    local dashes=""
-
-    # Erzeuge eine Linie aus Bindestrichen in der Breite des Titels
-    for ((i=0; i<length+4; i++)); do
-        dashes="${dashes}-"
-    done
-
-    echo ""
-    echo -e "${LH_COLOR_HEADER}${dashes}${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_HEADER}| $title |${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_HEADER}${dashes}${LH_COLOR_RESET}"
-    echo ""
-}
-
-# Gibt einen formatierten Menüpunkt aus
-# $1: Nummer des Menüpunkts
-# $2: Text des Menüpunkts
-function lh_print_menu_item() {
-    local number="$1"
-    local text="$2"
-
-    printf "  ${LH_COLOR_MENU_NUMBER}%2s.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}%s${LH_COLOR_RESET}\n" "$number" "$text"
-}
-
 # Am Ende der Datei lib_common.sh
 function lh_finalize_initialization() {
-    lh_load_backup_config # Lade Backup-Konfiguration
+    # lh_load_general_config wird jetzt früher aufgerufen
+    lh_load_backup_config     # Lade Backup-Konfiguration
+    lh_initialize_i18n        # Initialize internationalization
+    lh_load_language_module "lib" # Load library-specific translations
     export LH_LOG_DIR
     export LH_LOG_FILE
     export LH_SUDO_CMD
     export LH_PKG_MANAGER
     export LH_ALT_PKG_MANAGERS
+    # Exportiere Log-Konfiguration
+    export LH_LOG_LEVEL LH_LOG_TO_CONSOLE LH_LOG_TO_FILE
     # Exportiere auch die Backup-Konfigurationsvariablen, damit sie in Sub-Shells (Modulen) verfügbar sind
     export LH_BACKUP_ROOT LH_BACKUP_DIR LH_TEMP_SNAPSHOT_DIR LH_RETENTION_BACKUP LH_BACKUP_LOG_BASENAME LH_BACKUP_LOG
     # Exportiere Farbvariablen
     export LH_COLOR_RESET LH_COLOR_BLACK LH_COLOR_RED LH_COLOR_GREEN LH_COLOR_YELLOW LH_COLOR_BLUE LH_COLOR_MAGENTA LH_COLOR_CYAN LH_COLOR_WHITE
     export LH_COLOR_BOLD_BLACK LH_COLOR_BOLD_RED LH_COLOR_BOLD_GREEN LH_COLOR_BOLD_YELLOW LH_COLOR_BOLD_BLUE LH_COLOR_BOLD_MAGENTA LH_COLOR_BOLD_CYAN LH_COLOR_BOLD_WHITE
     export LH_COLOR_HEADER LH_COLOR_MENU_NUMBER LH_COLOR_MENU_TEXT LH_COLOR_PROMPT LH_COLOR_SUCCESS LH_COLOR_ERROR LH_COLOR_WARNING LH_COLOR_INFO LH_COLOR_SEPARATOR
+    # Exportiere Internationalisierung
+    export LH_LANG LH_LANG_DIR MSG
     # Exportiere Benachrichtigungsfunktionen (machen die Funktionen in Sub-Shells verfügbar)
     export -f lh_send_notification
     export -f lh_check_notification_tools
+    export -f lh_msg
+    export -f lh_msgln
+    export -f lh_t
+    export -f lh_load_language
+    export -f lh_load_language_module
+    # Exportiere neue Log-Funktionen
+    export -f lh_should_log
+}
+
+# Funktion zum Laden der allgemeinen Konfiguration (Sprache, Logging, etc.)
+function lh_load_general_config() {
+    # Standardwerte setzen
+    LH_LOG_LEVEL="INFO"
+    LH_LOG_TO_CONSOLE="true"
+    LH_LOG_TO_FILE="true"
+    
+    # Lade general.conf
+    if [ -f "$LH_GENERAL_CONFIG_FILE" ]; then
+        # Verwende echo statt lh_log_msg für frühe Initialisierung
+        if [ -n "${LH_LOG_FILE:-}" ]; then
+            local msg="${MSG[LIB_GENERAL_CONFIG_LOADED]:-Loading general configuration from %s}"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - [DEBUG] $(printf "$msg" "$LH_GENERAL_CONFIG_FILE")" >> "$LH_LOG_FILE" 2>/dev/null || true
+        fi
+        source "$LH_GENERAL_CONFIG_FILE"
+        
+        # Weise die geladenen Werte zu
+        LH_LOG_LEVEL="${CFG_LH_LOG_LEVEL:-$LH_LOG_LEVEL}"
+        LH_LOG_TO_CONSOLE="${CFG_LH_LOG_TO_CONSOLE:-$LH_LOG_TO_CONSOLE}"
+        LH_LOG_TO_FILE="${CFG_LH_LOG_TO_FILE:-$LH_LOG_TO_FILE}"
+        
+        # Setze auch die Sprach-Variable
+        if [ -n "${CFG_LH_LANG:-}" ]; then
+            export LH_LANG="${CFG_LH_LANG}"
+        fi
+    else
+        if [ -n "${LH_LOG_FILE:-}" ]; then
+            local msg="${MSG[LIB_GENERAL_CONFIG_NOT_FOUND]:-No general configuration file found. Using default values.}"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - [DEBUG] $msg" >> "$LH_LOG_FILE" 2>/dev/null || true
+        fi
+    fi
+    
+    # Validiere Log-Level
+    case "$LH_LOG_LEVEL" in
+        ERROR|WARN|INFO|DEBUG) ;; # Valid levels
+        *) 
+            if [ -n "${LH_LOG_FILE:-}" ]; then
+                local msg="${MSG[LIB_INVALID_LOG_LEVEL]:-Invalid log level '%s', using default 'INFO'}"
+                echo "$(date '+%Y-%m-%d %H:%M:%S') - [WARN] $(printf "$msg" "$LH_LOG_LEVEL")" >> "$LH_LOG_FILE" 2>/dev/null || true
+            fi
+            LH_LOG_LEVEL="INFO"
+            ;;
+    esac
+    
+    if [ -n "${LH_LOG_FILE:-}" ]; then
+        local msg="${MSG[LIB_LOG_CONFIG_SET]:-Log configuration: Level=%s, Console=%s, File=%s}"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - [DEBUG] $(printf "$msg" "$LH_LOG_LEVEL" "$LH_LOG_TO_CONSOLE" "$LH_LOG_TO_FILE")" >> "$LH_LOG_FILE" 2>/dev/null || true
+    fi
+}
+
+# Funktion zum Speichern der allgemeinen Konfiguration
+function lh_save_general_config() {
+    mkdir -p "$LH_CONFIG_DIR"
+    
+    # Erstelle neue general.conf basierend auf der Example-Datei
+    local example_file="$LH_CONFIG_DIR/general.conf.example"
+    if [ -f "$example_file" ]; then
+        # Kopiere Example-Datei und ersetze die Werte
+        cp "$example_file" "$LH_GENERAL_CONFIG_FILE"
+        
+        # Ersetze die Konfigurationswerte
+        sed -i "s/^CFG_LH_LANG=.*/CFG_LH_LANG=\"${LH_LANG:-en}\"/" "$LH_GENERAL_CONFIG_FILE"
+        sed -i "s/^CFG_LH_LOG_LEVEL=.*/CFG_LH_LOG_LEVEL=\"$LH_LOG_LEVEL\"/" "$LH_GENERAL_CONFIG_FILE"
+        sed -i "s/^CFG_LH_LOG_TO_CONSOLE=.*/CFG_LH_LOG_TO_CONSOLE=\"$LH_LOG_TO_CONSOLE\"/" "$LH_GENERAL_CONFIG_FILE"
+        sed -i "s/^CFG_LH_LOG_TO_FILE=.*/CFG_LH_LOG_TO_FILE=\"$LH_LOG_TO_FILE\"/" "$LH_GENERAL_CONFIG_FILE"
+    else
+        # Fallback: einfache Konfigurationsdatei erstellen
+        {
+            echo "# Little Linux Helper - General Configuration"
+            echo "CFG_LH_LANG=\"${LH_LANG:-en}\""
+            echo "CFG_LH_LOG_LEVEL=\"$LH_LOG_LEVEL\""
+            echo "CFG_LH_LOG_TO_CONSOLE=\"$LH_LOG_TO_CONSOLE\""
+            echo "CFG_LH_LOG_TO_FILE=\"$LH_LOG_TO_FILE\""
+        } > "$LH_GENERAL_CONFIG_FILE"
+    fi
+    
+    local msg="${MSG[LIB_GENERAL_CONFIG_SAVED]:-General configuration saved to %s}"
+    lh_log_msg "INFO" "$(printf "$msg" "$LH_GENERAL_CONFIG_FILE")"
+}
+
+# Funktion zum Überprüfen, ob eine Nachricht geloggt werden soll
+function lh_should_log() {
+    local message_level="$1"
+    
+    # Log-Level zu numerischen Werten zuordnen
+    local level_value=0
+    local config_value=0
+    
+    case "$message_level" in
+        ERROR) level_value=1 ;;
+        WARN)  level_value=2 ;;
+        INFO)  level_value=3 ;;
+        DEBUG) level_value=4 ;;
+        *) return 1 ;; # Unbekanntes Level, nicht loggen
+    esac
+    
+    case "$LH_LOG_LEVEL" in
+        ERROR) config_value=1 ;;
+        WARN)  config_value=2 ;;
+        INFO)  config_value=3 ;;
+        DEBUG) config_value=4 ;;
+        *) config_value=3 ;; # Fallback auf INFO
+    esac
+    
+    # Nachricht loggen, wenn message_level <= config_level
+    [ $level_value -le $config_value ]
 }
