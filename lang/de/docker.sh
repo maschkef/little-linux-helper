@@ -7,11 +7,11 @@
 # This script is part of the 'little-linux-helper' collection.
 # Licensed under the MIT License. See the LICENSE file in the project root for more information.
 #
-# Deutsche Übersetzungen für das Docker Modul
+# German translations for the Docker module
 
 [[ ! -v MSG_DE ]] && declare -A MSG_DE
 
-# Docker Modul Menü
+# Docker module menu
 MSG_DE[DOCKER_MENU_TITLE]="Docker-Funktionen"
 MSG_DE[DOCKER_MENU_SECURITY_CHECK]="Docker Sicherheitsprüfung"
 MSG_DE[DOCKER_MENU_SETUP_CHECK]="Docker Installation prüfen/installieren"
@@ -21,11 +21,11 @@ MSG_DE[DOCKER_PRESS_KEY_CONTINUE]="Drücken Sie eine Taste, um fortzufahren..."
 MSG_DE[DOCKER_MODULE_EXECUTED_DIRECTLY]="Docker-Modul direkt ausgeführt"
 
 
-# Konfiguration
+# Configuration
 MSG_DE[DOCKER_CONFIG_NOT_FOUND]="Docker-Konfigurationsdatei nicht gefunden."
 MSG_DE[DOCKER_CONFIG_USING_DEFAULTS]="Standard-Konfiguration wird verwendet. Sie können diese später anpassen."
 
-# Laufende Container
+# Running containers
 MSG_DE[DOCKER_RUNNING_CONTAINERS]="Laufende Docker Container"
 MSG_DE[DOCKER_DAEMON_NOT_RUNNING]="Docker-Daemon ist nicht erreichbar oder läuft nicht."
 MSG_DE[DOCKER_START_DAEMON_HINT]="Stellen Sie sicher, dass Docker gestartet ist: sudo systemctl start docker"
@@ -33,7 +33,7 @@ MSG_DE[DOCKER_NO_RUNNING_CONTAINERS]="Keine laufenden Container gefunden."
 MSG_DE[DOCKER_CONTAINERS_COUNT]="%d Container laufen aktuell:"
 MSG_DE[DOCKER_DETAILED_INFO]="Detaillierte Informationen:"
 
-# Konfigurationsverwaltung
+# Configuration management
 MSG_DE[DOCKER_CONFIG_MANAGEMENT]="Docker-Konfiguration verwalten"
 MSG_DE[DOCKER_CONFIG_DESCRIPTION]="Diese Konfiguration wird hauptsächlich für Docker-Sicherheitsprüfungen verwendet."
 MSG_DE[DOCKER_CONFIG_PURPOSE]="Sie bestimmt, wo und wie nach Docker Compose Dateien gesucht wird."
@@ -44,7 +44,7 @@ MSG_DE[DOCKER_CONFIG_SEARCH_DEPTH]="Maximale Suchtiefe:"
 MSG_DE[DOCKER_CONFIG_CHECK_RUNNING]="Laufende Container prüfen:"
 MSG_DE[DOCKER_CONFIG_CHECK_MODE]="Prüfmodus:"
 
-# Konfigurationsmenü
+# Configuration menu
 MSG_DE[DOCKER_CONFIG_WHAT_TO_CONFIGURE]="Was möchten Sie konfigurieren?"
 MSG_DE[DOCKER_CONFIG_MENU_CHANGE_PATH]="Suchpfad für Docker Compose Dateien ändern"
 MSG_DE[DOCKER_CONFIG_MENU_CHANGE_EXCLUDES]="Ausgeschlossene Verzeichnisse ändern"
@@ -54,7 +54,7 @@ MSG_DE[DOCKER_CONFIG_MENU_TOGGLE_RUNNING]="Laufende Container Prüfung ein/aussc
 MSG_DE[DOCKER_CONFIG_MENU_RESET]="Konfiguration zurücksetzen"
 MSG_DE[DOCKER_CONFIG_MENU_BACK]="Zurück zum Docker-Menü"
 
-# Konfigurationsoptionen
+# Configuration options
 MSG_DE[DOCKER_YOUR_CHOICE]="Ihre Wahl"
 MSG_DE[DOCKER_CONFIG_CURRENT_PATH]="Aktueller Suchpfad:"
 MSG_DE[DOCKER_CONFIG_PATH_DESCRIPTION]="Dies ist der Pfad, in dem nach Docker Compose Dateien gesucht wird."
@@ -91,7 +91,7 @@ MSG_DE[DOCKER_CONFIG_RESET_SUCCESS]="Konfiguration zurückgesetzt."
 MSG_DE[DOCKER_INVALID_CHOICE]="Ungültige Auswahl. Bitte versuchen Sie es erneut."
 MSG_DE[DOCKER_PRESS_ENTER_CONTINUE]="Drücken Sie Enter um fortzufahren..."
 
-# Hauptmenü
+# Main menu
 MSG_DE[DOCKER_FUNCTIONS]="Docker Funktionen"
 MSG_DE[DOCKER_MANAGEMENT_SUBTITLE]="Docker Management - Übergeordnetes Modul für Docker-Operationen"
 MSG_DE[DOCKER_MENU_SHOW_CONTAINERS]="Laufende Docker Container anzeigen"
@@ -99,14 +99,14 @@ MSG_DE[DOCKER_MENU_MANAGE_CONFIG]="Docker-Konfiguration verwalten"
 MSG_DE[DOCKER_MENU_SETUP]="Docker Installation & Setup"
 MSG_DE[DOCKER_MENU_SECURITY]="Docker Sicherheitsprüfung"
 
-# Fehlermeldungen
+# Error messages
 MSG_DE[DOCKER_CONFIG_NOT_FOUND_LONG]="Docker-Konfigurationsdatei '%s' nicht gefunden."
 MSG_DE[DOCKER_CONFIG_CREATE_INFO]="Bitte erstellen Sie diese Datei. Sie können 'config/docker.conf' als Vorlage verwenden"
 MSG_DE[DOCKER_CONFIG_REQUIRED_VARS]="oder sicherstellen, dass die Datei die notwendigen CFG_LH_DOCKER_* Variablen enthält:"
 MSG_DE[DOCKER_CONFIG_VAR_LIST_HEADER]="Benötigte Konfigurationsvariablen:"
 MSG_DE[DOCKER_CONFIG_SAVE_IMPOSSIBLE]="Docker-Konfigurationsdatei %s nicht gefunden. Speichern nicht möglich."
 
-# Konfiguration laden und verarbeiten
+# Load and process configuration
 MSG_DE[DOCKER_CONFIG_FOUND_LOADING]="Konfigurationsdatei gefunden, lade Variablen..."
 MSG_DE[DOCKER_CONFIG_SET_EFFECTIVE]="Setze effektive Konfigurationswerte mit Fallback-Defaults..."
 MSG_DE[DOCKER_CONFIG_EFFECTIVE_CONFIG]="Effektive Konfiguration:"
@@ -118,20 +118,20 @@ MSG_DE[DOCKER_CONFIG_CHECK_RUNNING_LOG]="  - CHECK_RUNNING: %s"
 MSG_DE[DOCKER_CONFIG_SKIP_WARNINGS_LOG]="  - SKIP_WARNINGS: %s"
 MSG_DE[DOCKER_CONFIG_PROCESSED]="Docker-Konfiguration erfolgreich verarbeitet"
 
-# Konfiguration speichern
+# Save configuration
 MSG_DE[DOCKER_CONFIG_SAVE_PREP]="Bereite Variablen zum Speichern vor..."
 MSG_DE[DOCKER_CONFIG_PROCESS_VAR]="Verarbeite Variable: %s = %s"
 MSG_DE[DOCKER_CONFIG_VAR_EXISTS]="Variable %s existiert, aktualisiere Wert..."
 MSG_DE[DOCKER_CONFIG_VAR_NOT_EXISTS]="Variable %s existiert nicht, füge neue Zeile hinzu..."
 MSG_DE[DOCKER_CONFIG_UPDATED]="Docker-Konfiguration aktualisiert in: %s"
 
-# Warnungen überspringen-Funktionen
+# Skip warnings functions
 MSG_DE[DOCKER_WARNING_CHECK_SKIP]="Prüfe ob Warnung '%s' übersprungen werden soll..."
 MSG_DE[DOCKER_NO_SKIP_WARNINGS]="Keine Skip-Warnings konfiguriert, führe Prüfung durch"
 MSG_DE[DOCKER_WARNING_SKIPPED]="Warnung '%s' wird übersprungen (in Skip-Liste: %s)"
 MSG_DE[DOCKER_WARNING_NOT_SKIPPED]="Warnung '%s' wird NICHT übersprungen"
 
-# Akzeptierte Warnungen
+# Accepted warnings
 MSG_DE[DOCKER_WARNING_CHECK_ACCEPTED]="Prüfe ob Warnung '%s' für '%s' akzeptiert ist..."
 MSG_DE[DOCKER_NO_ACCEPTED_WARNINGS]="Keine akzeptierten Warnungen konfiguriert"
 MSG_DE[DOCKER_ACCEPTED_WARNINGS_LIST]="Akzeptierte Warnungen: %s"
@@ -139,7 +139,7 @@ MSG_DE[DOCKER_COMPARE_WARNING]="Vergleiche: '%s' == '%s' && '%s' == '%s'"
 MSG_DE[DOCKER_WARNING_ACCEPTED]="Warnung '%s' für Verzeichnis '%s' ist explizit akzeptiert."
 MSG_DE[DOCKER_WARNING_NOT_ACCEPTED]="Warnung '%s' für '%s' ist NICHT akzeptiert"
 
-# Dateisuch-Funktionen
+# File search functions
 MSG_DE[DOCKER_SEARCH_START]="Starte Suche nach Docker-Compose Dateien in: %s"
 MSG_DE[DOCKER_SEARCH_PARAMS]="Suchparameter: Pfad=%s, Tiefe=%s"
 MSG_DE[DOCKER_SEARCH_DIR_NOT_EXISTS]="Suchverzeichnis existiert nicht: %s"
@@ -155,7 +155,7 @@ MSG_DE[DOCKER_SEARCH_EXIT_CODE]="Find-Kommando beendet mit Exit-Code: %s"
 MSG_DE[DOCKER_SEARCH_COMPLETED_COUNT]="Suche abgeschlossen: %s Dateien gefunden"
 MSG_DE[DOCKER_SEARCH_COMPLETED_NONE]="Suche abgeschlossen: Keine Docker-Compose Dateien gefunden"
 
-# Laufende Container Suche
+# Running container search
 MSG_DE[DOCKER_RUNNING_SEARCH_START]="Starte Ermittlung von Docker-Compose Dateien laufender Container"
 MSG_DE[DOCKER_RUNNING_SEARCH_INFO]="Ermittle Docker-Compose Dateien von laufenden Containern..."
 MSG_DE[DOCKER_CMD_NOT_AVAILABLE]="Docker-Kommando nicht verfügbar"
@@ -190,7 +190,7 @@ MSG_DE[DOCKER_REASON_OUTSIDE_SEARCH]="• Compose-Dateien befinden sich außerha
 MSG_DE[DOCKER_REASON_NO_LABELS]="• Container haben keine entsprechenden Labels"
 MSG_DE[DOCKER_CHECK_ALL_INSTEAD]="Möchten Sie stattdessen alle Compose-Dateien prüfen?"
 
-# Sicherheitsprüfungen
+# Security checks
 MSG_DE[DOCKER_CHECK_UPDATE_LABELS]="Starte Update-Labels Prüfung für: %s"
 MSG_DE[DOCKER_UPDATE_LABELS_SKIPPED]="Update-Labels Prüfung übersprungen (in Skip-Liste)"
 MSG_DE[DOCKER_CHECK_UPDATE_LABELS_INFO]="Prüfe Update-Management Labels in: %s"
@@ -205,7 +205,7 @@ MSG_DE[DOCKER_UPDATE_LABELS_EXAMPLE3]="    - 'com.centurylinklabs.watchtower.ena
 MSG_DE[DOCKER_UPDATE_LABELS_FOUND]="Update-Management Labels gefunden"
 MSG_DE[DOCKER_UPDATE_LABELS_SUCCESS]="✓ Update-Management Labels gefunden"
 
-# Umgebungsdatei-Berechtigungen
+# Environment file permissions
 MSG_DE[DOCKER_CHECK_ENV_PERMS_START]="Starte .env Berechtigungsprüfung für: %s"
 MSG_DE[DOCKER_ENV_PERMS_SKIPPED]=".env Berechtigungsprüfung übersprungen (in Skip-Liste)"
 MSG_DE[DOCKER_CHECK_ENV_PERMS_INFO]="Prüfe .env Dateiberechtigungen in: %s"
@@ -224,7 +224,7 @@ MSG_DE[DOCKER_PERMS_NOT_CORRECTED]="Berechtigung für %s nicht korrigiert (Benut
 MSG_DE[DOCKER_SAFE_PERMS]="Sichere Berechtigung für %s: %s"
 MSG_DE[DOCKER_SAFE_PERMS_SUCCESS]="✓ Sichere Berechtigung für %s: %s"
 
-# Verzeichnisberechtigungsprüfung
+# Directory permissions check
 MSG_DE[DOCKER_DIR_PERMS_START]="Starte Verzeichnisberechtigungsprüfung für: %s"
 MSG_DE[DOCKER_DIR_PERMS_SKIPPED]="Verzeichnisberechtigungsprüfung übersprungen (in Skip-Liste)"
 MSG_DE[DOCKER_DIR_PERMS_CHECK]="Prüfe Verzeichnisberechtigungen: %s"
@@ -235,13 +235,13 @@ MSG_DE[DOCKER_DIR_PERMS_RECOMMEND]="Empfehlung: chmod 755 %s"
 MSG_DE[DOCKER_DIR_PERMS_ACCEPTABLE_LOG]="Verzeichnisberechtigung akzeptabel: %s"
 MSG_DE[DOCKER_DIR_PERMS_ACCEPTABLE]="✓ Verzeichnisberechtigung akzeptabel: %s"
 
-# Latest-Image Prüfung
+# Latest image check
 MSG_DE[DOCKER_LATEST_IMAGES_CHECK]="Prüfe Latest-Image Verwendung in: %s"
 MSG_DE[DOCKER_LATEST_IMAGES_FOUND]="ℹ Latest-Tags oder fehlende Versionierung gefunden:"
 MSG_DE[DOCKER_LATEST_IMAGES_RECOMMEND]="Empfehlung: Verwende spezifische Versionen (z.B. nginx:1.21-alpine)"
 MSG_DE[DOCKER_LATEST_IMAGES_GOOD]="✓ Alle Images verwenden spezifische Versionen"
 
-# Privilegierte Container Prüfung
+# Privileged container check
 MSG_DE[DOCKER_PRIVILEGED_CHECK]="Prüfe privilegierte Container in: %s"
 MSG_DE[DOCKER_PRIVILEGED_FOUND]="⚠ Privilegierte Container gefunden"
 MSG_DE[DOCKER_PRIVILEGED_RECOMMEND]="Empfehlung: Entferne 'privileged: true' und nutze spezifische capabilities:"
@@ -250,20 +250,20 @@ MSG_DE[DOCKER_PRIVILEGED_EXAMPLE_NET]="  - NET_ADMIN  # für Netzwerk-Verwaltung
 MSG_DE[DOCKER_PRIVILEGED_EXAMPLE_TIME]="  - SYS_TIME   # für Zeit-Synchronisation"
 MSG_DE[DOCKER_PRIVILEGED_GOOD]="✓ Keine privilegierten Container gefunden"
 
-# Host-Volume Prüfung
+# Host volume check
 MSG_DE[DOCKER_HOST_VOLUMES_CHECK]="Prüfe Host-Volume Mounts in: %s"
 MSG_DE[DOCKER_HOST_VOLUMES_CRITICAL]="ℹ Kritischer Host-Pfad gemountet: %s"
 MSG_DE[DOCKER_HOST_VOLUMES_WARNING]="Hinweis: Host-Volume Mounts können notwendig sein, aber erhöhen das Sicherheitsrisiko"
 MSG_DE[DOCKER_HOST_VOLUMES_GOOD]="✓ Keine kritischen Host-Pfade gemountet"
 
-# Exponierte Ports Prüfung
+# Exposed ports check
 MSG_DE[DOCKER_EXPOSED_PORTS_CHECK]="Prüfe exponierte Ports in: %s"
 MSG_DE[DOCKER_EXPOSED_PORTS_WARNING]="⚠ Ports auf alle Interfaces exponiert (0.0.0.0)"
 MSG_DE[DOCKER_EXPOSED_PORTS_RECOMMEND]="Empfehlung: Begrenze auf localhost: '127.0.0.1:port:port'"
 MSG_DE[DOCKER_EXPOSED_PORTS_CONFIGURED]="✓ Port-Exposition konfiguriert"
 MSG_DE[DOCKER_EXPOSED_PORTS_NONE]="✓ Keine exponierten Ports gefunden"
 
-# Capabilities Prüfung
+# Capabilities check
 MSG_DE[DOCKER_CAPABILITIES_CHECK]="Prüfe gefährliche Capabilities in: %s"
 MSG_DE[DOCKER_CAPABILITIES_DANGEROUS]="⚠ Gefährliche Capability gefunden: %s"
 MSG_DE[DOCKER_CAPABILITIES_SYS_ADMIN]="SYS_ADMIN: Vollständige System-Administration"
@@ -273,7 +273,7 @@ MSG_DE[DOCKER_CAPABILITIES_NET_ADMIN]="NET_ADMIN: Netzwerk-Administration"
 MSG_DE[DOCKER_CAPABILITIES_RECOMMEND]="Empfehlung: Prüfe ob diese Rechte wirklich benötigt werden"
 MSG_DE[DOCKER_CAPABILITIES_GOOD]="✓ Keine gefährlichen Capabilities gefunden"
 
-# Security-Opt Prüfung
+# Security-opt check
 MSG_DE[DOCKER_SECURITY_OPT_CHECK]="Prüfe Security-Opt Einstellungen in: %s"
 MSG_DE[DOCKER_SECURITY_OPT_DISABLED]="⚠ Sicherheitsmaßnahmen deaktiviert gefunden"
 MSG_DE[DOCKER_SECURITY_OPT_PROTECT]="Apparmor und Seccomp bieten wichtigen Schutz vor:"
@@ -282,7 +282,7 @@ MSG_DE[DOCKER_SECURITY_OPT_SECCOMP]="  - Gefährlichen Systemaufrufen (Seccomp)"
 MSG_DE[DOCKER_SECURITY_OPT_RECOMMEND]="Empfehlung: Entferne 'apparmor:unconfined' und 'seccomp:unconfined'"
 MSG_DE[DOCKER_SECURITY_OPT_GOOD]="✓ Keine deaktivierten Sicherheitsmaßnahmen gefunden"
 
-# Standard-Passwort Prüfung
+# Default password check
 MSG_DE[DOCKER_DEFAULT_PASSWORDS_START]="Starte Default-Passwort Prüfung für: %s"
 MSG_DE[DOCKER_DEFAULT_PASSWORDS_SKIPPED]="Default-Passwort Prüfung übersprungen (in Skip-Liste)"
 MSG_DE[DOCKER_DEFAULT_PASSWORDS_CHECK]="Prüfe Default-Passwörter in: %s"

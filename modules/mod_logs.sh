@@ -7,38 +7,51 @@
 # This script is part of the 'little-linux-helper' collection.
 # Licensed under the MIT License. See the LICENSE file in the project root for more information.
 #
-# Modul für Log-Analyse und -Anzeige
+# Module for log analysis and display
 
-# Laden der gemeinsamen Bibliothek
-source "$(dirname "$0")/../lib/lib_common.sh"
-lh_detect_package_manager
+# Load common library
+# Use BASH_SOURCE to get the correct path when sourced
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
 
-# Load language module for logs
-lh_load_language_module "logs"
+# Complete initialization when run directly (not via help_master.sh)
+if [[ -z "${LH_INITIALIZED:-}" ]]; then
+    lh_load_general_config        # Load general config first for log level
+    lh_initialize_logging
+    lh_detect_package_manager
+    lh_finalize_initialization
+    export LH_INITIALIZED=1
+fi
 
-# Funktion zum Abrufen der letzten X Minuten Logs (aktueller Boot)
+# Load translations if not already loaded
+if [[ -z "${MSG[LOG_HEADER_LAST_MINUTES_CURRENT]:-}" ]]; then
+    lh_load_language_module "logs"
+    lh_load_language_module "common"
+    lh_load_language_module "lib"
+fi
+
+# Function to retrieve the last X minutes of logs (current boot)
 function logs_last_minutes_current() {
     lh_print_header "$(lh_msg 'LOG_HEADER_LAST_MINUTES_CURRENT')"
 
     local minutes_str
     local minutes_default="30"
-    local prompt_text="$(printf "$(lh_msg 'LOG_PROMPT_MINUTES')" "$minutes_default")"
+    local prompt_text="$(lh_msg 'LOG_PROMPT_MINUTES' "$minutes_default")"
 
     minutes_str=$(lh_ask_for_input "$prompt_text" "^[0-9]*$" "$(lh_msg 'LOG_ERROR_INVALID_INPUT')")
     local minutes=${minutes_str:-$minutes_default} # Apply default if empty
 
     # Final validation for the (possibly defaulted) value, assuming minutes must be positive
     if ! [[ "$minutes" =~ ^[0-9]+$ ]] || [ "$minutes" -lt 1 ]; then
-        lh_log_msg "WARN" "$(printf "$(lh_msg 'LOG_ERROR_INVALID_MINUTES')" "$minutes_default")"
-        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'LOG_WARNING_INVALID_INPUT_DEFAULT')" "30")${LH_COLOR_RESET}"
+        lh_log_msg "WARN" "$(lh_msg 'LOG_ERROR_INVALID_MINUTES' "$minutes_default")"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_INVALID_INPUT_DEFAULT' "30")${LH_COLOR_RESET}"
         minutes=$minutes_default
     fi
 
     if command -v journalctl >/dev/null 2>&1; then
-        # systemd-basierte Systeme mit journalctl
+        # systemd-based systems with journalctl
         local start_time=$(date --date="$minutes minutes ago" '+%Y-%m-%d %H:%M:%S')
         
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'LOG_INFO_LOGS_FROM_MINUTES')" "$minutes" "$start_time")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_LOGS_FROM_MINUTES' "$minutes" "$start_time")${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
         $LH_SUDO_CMD journalctl --since "$start_time"
         echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
@@ -53,7 +66,7 @@ function logs_last_minutes_current() {
         if lh_confirm_action "$(lh_msg 'LOG_CONFIRM_SAVE_LOGS')" "n"; then
             local log_backup_file="$LH_LOG_DIR/logs_last_${minutes}min_$(date '+%Y%m%d-%H%M').log"
             $LH_SUDO_CMD journalctl --no-pager --since "$start_time" > "$log_backup_file"
-            echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'LOG_SUCCESS_SAVED')" "$log_backup_file")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'LOG_SUCCESS_SAVED' "$log_backup_file")${LH_COLOR_RESET}"
         fi
     else
         echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_ALTERNATIVE_NO_JOURNALCTL')${LH_COLOR_RESET}"
@@ -69,7 +82,7 @@ function logs_last_minutes_current() {
 
         local start_time_epoch=$(date +%s -d "$minutes minutes ago")
 
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'LOG_INFO_LOGS_FROM_FILE')" "$minutes" "$log_file")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_LOGS_FROM_FILE' "$minutes" "$log_file")${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
         $LH_SUDO_CMD awk -v stime=$start_time_epoch '{
             cmd="date +%s -d \""$1" "$2"\"";
@@ -87,12 +100,12 @@ function logs_last_minutes_current() {
                 close(cmd);
                 if (timestamp >= stime) print
             }' "$log_file" > "$log_backup_file"
-            echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'LOG_SUCCESS_SAVED')" "$log_backup_file")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'LOG_SUCCESS_SAVED' "$log_backup_file")${LH_COLOR_RESET}"
         fi
     fi
 }
 
-# Funktion zum Abrufen der letzten X Minuten Logs (vorheriger Boot)
+# Function to retrieve the last X minutes of logs (previous boot)
 function logs_last_minutes_previous() {
     lh_print_header "$(lh_msg 'LOG_HEADER_LAST_MINUTES_PREVIOUS')"
 
@@ -103,18 +116,18 @@ function logs_last_minutes_previous() {
 
     local minutes_str
     local minutes_default="30"
-    local prompt_text="$(printf "$(lh_msg 'LOG_PROMPT_MINUTES')" "$minutes_default")"
+    local prompt_text="$(lh_msg 'LOG_PROMPT_MINUTES' "$minutes_default")"
 
     minutes_str=$(lh_ask_for_input "$prompt_text" "^[0-9]*$" "$(lh_msg 'LOG_ERROR_INVALID_INPUT')")
     local minutes=${minutes_str:-$minutes_default}
 
     if ! [[ "$minutes" =~ ^[0-9]+$ ]] || [ "$minutes" -lt 1 ]; then
-        lh_log_msg "WARN" "$(printf "$(lh_msg 'LOG_ERROR_INVALID_MINUTES_PREVIOUS')" "$minutes_default")"
-        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'LOG_WARNING_INVALID_INPUT_DEFAULT')" "30")${LH_COLOR_RESET}"
+        lh_log_msg "WARN" "$(lh_msg 'LOG_ERROR_INVALID_MINUTES_PREVIOUS' "$minutes_default")"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_INVALID_INPUT_DEFAULT' "30")${LH_COLOR_RESET}"
         minutes=$minutes_default
     fi
 
-    # Ermitteln der Start- und Endzeit des vorherigen Bootvorgangs
+    # Determine the start and end time of the previous boot
     local prev_boot_start_epoch=$($LH_SUDO_CMD journalctl -b -1 --output=short-unix | head -n 1 | awk '{print $1}' | cut -d'.' -f1)
     local prev_boot_end_epoch=$($LH_SUDO_CMD journalctl -b -1 --output=short-unix | tail -n 1 | awk '{print $1}' | cut -d'.' -f1)
 
@@ -123,18 +136,18 @@ function logs_last_minutes_previous() {
         return 1
     fi
 
-    # Berechnen der Startzeit für die Log-Abfrage
+    # Calculate the start time for the log query
     local start_time_epoch=$((prev_boot_end_epoch - minutes * 60))
-    # Sicherstellen, dass die Startzeit nicht vor dem Beginn des vorherigen Boots liegt
+    # Ensure that the start time does not precede the beginning of the previous boot
     if [[ $start_time_epoch -lt $prev_boot_start_epoch ]]; then
         start_time_epoch=$prev_boot_start_epoch
     fi
 
-    # Konvertieren der Zeiten in lesbares Format
+    # Convert the times to readable format
     local start_time=$(date -d "@$start_time_epoch" '+%Y-%m-%d %H:%M:%S')
     local end_time=$(date -d "@$prev_boot_end_epoch" '+%Y-%m-%d %H:%M:%S')
 
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'LOG_INFO_LOGS_PREVIOUS_BOOT')" "$minutes" "$start_time" "$end_time")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_LOGS_PREVIOUS_BOOT' "$minutes" "$start_time" "$end_time")${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
     $LH_SUDO_CMD journalctl -b -1 --since "$start_time" --until "$end_time"
     echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
@@ -149,11 +162,11 @@ function logs_last_minutes_previous() {
     if lh_confirm_action "$(lh_msg 'LOG_CONFIRM_SAVE_LOGS')" "n"; then
         local log_backup_file="$LH_LOG_DIR/logs_previous_boot_last_${minutes}min_$(date '+%Y%m%d-%H%M').log"
         $LH_SUDO_CMD journalctl --no-pager -b -1 --since "$start_time" --until "$end_time" > "$log_backup_file"
-        echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'LOG_SUCCESS_SAVED')" "$log_backup_file")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'LOG_SUCCESS_SAVED' "$log_backup_file")${LH_COLOR_RESET}"
     fi
 }
 
-# Funktion zum Abrufen der Logs eines bestimmten systemd-Dienstes
+# Function to retrieve the logs of a specific systemd service
 function logs_specific_service() {
     lh_print_header "$(lh_msg 'LOG_HEADER_SPECIFIC_SERVICE')"
 
@@ -162,7 +175,7 @@ function logs_specific_service() {
         return 1
     fi
 
-    # Liste der laufenden Dienste anzeigen
+    # Show list of running services
     echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_RUNNING_SERVICES')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
     $LH_SUDO_CMD systemctl list-units --type=service --state=running | grep "\.service" | sort | head -n 20
@@ -175,14 +188,14 @@ function logs_specific_service() {
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_ERROR_NO_INPUT')${LH_COLOR_RESET}"
         return 1
     fi
-    # Füge .service hinzu, falls nicht vorhanden
+    # Add .service if not present
     if ! [[ "$service_name" == *".service" ]]; then
         service_name="${service_name}.service"
     fi
 
-    # Überprüfen, ob der Dienst existiert
+    # Check if the service exists
     if ! $LH_SUDO_CMD systemctl list-units --type=service --all | grep -q "$service_name"; then
-        echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'LOG_ERROR_SERVICE_NOT_FOUND')" "$service_name")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'LOG_ERROR_SERVICE_NOT_FOUND' "$service_name")${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_SIMILAR_SERVICES')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
         $LH_SUDO_CMD systemctl list-units --type=service --all | grep -i "$(echo $service_name | sed 's/\.service$//')"
@@ -190,7 +203,7 @@ function logs_specific_service() {
         return 1
     fi
 
-    # Zeitraum abfragen
+    # Query time period
     echo -e "${LH_COLOR_PROMPT}$(lh_msg 'LOG_MENU_TIME_PROMPT')${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'LOG_MENU_TIME_ALL')${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'LOG_MENU_TIME_SINCE_BOOT')${LH_COLOR_RESET}"
@@ -207,7 +220,7 @@ function logs_specific_service() {
 
     case $time_option in
         1)
-            # Alle verfügbaren Logs (keine Zeitänderung nötig)
+            # All available logs (no time change needed)
             ;;
         2)
             journalctl_time_opts+=("-b")
@@ -215,13 +228,13 @@ function logs_specific_service() {
         3)
             local hours_default="24"
             local hours_str
-            local hours_prompt="$(printf "$(lh_msg 'LOG_PROMPT_HOURS')" "$hours_default")"
+            local hours_prompt="$(lh_msg 'LOG_PROMPT_HOURS' "$hours_default")"
             hours_str=$(lh_ask_for_input "$hours_prompt" "^[0-9]*$" "$(lh_msg 'LOG_ERROR_INVALID_INPUT')")
             local hours=${hours_str:-$hours_default}
 
             if ! [[ "$hours" =~ ^[0-9]+$ ]] || [ "$hours" -lt 0 ]; then # Allow 0 hours
-                lh_log_msg "WARN" "$(printf "$(lh_msg 'LOG_ERROR_INVALID_HOURS')" "$hours_default")"
-                echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'LOG_WARNING_INVALID_INPUT_HOURS')" "$hours_default")${LH_COLOR_RESET}"
+                lh_log_msg "WARN" "$(lh_msg 'LOG_ERROR_INVALID_HOURS' "$hours_default")"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_INVALID_INPUT_HOURS' "$hours_default")${LH_COLOR_RESET}"
                 hours=$hours_default
             fi
             journalctl_time_opts+=("--since" "$hours hours ago")
@@ -229,32 +242,32 @@ function logs_specific_service() {
         4)
             local days_default="7"
             local days_str
-            local days_prompt="$(printf "$(lh_msg 'LOG_PROMPT_DAYS')" "$days_default")"
+            local days_prompt="$(lh_msg 'LOG_PROMPT_DAYS' "$days_default")"
             days_str=$(lh_ask_for_input "$days_prompt" "^[0-9]*$" "$(lh_msg 'LOG_ERROR_INVALID_INPUT')")
             local days=${days_str:-$days_default}
 
             if ! [[ "$days" =~ ^[0-9]+$ ]] || [ "$days" -lt 0 ]; then # Allow 0 days
-                lh_log_msg "WARN" "$(printf "$(lh_msg 'LOG_ERROR_INVALID_DAYS')" "$days_default")"
-                echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'LOG_WARNING_INVALID_INPUT_DAYS')" "$days_default")${LH_COLOR_RESET}"
+                lh_log_msg "WARN" "$(lh_msg 'LOG_ERROR_INVALID_DAYS' "$days_default")"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_INVALID_INPUT_DAYS' "$days_default")${LH_COLOR_RESET}"
                 days=$days_default
             fi
             journalctl_time_opts+=("--since" "$days days ago")
             ;;
         *)
             if [[ -n "$service_name" ]]; then # Only log if a service name exists
-                lh_log_msg "INFO" "$(printf "$(lh_msg 'LOG_MSG_SHOWING_ALL_LOGS')" "$service_name")"
+                lh_log_msg "INFO" "$(lh_msg 'LOG_MSG_SHOWING_ALL_LOGS' "$service_name")"
             else
                 lh_log_msg "WARN" "$(lh_msg 'LOG_MSG_NO_SERVICE_NAME')"
             fi
             ;;
     esac
 
-    # Ausgabe nach Priorität filtern?
+    # Filter output by priority?
     if lh_confirm_action "$(lh_msg 'LOG_CONFIRM_FILTER_PRIORITY')" "n"; then
         journalctl_filter_opts+=("-p" "warning..emerg")
     fi
 
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'LOG_INFO_LOGS_FOR_SERVICE')" "$service_name")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_LOGS_FOR_SERVICE' "$service_name")${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
     "${journalctl_base_cmd[@]}" "${journalctl_time_opts[@]}" "${journalctl_filter_opts[@]}"
     echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
@@ -262,20 +275,20 @@ function logs_specific_service() {
     if lh_confirm_action "$(lh_msg 'LOG_CONFIRM_SAVE_LOGS')" "n"; then
         local log_backup_file="$LH_LOG_DIR/logs_${service_name}_$(date '+%Y%m%d-%H%M').log"
         "${journalctl_base_cmd[@]}" "${journalctl_time_opts[@]}" "${journalctl_filter_opts[@]}" --no-pager > "$log_backup_file"
-        echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'LOG_SUCCESS_SAVED')" "$log_backup_file")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'LOG_SUCCESS_SAVED' "$log_backup_file")${LH_COLOR_RESET}"
     fi
 }
 
-# Funktion zum Anzeigen der Xorg-Logs
+# Function to display Xorg logs
 function logs_show_xorg() {
     lh_print_header "$(lh_msg 'LOG_HEADER_XORG')"
 
-    # Mögliche Pfade für Xorg-Logs
+    # Possible paths for Xorg logs
     local xorg_log_paths=(
-        "/var/log/Xorg.0.log"    # Häufigster Pfad
+        "/var/log/Xorg.0.log"    # Most common path
         "/var/log/X.0.log"       # Alternative 1
         "/var/log/Xorg.log"      # Alternative 2
-        "$HOME/.local/share/xorg/Xorg.0.log" # Neuere Distributionen
+        "$HOME/.local/share/xorg/Xorg.0.log" # Newer distributions
     )
 
     local xorg_log_found=false
@@ -292,7 +305,7 @@ function logs_show_xorg() {
     if ! $xorg_log_found; then
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_ERROR_NO_XORG_LOGS')${LH_COLOR_RESET}"
 
-        # Als Fallback nach X-Server-Logs im Journal suchen
+        # As a fallback, search for X server logs in the journal
         if command -v journalctl >/dev/null 2>&1; then
             echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_TRYING_XSERVER_JOURNALCTL')${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
@@ -303,7 +316,7 @@ function logs_show_xorg() {
             return 1
         fi
     else
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'LOG_INFO_XORG_LOG_FOUND')" "$xorg_log_path")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_XORG_LOG_FOUND' "$xorg_log_path")${LH_COLOR_RESET}"
 
         echo -e "${LH_COLOR_PROMPT}$(lh_msg 'LOG_MENU_XORG_PROMPT')${LH_COLOR_RESET}"
         echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'LOG_MENU_XORG_FULL')${LH_COLOR_RESET}"
@@ -316,15 +329,15 @@ function logs_show_xorg() {
 
         case $xorg_option in
             2)
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'LOG_TEXT_ERRORS_FROM_XORG')" "$xorg_log_path")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_TEXT_ERRORS_FROM_XORG' "$xorg_log_path")${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
                 $LH_SUDO_CMD grep --color=always -E "\(EE\)|\(WW\)" "$xorg_log_path" | less -R
                 echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
                 ;;
             3)
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'LOG_TEXT_SESSION_CONFIG_FROM_XORG')" "$xorg_log_path")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_TEXT_SESSION_CONFIG_FROM_XORG' "$xorg_log_path")${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
-                # Hier könnte man grep --color=always verwenden, wenn die Suchbegriffe hervorgehoben werden sollen
+                # Here you could use grep --color=always if you want to highlight search terms
                 ($LH_SUDO_CMD grep -A 20 "X.Org X Server" "$xorg_log_path"
                 echo ""
                 $LH_SUDO_CMD grep -A 10 "Loading extension" "$xorg_log_path"
@@ -333,22 +346,22 @@ function logs_show_xorg() {
                 echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
                 ;;
             *)
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'LOG_TEXT_FULL_FROM_XORG')" "$xorg_log_path")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_TEXT_FULL_FROM_XORG' "$xorg_log_path")${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
                 $LH_SUDO_CMD less -R "$xorg_log_path"
-                echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}" # less wird den Bildschirm leeren, diese Zeile ist ggf. nicht direkt sichtbar
+                echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}" # less will clear the screen, this line may not be directly visible
                 ;;
         esac
 
         if lh_confirm_action "$(lh_msg 'LOG_CONFIRM_SAVE_LOGS')" "n"; then
             local log_backup_file="$LH_LOG_DIR/xorg_logs_$(date '+%Y%m%d-%H%M').log"
             $LH_SUDO_CMD cp "$xorg_log_path" "$log_backup_file"
-            echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'LOG_SUCCESS_SAVED')" "$log_backup_file")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'LOG_SUCCESS_SAVED' "$log_backup_file")${LH_COLOR_RESET}"
         fi
     fi
 }
 
-# Funktion zum Anzeigen der dmesg-Ausgabe
+# Function to display the dmesg output
 function logs_show_dmesg() {
     lh_print_header "$(lh_msg 'LOG_HEADER_DMESG')"
 
@@ -367,8 +380,8 @@ function logs_show_dmesg() {
     dmesg_option_prompt="$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'LOG_PROMPT_CHOOSE_OPTION')${LH_COLOR_RESET}")"
     read -p "$dmesg_option_prompt" dmesg_option
 
-    local lines # Deklarieren für den Fall 2
-    local keyword # Deklarieren für den Fall 3
+    local lines # Declare for case 2
+    local keyword # Declare for case 3
     local dmesg_cmd_display_args=()
     local dmesg_cmd_save_args=()
 
@@ -376,34 +389,34 @@ function logs_show_dmesg() {
         2)
             local lines_default="50"
             local lines_str
-            local lines_prompt="$(printf "$(lh_msg 'LOG_PROMPT_LINES')" "$lines_default")"
+            local lines_prompt="$(lh_msg 'LOG_PROMPT_LINES' "$lines_default")"
 
             lines_str=$(lh_ask_for_input "$lines_prompt" "^[0-9]*$" "$(lh_msg 'LOG_ERROR_INVALID_INPUT')")
-            lines=${lines_str:-$lines_default} # lines ist hier schon deklariert
+            lines=${lines_str:-$lines_default} # lines is already declared here
 
             if ! [[ "$lines" =~ ^[0-9]+$ ]] || [ "$lines" -le 0 ]; then # Must be > 0
-                lh_log_msg "WARN" "$(printf "$(lh_msg 'LOG_ERROR_INVALID_LINES')" "$lines_default")"
-                echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'LOG_WARNING_INVALID_INPUT_LINES')" "$lines_default")${LH_COLOR_RESET}"
+                lh_log_msg "WARN" "$(lh_msg 'LOG_ERROR_INVALID_LINES' "$lines_default")"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_INVALID_INPUT_LINES' "$lines_default")${LH_COLOR_RESET}"
                 lines=$lines_default
             fi
 
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'LOG_TEXT_LAST_LINES_DMESG')" "$lines")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_TEXT_LAST_LINES_DMESG' "$lines")${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
             $LH_SUDO_CMD dmesg --color=always | tail -n "$lines"
             echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
             dmesg_cmd_save_args+=("| tail -n \"$lines\"") # This needs to be handled with eval or subshell for saving
             ;;
         3)
-            keyword=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_KEYWORD')") # Kein Default-Wert hier, erfordert Eingabe
+            keyword=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_KEYWORD')") # No default value here, requires input
 
-            if [ -z "$keyword" ]; then # Prüfen ob wirklich etwas eingegeben wurde
+            if [ -z "$keyword" ]; then # Check if anything was entered
                 echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_NO_KEYWORD')${LH_COLOR_RESET}"
                 read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")" -n1 -s
                 echo
                 return 1
             fi
 
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'LOG_TEXT_DMESG_FILTERED')" "$keyword")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_TEXT_DMESG_FILTERED' "$keyword")${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
             $LH_SUDO_CMD dmesg --color=always | grep --color=always -i "$keyword"
             echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
@@ -419,14 +432,14 @@ function logs_show_dmesg() {
         *)
             echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_TEXT_DMESG_FULL')${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
-            # Für sehr lange Ausgaben ist `less` benutzerfreundlicher als `cat`
+            # For very long output, `less` is more user-friendly than `cat`
             $LH_SUDO_CMD dmesg --color=always | less -R
-            echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}" # less leert den Bildschirm
+            echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}" # less clears the screen
             # No specific save args, dmesg default output
             ;;
     esac
 
-    # Nur nachfragen, wenn auch eine Ausgabe erfolgt ist (z.B. nicht bei abgebrochener Schlüsselworteingabe)
+    # Only ask if output was actually produced (e.g. not for aborted keyword input)
     if [ "$dmesg_option" == "1" ] || \
        ([ "$dmesg_option" == "2" ] && [ -n "$lines" ]) || \
        ([ "$dmesg_option" == "3" ] && [ -n "$keyword" ]) || \ # keyword check is already done, this is fine
@@ -443,16 +456,16 @@ function logs_show_dmesg() {
                 4)
                     $LH_SUDO_CMD dmesg --level=err,warn > "$log_backup_file"
                     ;;
-                *) # Fall 1 oder ungültige Option, die zu Fall 1 führte
+                *) # Case 1 or invalid option that led to case 1
                     $LH_SUDO_CMD dmesg > "$log_backup_file"
                     ;;
             esac
-            echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'LOG_SUCCESS_SAVED')" "$log_backup_file")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'LOG_SUCCESS_SAVED' "$log_backup_file")${LH_COLOR_RESET}"
         fi
     fi
 }
 
-# Funktion zum Anzeigen der Paketmanager-Logs
+# Function to display package manager logs
 function logs_show_package_manager() {
     lh_print_header "$(lh_msg 'LOG_HEADER_PACKAGE_MANAGER')"
 
@@ -476,7 +489,7 @@ function logs_show_package_manager() {
             elif [ -f "/var/log/dpkg.log" ]; then
                 log_file="/var/log/dpkg.log"
             else
-                echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'LOG_ERROR_NO_PKG_LOGS')" "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_ERROR_NO_PKG_LOGS' "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
                 return 1
             fi
             ;;
@@ -486,10 +499,10 @@ function logs_show_package_manager() {
             elif [ -f "/var/log/dnf.rpm.log" ]; then
                 log_file="/var/log/dnf.rpm.log"
             elif [ -d "/var/log/dnf" ]; then
-                # Neueste Logdatei verwenden
+                # Use latest log file
                 log_file=$(ls -t /var/log/dnf/dnf.log* 2>/dev/null | head -n 1)
             else
-                echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'LOG_ERROR_NO_PKG_LOGS')" "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_ERROR_NO_PKG_LOGS' "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
                 return 1
             fi
             ;;
@@ -497,17 +510,17 @@ function logs_show_package_manager() {
             log_file="/var/log/pacman.log"
             ;;
         *)
-            echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'LOG_ERROR_NO_PKG_LOGS')" "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_ERROR_NO_PKG_LOGS' "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
             return 1
             ;;
     esac
 
     if [ ! -f "$log_file" ]; then
-        echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'LOG_ERROR_LOG_FILE_NOT_EXIST')" "$log_file")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'LOG_ERROR_LOG_FILE_NOT_EXIST' "$log_file")${LH_COLOR_RESET}"
         return 1
     fi
 
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'LOG_INFO_PACKAGE_MANAGER_LOG')" "$log_file")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_PACKAGE_MANAGER_LOG' "$log_file")${LH_COLOR_RESET}"
 
     echo -e "${LH_COLOR_PROMPT}$(lh_msg 'LOG_MENU_PKG_PROMPT')${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'LOG_MENU_PKG_LAST50')${LH_COLOR_RESET}"
@@ -595,7 +608,7 @@ function logs_show_package_manager() {
                 return 1
             fi
 
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'LOG_TEXT_PACKAGE_ENTRIES')" "$package")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_TEXT_PACKAGE_ENTRIES' "$package")${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
             $LH_SUDO_CMD grep -a --color=always "$package" "$log_file" | tail -n 50
             echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
@@ -675,11 +688,11 @@ function logs_show_package_manager() {
                 $LH_SUDO_CMD tail -n 50 "$log_file" > "$log_backup_file"
                 ;;
         esac        
-        echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'LOG_SUCCESS_SAVED')" "$log_backup_file")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'LOG_SUCCESS_SAVED' "$log_backup_file")${LH_COLOR_RESET}"
     fi
 }
 
-# Funktion für erweiterte Log-Analyse mit Python (Optional)
+# Function for advanced log analysis with Python (optional)
 function logs_advanced_analysis() {
     lh_print_header "$(lh_msg 'LOG_HEADER_ADVANCED_ANALYSIS')"
 
@@ -690,7 +703,7 @@ function logs_advanced_analysis() {
         if python3 -c "import sys; sys.exit(0 if sys.version_info.major == 3 else 1)" &>/dev/null; then
             python_cmd="python3"
         else
-            lh_log_msg "WARN" "$(printf "$(lh_msg 'LOG_PYTHON_NOT_PYTHON3')" "python3")"
+            lh_log_msg "WARN" "$(lh_msg 'LOG_PYTHON_NOT_PYTHON3' "python3")"
         fi
     fi
 
@@ -701,7 +714,7 @@ function logs_advanced_analysis() {
                 python_cmd="python"
                 lh_log_msg "INFO" "$(lh_msg 'LOG_PYTHON_USING_AFTER_ENSURE')"
             else
-                lh_log_msg "WARN" "$(printf "$(lh_msg 'LOG_PYTHON_NOT_PYTHON3')" "python")"
+                lh_log_msg "WARN" "$(lh_msg 'LOG_PYTHON_NOT_PYTHON3' "python")"
             fi
         fi
     fi
@@ -736,14 +749,14 @@ function logs_advanced_analysis() {
     local python_script="$LH_ROOT_DIR/scripts/advanced_log_analyzer.py"
 
     if [ ! -f "$python_script" ]; then
-        lh_log_msg "ERROR" "$(printf "$(lh_msg 'LOG_MSG_PYTHON_SCRIPT_NOT_FOUND')" "$python_script")"        
+        lh_log_msg "ERROR" "$(lh_msg 'LOG_MSG_PYTHON_SCRIPT_NOT_FOUND' "$python_script")"        
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'LOG_ERROR_SCRIPT_NOT_FOUND')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_ERROR}$python_script${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_ENSURE_SCRIPT')${LH_COLOR_RESET}"
         return 1
     fi
 
-    # Auswahl der zu analysierenden Logdatei
+    # Select the log file to analyze
     echo -e "${LH_COLOR_PROMPT}$(lh_msg 'LOG_ANALYSIS_SOURCE_PROMPT')${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'LOG_ANALYSIS_SOURCE_SYSTEM')${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'LOG_ANALYSIS_SOURCE_CUSTOM')${LH_COLOR_RESET}"
@@ -762,7 +775,7 @@ function logs_advanced_analysis() {
 
     case $log_source_option in
         1)
-            # Systemlog
+            # System log
             if [ -f "/var/log/syslog" ]; then
                 log_file="/var/log/syslog"
                 log_format="syslog"
@@ -779,7 +792,7 @@ function logs_advanced_analysis() {
             log_file=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_CUSTOM_LOG')")
 
             if [ ! -f "$log_file" ]; then
-                echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'LOG_ERROR_FILE_NOT_EXIST')" "$log_file")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'LOG_ERROR_FILE_NOT_EXIST' "$log_file")${LH_COLOR_RESET}"
                 return 1
             fi
             ;;
@@ -806,7 +819,7 @@ function logs_advanced_analysis() {
                     $LH_SUDO_CMD journalctl -b > "$journal_file"
                     ;;
                 2)
-                    local hours=$(lh_ask_for_input "$(printf "$(lh_msg 'LOG_PROMPT_HOURS')" "24")")
+                    local hours=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_HOURS' "24")")
                     if [ -z "$hours" ]; then
                         hours="24"
                     fi
@@ -850,7 +863,7 @@ function logs_advanced_analysis() {
                 log_file=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_WEBSERVER_LOG')")
 
                 if [ ! -f "$log_file" ]; then
-                    echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'LOG_ERROR_FILE_NOT_EXIST')" "$log_file")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'LOG_ERROR_FILE_NOT_EXIST' "$log_file")${LH_COLOR_RESET}"
                     return 1
                 fi
             else
@@ -875,7 +888,7 @@ function logs_advanced_analysis() {
                 done
 
                 local log_choice_prompt
-                log_choice_prompt="$(echo -e "${LH_COLOR_PROMPT}$(printf "$(lh_msg 'LOG_ANALYSIS_SELECT_LOG')" "$((i-1))")${LH_COLOR_RESET}")"
+                log_choice_prompt="$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'LOG_ANALYSIS_SELECT_LOG' "$((i-1))")${LH_COLOR_RESET}")"
                 read -p "$log_choice_prompt" log_choice
 
                 if ! [[ "$log_choice" =~ ^[0-9]+$ ]] || [ "$log_choice" -lt 1 ] || [ "$log_choice" -gt $((i-1)) ]; then
@@ -919,7 +932,7 @@ function logs_advanced_analysis() {
             ;;
     esac
 
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'LOG_STATUS_STARTING_ANALYSIS')" "$log_file")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_STATUS_STARTING_ANALYSIS' "$log_file")${LH_COLOR_RESET}"
     $LH_SUDO_CMD "$python_cmd" "$python_script" "$log_file" --format "$log_format" $analysis_args
 
     if [ $? -ne 0 ]; then
@@ -927,7 +940,7 @@ function logs_advanced_analysis() {
     fi
 }
 
-# Hauptfunktion des Moduls: Untermenü anzeigen und Aktionen steuern
+# Main function of the module: show submenu and control actions
 function log_analyzer_menu() {
     while true; do
         lh_print_header "$(lh_msg 'LOG_HEADER_MENU')"
@@ -973,18 +986,18 @@ function log_analyzer_menu() {
                 return 0
                 ;;
             *)
-                lh_log_msg "WARN" "$(printf "$(lh_msg 'LOG_INVALID_SELECTION'): %s" "$option")"
+                lh_log_msg "WARN" "$(lh_msg 'LOG_INVALID_SELECTION' "$option")"
                 echo -e "${LH_COLOR_WARNING}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
                 ;;
         esac
 
-        # Kurze Pause, damit Benutzer die Ausgabe lesen kann
+        # Short pause so user can read the output
         echo ""
         read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")" -n1 -s
         echo ""
     done
 }
 
-# Modul starten
+# Start module
 log_analyzer_menu
 exit $?

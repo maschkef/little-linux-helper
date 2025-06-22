@@ -7,17 +7,35 @@
 # This script is part of the 'little-linux-helper' collection.
 # Licensed under the MIT License. See the LICENSE file in the project root for more information.
 #
-# Modul für Paketverwaltung und System-Updates
+# Module for package management and system updates
 
-# Laden der gemeinsamen Bibliothek
-source "$(dirname "$0")/../lib/lib_common.sh"
-lh_detect_package_manager
-lh_detect_alternative_managers
+# Load common library
+# Use BASH_SOURCE to get the correct path when sourced
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
 
-# Load package management translations
-lh_load_language_module "packages"
+# Complete initialization when run directly (not via help_master.sh)
+if [[ -z "${LH_INITIALIZED:-}" ]]; then
+    lh_load_general_config        # Load general config first for log level
+    lh_initialize_logging
+    lh_detect_package_manager
+    lh_detect_alternative_managers
+    lh_finalize_initialization
+    export LH_INITIALIZED=1
+else
+    # When sourced from main script, ensure alternative managers are detected
+    if [[ -z "${LH_ALTERNATIVE_MANAGERS_DETECTED:-}" ]]; then
+        lh_detect_alternative_managers
+    fi
+fi
 
-# Funktion für Systemaktualisierung
+# Load translations if not already loaded
+if [[ -z "${MSG[PKG_HEADER_SYSTEM_UPDATE]:-}" ]]; then
+    lh_load_language_module "packages"
+    lh_load_language_module "common"
+    lh_load_language_module "lib"
+fi
+
+# Function for system update
 function pkg_system_update() {
     lh_print_header "$(lh_msg PKG_HEADER_SYSTEM_UPDATE)"
 
@@ -26,7 +44,7 @@ function pkg_system_update() {
         auto_confirm=true
     fi
 
-    # Spezifische Logik für Garuda Linux, falls 'garuda-update' existiert
+    # Specific logic for Garuda Linux, if 'garuda-update' exists
     if command -v garuda-update >/dev/null 2>&1; then
         echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_GARUDA_SPECIAL)${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_BEGINNING_UPDATE)${LH_COLOR_RESET}"
@@ -42,10 +60,10 @@ function pkg_system_update() {
             lh_log_msg "INFO" "$(lh_msg PKG_SUCCESS_GARUDA_UPDATE)"
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg PKG_SUCCESS_GARUDA_UPDATE)${LH_COLOR_RESET}"
             
-            # Bietet an, auch alternative Paketmanager zu aktualisieren.
+            # Offer to also update alternative package managers.
             for alt_manager in "${LH_ALT_PKG_MANAGERS[@]}"; do
                 echo ""
-                if lh_confirm_action "$(printf "$(lh_msg PKG_PROMPT_UPDATE_ALTERNATIVE)" "$alt_manager")" "n"; then
+                if lh_confirm_action "$(lh_msg PKG_PROMPT_UPDATE_ALTERNATIVE "$alt_manager")" "n"; then
                     pkg_update_alternative "$alt_manager" "$auto_confirm"
                 fi
             done
@@ -53,15 +71,15 @@ function pkg_system_update() {
             if lh_confirm_action "$(lh_msg PKG_PROMPT_FIND_ORPHANS_AFTER)" "y"; then
                 pkg_find_orphans
             fi
-            return 0 # Erfolgreich beendet
+            return 0 # Finished successfully
         else
-            lh_log_msg "WARN" "garuda-update fehlgeschlagen (Code: $garuda_update_status). Versuche Fallback auf Standard-Paketmanager."
+            lh_log_msg "WARN" "garuda-update failed (Code: $garuda_update_status). Trying fallback to standard package manager."
             echo -e "${LH_COLOR_WARNING}$(lh_msg PKG_WARN_GARUDA_FALLBACK)${LH_COLOR_RESET}"
-            # Fährt mit dem regulären Update-Prozess fort
+            # Continue with the regular update process
         fi
     fi
 
-    # Spezifische Logik für immutable Distros wie Fedora Silverblue
+    # Specific logic for immutable distros like Fedora Silverblue
     if command -v rpm-ostree >/dev/null 2>&1; then
         echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_IMMUTABLE_SPECIAL)${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_BEGINNING_UPDATE)${LH_COLOR_RESET}"
@@ -74,20 +92,20 @@ function pkg_system_update() {
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg PKG_SUCCESS_RPM_OSTREE)${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_REBOOT_REQUIRED)${LH_COLOR_RESET}"
 
-            # Schleife durch alle erkannten alternativen Paketmanager, da rpm-ostree diese nicht abdeckt
+            # Loop through all detected alternative package managers, since rpm-ostree does not cover them
             for alt_manager in "${LH_ALT_PKG_MANAGERS[@]}"; do
                 echo ""
-                if lh_confirm_action "$(printf "$(lh_msg PKG_PROMPT_UPDATE_ALTERNATIVE)" "$alt_manager")" "n"; then
+                if lh_confirm_action "$(lh_msg PKG_PROMPT_UPDATE_ALTERNATIVE "$alt_manager")" "n"; then
                     pkg_update_alternative "$alt_manager" "$auto_confirm"
                 fi
             done
 
-            # Kein pkg_find_orphans für rpm-ostree, da es anders funktioniert.
-            return 0 # Erfolgreich beendet
+            # No pkg_find_orphans for rpm-ostree, as it works differently.
+            return 0 # Finished successfully
         else
-            lh_log_msg "ERROR" "rpm-ostree upgrade fehlgeschlagen (Code: $rpm_ostree_status)."
+            lh_log_msg "ERROR" "rpm-ostree upgrade failed (Code: $rpm_ostree_status)."
             echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_RPM_OSTREE_FAILED)${LH_COLOR_RESET}"
-            return 1 # Kein Fallback möglich/sinnvoll
+            return 1 # No fallback possible/sensible
         fi
     fi
 
@@ -97,7 +115,7 @@ function pkg_system_update() {
         return 1
     fi
 
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_USING_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_USING_PACKAGE_MANAGER "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_BEGINNING_UPDATE)${LH_COLOR_RESET}"
 
     case $LH_PKG_MANAGER in
@@ -143,8 +161,8 @@ function pkg_system_update() {
             fi
             ;;
         *)
-            lh_log_msg "ERROR" "$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")"
-            echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+            lh_log_msg "ERROR" "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
             return 1
             ;;
     esac
@@ -154,25 +172,25 @@ function pkg_system_update() {
         lh_log_msg "INFO" "$(lh_msg PKG_SUCCESS_SYSTEM_UPDATE)" # lh_log_msg handles its own color
         echo -e "${LH_COLOR_SUCCESS}$(lh_msg PKG_SUCCESS_SYSTEM_UPDATE)${LH_COLOR_RESET}"
 
-        # Schleife durch alle erkannten alternativen Paketmanager
+        # Loop through all detected alternative package managers
         for alt_manager in "${LH_ALT_PKG_MANAGERS[@]}"; do
             echo ""
-            if lh_confirm_action "$(printf "$(lh_msg PKG_PROMPT_UPDATE_ALTERNATIVE)" "$alt_manager")" "n"; then
+            if lh_confirm_action "$(lh_msg PKG_PROMPT_UPDATE_ALTERNATIVE "$alt_manager")" "n"; then
                 pkg_update_alternative "$alt_manager" "$auto_confirm"
             fi
         done
     else
-        lh_log_msg "ERROR" "$(printf "$(lh_msg PKG_ERROR_SYSTEM_UPDATE_FAILED)" "$update_status")"
-        echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg PKG_ERROR_SYSTEM_UPDATE_FAILED)" "$update_status")${LH_COLOR_RESET}"
+        lh_log_msg "ERROR" "$(lh_msg PKG_ERROR_SYSTEM_UPDATE_FAILED "$update_status")"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_SYSTEM_UPDATE_FAILED "$update_status")${LH_COLOR_RESET}"
     fi
 
-    # Angebot für zusätzliche Operationen nach dem Update
+    # Offer additional operations after the update
     if [ $update_status -eq 0 ] && lh_confirm_action "$(lh_msg PKG_PROMPT_FIND_ORPHANS_AFTER)" "y"; then
         pkg_find_orphans
     fi
 }
 
-# Funktion zum Aktualisieren alternativer Paketmanager
+# Function to update alternative package managers
 function pkg_update_alternative() {
     local alt_manager="$1"
     local auto_confirm="${2:-false}"
@@ -206,13 +224,13 @@ function pkg_update_alternative() {
             echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_APPIMAGE_LOCATIONS)${LH_COLOR_RESET}"
             ;;
         *)
-            lh_log_msg "WARN" "$(printf "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER)" "$alt_manager")"
-            echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER)" "$alt_manager")${LH_COLOR_RESET}"
+            lh_log_msg "WARN" "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER "$alt_manager")"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER "$alt_manager")${LH_COLOR_RESET}"
             ;;
     esac
 }
 
-# Funktion zum Suchen und Entfernen von Waisenpaketen
+# Function to search for and remove orphaned packages
 function pkg_find_orphans() {
     lh_print_header "$(lh_msg PKG_HEADER_FIND_ORPHANS)"
 
@@ -291,26 +309,26 @@ function pkg_find_orphans() {
             fi
             ;;
         *)
-            lh_log_msg "ERROR" "$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")"
-            echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+            lh_log_msg "ERROR" "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
             return 1
             ;;
     esac
 
-    # Suche nach Waisenpaketen in alternativen Paketmanagern
+    # Search for orphaned packages in alternative package managers
     for alt_manager in "${LH_ALT_PKG_MANAGERS[@]}"; do
-        if lh_confirm_action "$(printf "$(lh_msg PKG_PROMPT_FIND_ALT_ORPHANS)" "$alt_manager")" "n"; then
+        if lh_confirm_action "$(lh_msg PKG_PROMPT_FIND_ALT_ORPHANS "$alt_manager")" "n"; then
             pkg_find_orphans_alternative "$alt_manager"
         fi
     done
 
-    # Zusätzliche Optionen für Paketbereinigung
+    # Additional options for package cleanup
     if lh_confirm_action "$(lh_msg PKG_PROMPT_CLEAN_CACHE)" "n"; then
         pkg_clean_cache
     fi
 }
 
-# Funktion zum Finden von Waisenpaketen alternativer Paketmanager
+# Function to find orphaned packages in alternative package managers
 function pkg_find_orphans_alternative() {
     local alt_manager="$1"
 
@@ -374,12 +392,12 @@ function pkg_find_orphans_alternative() {
             echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_APPIMAGE_MANUAL_CHECK)${LH_COLOR_RESET}"
             ;;
         *)
-            lh_log_msg "WARN" "$(printf "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER)" "$alt_manager")"
+            lh_log_msg "WARN" "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER "$alt_manager")"
             ;;
     esac
 }
 
-# Funktion zur Bereinigung des Paket-Caches
+# Function to clean the package cache
 function pkg_clean_cache() {
     lh_print_header "$(lh_msg PKG_HEADER_CLEAN_CACHE)"
 
@@ -401,13 +419,13 @@ function pkg_clean_cache() {
 
     case $LH_PKG_MANAGER in
         pacman)
-            # Bietet verschiedene Optionen zur Cache-Bereinigung
+            # Offer various options for cache cleaning
             echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_PACMAN_CLEAN_OPTION)${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_PACMAN_CLEAN_1)${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_PACMAN_CLEAN_2)${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_PACMAN_CLEAN_3)${LH_COLOR_RESET}"
 
-            read -p "$(echo -e "${LH_COLOR_PROMPT}$(printf "$(lh_msg PKG_PROMPT_OPTION)" "3"): ${LH_COLOR_RESET}")" clean_option
+            read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION "3"): ${LH_COLOR_RESET}")" clean_option
 
             case $clean_option in
                 1)
@@ -439,13 +457,13 @@ function pkg_clean_cache() {
             $LH_SUDO_CMD dnf clean all
             ;;
         yay)
-            # Bietet ähnliche Optionen wie bei pacman
+            # Offer similar options as with pacman
             echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_YAY_CLEAN_OPTION)${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_YAY_CLEAN_1)${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_YAY_CLEAN_2)${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_YAY_CLEAN_3)${LH_COLOR_RESET}"
 
-            read -p "$(echo -e "${LH_COLOR_PROMPT}$(printf "$(lh_msg PKG_PROMPT_OPTION)" "3"): ${LH_COLOR_RESET}")" clean_option
+            read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION "3"): ${LH_COLOR_RESET}")" clean_option
 
             case $clean_option in
                 1)
@@ -464,15 +482,15 @@ function pkg_clean_cache() {
             esac
             ;;
         *)
-            lh_log_msg "ERROR" "$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")"
-            echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+            lh_log_msg "ERROR" "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
             return 1
             ;;
     esac
 
-    # Cache alternativer Paketmanager bereinigen
+    # Clean cache of alternative package managers
     for alt_manager in "${LH_ALT_PKG_MANAGERS[@]}"; do
-        if lh_confirm_action "$(printf "$(lh_msg PKG_PROMPT_CLEAN_ALT_CACHE)" "$alt_manager")" "n"; then
+        if lh_confirm_action "$(lh_msg PKG_PROMPT_CLEAN_ALT_CACHE "$alt_manager")" "n"; then
             pkg_clean_cache_alternative "$alt_manager"
         fi
     done
@@ -481,14 +499,14 @@ function pkg_clean_cache() {
     echo -e "${LH_COLOR_SUCCESS}$(lh_msg PKG_SUCCESS_CACHE_CLEANED)${LH_COLOR_RESET}"
 }
 
-# Funktion zum Bereinigen des Caches alternativer Paketmanager
+# Function to clean the cache of alternative package managers
 function pkg_clean_cache_alternative() {
     local alt_manager="$1"
 
     case $alt_manager in
         flatpak)
             echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_CLEANING_FLATPAK_CACHE)${LH_COLOR_RESET}"
-            # Entferne nicht mehr benötigte Dateien
+            # Remove no longer needed files
             if command -v flatpak >/dev/null 2>&1; then
                 rm -rf ~/.local/share/flatpak/.ostree/repo/objects/*.*.filez 2>/dev/null
                 lh_log_msg "INFO" "$(lh_msg PKG_SUCCESS_FLATPAK_CACHE_CLEANED)"
@@ -509,7 +527,7 @@ function pkg_clean_cache_alternative() {
                 lh_log_msg "INFO" "$(lh_msg PKG_SUCCESS_NIX_STORE_CLEANED)"
             fi
 
-            # Optional: Optimierung des Nix-Stores
+            # Optional: Optimize the Nix store
             if lh_confirm_action "$(lh_msg PKG_PROMPT_NIX_OPTIMIZE)" "n"; then
                 nix-store --optimise
                 lh_log_msg "INFO" "$(lh_msg PKG_SUCCESS_NIX_STORE_OPTIMIZED)"
@@ -519,12 +537,12 @@ function pkg_clean_cache_alternative() {
             echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_APPIMAGE_CACHE_MINIMAL)${LH_COLOR_RESET}"
             ;;
         *)
-            lh_log_msg "WARN" "$(printf "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER)" "$alt_manager")"
+            lh_log_msg "WARN" "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER "$alt_manager")"
             ;;
     esac
 }
 
-# Funktion zum Suchen und Installieren von Paketen
+# Function to search and install packages
 function pkg_search_install() {
     lh_print_header "$(lh_msg PKG_HEADER_SEARCH_INSTALL)"
 
@@ -541,7 +559,7 @@ function pkg_search_install() {
         return 1
     fi
 
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_SEARCHING_PACKAGES)" "$package")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_SEARCHING_PACKAGES "$package")${LH_COLOR_RESET}"
 
     case $LH_PKG_MANAGER in
         pacman)
@@ -553,7 +571,7 @@ function pkg_search_install() {
                 return 0
             fi
 
-            if lh_confirm_action "$(printf "$(lh_msg PKG_PROMPT_INSTALL_PACKAGE)" "$install_pkg")" "y"; then
+            if lh_confirm_action "$(lh_msg PKG_PROMPT_INSTALL_PACKAGE "$install_pkg")" "y"; then
                 $LH_SUDO_CMD pacman -S "$install_pkg"
             fi
             ;;
@@ -566,7 +584,7 @@ function pkg_search_install() {
                 return 0
             fi
 
-            if lh_confirm_action "$(printf "$(lh_msg PKG_PROMPT_INSTALL_PACKAGE)" "$install_pkg")" "y"; then
+            if lh_confirm_action "$(lh_msg PKG_PROMPT_INSTALL_PACKAGE "$install_pkg")" "y"; then
                 $LH_SUDO_CMD apt install "$install_pkg"
             fi
             ;;
@@ -579,7 +597,7 @@ function pkg_search_install() {
                 return 0
             fi
 
-            if lh_confirm_action "$(printf "$(lh_msg PKG_PROMPT_INSTALL_PACKAGE)" "$install_pkg")" "y"; then
+            if lh_confirm_action "$(lh_msg PKG_PROMPT_INSTALL_PACKAGE "$install_pkg")" "y"; then
                 $LH_SUDO_CMD dnf install "$install_pkg"
             fi
             ;;
@@ -592,18 +610,18 @@ function pkg_search_install() {
                 return 0
             fi
 
-            if lh_confirm_action "$(printf "$(lh_msg PKG_PROMPT_INSTALL_PACKAGE)" "$install_pkg")" "y"; then
+            if lh_confirm_action "$(lh_msg PKG_PROMPT_INSTALL_PACKAGE "$install_pkg")" "y"; then
                 yay -S "$install_pkg"
             fi
             ;;
         *)
-            lh_log_msg "ERROR" "$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")"
-            echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+            lh_log_msg "ERROR" "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
             return 1
             ;;
     esac
 
-    # Option, auch in alternativen Paketmanagern zu suchen
+    # Option to also search in alternative package managers
     if [ ${#LH_ALT_PKG_MANAGERS[@]} -gt 0 ]; then
         echo ""
         if lh_confirm_action "$(lh_msg PKG_PROMPT_SEARCH_ALTERNATIVE)" "n"; then
@@ -612,7 +630,7 @@ function pkg_search_install() {
     fi
 }
 
-# Funktion zum Suchen und Installieren in alternativen Paketquellen
+# Function to search and install in alternative package sources
 function pkg_search_install_alternative() {
     local package="$1"
 
@@ -625,7 +643,7 @@ function pkg_search_install_alternative() {
     done
     echo -e "${LH_COLOR_MENU_NUMBER}0.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg BACK)${LH_COLOR_RESET}"
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(printf "$(lh_msg PKG_PROMPT_CHOOSE_SOURCE)" "$((${#LH_ALT_PKG_MANAGERS[@]}))"): ${LH_COLOR_RESET}")" choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_SOURCE \"$((${#LH_ALT_PKG_MANAGERS[@]}))\"): ${LH_COLOR_RESET}")" choice
 
     if [ "$choice" -eq 0 ]; then
         return 0
@@ -636,35 +654,35 @@ function pkg_search_install_alternative() {
 
         case $selected_manager in
             flatpak)
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_SEARCHING_FLATPAK)" "$package")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_SEARCHING_FLATPAK "$package")${LH_COLOR_RESET}"
                 if flatpak search "$package" | grep -q .; then
                     flatpak search "$package"
 
                     local install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_FLATPAK_APP_ID)")
 
                     if [ "$install_pkg" != "$(lh_msg CANCEL)" ]; then
-                        if lh_confirm_action "$(printf "$(lh_msg PKG_PROMPT_INSTALL_FLATPAK)" "$install_pkg")" "y"; then
+                        if lh_confirm_action "$(lh_msg PKG_PROMPT_INSTALL_FLATPAK "$install_pkg")" "y"; then
                             flatpak install "$install_pkg"
                         fi
                     fi
                 else
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_NO_FLATPAK_FOUND)" "$package")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_NO_FLATPAK_FOUND "$package")${LH_COLOR_RESET}"
                 fi
                 ;;
             snap)
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_SEARCHING_SNAP)" "$package")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_SEARCHING_SNAP "$package")${LH_COLOR_RESET}"
                 snap find "$package"
 
                 local install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_SNAP_NAME)")
 
                 if [ "$install_pkg" != "$(lh_msg CANCEL)" ]; then
-                    if lh_confirm_action "$(printf "$(lh_msg PKG_PROMPT_INSTALL_SNAP)" "$install_pkg")" "y"; then
+                    if lh_confirm_action "$(lh_msg PKG_PROMPT_INSTALL_SNAP "$install_pkg")" "y"; then
                         $LH_SUDO_CMD snap install "$install_pkg"
                     fi
                 fi
                 ;;
             nix)
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_SEARCHING_NIX)" "$package")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_SEARCHING_NIX "$package")${LH_COLOR_RESET}"
                 if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
                     source "$HOME/.nix-profile/etc/profile.d/nix.sh"
                 fi
@@ -674,7 +692,7 @@ function pkg_search_install_alternative() {
                 local install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_NIX_PACKAGE_NAME)")
 
                 if [ "$install_pkg" != "$(lh_msg CANCEL)" ]; then
-                    if lh_confirm_action "$(printf "$(lh_msg PKG_PROMPT_INSTALL_NIX)" "$install_pkg")" "y"; then
+                    if lh_confirm_action "$(lh_msg PKG_PROMPT_INSTALL_NIX "$install_pkg")" "y"; then
                         nix-env -iA "nixpkgs.$install_pkg"
                     fi
                 fi
@@ -684,7 +702,7 @@ function pkg_search_install_alternative() {
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_APPIMAGE_CENTRAL_REPO)${LH_COLOR_RESET}"
                 ;;
             *)
-                lh_log_msg "WARN" "$(printf "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER)" "$selected_manager")"
+                lh_log_msg "WARN" "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER "$selected_manager")"
                 ;;
         esac
     else
@@ -692,7 +710,7 @@ function pkg_search_install_alternative() {
     fi
 }
 
-# Funktion zum Anzeigen installierter Pakete
+# Function to display installed packages
 function pkg_list_installed() {
     lh_print_header "$(lh_msg PKG_HEADER_LIST_INSTALLED)"
     if [ -z "$LH_PKG_MANAGER" ]; then
@@ -708,7 +726,7 @@ function pkg_list_installed() {
     echo -e "${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_ALT_PACKAGES)${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_MENU_NUMBER}5.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_CANCEL)${LH_COLOR_RESET}"
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(printf "$(lh_msg PKG_PROMPT_OPTION)" "1-5"): ${LH_COLOR_RESET}")" list_option
+    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION \"1-5\"): ${LH_COLOR_RESET}")" list_option
 
     case $list_option in
         1)
@@ -735,8 +753,8 @@ function pkg_list_installed() {
                     fi
                     ;;
                 *)
-                    lh_log_msg "ERROR" "$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")"
-                    echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+                    lh_log_msg "ERROR" "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
                     return 1
                     ;;
             esac
@@ -750,24 +768,24 @@ function pkg_list_installed() {
 
             case $LH_PKG_MANAGER in
                 pacman)
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_INSTALLED_CONTAINING)" "$search_term")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_INSTALLED_CONTAINING "$search_term")${LH_COLOR_RESET}"
                     pacman -Q | grep -i "$search_term"
                     ;;
                 apt)
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_INSTALLED_CONTAINING)" "$search_term")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_INSTALLED_CONTAINING "$search_term")${LH_COLOR_RESET}"
                     dpkg-query -l | grep -i "$search_term"
                     ;;
                 dnf)
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_INSTALLED_CONTAINING)" "$search_term")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_INSTALLED_CONTAINING "$search_term")${LH_COLOR_RESET}"
                     dnf list installed | grep -i "$search_term"
                     ;;
                 yay)
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_INSTALLED_CONTAINING)" "$search_term")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_INSTALLED_CONTAINING "$search_term")${LH_COLOR_RESET}"
                     pacman -Q | grep -i "$search_term"
                     ;;
                 *)
-                    lh_log_msg "ERROR" "$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")"
-                    echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+                    lh_log_msg "ERROR" "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
                     return 1
                     ;;
             esac
@@ -805,8 +823,8 @@ function pkg_list_installed() {
                     fi
                     ;;
                 *)
-                    lh_log_msg "ERROR" "$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")"
-                    echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+                    lh_log_msg "ERROR" "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
                     return 1
                     ;;
             esac
@@ -825,7 +843,7 @@ function pkg_list_installed() {
     esac
 }
 
-# Funktion zum Anzeigen installierter Pakete aus alternativen Quellen
+# Function to display installed packages from alternative sources
 function pkg_list_installed_alternative() {
     if [ ${#LH_ALT_PKG_MANAGERS[@]} -eq 0 ]; then
         echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_NO_ALT_MANAGERS)${LH_COLOR_RESET}"
@@ -841,7 +859,7 @@ function pkg_list_installed_alternative() {
     done
     echo -e "${LH_COLOR_MENU_NUMBER}0.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg BACK)${LH_COLOR_RESET}"
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(printf "$(lh_msg PKG_PROMPT_CHOOSE_SOURCE)" "$((${#LH_ALT_PKG_MANAGERS[@]}))"): ${LH_COLOR_RESET}")" choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_SOURCE \"$((${#LH_ALT_PKG_MANAGERS[@]}))\"): ${LH_COLOR_RESET}")" choice
 
     if [ "$choice" -eq 0 ]; then
         return 0
@@ -884,7 +902,7 @@ function pkg_list_installed_alternative() {
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_APPIMAGE_OTHER_LOCATIONS)${LH_COLOR_RESET}"
                 ;;
             *)
-                lh_log_msg "WARN" "$(printf "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER)" "$selected_manager")"
+                lh_log_msg "WARN" "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER "$selected_manager")"
                 ;;
         esac
     else
@@ -892,7 +910,7 @@ function pkg_list_installed_alternative() {
     fi
 }
 
-# Funktion zum Anzeigen des Paketmanager-Logs
+# Function to display the package manager log
 function pkg_show_logs() {
     lh_print_header "$(lh_msg PKG_HEADER_SHOW_LOGS)"
     if [ -z "$LH_PKG_MANAGER" ]; then
@@ -904,20 +922,20 @@ function pkg_show_logs() {
     case $LH_PKG_MANAGER in
         pacman)
             if [ -f /var/log/pacman.log ]; then
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_LAST_ENTRIES)" "pacman")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_LAST_ENTRIES "pacman")${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 tail -n 50 /var/log/pacman.log
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
                 if lh_confirm_action "$(lh_msg PKG_PROMPT_SEARCH_PACKAGE_LOG)" "n"; then
                     local package=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_ENTER_PACKAGE_NAME_LOG)")
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_ENTRIES_FOR_PACKAGE)" "$package")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_ENTRIES_FOR_PACKAGE "$package")${LH_COLOR_RESET}"
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                     grep "$package" /var/log/pacman.log | tail -n 50
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 fi
             else
-                echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg PKG_WARN_LOG_NOT_FOUND)" "/var/log/pacman.log")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg PKG_WARN_LOG_NOT_FOUND "/var/log/pacman.log")${LH_COLOR_RESET}"
             fi
             ;;
         apt)
@@ -933,7 +951,7 @@ function pkg_show_logs() {
             fi
 
             if [ ${#apt_logs[@]} -eq 0 ]; then
-                echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg PKG_WARN_LOG_NOT_FOUND)" "apt/dpkg")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg PKG_WARN_LOG_NOT_FOUND "apt/dpkg")${LH_COLOR_RESET}"
                 return 1
             fi
 
@@ -942,7 +960,7 @@ function pkg_show_logs() {
                 echo -e "${LH_COLOR_MENU_NUMBER}$((i+1)).${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}${apt_logs[$i]}${LH_COLOR_RESET}"
             done
 
-            read -p "$(echo -e "${LH_COLOR_PROMPT}$(printf "$(lh_msg PKG_PROMPT_CHOOSE_LOG)" "${#apt_logs[@]}"): ${LH_COLOR_RESET}")" log_choice
+            read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_LOG \"${#apt_logs[@]}\"): ${LH_COLOR_RESET}")" log_choice
 
             if ! [[ "$log_choice" =~ ^[0-9]+$ ]] || [ "$log_choice" -lt 1 ] || [ "$log_choice" -gt ${#apt_logs[@]} ]; then
                 echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_INVALID_LOG_SELECTION)${LH_COLOR_RESET}"
@@ -950,14 +968,14 @@ function pkg_show_logs() {
             fi
 
             local selected_log="${apt_logs[$((log_choice-1))]}"
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_LAST_ENTRIES)" "$(basename "$selected_log")")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_LAST_ENTRIES "$(basename "$selected_log")")${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             tail -n 50 "$selected_log"
             echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
             if lh_confirm_action "$(lh_msg PKG_PROMPT_SEARCH_PACKAGE_LOG)" "n"; then
                 local package=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_ENTER_PACKAGE_NAME_LOG)")
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_ENTRIES_FOR_PACKAGE)" "$package")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_ENTRIES_FOR_PACKAGE "$package")${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 grep "$package" "$selected_log" | tail -n 50
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
@@ -970,7 +988,7 @@ function pkg_show_logs() {
 
                 if lh_confirm_action "$(lh_msg PKG_PROMPT_SHOW_NEWEST_LOG)" "y"; then
                     local newest_log=$(ls -t /var/log/dnf/dnf.log* | head -n 1)
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_LAST_ENTRIES)" "$(basename "$newest_log")")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_LAST_ENTRIES "$(basename "$newest_log")")${LH_COLOR_RESET}"
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                     tail -n 50 "$newest_log"
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
@@ -978,7 +996,7 @@ function pkg_show_logs() {
 
                 if lh_confirm_action "$(lh_msg PKG_PROMPT_SEARCH_PACKAGE_LOG)" "n"; then
                     local package=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_ENTER_PACKAGE_NAME_LOG)")
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_ENTRIES_FOR_PACKAGE)" "$package")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_ENTRIES_FOR_PACKAGE "$package")${LH_COLOR_RESET}"
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                     grep "$package" /var/log/dnf/dnf.log* | tail -n 50
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
@@ -988,32 +1006,32 @@ function pkg_show_logs() {
             fi
             ;;
         yay)
-            # yay verwendet auch pacman.log für reguläre Pakete
+            # yay also uses pacman.log for regular packages
             if [ -f /var/log/pacman.log ]; then
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_LAST_ENTRIES)" "pacman")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_LAST_ENTRIES "pacman")${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 tail -n 50 /var/log/pacman.log
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
                 if lh_confirm_action "$(lh_msg PKG_PROMPT_SEARCH_PACKAGE_LOG)" "n"; then
                     local package=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_ENTER_PACKAGE_NAME_LOG)")
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_ENTRIES_FOR_PACKAGE)" "$package")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_ENTRIES_FOR_PACKAGE "$package")${LH_COLOR_RESET}"
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                     grep "$package" /var/log/pacman.log | tail -n 50
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 fi
             else
-                echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg PKG_WARN_LOG_NOT_FOUND)" "/var/log/pacman.log")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg PKG_WARN_LOG_NOT_FOUND "/var/log/pacman.log")${LH_COLOR_RESET}"
             fi
             ;;
         *)
-            lh_log_msg "ERROR" "$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")"
-            echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER)" "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+            lh_log_msg "ERROR" "$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_UNKNOWN_PACKAGE_MANAGER "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
             return 1
             ;;
     esac
 
-    # Option für Logs alternativer Paketmanager
+    # Option for logs of alternative package managers
     if [ ${#LH_ALT_PKG_MANAGERS[@]} -gt 0 ]; then
         echo ""
         if lh_confirm_action "$(lh_msg PKG_PROMPT_SHOW_ALT_LOGS)" "n"; then
@@ -1022,7 +1040,7 @@ function pkg_show_logs() {
     fi
 }
 
-# Funktion zum Anzeigen von Logs alternativer Paketmanager
+# Function to display logs of alternative package managers
 function pkg_show_logs_alternative() {
     echo ""
     echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_AVAILABLE_ALT_SOURCES)${LH_COLOR_RESET}"
@@ -1033,7 +1051,7 @@ function pkg_show_logs_alternative() {
     done
     echo -e "${LH_COLOR_MENU_NUMBER}0.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg BACK)${LH_COLOR_RESET}"
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(printf "$(lh_msg PKG_PROMPT_CHOOSE_SOURCE)" "$((${#LH_ALT_PKG_MANAGERS[@]}))"): ${LH_COLOR_RESET}")" choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_SOURCE \"$((${#LH_ALT_PKG_MANAGERS[@]}))\"): ${LH_COLOR_RESET}")" choice
 
     if [ "$choice" -eq 0 ]; then
         return 0
@@ -1072,7 +1090,7 @@ function pkg_show_logs_alternative() {
                     echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_NO_SNAP_LOGS)${LH_COLOR_RESET}"
                 fi
                 echo ""
-                # Snap-spezifische Logs
+                # Snap-specific logs
                 if [ -d /var/log/snappy ]; then
                     echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_SNAP_SYSTEM_LOGS)${LH_COLOR_RESET}"
                     ls -la /var/log/snappy/
@@ -1081,14 +1099,14 @@ function pkg_show_logs_alternative() {
             nix)
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_NIX_ACTIVITY_LOGS)${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}------------------${LH_COLOR_RESET}"
-                # Nix-Daemon Logs
+                # Nix-daemon logs
                 if journalctl --no-pager -u nix-daemon 2>/dev/null | grep -q .; then
                     journalctl --no-pager -u nix-daemon -n 50
                 else
                     echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_NO_NIX_DAEMON_LOGS)${LH_COLOR_RESET}"
                 fi
                 echo ""
-                # Benutzer-spezifische Nix-Logs
+                # User-specific Nix logs
                 if [ -d "$HOME/.nix-defexpr/channels" ]; then
                     echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_NIX_CHANNEL_HISTORY)${LH_COLOR_RESET}"
                     find "$HOME/.nix-defexpr" -name "*generation*" | while read -r gen_file; do
@@ -1104,10 +1122,10 @@ function pkg_show_logs_alternative() {
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_APPIMAGE_CHECK_LOGS)${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_INFO}  - ~/.local/share/applications/${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_INFO}  - ~/.cache/${LH_COLOR_RESET}"
-                echo -e "${LH_COLOR_INFO}  - Anwendungsspezifische Verzeichnisse${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}  - Application-specific directories${LH_COLOR_RESET}"
                 ;;
             *)
-                lh_log_msg "WARN" "$(printf "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER)" "$selected_manager")"
+                lh_log_msg "WARN" "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER "$selected_manager")"
                 ;;
         esac
     else
@@ -1115,14 +1133,14 @@ function pkg_show_logs_alternative() {
     fi
 }
 
-# Hauptfunktion des Moduls: Untermenü anzeigen und Aktionen steuern
+# Main function of the module: show submenu and control actions
 function package_management_menu() {
-    # Sicherstellen, dass der Paketmanager erkannt wurde
+    # Ensure that the package manager was detected
     if [ -z "$LH_PKG_MANAGER" ]; then
         lh_detect_package_manager
     fi
 
-    # Alternative Paketmanager bei Start erkennen, falls nicht bereits geschehen
+    # Detect alternative package managers at startup if not already done
     if [ ${#LH_ALT_PKG_MANAGERS[@]} -eq 0 ]; then
         lh_detect_alternative_managers
     fi
@@ -1140,9 +1158,9 @@ function package_management_menu() {
         lh_print_menu_item 0 "$(lh_msg PKG_MENU_BACK)"
         echo ""
 
-        # Zeige erkannte alternative Paketmanager
+        # Show detected alternative package managers
         if [ ${#LH_ALT_PKG_MANAGERS[@]} -gt 0 ]; then
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg PKG_INFO_DETECTED_ALT_SOURCES)" "${LH_ALT_PKG_MANAGERS[*]}")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_DETECTED_ALT_SOURCES "${LH_ALT_PKG_MANAGERS[*]}")${LH_COLOR_RESET}"
             echo ""
         fi
 
@@ -1175,18 +1193,18 @@ function package_management_menu() {
                 return 0
                 ;;
             *)
-                lh_log_msg "WARN" "$(printf "$(lh_msg PKG_ERROR_INVALID_SELECTION)" "$option")"
+                lh_log_msg "WARN" "$(lh_msg PKG_ERROR_INVALID_SELECTION "$option")"
                 echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_INVALID_SELECTION)${LH_COLOR_RESET}"
                 ;;
         esac
 
-        # Kurze Pause, damit Benutzer die Ausgabe lesen kann
+        # Short pause so the user can read the output
         echo ""
         read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg PRESS_KEY_CONTINUE)${LH_COLOR_RESET}")" -n1 -s
         echo ""
     done
 }
 
-# Modul starten
+# Start module
 package_management_menu
 exit $?

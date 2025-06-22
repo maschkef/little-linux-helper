@@ -6,7 +6,7 @@
 #
 # Color definitions for console output
 
-# Farben für die Ausgabe
+# Colors for output
 LH_COLOR_RESET='\e[0m'
 LH_COLOR_BLACK='\e[0;30m'
 LH_COLOR_RED='\e[0;31m'
@@ -26,7 +26,7 @@ LH_COLOR_BOLD_MAGENTA='\e[1;35m'
 LH_COLOR_BOLD_CYAN='\e[1;36m'
 LH_COLOR_BOLD_WHITE='\e[1;37m'
 
-# Aliase für häufig verwendete Farben
+# Aliases for frequently used colors
 LH_COLOR_HEADER="${LH_COLOR_BOLD_CYAN}"
 LH_COLOR_MENU_NUMBER="${LH_COLOR_BOLD_YELLOW}"
 LH_COLOR_MENU_TEXT="${LH_COLOR_CYAN}"

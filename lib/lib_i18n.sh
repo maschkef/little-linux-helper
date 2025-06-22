@@ -123,7 +123,7 @@ function lh_load_language_module() {
             lh_log_msg "WARN" "$(printf "$msg" "$module_name" "$lang_code")"
             # For non-English modules that don't exist, we already have English loaded, so we're done
             export MSG
-            lh_log_msg "INFO" "Language module loaded: $module_name ($original_lang_code fallback to English)"
+            lh_log_msg "DEBUG" "Language module loaded: $module_name ($original_lang_code fallback to English)"
             return 0
         fi
         
@@ -159,7 +159,7 @@ function lh_load_language_module() {
     fi
     
     export MSG
-    lh_log_msg "INFO" "Language module loaded: $module_name ($original_lang_code with English fallback)"
+    lh_log_msg "DEBUG" "Language module loaded: $module_name ($original_lang_code with English fallback)"
     return 0
 }
 
@@ -264,12 +264,13 @@ function lh_initialize_i18n() {
     if [[ -z "${LH_LANG:-}" ]]; then
         # Load language configuration from general.conf
         if [[ -f "$LH_GENERAL_CONFIG_FILE" ]]; then
-            source "$LH_GENERAL_CONFIG_FILE"
-            if [[ -n "${CFG_LH_LANG:-}" ]]; then
-                if [[ "$CFG_LH_LANG" == "auto" ]]; then
+            # Extract only the language setting to avoid overriding other variables
+            local cfg_lang=$(grep "^CFG_LH_LANG=" "$LH_GENERAL_CONFIG_FILE" | sed 's/^CFG_LH_LANG="//' | sed 's/"$//')
+            if [[ -n "$cfg_lang" ]]; then
+                if [[ "$cfg_lang" == "auto" ]]; then
                     lh_detect_system_language
                 else
-                    export LH_LANG="$CFG_LH_LANG"
+                    export LH_LANG="$cfg_lang"
                 fi
             fi
         else

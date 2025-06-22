@@ -6,26 +6,26 @@
 #
 # Desktop notification functions
 
-# Sendet eine Desktop-Benachrichtigung an den ermittelten Target User
+# Sends a desktop notification to the determined target user
 # $1: notification_type ("success", "error", "warning", "info")
-# $2: title (Titel der Benachrichtigung)
-# $3: message (Hauptnachricht)
-# $4: (Optional) urgency ("low", "normal", "critical") - wird automatisch gesetzt falls leer
-# Rückgabe: 0 bei Erfolg, 1 bei Fehler
+# $2: title (Title of the notification)
+# $3: message (Main message)
+# $4: (Optional) urgency ("low", "normal", "critical") - will be set automatically if empty
+# Return: 0 on success, 1 on error
 function lh_send_notification() {
     local notification_type="$1"
     local title="$2"
     local message="$3"
     local urgency="${4:-}"
     
-    # Validierung der Parameter
+    # Parameter validation
     if [ -z "$notification_type" ] || [ -z "$title" ] || [ -z "$message" ]; then
         local msg="${MSG[LIB_NOTIFICATION_INCOMPLETE_PARAMS]:-lh_send_notification: Incomplete parameters (type, title, message required)}"
         lh_log_msg "ERROR" "$msg"
         return 1
     fi
     
-    # Urgency automatisch setzen, falls nicht angegeben
+    # Set urgency automatically if not specified
     if [ -z "$urgency" ]; then
         case "$notification_type" in
             "success") urgency="normal" ;;
@@ -39,7 +39,7 @@ function lh_send_notification() {
     local msg="${MSG[LIB_NOTIFICATION_TRYING_SEND]:-Trying to send desktop notification: [%s] %s - %s}"
     lh_log_msg "DEBUG" "$(printf "$msg" "$notification_type" "$title" "$message")"
     
-    # Target User Info ermitteln (nutzt das bestehende Framework)
+    # Get target user info (uses the existing framework)
     if ! lh_get_target_user_info; then
         local msg="${MSG[LIB_NOTIFICATION_USER_INFO_FAILED]:-Could not determine target user info, desktop notification will be skipped}"
         lh_log_msg "WARN" "$msg"
@@ -56,7 +56,7 @@ function lh_send_notification() {
     local msg="${MSG[LIB_NOTIFICATION_SENDING_AS_USER]:-Sending notification as user: %s}"
     lh_log_msg "DEBUG" "$(printf "$msg" "$target_user")"
     
-    # Icon basierend auf Typ setzen
+    # Set icon based on type
     local icon=""
     case "$notification_type" in
         "success") icon="dialog-information" ;;
@@ -66,17 +66,17 @@ function lh_send_notification() {
         *) icon="dialog-information" ;;
     esac
     
-    # Verschiedene Benachrichtigungsmethoden versuchen
+    # Try different notification methods
     local notification_sent=false
     
-    # 1. notify-send versuchen (am häufigsten verfügbar)
+    # 1. Try notify-send (most commonly available)
     if lh_run_command_as_target_user "command -v notify-send >/dev/null 2>&1"; then
         local msg="${MSG[LIB_NOTIFICATION_USING_NOTIFY_SEND]:-Using notify-send for desktop notification}"
         lh_log_msg "DEBUG" "$msg"
         
         local notify_cmd="notify-send"
         notify_cmd="$notify_cmd --urgency='$urgency'"
-        notify_cmd="$notify_cmd --expire-time=10000"  # 10 Sekunden
+        notify_cmd="$notify_cmd --expire-time=10000"  # 10 seconds
         if [ -n "$icon" ]; then
             notify_cmd="$notify_cmd --icon='$icon'"
         fi
@@ -95,7 +95,7 @@ function lh_send_notification() {
         fi
     fi
     
-    # 2. zenity versuchen (falls notify-send nicht funktioniert hat)
+    # 2. Try zenity (if notify-send didn't work)
     if [ "$notification_sent" = false ] && lh_run_command_as_target_user "command -v zenity >/dev/null 2>&1"; then
         local msg="${MSG[LIB_NOTIFICATION_USING_ZENITY]:-Using zenity for desktop notification}"
         lh_log_msg "DEBUG" "$msg"
@@ -113,7 +113,7 @@ function lh_send_notification() {
         fi
     fi
     
-    # 3. kdialog versuchen (für KDE-Umgebungen)
+    # 3. Try kdialog (for KDE environments)
     if [ "$notification_sent" = false ] && lh_run_command_as_target_user "command -v kdialog >/dev/null 2>&1"; then
         local msg="${MSG[LIB_NOTIFICATION_USING_KDIALOG]:-Using kdialog for desktop notification}"
         lh_log_msg "DEBUG" "$msg"
@@ -142,8 +142,8 @@ function lh_send_notification() {
     return 0
 }
 
-# Hilfsfunktion: Prüft verfügbare Desktop-Benachrichtigungstools und bietet Installation an
-# Rückgabe: 0 wenn mindestens ein Tool verfügbar ist, 1 sonst
+# Helper function: Checks available desktop notification tools and offers installation
+# Return: 0 if at least one tool is available, 1 otherwise
 function lh_check_notification_tools() {
     local tools_available=false
     local available_tools=()
@@ -152,13 +152,13 @@ function lh_check_notification_tools() {
     local msg="${MSG[LIB_NOTIFICATION_CHECKING_TOOLS]:-Checking available desktop notification tools...}"
     lh_log_msg "INFO" "$msg"
     
-    # Target User ermitteln für die Prüfung
+    # Determine target user for the check
     if ! lh_get_target_user_info; then
         local msg="${MSG[LIB_NOTIFICATION_USER_CHECK_FAILED]:-Could not determine target user - checking tools as current user}"
         lh_log_msg "WARN" "$msg"
     fi
     
-    # Prüfe notify-send
+    # Check notify-send
     if lh_run_command_as_target_user "command -v notify-send >/dev/null 2>&1"; then
         local msg="${MSG[LIB_NOTIFICATION_TOOL_AVAILABLE]:-✓ %s available}"
         echo -e "${LH_COLOR_SUCCESS}$(printf "$msg" "notify-send")${LH_COLOR_RESET}"
@@ -170,7 +170,7 @@ function lh_check_notification_tools() {
         missing_tools+=("libnotify-bin/libnotify")
     fi
     
-    # Prüfe zenity
+    # Check zenity
     if lh_run_command_as_target_user "command -v zenity >/dev/null 2>&1"; then
         local msg="${MSG[LIB_NOTIFICATION_TOOL_AVAILABLE]:-✓ %s available}"
         echo -e "${LH_COLOR_SUCCESS}$(printf "$msg" "zenity")${LH_COLOR_RESET}"
@@ -182,7 +182,7 @@ function lh_check_notification_tools() {
         missing_tools+=("zenity")
     fi
     
-    # Prüfe kdialog
+    # Check kdialog
     if lh_run_command_as_target_user "command -v kdialog >/dev/null 2>&1"; then
         local msg="${MSG[LIB_NOTIFICATION_TOOL_AVAILABLE]:-✓ %s available}"
         echo -e "${LH_COLOR_SUCCESS}$(printf "$msg" "kdialog")${LH_COLOR_RESET}"
@@ -194,13 +194,13 @@ function lh_check_notification_tools() {
         missing_tools+=("kdialog")
     fi
     
-    # Zusammenfassung
+    # Summary
     echo ""
     if [ "$tools_available" = true ]; then
         local msg="${MSG[LIB_NOTIFICATION_TOOLS_AVAILABLE]:-Desktop notifications are available via: %s}"
         echo -e "${LH_COLOR_SUCCESS}$(printf "$msg" "${available_tools[*]}")${LH_COLOR_RESET}"
         
-        # Test-Benachrichtigung anbieten
+        # Offer test notification
         local prompt="${MSG[LIB_NOTIFICATION_TEST_PROMPT]:-Would you like to send a test notification?}"
         if lh_confirm_action "$prompt" "n"; then
             local test_msg="${MSG[LIB_NOTIFICATION_TEST_MESSAGE]:-Test notification successful!}"
@@ -232,7 +232,7 @@ function lh_check_notification_tools() {
                     ;;
             esac
             
-            # Nach Installation erneut prüfen
+            # Check again after installation
             local msg="${MSG[LIB_NOTIFICATION_RECHECK_AFTER_INSTALL]:-Checking again after installation...}"
             echo -e "${LH_COLOR_INFO}$msg${LH_COLOR_RESET}"
             lh_check_notification_tools

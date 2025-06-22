@@ -7,22 +7,35 @@
 # This script is part of the 'little-linux-helper' collection.
 # Licensed under the MIT License. See the LICENSE file in the project root for more information.
 #
-# Modul zur Anzeige von Systeminformationen
+# Module for displaying system information
 
-# Laden der gemeinsamen Bibliothek
-source "$(dirname "$0")/../lib/lib_common.sh"
-lh_detect_package_manager
+# Load common library
+# Use BASH_SOURCE to get the correct path when sourced
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
 
-# Load system_info module translations
-lh_load_language_module "system_info"
+# Complete initialization when run directly (not via help_master.sh)
+if [[ -z "${LH_INITIALIZED:-}" ]]; then
+    lh_load_general_config        # Load general config first for log level
+    lh_initialize_logging
+    lh_detect_package_manager
+    lh_finalize_initialization
+    export LH_INITIALIZED=1
+fi
 
-# Funktion zum Anzeigen von Betriebssystem- und Kernel-Informationen
+# Load translations if not already loaded
+if [[ -z "${MSG[SYSINFO_HEADER_OS_KERNEL]:-}" ]]; then
+    lh_load_language_module "system_info"
+    lh_load_language_module "common"
+    lh_load_language_module "lib"
+fi
+
+# Function to display operating system and kernel information
 function system_os_kernel_info() {
     lh_print_header "$(lh_msg 'SYSINFO_HEADER_OS_KERNEL')"
 
     echo -e "${LH_COLOR_INFO}$(lh_msg 'SYSINFO_OS_LABEL')${LH_COLOR_RESET}"
     if [ -f /etc/os-release ]; then
-        # Anzeige ausgewählter Felder aus os-release
+        # Show selected fields from os-release
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         cat /etc/os-release | grep "^NAME\|^VERSION\|^ID\|^PRETTY_NAME" | sort
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
@@ -41,12 +54,12 @@ function system_os_kernel_info() {
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 }
 
-# Funktion zum Anzeigen von CPU-Informationen
+# Function to display CPU information
 function system_cpu_info() {
     lh_print_header "$(lh_msg 'SYSINFO_HEADER_CPU')"
 
     if command -v lscpu >/dev/null; then
-        # Zeige ausgewählte CPU-Details
+        # Show selected CPU details
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         lscpu | grep -E "^Architektur:|^CPU\(s\):|^Thread\(s\) pro Kern:|^Kern\(e\) pro Sockel:|^Sockel:|^Modellname:|^CPU MHz:|^CPU max MHz:|^CPU min MHz:|^L1d Cache:|^L1i Cache:|^L2 Cache:|^L3 Cache:"
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
@@ -58,7 +71,7 @@ function system_cpu_info() {
     fi
 }
 
-# Funktion zum Anzeigen der RAM-Nutzung
+# Function to display RAM usage
 function system_ram_info() {
     lh_print_header "$(lh_msg 'SYSINFO_HEADER_RAM')"
 
@@ -80,7 +93,7 @@ function system_ram_info() {
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 }
 
-# Funktion zum Anzeigen von PCI-Geräten
+# Function to display PCI devices
 function system_pci_devices() {
     lh_print_header "$(lh_msg 'SYSINFO_HEADER_PCI')"
 
@@ -102,7 +115,7 @@ function system_pci_devices() {
     fi
 }
 
-# Funktion zum Anzeigen von USB-Geräten
+# Function to display USB devices
 function system_usb_devices() {
     lh_print_header "$(lh_msg 'SYSINFO_HEADER_USB')"
 
@@ -124,7 +137,7 @@ function system_usb_devices() {
     fi
 }
 
-# Funktion zum Anzeigen der Festplattenübersicht
+# Function to display disk overview
 function system_disk_overview() {
     lh_print_header "$(lh_msg 'SYSINFO_HEADER_DISK_OVERVIEW')"
 
@@ -139,7 +152,7 @@ function system_disk_overview() {
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 }
 
-# Funktion zum Anzeigen der Top-Prozesse
+# Function to display top processes
 function system_top_processes() {
     lh_print_header "$(lh_msg 'SYSINFO_HEADER_TOP_PROCESSES')"
 
@@ -160,7 +173,7 @@ function system_top_processes() {
     fi
 }
 
-# Funktion zum Anzeigen der Netzwerkkonfiguration
+# Function to display network configuration
 function system_network_config() {
     lh_print_header "$(lh_msg 'SYSINFO_HEADER_NETWORK')"
 
@@ -193,7 +206,7 @@ function system_network_config() {
     fi
 }
 
-# Funktion zum Anzeigen von Temperaturen und Sensorwerten
+# Function to display temperatures and sensor values
 function system_temperature_sensors() {
     lh_print_header "$(lh_msg 'SYSINFO_HEADER_SENSORS')"
 
@@ -207,7 +220,7 @@ function system_temperature_sensors() {
     sensors
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
-    # Alternativ auch über /sys/class/thermal, falls verfügbar
+    # Alternatively, via /sys/class/thermal, if available
     if [ -d /sys/class/thermal ]; then
         echo -e "\n$(lh_msg 'SYSINFO_SENSORS_KERNEL_THERMAL')"
         echo "--------------------------"
@@ -216,14 +229,14 @@ function system_temperature_sensors() {
                 zone_type=$(cat "$thermal_zone/type")
                 temp_millidegree=$(cat "$thermal_zone/temp")
                 temp_degree=$(echo "scale=1; $temp_millidegree / 1000" | bc 2>/dev/null || echo "$temp_millidegree")
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'SYSINFO_SENSORS_ZONE_LABEL')" "$(basename "$thermal_zone")")${LH_COLOR_RESET} $zone_type = $temp_degree°C"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'SYSINFO_SENSORS_ZONE_LABEL' "$(basename "$thermal_zone")")${LH_COLOR_RESET} $zone_type = $temp_degree°C"
             fi
         done
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     fi
 }
 
-# Hauptfunktion des Moduls: Untermenü anzeigen und Aktionen steuern
+# Main function of the module: show submenu and control actions
 function system_info_menu() {
     while true; do
         lh_print_header "$(lh_msg 'SYSINFO_MENU_TITLE')"
@@ -275,18 +288,18 @@ function system_info_menu() {
                 return 0
                 ;;
             *)
-                lh_log_msg "WARN" "$(printf "$(lh_msg 'INVALID_SELECTION'): %s" "$option")"
+                lh_log_msg "WARN" "$(lh_msg 'INVALID_SELECTION' "$option")"
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'SYSINFO_INVALID_SELECTION_TRY_AGAIN')${LH_COLOR_RESET}"
                 ;;
         esac
 
-        # Kurze Pause, damit Benutzer die Ausgabe lesen kann
+        # Short pause so user can read the output
         echo ""
         read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")" -n1 -s
         echo ""
     done
 }
 
-# Modul starten
+# Start module
 system_info_menu
 exit $?

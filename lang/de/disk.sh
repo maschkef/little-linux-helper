@@ -4,12 +4,12 @@
 # Copyright (c) 2025 wuldorf
 # SPDX-License-Identifier: MIT
 #
-# Deutsche Übersetzungen für das Festplatten-Modul
+# German translations for the disk module
 
-# Bedingte Deklaration für Moduldateien
+# Conditional declaration for module files
 [[ ! -v MSG_DE ]] && declare -A MSG_DE
 
-# Menüelemente und Überschriften
+# Menu items and headings
 MSG_DE[DISK_MENU_TITLE]="Festplatten-Werkzeuge"
 MSG_DE[DISK_MENU_MOUNTED]="Übersicht der eingebundenen Laufwerke"
 MSG_DE[DISK_MENU_SMART]="S.M.A.R.T.-Werte auslesen"
@@ -21,7 +21,7 @@ MSG_DE[DISK_MENU_HEALTH]="Festplatten-Gesundheitsstatus prüfen"
 MSG_DE[DISK_MENU_LARGEST_FILES]="Größte Dateien anzeigen"
 MSG_DE[DISK_MENU_BACK]="Zurück zum Hauptmenü"
 
-# Überschriften
+# Headings
 MSG_DE[DISK_HEADER_MOUNTED]="Eingebundene Laufwerke"
 MSG_DE[DISK_HEADER_SMART]="S.M.A.R.T.-Werte"
 MSG_DE[DISK_HEADER_FILE_ACCESS]="Dateizugriff prüfen"
@@ -31,11 +31,11 @@ MSG_DE[DISK_HEADER_FILESYSTEM]="Dateisystem überprüfen"
 MSG_DE[DISK_HEADER_HEALTH]="Festplatten-Gesundheitsstatus prüfen"
 MSG_DE[DISK_HEADER_LARGEST_FILES]="Größte Dateien anzeigen"
 
-# Eingebundene Laufwerke
+# Mounted drives
 MSG_DE[DISK_MOUNTED_OVERVIEW]="Übersicht der aktuell eingebundenen Laufwerke (df):"
 MSG_DE[DISK_MOUNTED_BLOCKDEVICES]="Alle Blockgeräte mit Dateisystemdetails (lsblk):"
 
-# S.M.A.R.T.-bezogen
+# S.M.A.R.T.-related
 MSG_DE[DISK_SMART_SCANNING]="Verfügbare Laufwerke werden gescannt..."
 MSG_DE[DISK_SMART_NO_DRIVES]="Keine Laufwerke gefunden. Versuche direkte Suche..."
 MSG_DE[DISK_SMART_NO_DRIVES_FOUND]="Keine Festplatten gefunden oder 'smartctl' konnte keine Geräte erkennen."
@@ -44,12 +44,12 @@ MSG_DE[DISK_SMART_CHECK_ALL]="Alle Laufwerke prüfen"
 MSG_DE[DISK_SMART_SELECT_DRIVE]="Bitte wählen Sie ein Laufwerk (1-%d):"
 MSG_DE[DISK_SMART_VALUES_FOR]="=== S.M.A.R.T.-Werte für %s ==="
 
-# Dateizugriff
+# File access
 MSG_DE[DISK_ACCESS_ENTER_PATH]="Geben Sie den Pfad des Ordners ein"
 MSG_DE[DISK_ACCESS_PATH_NOT_EXIST]="Der angegebene Pfad existiert nicht oder ist kein Verzeichnis."
 MSG_DE[DISK_ACCESS_CHECKING]="Prüfen, welche Prozesse auf den Ordner %s zugreifen..."
 
-# Festplattenbelegung
+# Disk usage
 MSG_DE[DISK_USAGE_OVERVIEW]="Übersicht der Speichernutzung nach Dateisystemen:"
 MSG_DE[DISK_USAGE_NCDU_START]="Möchten Sie die interaktive Festplattenanalyse mit ncdu starten?"
 MSG_DE[DISK_USAGE_NCDU_INSTALL]="Möchten Sie das interaktive Festplattenanalyse-Tool 'ncdu' installieren?"
@@ -57,7 +57,7 @@ MSG_DE[DISK_USAGE_ANALYZE_PATH]="Geben Sie den zu analysierenden Pfad ein (z.B. 
 MSG_DE[DISK_USAGE_ALTERNATIVE]="Alternativ können die größten Dateien auch mit du/find angezeigt werden."
 MSG_DE[DISK_USAGE_SHOW_LARGEST]="Möchten Sie die größten Dateien in einem bestimmten Verzeichnis anzeigen?"
 
-# Geschwindigkeitstest
+# Speed test
 MSG_DE[DISK_SPEED_AVAILABLE_DEVICES]="Verfügbare Blockgeräte:"
 MSG_DE[DISK_SPEED_ENTER_DRIVE]="Geben Sie das zu testende Laufwerk an (z.B. /dev/sda)"
 MSG_DE[DISK_SPEED_NOT_BLOCK_DEVICE]="Das angegebene Gerät existiert nicht oder ist kein Blockgerät."
@@ -69,7 +69,7 @@ MSG_DE[DISK_SPEED_CONFIRM_WRITE]="Sind Sie sicher, dass Sie fortfahren möchten?
 MSG_DE[DISK_SPEED_WRITE_TEST]="Durchführung eines Schreibtests mit dd (512 MB)..."
 MSG_DE[DISK_SPEED_CLEANUP]="Bereinigen des Testfiles..."
 
-# Dateisystemprüfung
+# Filesystem check
 MSG_DE[DISK_FSCK_AVAILABLE_PARTITIONS]="Verfügbare Partitionen:"
 MSG_DE[DISK_FSCK_WARNING_UNMOUNTED]="WARNUNG: Dateisystemüberprüfungen sollten nur an nicht gemounteten Partitionen durchgeführt werden!"
 MSG_DE[DISK_FSCK_WARNING_LIVECD]="         Es wird empfohlen, diese Überprüfung von einer Live-CD oder im Recovery-Modus durchzuführen."
@@ -104,7 +104,7 @@ MSG_DE[DISK_FSCK_CODE_16]="16: Nutzungsfehler oder Syntaxfehler"
 MSG_DE[DISK_FSCK_CODE_32]="32: Fsck wurde abgebrochen"
 MSG_DE[DISK_FSCK_CODE_128]="128: Shared-Library-Fehler"
 
-# Gesundheitsprüfung
+# Health check
 MSG_DE[DISK_HEALTH_SCANNING]="Verfügbare Laufwerke werden gescannt..."
 MSG_DE[DISK_HEALTH_NO_DRIVES]="Keine Laufwerke gefunden. Versuche direkte Suche..."
 MSG_DE[DISK_HEALTH_NO_DRIVES_FOUND]="Keine Festplatten gefunden oder 'smartctl' konnte keine Geräte erkennen."
@@ -126,7 +126,7 @@ MSG_DE[DISK_HEALTH_TEST_RESULTS]="Testergebnisse für %s:"
 MSG_DE[DISK_HEALTH_EXTENDED_ATTRIBUTES]="Erweiterte Attribute für %s:"
 MSG_DE[DISK_HEALTH_OPERATION_CANCELLED]="Operation abgebrochen."
 
-# Größte Dateien
+# Largest files
 MSG_DE[DISK_LARGEST_ENTER_PATH]="Geben Sie den Pfad an, in dem gesucht werden soll"
 MSG_DE[DISK_LARGEST_PATH_NOT_EXIST]="Der angegebene Pfad existiert nicht oder ist kein Verzeichnis."
 MSG_DE[DISK_LARGEST_FILE_COUNT]="Wie viele Dateien sollen angezeigt werden? [Standard ist 20]:"
@@ -139,14 +139,14 @@ MSG_DE[DISK_LARGEST_METHOD_FIND]="find (besser für große Verzeichnisse, zeigt 
 MSG_DE[DISK_LARGEST_SELECT_METHOD_PROMPT]="Wählen Sie eine Option (1-2):"
 MSG_DE[DISK_LARGEST_INVALID_USING_DU]="Ungültige Auswahl. Verwende du."
 
-# Fehlermeldungen
+# Error messages
 MSG_DE[DISK_ERROR_SMARTCTL_NOT_INSTALLED]="Das Programm 'smartctl' ist nicht installiert und konnte nicht installiert werden."
 MSG_DE[DISK_ERROR_DU_NOT_INSTALLED]="Das Programm 'du' ist nicht installiert und konnte nicht installiert werden."
 MSG_DE[DISK_ERROR_LSOF_NOT_INSTALLED]="Das Programm 'lsof' ist nicht installiert und konnte nicht installiert werden."
 MSG_DE[DISK_ERROR_HDPARM_NOT_INSTALLED]="Das Programm 'hdparm' ist nicht installiert und konnte nicht installiert werden."
 MSG_DE[DISK_ERROR_FSCK_NOT_INSTALLED]="Das Programm 'fsck' ist nicht installiert und konnte nicht installiert werden."
 
-# Allgemeine Nachrichten
+# General messages
 MSG_DE[DISK_INVALID_SELECTION]="Ungültige Auswahl."
 MSG_DE[DISK_BACK_TO_MAIN_MENU]="Zurück zum Hauptmenü."
 MSG_DE[DISK_INVALID_SELECTION_TRY_AGAIN]="Ungültige Auswahl. Bitte versuchen Sie es erneut."

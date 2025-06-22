@@ -7,16 +7,29 @@
 # This script is part of the 'little-linux-helper' collection.
 # Licensed under the MIT License. See the LICENSE file in the project root for more information.
 #
-# Modul für Sicherheitsüberprüfungen
+# Module for security checks
 
-# Laden der gemeinsamen Bibliothek
-source "$(dirname "$0")/../lib/lib_common.sh"
-lh_detect_package_manager
+# Load common library
+# Use BASH_SOURCE to get the correct path when sourced
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
 
-# Load security module translations
-lh_load_language_module "security"
+# Complete initialization when run directly (not via help_master.sh)
+if [[ -z "${LH_INITIALIZED:-}" ]]; then
+    lh_load_general_config        # Load general config first for log level
+    lh_initialize_logging
+    lh_detect_package_manager
+    lh_finalize_initialization
+    export LH_INITIALIZED=1
+fi
 
-# Funktion zur Anzeige offener Netzwerkports
+# Load translations if not already loaded
+if [[ -z "${MSG[SECURITY_OPEN_PORTS_TITLE]:-}" ]]; then
+    lh_load_language_module "security"
+    lh_load_language_module "common"
+    lh_load_language_module "lib"
+fi
+
+# Function to display open network ports
 function security_show_open_ports() {
     lh_print_header "$(lh_msg 'SECURITY_OPEN_PORTS_TITLE')"
 
@@ -52,7 +65,7 @@ function security_show_open_ports() {
     fi
 }
 
-# Funktion zur Anzeige fehlgeschlagener Anmeldeversuche
+# Function to display failed login attempts
 function security_show_failed_logins() {
     lh_print_header "$(lh_msg 'SECURITY_FAILED_LOGINS_TITLE')"
 
@@ -145,7 +158,7 @@ function security_show_failed_logins() {
     fi
 }
 
-# Funktion zur Überprüfung auf Rootkits
+# Function to check for rootkits
 function security_check_rootkits() {
     lh_print_header "$(lh_msg 'SECURITY_ROOTKIT_TITLE')"
 
@@ -188,7 +201,7 @@ function security_check_rootkits() {
             ;;
     esac
 
-    # Überprüfen, ob chkrootkit ebenfalls verfügbar ist und installiert werden soll
+    # Check if chkrootkit is also available and should be installed
     if ! command -v chkrootkit >/dev/null 2>&1; then
         if lh_confirm_action "$(lh_msg 'SECURITY_ROOTKIT_CHKROOTKIT_INSTALL')" "n"; then
             if lh_check_command "chkrootkit" true; then
@@ -202,7 +215,7 @@ function security_check_rootkits() {
     fi
 }
 
-# Funktion zur Prüfung des Firewall-Status
+# Function to check firewall status
 function security_check_firewall() {
     lh_print_header "$(lh_msg 'SECURITY_FIREWALL_TITLE')"
 
@@ -210,7 +223,7 @@ function security_check_firewall() {
     local firewall_active=false
     local firewall_name=""
 
-    # UFW prüfen (Ubuntu/Debian)
+    # Check UFW (Ubuntu/Debian)
     if command -v ufw >/dev/null 2>&1; then
         firewall_found=true
         firewall_name="UFW (Uncomplicated Firewall)"
@@ -225,7 +238,7 @@ function security_check_firewall() {
         fi
     fi
 
-    # firewalld prüfen (Fedora/RHEL/CentOS)
+    # Check firewalld (Fedora/RHEL/CentOS)
     if command -v firewall-cmd >/dev/null 2>&1; then
         firewall_found=true
         firewall_name="firewalld"
@@ -244,7 +257,7 @@ function security_check_firewall() {
         fi
     fi
 
-    # iptables direkt prüfen
+    # Check iptables directly
     if command -v iptables >/dev/null 2>&1; then
         if ! $firewall_found; then
             firewall_found=true
@@ -256,7 +269,7 @@ function security_check_firewall() {
         $LH_SUDO_CMD iptables -L -n -v
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
-        # Wenn mindestens eine Regel in der INPUT-Kette existiert (außer der Policy)
+        # If at least one rule exists in the INPUT chain (except for the policy)
         if $LH_SUDO_CMD iptables -L INPUT -n -v | grep -q "Chain INPUT" && \
            $LH_SUDO_CMD iptables -L INPUT -n -v | tail -n +3 | grep -q "."; then
             firewall_active=true
@@ -268,7 +281,7 @@ function security_check_firewall() {
     fi
 
     if ! $firewall_active && $firewall_found; then
-        echo -e "\n${LH_COLOR_WARNING}$(printf "$(lh_msg 'SECURITY_FIREWALL_INACTIVE_WARNING')" "$firewall_name")${LH_COLOR_RESET}"
+        echo -e "\n${LH_COLOR_WARNING}$(lh_msg 'SECURITY_FIREWALL_INACTIVE_WARNING' "$firewall_name")${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'SECURITY_FIREWALL_ACTIVATION_RECOMMENDED')${LH_COLOR_RESET}"
 
         if lh_confirm_action "$(lh_msg 'SECURITY_FIREWALL_SHOW_ACTIVATION_INFO')" "y"; then
@@ -294,20 +307,20 @@ function security_check_firewall() {
                     echo -e "${LH_COLOR_INFO}$(lh_msg 'SECURITY_FIREWALL_IPTABLES_MINIMAL')${LH_COLOR_RESET}"
                     echo -e "${LH_COLOR_INFO}sudo iptables -A INPUT -i lo -j ACCEPT${LH_COLOR_RESET}"
                     echo -e "${LH_COLOR_INFO}sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT${LH_COLOR_RESET}"
-                    echo -e "${LH_COLOR_INFO}sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT # SSH erlauben${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT # Allow SSH${LH_COLOR_RESET}"
                     echo -e "${LH_COLOR_INFO}sudo iptables -A INPUT -j DROP${LH_COLOR_RESET}"
                     echo -e "\n${LH_COLOR_INFO}$(lh_msg 'SECURITY_FIREWALL_IPTABLES_SAVE_INFO')${LH_COLOR_RESET}"
-                    echo -e "${LH_COLOR_INFO}sudo apt install iptables-persistent # Für Debian/Ubuntu${LH_COLOR_RESET}"
-                    echo -e "${LH_COLOR_INFO}sudo service iptables save # Für manche RHEL-basierte Systeme${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo apt install iptables-persistent # For Debian/Ubuntu${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}sudo service iptables save # For some RHEL-based systems${LH_COLOR_RESET}"
                     ;;
             esac
         fi
     elif $firewall_active; then
-        echo -e "\n${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'SECURITY_FIREWALL_ACTIVE_SUCCESS')" "$firewall_name")${LH_COLOR_RESET}"
+        echo -e "\n${LH_COLOR_SUCCESS}$(lh_msg 'SECURITY_FIREWALL_ACTIVE_SUCCESS' "$firewall_name")${LH_COLOR_RESET}"
     fi
 }
 
-# Funktion zur Prüfung von System-Updates
+# Function to check for system updates
 function security_check_updates() {
     lh_print_header "$(lh_msg 'SECURITY_UPDATES_TITLE')"
 
@@ -321,7 +334,7 @@ function security_check_updates() {
 
     case $LH_PKG_MANAGER in
         pacman)
-            $LH_SUDO_CMD pacman -Sy >/dev/null 2>&1  # Pakete synchronisieren
+            $LH_SUDO_CMD pacman -Sy >/dev/null 2>&1  # Synchronize packages
 
             local updates=$($LH_SUDO_CMD pacman -Qu 2>/dev/null)
             if [ -n "$updates" ]; then
@@ -344,13 +357,13 @@ function security_check_updates() {
 
             echo -e "${LH_COLOR_INFO}$(lh_msg 'SECURITY_UPDATES_SECURITY_AVAILABLE')${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
-            # Ubuntu/Debian-Security-Updates haben spezifische Quellen
+            # Ubuntu/Debian Security Updates have specific sources
             $LH_SUDO_CMD apt list --upgradable 2>/dev/null | grep -i security
             echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
             local all_updates=$($LH_SUDO_CMD apt list --upgradable 2>/dev/null | grep -v "Auflistung..." | wc -l)
             if [ "$all_updates" -gt 0 ]; then
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'SECURITY_UPDATES_TOTAL_COUNT')" "$all_updates")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'SECURITY_UPDATES_TOTAL_COUNT' "$all_updates")${LH_COLOR_RESET}"
 
                 if lh_confirm_action "$(lh_msg 'SECURITY_UPDATES_SHOW_ALL')" "y"; then
                     echo -e "\n${LH_COLOR_INFO}$(lh_msg 'SECURITY_UPDATES_ALL_AVAILABLE')${LH_COLOR_RESET}"
@@ -367,7 +380,7 @@ function security_check_updates() {
             fi
             ;;
         dnf)
-            # Fedora/RHEL hebt Sicherheits-Updates nicht speziell hervor, alle Updates werden als Sicherheitsverbesserung betrachtet
+            # Fedora/RHEL do not specifically highlight security updates, all updates are considered security improvements
             $LH_SUDO_CMD dnf check-update --refresh >/dev/null 2>&1
 
             local all_updates=$($LH_SUDO_CMD dnf check-update --quiet 2>/dev/null | wc -l)
@@ -385,7 +398,7 @@ function security_check_updates() {
             fi
             ;;
         yay)
-            yay -Sy >/dev/null 2>&1  # Pakete synchronisieren
+            yay -Sy >/dev/null 2>&1  # Synchronize packages
 
             local updates=$(yay -Qu 2>/dev/null)
             if [ -n "$updates" ]; then
@@ -404,18 +417,18 @@ function security_check_updates() {
             fi
             ;;
         *)
-            lh_log_msg "ERROR" "$(printf "$(lh_msg 'SECURITY_UPDATES_UNKNOWN_PKG_MANAGER')" "$LH_PKG_MANAGER")"
-            echo -e "${LH_COLOR_ERROR}$(lh_msg 'ERROR'): $(printf "$(lh_msg 'SECURITY_UPDATES_UNKNOWN_PKG_MANAGER')" "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+            lh_log_msg "ERROR" "$(lh_msg 'SECURITY_UPDATES_UNKNOWN_PKG_MANAGER' "$LH_PKG_MANAGER")"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'ERROR'): $(lh_msg 'SECURITY_UPDATES_UNKNOWN_PKG_MANAGER' "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
             return 1
             ;;
     esac
 }
 
-# Funktion zur Überprüfung von Benutzerkennwörtern
+# Function to check user password policies
 function security_check_password_policy() {
     lh_print_header "$(lh_msg 'SECURITY_PASSWORD_TITLE')"
 
-    # Überprüfen der Passwort-Richtlinien
+    # Check password policies
     if [ -f /etc/security/pwquality.conf ]; then
         echo -e "${LH_COLOR_INFO}$(lh_msg 'SECURITY_PASSWORD_QUALITY_CONFIG')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
@@ -435,7 +448,7 @@ function security_check_password_policy() {
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'SECURITY_PASSWORD_NO_CONFIG')${LH_COLOR_RESET}"
     fi
 
-    # Ablaufdatum für Benutzerkennwörter
+    # Expiration date for user passwords
     echo -e "\n${LH_COLOR_INFO}$(lh_msg 'SECURITY_PASSWORD_EXPIRY_POLICIES')${LH_COLOR_RESET}"
     if [ -f /etc/login.defs ]; then
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
@@ -445,7 +458,7 @@ function security_check_password_policy() {
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'SECURITY_PASSWORD_LOGIN_DEFS_NOT_FOUND')${LH_COLOR_RESET}"
     fi
 
-    # Prüfen, ob Benutzer ohne Passwort existieren
+    # Check for users without passwords
     if ! lh_check_command "passwd" true; then
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'SECURITY_PASSWORD_PASSWD_NOT_AVAILABLE')${LH_COLOR_RESET}"
     else
@@ -462,7 +475,7 @@ function security_check_password_policy() {
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     fi
 
-    # Benutzerkontoinformationen
+    # User account information
     if lh_confirm_action "$(lh_msg 'SECURITY_PASSWORD_ACCOUNT_DETAILS')" "y"; then
         echo -e "\n${LH_COLOR_INFO}$(lh_msg 'SECURITY_PASSWORD_ACCOUNT_INFO')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
@@ -471,7 +484,7 @@ function security_check_password_policy() {
     fi
 }
 
-# Hauptfunktion des Moduls: Untermenü anzeigen und Aktionen steuern  
+# Main function of the module: Show submenu and control actions  
 function security_checks_menu() {
     while true; do
         lh_print_header "$(lh_msg 'SECURITY_TITLE')"
@@ -515,18 +528,18 @@ function security_checks_menu() {
                 return 0
                 ;;
             *)
-                lh_log_msg "WARN" "$(printf "$(lh_msg 'INVALID_SELECTION')" "$option")"
+                lh_log_msg "WARN" "$(lh_msg 'INVALID_SELECTION' "$option")"
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
                 ;;
         esac
 
-        # Kurze Pause, damit Benutzer die Ausgabe lesen kann
+        # Short pause to allow the user to read the output
         echo ""
         read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")" -n1 -s
         echo ""
     done
 }
 
-# Modul starten
+# Start module
 security_checks_menu
 exit $?

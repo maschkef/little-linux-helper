@@ -7,16 +7,29 @@
 # This script is part of the 'little-linux-helper' collection.
 # Licensed under the MIT License. See the LICENSE file in the project root for more information.
 #
-# Modul für Festplatten-Werkzeuge und -Analyse
+# Module for disk tools and analysis
 
-# Laden der gemeinsamen Bibliothek
-source "$(dirname "$0")/../lib/lib_common.sh"
-lh_detect_package_manager
+# Load common library
+# Use BASH_SOURCE to get the correct path when sourced
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
 
-# Load disk module translations
-lh_load_language_module "disk"
+# Complete initialization when run directly (not via help_master.sh)
+if [[ -z "${LH_INITIALIZED:-}" ]]; then
+    lh_load_general_config        # Load general config first for log level
+    lh_initialize_logging
+    lh_detect_package_manager
+    lh_finalize_initialization
+    export LH_INITIALIZED=1
+fi
 
-# Funktion zum Anzeigen der eingebundenen Laufwerke
+# Load translations if not already loaded
+if [[ -z "${MSG[DISK_HEADER_MOUNTED]:-}" ]]; then
+    lh_load_language_module "disk"
+    lh_load_language_module "common"
+    lh_load_language_module "lib"
+fi
+
+# Function to display mounted drives
 function disk_show_mounted() {
     lh_print_header "$(lh_msg 'DISK_HEADER_MOUNTED')"
 
@@ -31,7 +44,7 @@ function disk_show_mounted() {
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 }
 
-# Funktion zum Auslesen der S.M.A.R.T.-Werte
+# Function to read S.M.A.R.T. values
 function disk_smart_values() {
     lh_print_header "$(lh_msg 'DISK_HEADER_SMART')"
 
@@ -57,7 +70,7 @@ function disk_smart_values() {
         return 1
     fi
 
-    # Liste der Laufwerke anzeigen und Auswahl ermöglichen
+    # Display list of drives and enable selection
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_SMART_FOUND_DRIVES')${LH_COLOR_RESET}"
     local i=1
     local drive_array=()
@@ -69,30 +82,30 @@ function disk_smart_values() {
     done
     echo -e "${LH_COLOR_MENU_NUMBER}$i)${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_SMART_CHECK_ALL')${LH_COLOR_RESET}"
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(printf "$(lh_msg 'DISK_SMART_SELECT_DRIVE')" "$i") ${LH_COLOR_RESET}")" drive_choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_SMART_SELECT_DRIVE' "$i") ${LH_COLOR_RESET}")" drive_choice
 
     if ! [[ "$drive_choice" =~ ^[0-9]+$ ]] || [ "$drive_choice" -lt 1 ] || [ "$drive_choice" -gt "$i" ]; then
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_INVALID_SELECTION')${LH_COLOR_RESET}"
         return 1
     fi
 
-    # SMART-Werte anzeigen
+    # Display SMART values
     if [ "$drive_choice" -eq "$i" ]; then
-        # Alle Laufwerke prüfen
+        # Check all drives
         for drive in "${drive_array[@]}"; do
-            echo -e "${LH_COLOR_HEADER}$(printf "$(lh_msg 'DISK_SMART_VALUES_FOR')" "$drive")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_HEADER}$(lh_msg 'DISK_SMART_VALUES_FOR' "$drive")${LH_COLOR_RESET}"
             $LH_SUDO_CMD smartctl -a "$drive"
             echo ""
         done
     else
-        # Nur das ausgewählte Laufwerk prüfen
+        # Only check the selected drive
         local selected_drive="${drive_array[$((drive_choice-1))]}"
-        echo -e "${LH_COLOR_HEADER}$(printf "$(lh_msg 'DISK_SMART_VALUES_FOR')" "$selected_drive")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_HEADER}$(lh_msg 'DISK_SMART_VALUES_FOR' "$selected_drive")${LH_COLOR_RESET}"
         $LH_SUDO_CMD smartctl -a "$selected_drive"
     fi
 }
 
-# Funktion zum Prüfen von Dateizugriffen
+# Function to check file access
 function disk_check_file_access() {
     lh_print_header "$(lh_msg 'DISK_HEADER_FILE_ACCESS')"
 
@@ -108,13 +121,13 @@ function disk_check_file_access() {
         return 1
     fi
 
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DISK_ACCESS_CHECKING')" "$folder_path")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_ACCESS_CHECKING' "$folder_path")${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     $LH_SUDO_CMD lsof +D "$folder_path"
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 }
 
-# Funktion zum Prüfen der Festplattenbelegung
+# Function to check disk usage
 function disk_check_usage() {
     lh_print_header "$(lh_msg 'DISK_HEADER_USAGE')"
 
@@ -123,7 +136,7 @@ function disk_check_usage() {
     df -hT
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
-    # Prüfen, ob ncdu installiert ist und ggf. anbieten
+    # Check if ncdu is installed and offer it if available
     if lh_check_command "ncdu" false; then
         if lh_confirm_action "$(lh_msg 'DISK_USAGE_NCDU_START')" "y"; then
             local path_to_analyze=$(lh_ask_for_input "$(lh_msg 'DISK_USAGE_ANALYZE_PATH')" "/")
@@ -144,7 +157,7 @@ function disk_check_usage() {
     fi
 }
 
-# Funktion zum Testen der Festplattengeschwindigkeit
+# Function to test disk speed
 function disk_speed_test() {
     lh_print_header "$(lh_msg 'DISK_HEADER_SPEED_TEST')"
 
@@ -153,7 +166,7 @@ function disk_speed_test() {
         return 1
     fi
 
-    # Liste der Blockgeräte anzeigen
+    # Display list of block devices
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_SPEED_AVAILABLE_DEVICES')${LH_COLOR_RESET}"
     lsblk -d -o NAME,SIZE,MODEL,VENDOR | grep -v "loop"
 
@@ -166,12 +179,12 @@ function disk_speed_test() {
 
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_SPEED_INFO_NOTE')${LH_COLOR_RESET}"
 
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DISK_SPEED_TESTING')" "$drive")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_SPEED_TESTING' "$drive")${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     $LH_SUDO_CMD hdparm -Tt "$drive"
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
-    # Optionalen erweiterten Test mit dd anbieten
+    # Offer optional extended test with dd
     if lh_confirm_action "$(lh_msg 'DISK_SPEED_EXTENDED_TEST')" "n"; then
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'DISK_SPEED_WRITE_WARNING')${LH_COLOR_RESET}"
 
@@ -187,7 +200,7 @@ function disk_speed_test() {
     fi
 }
 
-# Funktion zum Überprüfen des Dateisystems
+# Function to check filesystem
 function disk_check_filesystem() {
     lh_print_header "$(lh_msg 'DISK_HEADER_FILESYSTEM')"
 
@@ -196,7 +209,7 @@ function disk_check_filesystem() {
         return 1
     fi
 
-    # Liste der verfügbaren Partitionen anzeigen
+    # Display list of available partitions
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_FSCK_AVAILABLE_PARTITIONS')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     lsblk -o NAME,FSTYPE,SIZE,MOUNTPOINT,FSAVAIL | grep -v "loop"
@@ -213,10 +226,10 @@ function disk_check_filesystem() {
             return 1
         fi
 
-        # Prüfen, ob die Partition gemountet ist
+        # Check if the partition is mounted
         if mount | grep -q "$partition"; then
-            echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DISK_FSCK_PARTITION_MOUNTED')" "$partition")${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DISK_FSCK_UNMOUNT_INFO')" "$partition")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_FSCK_PARTITION_MOUNTED' "$partition")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_FSCK_UNMOUNT_INFO' "$partition")${LH_COLOR_RESET}"
 
             if lh_confirm_action "$(lh_msg 'DISK_FSCK_AUTO_UNMOUNT')" "n"; then
                 if $LH_SUDO_CMD umount "$partition"; then
@@ -231,7 +244,7 @@ function disk_check_filesystem() {
                 fi
         fi
 
-        # Optionen für fsck anzeigen
+        # Display options for fsck
         echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_FSCK_OPTIONS_PROMPT')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_FSCK_OPTION_CHECK_ONLY')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_FSCK_OPTION_AUTO_SIMPLE')${LH_COLOR_RESET}"
@@ -251,7 +264,7 @@ function disk_check_filesystem() {
             *) echo -e "${LH_COLOR_WARNING}$(lh_msg 'DISK_FSCK_INVALID_DEFAULT')${LH_COLOR_RESET}"; fsck_param="" ;;
         esac
 
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DISK_FSCK_CHECKING')" "$partition")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_FSCK_CHECKING' "$partition")${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_FSCK_PLEASE_WAIT')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         $LH_SUDO_CMD fsck $fsck_param "$partition"
@@ -261,7 +274,7 @@ function disk_check_filesystem() {
         if [ $fsck_result -eq 0 ]; then
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DISK_FSCK_COMPLETED_NO_ERRORS')${LH_COLOR_RESET}"
         else
-            echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DISK_FSCK_COMPLETED_WITH_CODE')" "$fsck_result")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'DISK_FSCK_COMPLETED_WITH_CODE' "$fsck_result")${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_FSCK_ERROR_CODE_MEANING')${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_FSCK_CODE_0')${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_FSCK_CODE_1')${LH_COLOR_RESET}"
@@ -275,7 +288,7 @@ function disk_check_filesystem() {
     fi
 }
 
-# Funktion zum Prüfen des Festplatten-Gesundheitsstatus
+# Function to check disk health status
 function disk_check_health() {
     lh_print_header "$(lh_msg 'DISK_HEADER_HEALTH')"
 
@@ -284,7 +297,7 @@ function disk_check_health() {
         return 1
     fi
 
-    # Scannen nach verfügbaren Laufwerken
+    # Scan for available drives
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_HEALTH_SCANNING')${LH_COLOR_RESET}"
     local drives
     drives=$($LH_SUDO_CMD smartctl --scan | awk '{print $1}')
@@ -309,16 +322,16 @@ function disk_check_health() {
     fi
 
     if $check_all; then
-        # Alle Laufwerke prüfen
+        # Check all drives
         for drive in $drives; do
-            echo -e "${LH_COLOR_HEADER}$(printf "$(lh_msg 'DISK_HEALTH_STATUS_FOR')" "$drive")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_HEADER}$(lh_msg 'DISK_HEALTH_STATUS_FOR' "$drive")${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             $LH_SUDO_CMD smartctl -H "$drive"
             echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             echo ""
         done
     else
-        # Liste der Laufwerke anzeigen und Auswahl ermöglichen
+        # Display list of drives and enable selection
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_HEALTH_FOUND_DRIVES')${LH_COLOR_RESET}"
         local i=1
         local drive_array=()
@@ -329,7 +342,7 @@ function disk_check_health() {
             i=$((i+1))
         done
 
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(printf "$(lh_msg 'DISK_HEALTH_SELECT_DRIVE')" "$((i-1))") ${LH_COLOR_RESET}")" drive_choice
+        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_HEALTH_SELECT_DRIVE' "$((i-1))") ${LH_COLOR_RESET}")" drive_choice
 
         if ! [[ "$drive_choice" =~ ^[0-9]+$ ]] || [ "$drive_choice" -lt 1 ] || [ "$drive_choice" -gt $((i-1)) ]; then
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_INVALID_SELECTION')${LH_COLOR_RESET}"
@@ -337,12 +350,12 @@ function disk_check_health() {
         fi
 
         local selected_drive="${drive_array[$((drive_choice-1))]}"
-        echo -e "${LH_COLOR_HEADER}$(printf "$(lh_msg 'DISK_HEALTH_STATUS_FOR')" "$selected_drive")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_HEADER}$(lh_msg 'DISK_HEALTH_STATUS_FOR' "$selected_drive")${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
         $LH_SUDO_CMD smartctl -H "$selected_drive"
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
-        # Zusätzliche Tests anbieten
+        # Offer additional tests
         echo -e "\n${LH_COLOR_PROMPT}$(lh_msg 'DISK_HEALTH_ADDITIONAL_TESTS')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_HEALTH_SHORT_TEST')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_HEALTH_ATTRIBUTES')${LH_COLOR_RESET}"
@@ -352,21 +365,21 @@ function disk_check_health() {
 
         case $test_option in
             1)
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DISK_HEALTH_STARTING_SHORT_TEST')" "$selected_drive")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_HEALTH_STARTING_SHORT_TEST' "$selected_drive")${LH_COLOR_RESET}"
                 $LH_SUDO_CMD smartctl -t short "$selected_drive"
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_HEALTH_TEST_RUNNING')${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_HEALTH_TEST_COMPLETION')${LH_COLOR_RESET}"
                 if lh_confirm_action "$(lh_msg 'DISK_HEALTH_WAIT_FOR_RESULTS')" "y"; then
                     echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_HEALTH_WAITING')${LH_COLOR_RESET}"
                     sleep 120
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DISK_HEALTH_TEST_RESULTS')" "$selected_drive")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_HEALTH_TEST_RESULTS' "$selected_drive")${LH_COLOR_RESET}"
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                     $LH_SUDO_CMD smartctl -l selftest "$selected_drive"
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 fi
                 ;;
             2)
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DISK_HEALTH_EXTENDED_ATTRIBUTES')" "$selected_drive")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_HEALTH_EXTENDED_ATTRIBUTES' "$selected_drive")${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 $LH_SUDO_CMD smartctl -a "$selected_drive"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
@@ -381,7 +394,7 @@ function disk_check_health() {
     fi
 }
 
-# Funktion zum Anzeigen der größten Dateien
+# Function to display largest files
 function disk_show_largest_files() {
     lh_print_header "$(lh_msg 'DISK_HEADER_LARGEST_FILES')"
 
@@ -398,38 +411,38 @@ function disk_show_largest_files() {
     fi
 
     local file_count_prompt="$(lh_msg 'DISK_LARGEST_FILE_COUNT')"
-    local file_count_regex="^[1-9][0-9]*$" # Regex für positive Ganzzahlen
+    local file_count_regex="^[1-9][0-9]*$" # Regex for positive integers
     local file_count_error="$(lh_msg 'DISK_LARGEST_INVALID_NUMBER')"
     local file_count_default="20"
     local file_count
 
-    # Rufe lh_ask_for_input korrekt auf
+    # Call lh_ask_for_input correctly
     file_count=$(lh_ask_for_input "$file_count_prompt" "$file_count_regex" "$file_count_error")
 
-    # Behandeln, falls lh_ask_for_input aufgrund eines Fehlers oder einer leeren Eingabe (die nicht vom Regex abgefangen wurde)
-    # eine leere Zeichenkette zurückgibt, oder wenn der Benutzer die Eingabe abbricht (was lh_ask_for_input nicht direkt behandelt).
-    # Da lh_ask_for_input eine Eingabe erzwingt, die dem Regex entspricht, sollte file_count hier gültig sein,
-    # es sei denn, der Regex erlaubt leere Eingaben, was ^[1-9][0-9]*$ nicht tut.
+    # Handle cases where lh_ask_for_input returns an empty string due to an error or empty input (not caught by regex)
+    # or when the user cancels the input (which lh_ask_for_input doesn't handle directly).
+    # Since lh_ask_for_input enforces input that matches the regex, file_count should be valid here,
+    # unless the regex allows empty inputs, which ^[1-9][0-9]*$ does not.
 
-    # Wenn du einen Standardwert bei leerer Eingabe möchtest, müsste lh_ask_for_input das unterstützen
-    # oder du machst es nach dem Aufruf:
-    # if [ -z "$file_count" ]; then # Dies wird nicht passieren, wenn Regex ^[1-9][0-9]*$ ist
+    # If you want a default value for empty input, lh_ask_for_input would need to support that
+    # or you do it after the call:
+    # if [ -z "$file_count" ]; then # This won't happen if regex is ^[1-9][0-9]*$
     # file_count="$file_count_default"
     # fi
 
-    # Die obige Logik mit dem expliziten Default-Handling ist besser, wenn lh_ask_for_input
-    # keinen Default-Parameter hat. Die aktuelle lh_ask_for_input-Implementierung
-    # hat keinen Default-Parameter. Sie erzwingt eine Eingabe, die dem Regex entspricht.
+    # The above logic with explicit default handling is better if lh_ask_for_input
+    # doesn't have a default parameter. The current lh_ask_for_input implementation
+    # doesn't have a default parameter. It enforces input that matches the regex.
 
-    # Also, wenn du lh_ask_for_input verwendest, wird es so lange fragen, bis der Regex passt.
-    # Eine separate Default-Zuweisung wie "file_count=20" bei ungültiger Eingabe ist dann nicht mehr nötig,
-    # da lh_ask_for_input die Gültigkeit bereits sicherstellt.
+    # So, when you use lh_ask_for_input, it will keep asking until the regex matches.
+    # A separate default assignment like "file_count=20" for invalid input is then no longer needed,
+    # since lh_ask_for_input already ensures validity.
 
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DISK_LARGEST_SEARCHING')" "$file_count" "$search_path")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_LARGEST_SEARCHING' "$file_count" "$search_path")${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_LARGEST_PLEASE_WAIT')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
-    # Option auswählen: du oder find
+    # Select option: du or find
     echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_LARGEST_SELECT_METHOD')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_LARGEST_METHOD_DU')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_LARGEST_METHOD_FIND')${LH_COLOR_RESET}"
@@ -451,7 +464,7 @@ function disk_show_largest_files() {
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 }
 
-# Hauptfunktion des Moduls: Untermenü anzeigen und Aktionen steuern
+# Main function of the module: display submenu and control actions
 function disk_tools_menu() {
     while true; do
         lh_print_header "$(lh_msg 'DISK_MENU_TITLE')"
@@ -499,18 +512,18 @@ function disk_tools_menu() {
                 return 0
                 ;;
             *)
-                lh_log_msg "WARN" "$(printf "$(lh_msg 'INVALID_SELECTION'): %s" "$option")"
+                lh_log_msg "WARN" "$(lh_msg 'INVALID_SELECTION' "$option")"
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_INVALID_SELECTION_TRY_AGAIN')${LH_COLOR_RESET}"
                 ;;
         esac
 
-        # Kurze Pause, damit Benutzer die Ausgabe lesen kann
+        # Short pause so user can read the output
         echo ""
         read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")" -n1 -s
         echo ""
     done
 }
 
-# Modul starten
+# Start module
 disk_tools_menu
 exit $?

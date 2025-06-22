@@ -10,19 +10,30 @@
 # Module for BTRFS related backup functions
 
 # Load common library
-source "$(dirname "$0")/../lib/lib_common.sh"
+# Use BASH_SOURCE to get the correct path when sourced
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
+    lh_load_general_config        # Load general config first for log level
+    lh_initialize_logging
+    lh_detect_package_manager
+    lh_load_backup_config
     lh_finalize_initialization
     export LH_INITIALIZED=1
+else
+    # When sourced from main script, only load backup config if needed
+    if [[ -z "${LH_BACKUP_ROOT:-}" ]]; then
+        lh_load_backup_config
+    fi
 fi
 
-lh_detect_package_manager
-lh_load_backup_config
-
-# Load backup-specific translations
-lh_load_language_module "backup"
+# Load translations if not already loaded
+if [[ -z "${MSG[BACKUP_MENU_TITLE]:-}" ]]; then
+    lh_load_language_module "backup"
+    lh_load_language_module "common"
+    lh_load_language_module "lib"
+fi
 
 # Check if btrfs is available
 if ! lh_check_command "btrfs" "true"; then
@@ -42,7 +53,7 @@ backup_log_msg() {
     # The directory for LH_BACKUP_LOG ($LH_LOG_DIR) should already exist.
     if [ -n "$LH_BACKUP_LOG" ] && [ ! -f "$LH_BACKUP_LOG" ]; then
         # Try to create the file if it doesn't exist yet.
-        touch "$LH_BACKUP_LOG" || echo "$(printf "$(lh_msg 'BACKUP_LOG_WARN_CREATE')" "$LH_BACKUP_LOG")" >&2
+        touch "$LH_BACKUP_LOG" || echo "$(lh_msg 'BACKUP_LOG_WARN_CREATE' "$LH_BACKUP_LOG")" >&2
     fi
     echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$LH_BACKUP_LOG"
 }
@@ -70,12 +81,12 @@ find_btrfs_root() {
 configure_backup() {
     lh_print_header "$(lh_msg 'BACKUP_CONFIG_HEADER')"
     
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BACKUP_CURRENT_CONFIG')" "$LH_BACKUP_CONFIG_FILE"):${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_CURRENT_CONFIG' "$LH_BACKUP_CONFIG_FILE"):${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_BACKUP_ROOT')${LH_COLOR_RESET} $LH_BACKUP_ROOT"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_BACKUP_DIR')${LH_COLOR_RESET} $LH_BACKUP_DIR ($(lh_msg 'CONFIG_RELATIVE_TO_TARGET'))"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_TEMP_SNAPSHOT_DIR'):${LH_COLOR_RESET} $LH_TEMP_SNAPSHOT_DIR"
-    echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_RETENTION')${LH_COLOR_RESET} $(printf "$(lh_msg 'CONFIG_BACKUPS_COUNT')" "$LH_RETENTION_BACKUP")"
-    echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_LOGFILE')${LH_COLOR_RESET} $LH_BACKUP_LOG ($(printf "$(lh_msg 'CONFIG_FILENAME')" "$(basename "$LH_BACKUP_LOG")"))"
+    echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_RETENTION')${LH_COLOR_RESET} $(lh_msg 'CONFIG_BACKUPS_COUNT' "$LH_RETENTION_BACKUP")"
+    echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_LOGFILE')${LH_COLOR_RESET} $LH_BACKUP_LOG ($(lh_msg 'CONFIG_FILENAME' "$(basename "$LH_BACKUP_LOG")"))"
     echo ""
     
     if lh_confirm_action "$(lh_msg 'CONFIG_CHANGE_QUESTION')" "n"; then
@@ -161,7 +172,7 @@ configure_backup() {
             echo -e "  ${LH_COLOR_INFO}$(lh_msg 'CONFIG_NEW_EXCLUDES'):${LH_COLOR_RESET} $LH_TAR_EXCLUDES"
             if lh_confirm_action "$(lh_msg 'CONFIG_SAVE_PERMANENTLY')" "y"; then
                 lh_save_backup_config
-                echo "$(printf "$(lh_msg 'CONFIG_SAVED')" "$LH_BACKUP_CONFIG_FILE")"
+                echo "$(lh_msg 'CONFIG_SAVED' "$LH_BACKUP_CONFIG_FILE")"
             fi
         else
             echo "$(lh_msg 'CONFIG_NO_CHANGES')"
@@ -186,36 +197,36 @@ create_direct_snapshot() {
         mount_point="/$subvol"
     fi
 
-    backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_CREATE_DIRECT_SNAPSHOT')" "$subvol" "$mount_point")"
+    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CREATE_DIRECT_SNAPSHOT' "$subvol" "$mount_point")"
 
     # Find BTRFS root
     local btrfs_root=$(find_btrfs_root "$mount_point")
     if [ -z "$btrfs_root" ]; then
-        backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_ROOT_NOT_FOUND')" "$mount_point")"
+        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_ROOT_NOT_FOUND' "$mount_point")"
         return 1
     fi
 
-    backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_ROOT_FOUND')" "$btrfs_root")"
+    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_ROOT_FOUND' "$btrfs_root")"
 
     # Determine subvolume path relative to BTRFS root
     local subvol_path=$(btrfs subvolume show "$mount_point" | grep "^[[:space:]]*Name:" | awk '{print $2}')
     if [ -z "$subvol_path" ]; then
-        backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_SUBVOLUME_PATH_ERROR')" "$mount_point")"
+        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_SUBVOLUME_PATH_ERROR' "$mount_point")"
         return 1
     fi
 
-    backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_SUBVOLUME_PATH')" "$subvol_path")"
+    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SUBVOLUME_PATH' "$subvol_path")"
 
     # Create read-only snapshot
     mkdir -p "$LH_TEMP_SNAPSHOT_DIR"
     btrfs subvolume snapshot -r "$mount_point" "$snapshot_path"
 
     if [ $? -ne 0 ]; then
-        backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_SNAPSHOT_ERROR')" "$subvol")"
+        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_SNAPSHOT_ERROR' "$subvol")"
         return 1
     fi
 
-    backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_SNAPSHOT_SUCCESS')" "$snapshot_path")"
+    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SNAPSHOT_SUCCESS' "$snapshot_path")"
     return 0
 }
 
@@ -295,17 +306,17 @@ btrfs_backup() {
     fi
     
     # Check backup target and adapt for this session if necessary
-    echo "$(printf "$(lh_msg 'BACKUP_CURRENT_TARGET')" "$LH_BACKUP_ROOT")"
+    echo "$(lh_msg 'BACKUP_CURRENT_TARGET' "$LH_BACKUP_ROOT")"
     local change_backup_root_for_session=false
     local prompt_for_new_path_message="" # This variable is used by lh_ask_for_input which handles its own coloring
 
     if [ ! -d "$LH_BACKUP_ROOT" ] || [ -z "$LH_BACKUP_ROOT" ]; then
-        backup_log_msg "WARN" "$(printf "$(lh_msg 'BTRFS_LOG_TARGET_NOT_FOUND')" "$LH_BACKUP_ROOT")"
-        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BACKUP_TARGET_UNAVAILABLE')" "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+        backup_log_msg "WARN" "$(lh_msg 'BTRFS_LOG_TARGET_NOT_FOUND' "$LH_BACKUP_ROOT")"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BACKUP_TARGET_UNAVAILABLE' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
         change_backup_root_for_session=true
         prompt_for_new_path_message="$(lh_msg 'BACKUP_TARGET_NOT_AVAILABLE_PROMPT')"
     else
-        if ! lh_confirm_action "$(printf "$(lh_msg 'BACKUP_USE_TARGET_SESSION')" "$LH_BACKUP_ROOT")" "y"; then
+        if ! lh_confirm_action "$(lh_msg 'BACKUP_USE_TARGET_SESSION' "$LH_BACKUP_ROOT")" "y"; then
             change_backup_root_for_session=true
             prompt_for_new_path_message="$(lh_msg 'BACKUP_ALTERNATIVE_PATH_PROMPT')"
         fi
@@ -323,15 +334,15 @@ btrfs_backup() {
             new_backup_root_path="${new_backup_root_path%/}" # Remove optional trailing slash
 
             if [ ! -d "$new_backup_root_path" ]; then
-                if lh_confirm_action "$(printf "$(lh_msg 'BACKUP_CREATE_DIR_CONFIRM')" "$new_backup_root_path")" "y"; then
+                if lh_confirm_action "$(lh_msg 'BACKUP_CREATE_DIR_CONFIRM' "$new_backup_root_path")" "y"; then
                     $LH_SUDO_CMD mkdir -p "$new_backup_root_path"
                     if [ $? -eq 0 ]; then
                         LH_BACKUP_ROOT="$new_backup_root_path"
-                        backup_log_msg "INFO" "$(printf "$(lh_msg 'BACKUP_TARGET_SET_CREATED')" "$LH_BACKUP_ROOT")"
+                        backup_log_msg "INFO" "$(lh_msg 'BACKUP_TARGET_SET_CREATED' "$LH_BACKUP_ROOT")"
                         break 
                     else
-                        backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_CREATE_DIR_ERROR')" "$new_backup_root_path")"
-                        echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'BACKUP_CREATE_DIR_ERROR')" "$new_backup_root_path")${LH_COLOR_RESET}"
+                        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_CREATE_DIR_ERROR' "$new_backup_root_path")"
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BACKUP_CREATE_DIR_ERROR' "$new_backup_root_path")${LH_COLOR_RESET}"
                         prompt_for_new_path_message="$(lh_msg 'BACKUP_CREATE_DIR_RETRY')"
                     fi
                 else
@@ -340,14 +351,14 @@ btrfs_backup() {
                 fi
             else # Directory exists
                 LH_BACKUP_ROOT="$new_backup_root_path"
-                backup_log_msg "INFO" "$(printf "$(lh_msg 'BACKUP_TARGET_SET')" "$LH_BACKUP_ROOT")"
+                backup_log_msg "INFO" "$(lh_msg 'BACKUP_TARGET_SET' "$LH_BACKUP_ROOT")"
                 break
             fi
         done
     fi
         
     # Space check
-    backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_CHECK_SPACE')" "$LH_BACKUP_ROOT")"
+    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CHECK_SPACE' "$LH_BACKUP_ROOT")"
     local available_space_bytes
     available_space_bytes=$(df --output=avail -B1 "$LH_BACKUP_ROOT" 2>/dev/null | tail -n1)
 
@@ -365,8 +376,8 @@ btrfs_backup() {
     }
 
     if ! [[ "$available_space_bytes" =~ ^[0-9]+$ ]]; then
-        backup_log_msg "WARN" "$(printf "$(lh_msg 'BTRFS_LOG_SPACE_CHECK_ERROR')" "$LH_BACKUP_ROOT")"
-        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BACKUP_SPACE_CHECK_WARNING')" "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+        backup_log_msg "WARN" "$(lh_msg 'BTRFS_LOG_SPACE_CHECK_ERROR' "$LH_BACKUP_ROOT")"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BACKUP_SPACE_CHECK_WARNING' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
         if ! lh_confirm_action "$(lh_msg 'BACKUP_CONFIRM_CONTINUE')" "n"; then
             backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_BACKUP_CANCELLED_SPACE')"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_CANCELLED')${LH_COLOR_RESET}"
@@ -416,11 +427,11 @@ btrfs_backup() {
         local available_hr=$(format_bytes_for_display "$available_space_bytes")
         local required_hr=$(format_bytes_for_display "$required_with_margin")
 
-        backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_SPACE_INFO')" "$available_hr" "$required_hr")"
+        backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SPACE_INFO' "$available_hr" "$required_hr")"
 
         if [ "$available_space_bytes" -lt "$required_with_margin" ]; then
-            echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BACKUP_SPACE_WARNING')" "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BACKUP_SPACE_INFO')" "$available_hr" "$required_hr")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'BACKUP_SPACE_WARNING' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_SPACE_INFO' "$available_hr" "$required_hr")${LH_COLOR_RESET}"
             if ! lh_confirm_action "$(lh_msg 'BACKUP_CONFIRM_CONTINUE')" "n"; then
                 backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_BACKUP_CANCELLED_LOW_SPACE')"
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_CANCELLED')${LH_COLOR_RESET}"
@@ -428,7 +439,7 @@ btrfs_backup() {
                 return 1
             fi
         else
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BACKUP_SUFFICIENT_SPACE')" "$LH_BACKUP_ROOT" "$available_hr")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUFFICIENT_SPACE' "$LH_BACKUP_ROOT" "$available_hr")${LH_COLOR_RESET}"
         fi
     fi
 
@@ -461,12 +472,12 @@ btrfs_backup() {
     # List of subvolumes to backup
     local subvolumes=("@" "@home")
     
-    echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'BACKUP_SESSION_STARTED')" "$timestamp")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BACKUP_SESSION_STARTED' "$timestamp")${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'BACKUP_SEPARATOR')${LH_COLOR_RESET}"
     
     # Main loop: Process each subvolume
     for subvol in "${subvolumes[@]}"; do
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_PROCESSING_SUBVOLUME')" "$subvol")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_PROCESSING_SUBVOLUME' "$subvol")${LH_COLOR_RESET}"
         
         # Define snapshot names and paths
         local snapshot_name="$subvol-$timestamp"
@@ -479,7 +490,7 @@ btrfs_backup() {
         create_direct_snapshot "$subvol" "$timestamp"
         if [ $? -ne 0 ]; then
             # create_direct_snapshot already outputs error message and logs
-            echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'BTRFS_SNAPSHOT_CREATE_ERROR')" "$subvol")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_SNAPSHOT_CREATE_ERROR' "$subvol")${LH_COLOR_RESET}"
             CURRENT_TEMP_SNAPSHOT="" # Ensure no cleanup is attempted for a non-created snapshot
             continue
         fi
@@ -488,7 +499,7 @@ btrfs_backup() {
         local backup_subvol_dir="$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol"
         mkdir -p "$backup_subvol_dir"
         if [ $? -ne 0 ]; then
-            backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_BACKUP_SUBVOL_DIR_ERROR')" "$subvol")"
+            backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_BACKUP_SUBVOL_DIR_ERROR' "$subvol")"
             # Safe cleanup of temporary snapshot
             safe_cleanup_temp_snapshot "$snapshot_path"
             CURRENT_TEMP_SNAPSHOT=""
@@ -499,11 +510,11 @@ btrfs_backup() {
         local last_backup=$(ls -1d "$backup_subvol_dir/$subvol-"* 2>/dev/null | sort -r | head -n1)
         
         # Transfer snapshot to backup target
-        backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_TRANSFER_SNAPSHOT')" "$subvol")"
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_TRANSFER_SUBVOLUME')" "$subvol")${LH_COLOR_RESET}"
+        backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_TRANSFER_SNAPSHOT' "$subvol")"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_TRANSFER_SUBVOLUME' "$subvol")${LH_COLOR_RESET}"
         
         if [ -n "$last_backup" ]; then
-            backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_PREVIOUS_BACKUP_FOUND')" "$last_backup")"
+            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_PREVIOUS_BACKUP_FOUND' "$last_backup")"
             # Currently only full backups, incremental for later
             backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SEND_FULL_SNAPSHOT_PREV')"
             btrfs send "$snapshot_path" | btrfs receive "$backup_subvol_dir"
@@ -516,19 +527,19 @@ btrfs_backup() {
         
         # Check success
         if [ $send_status -ne 0 ]; then
-            backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_TRANSFER_ERROR')" "$subvol")"
-            echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'BTRFS_TRANSFER_ERROR')" "$subvol")${LH_COLOR_RESET}"
+            backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_TRANSFER_ERROR' "$subvol")"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_TRANSFER_ERROR' "$subvol")${LH_COLOR_RESET}"
         else
-            backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_TRANSFER_SUCCESS')" "$backup_subvol_dir/$snapshot_name")"
-            echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'BTRFS_BACKUP_SUCCESS')" "$subvol")${LH_COLOR_RESET}"
+            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_TRANSFER_SUCCESS' "$backup_subvol_dir/$snapshot_name")"
+            echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_BACKUP_SUCCESS' "$subvol")${LH_COLOR_RESET}"
             
             # Create backup marker
             if ! create_backup_marker "$backup_subvol_dir/$snapshot_name" "$timestamp" "$subvol"; then
-                backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_MARKER_ERROR')" "$backup_subvol_dir/$snapshot_name")"
-                echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_MARKER_CREATE_WARNING')" "$snapshot_name")${LH_COLOR_RESET}"
+                backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_MARKER_ERROR' "$backup_subvol_dir/$snapshot_name")"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_MARKER_CREATE_WARNING' "$snapshot_name")${LH_COLOR_RESET}"
                 # Optional: Here we could set send_status to an error code to mark the overall backup session as failed
             else
-                backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_MARKER_SUCCESS')" "$snapshot_name")"
+                backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_MARKER_SUCCESS' "$snapshot_name")"
             fi
         fi
         
@@ -539,14 +550,14 @@ btrfs_backup() {
         CURRENT_TEMP_SNAPSHOT=""
         
         # Clean up old backups
-        backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_CLEANUP_OLD_BACKUPS')" "$subvol")"
+        backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_OLD_BACKUPS' "$subvol")"
         ls -1d "$backup_subvol_dir/$subvol-"* 2>/dev/null | sort | head -n "-$LH_RETENTION_BACKUP" | while read backup; do
             local marker_file_to_delete="${backup}.backup_complete"
-            backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_DELETE_OLD_BACKUP')" "$backup" "$marker_file_to_delete")"
+            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_DELETE_OLD_BACKUP' "$backup" "$marker_file_to_delete")"
             if btrfs subvolume delete "$backup"; then
                 rm -f "$marker_file_to_delete"
             else
-                backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_DELETE_ERROR')" "$backup")"
+                backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_DELETE_ERROR' "$backup")"
             fi
         done
         
@@ -558,7 +569,7 @@ btrfs_backup() {
     
     local end_time=$(date +%s)
     echo -e "${LH_COLOR_SEPARATOR}----------------------------------------${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'BACKUP_SESSION_FINISHED')" "$timestamp")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BACKUP_SESSION_FINISHED' "$timestamp")${LH_COLOR_RESET}"
     backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SESSION_COMPLETE')"
     
     # Summary
@@ -579,27 +590,27 @@ btrfs_backup() {
     
     # Error checking
     if grep -q "ERROR" "$LH_BACKUP_LOG"; then # Check for errors in the current session's log entries
-        echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_STATUS')${LH_COLOR_RESET} ${LH_COLOR_ERROR}$(printf "$(lh_msg 'BACKUP_SUMMARY_STATUS_ERROR')" "$LH_BACKUP_LOG")${LH_COLOR_RESET}"
+        echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_STATUS')${LH_COLOR_RESET} ${LH_COLOR_ERROR}$(lh_msg 'BACKUP_SUMMARY_STATUS_ERROR' "$LH_BACKUP_LOG")${LH_COLOR_RESET}"
     else
         echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_STATUS')${LH_COLOR_RESET} ${LH_COLOR_SUCCESS}$(lh_msg 'BACKUP_SUMMARY_STATUS_OK')${LH_COLOR_RESET}"
     fi
     
     # Error checking and desktop notification
     if grep -q "ERROR" "$LH_BACKUP_LOG"; then
-        echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_STATUS')${LH_COLOR_RESET} ${LH_COLOR_ERROR}$(printf "$(lh_msg 'BACKUP_SUMMARY_STATUS_ERROR')" "$LH_BACKUP_LOG")${LH_COLOR_RESET}"
+        echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_STATUS')${LH_COLOR_RESET} ${LH_COLOR_ERROR}$(lh_msg 'BACKUP_SUMMARY_STATUS_ERROR' "$LH_BACKUP_LOG")${LH_COLOR_RESET}"
         
         # Desktop notification for errors
         lh_send_notification "error" \
             "$(lh_msg 'BTRFS_NOTIFICATION_ERROR_TITLE')" \
-            "$(printf "$(lh_msg 'BTRFS_NOTIFICATION_ERROR_BODY')" "${subvolumes[*]}")
-$(printf "$(lh_msg 'BTRFS_NOTIFICATION_ERROR_TIME')" "$timestamp")
-$(printf "$(lh_msg 'BACKUP_NOTIFICATION_SEE_LOG')" "$(basename "$LH_BACKUP_LOG")")" 
+            "$(lh_msg 'BTRFS_NOTIFICATION_ERROR_BODY' "${subvolumes[*]}")
+$(lh_msg 'BTRFS_NOTIFICATION_ERROR_TIME' "$timestamp")
+$(lh_msg 'BACKUP_NOTIFICATION_SEE_LOG' "$(basename "$LH_BACKUP_LOG")")" 
     else
         lh_send_notification "success" \
             "$(lh_msg 'BTRFS_NOTIFICATION_SUCCESS_TITLE')" \
-            "$(printf "$(lh_msg 'BTRFS_NOTIFICATION_SUCCESS_BODY')" "${subvolumes[*]}")
-$(printf "$(lh_msg 'BTRFS_NOTIFICATION_SUCCESS_TARGET')" "$LH_BACKUP_ROOT$LH_BACKUP_DIR")
-$(printf "$(lh_msg 'BTRFS_NOTIFICATION_SUCCESS_TIME')" "$timestamp")"
+            "$(lh_msg 'BTRFS_NOTIFICATION_SUCCESS_BODY' "${subvolumes[*]}")
+$(lh_msg 'BTRFS_NOTIFICATION_SUCCESS_TARGET' "$LH_BACKUP_ROOT$LH_BACKUP_DIR")
+$(lh_msg 'BTRFS_NOTIFICATION_SUCCESS_TIME' "$timestamp")"
     fi
     
     return 0
@@ -617,10 +628,10 @@ cleanup_orphaned_temp_snapshots() {
     local orphaned_snapshots=($(find "$LH_TEMP_SNAPSHOT_DIR" -maxdepth 1 -name "@-20*" -o -name "@home-20*" 2>/dev/null))
     
     if [ ${#orphaned_snapshots[@]} -gt 0 ]; then
-        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_ORPHANED_SNAPSHOTS_FOUND')" "${#orphaned_snapshots[@]}")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_ORPHANED_SNAPSHOTS_FOUND' "${#orphaned_snapshots[@]}")${LH_COLOR_RESET}"
         
         for snapshot in "${orphaned_snapshots[@]}"; do
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_ORPHANED_SNAPSHOT_FOUND')" "$(basename "$snapshot")")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ORPHANED_SNAPSHOT_FOUND' "$(basename "$snapshot")")${LH_COLOR_RESET}"
         done
         
         if lh_confirm_action "$(lh_msg 'BTRFS_CONFIRM_CLEANUP_ORPHANED')" "y"; then
@@ -628,22 +639,22 @@ cleanup_orphaned_temp_snapshots() {
             local error_count=0
             
             for snapshot in "${orphaned_snapshots[@]}"; do
-                backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_CLEANUP_ORPHANED')" "$snapshot")"
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_ORPHANED_SNAPSHOT_DELETE')" "$(basename "$snapshot")")${LH_COLOR_RESET}"
+                backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_ORPHANED' "$snapshot")"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ORPHANED_SNAPSHOT_DELETE' "$(basename "$snapshot")")${LH_COLOR_RESET}"
                 
                 if btrfs subvolume delete "$snapshot" >/dev/null 2>&1; then
                     echo -e "  ${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_ORPHANED_SNAPSHOT_DELETE_SUCCESS')${LH_COLOR_RESET}"
                     ((cleaned_count++))
                 else
                     echo -e "  ${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ORPHANED_SNAPSHOT_DELETE_ERROR')${LH_COLOR_RESET}"
-                    backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_DELETE_ORPHANED_ERROR')" "$snapshot")"
+                    backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_DELETE_ORPHANED_ERROR' "$snapshot")"
                     ((error_count++))
                 fi
             done
             
-            echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'BTRFS_ORPHANED_SNAPSHOTS_CLEANED')" "$cleaned_count")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_ORPHANED_SNAPSHOTS_CLEANED' "$cleaned_count")${LH_COLOR_RESET}"
             if [ $error_count -gt 0 ]; then
-                echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'BTRFS_ORPHANED_SNAPSHOTS_ERROR')" "$error_count")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ORPHANED_SNAPSHOTS_ERROR' "$error_count")${LH_COLOR_RESET}"
             fi
         else
             backup_log_msg "INFO" "$(lh_msg 'BTRFS_ORPHANED_SNAPSHOTS_CLEANUP_SKIPPED')"
@@ -659,7 +670,7 @@ safe_cleanup_temp_snapshot() {
     local snapshot_name="$(basename "$snapshot_path")"
     
     if [ -d "$snapshot_path" ]; then
-        backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_CLEANUP_TEMP')" "$snapshot_path")"
+        backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_TEMP' "$snapshot_path")"
         
         # Multiple attempts for robust deletion
         local max_attempts=3
@@ -667,10 +678,10 @@ safe_cleanup_temp_snapshot() {
         
         while [ $attempt -le $max_attempts ]; do
             if btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1; then
-                backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_TEMP_DELETED')" "$snapshot_name")"
+                backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_TEMP_DELETED' "$snapshot_name")"
                 return 0
             else
-                backup_log_msg "WARN" "$(printf "$(lh_msg 'BTRFS_LOG_TEMP_DELETE_ATTEMPT')" "$attempt" "$max_attempts" "$snapshot_name")"
+                backup_log_msg "WARN" "$(lh_msg 'BTRFS_LOG_TEMP_DELETE_ATTEMPT' "$attempt" "$max_attempts" "$snapshot_name")"
                 if [ $attempt -lt $max_attempts ]; then
                     sleep 2  # Short wait before retry
                 fi
@@ -678,9 +689,9 @@ safe_cleanup_temp_snapshot() {
             fi
         done
         
-        backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_TEMP_DELETE_ERROR')" "$snapshot_path")"
-        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_WARNING_TEMP_SNAPSHOT_DELETE')" "$snapshot_name")${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_MANUAL_DELETE_HINT')" "$snapshot_path")${LH_COLOR_RESET}"
+        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_TEMP_DELETE_ERROR' "$snapshot_path")"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_WARNING_TEMP_SNAPSHOT_DELETE' "$snapshot_name")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_MANUAL_DELETE_HINT' "$snapshot_path")${LH_COLOR_RESET}"
         return 1
     fi
 }
@@ -692,15 +703,15 @@ cleanup_on_exit() {
     if [ -n "$CURRENT_TEMP_SNAPSHOT" ] && [ -d "$CURRENT_TEMP_SNAPSHOT" ]; then
         echo ""
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_BACKUP_INTERRUPTED')${LH_COLOR_RESET}"
-        backup_log_msg "WARN" "$(printf "$(lh_msg 'BTRFS_LOG_CLEANUP_INTERRUPTED')" "$CURRENT_TEMP_SNAPSHOT")"
+        backup_log_msg "WARN" "$(lh_msg 'BTRFS_LOG_CLEANUP_INTERRUPTED' "$CURRENT_TEMP_SNAPSHOT")"
         
         if btrfs subvolume delete "$CURRENT_TEMP_SNAPSHOT" >/dev/null 2>&1; then
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_TEMP_SNAPSHOT_CLEANED')${LH_COLOR_RESET}"
             backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_INTERRUPTED_SUCCESS')"
         else
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_CLEANUP_TEMP')${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_MANUAL_DELETE_HINT')" "$CURRENT_TEMP_SNAPSHOT")${LH_COLOR_RESET}"
-            backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_CLEANUP_INTERRUPTED_ERROR')" "$CURRENT_TEMP_SNAPSHOT")"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_MANUAL_DELETE_HINT' "$CURRENT_TEMP_SNAPSHOT")${LH_COLOR_RESET}"
+            backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_CLEANUP_INTERRUPTED_ERROR' "$CURRENT_TEMP_SNAPSHOT")"
         fi
     fi
     
@@ -726,7 +737,7 @@ delete_btrfs_backups() {
     
     # Check backup directory
     if [ ! -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
-        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_NO_BACKUPS_FOUND')" "$LH_BACKUP_ROOT$LH_BACKUP_DIR")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_NO_BACKUPS_FOUND' "$LH_BACKUP_ROOT$LH_BACKUP_DIR")${LH_COLOR_RESET}"
         return 1
     fi
     
@@ -748,7 +759,7 @@ delete_btrfs_backups() {
     done
     echo -e "  ${LH_COLOR_MENU_NUMBER}$((${#subvols[@]}+1)).${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BTRFS_ALL_SUBVOLUMES')${LH_COLOR_RESET}"
     
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(printf "$(lh_msg 'BACKUP_CHOOSE_OPTION_1_N')" "$((${#subvols[@]}+1))")${LH_COLOR_RESET}")" choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'BACKUP_CHOOSE_OPTION_1_N' "$((${#subvols[@]}+1))")${LH_COLOR_RESET}")" choice
     
     local selected_subvols=()
     if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#subvols[@]}" ]; then
@@ -769,14 +780,14 @@ delete_btrfs_backups() {
         local snapshots=($(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" 2>/dev/null | grep -v '\.backup_complete$' | sort -r))
         
         if [ ${#snapshots[@]} -eq 0 ]; then
-            echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_NO_SNAPSHOTS')" "$subvol")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_NO_SNAPSHOTS' "$subvol")${LH_COLOR_RESET}"
             continue
         fi
         
         list_snapshots_with_integrity "$subvol"
         
         echo ""
-        echo -e "${LH_COLOR_PROMPT}$(printf "$(lh_msg 'BTRFS_DELETE_OPTIONS')" "$subvol")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_PROMPT}$(lh_msg 'BTRFS_DELETE_OPTIONS' "$subvol")${LH_COLOR_RESET}"
         echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BTRFS_DELETE_OPTION_SELECT')${LH_COLOR_RESET}"
         echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BTRFS_DELETE_OPTION_AUTO')${LH_COLOR_RESET}"
         echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BTRFS_DELETE_OPTION_OLDER')${LH_COLOR_RESET}"
@@ -798,7 +809,7 @@ delete_btrfs_backups() {
                     if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le "${#snapshots[@]}" ]; then
                         snapshots_to_delete+=("${snapshots[$((num-1))]}")
                     else
-                        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_DELETE_INVALID_NUMBER')" "$num")${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_DELETE_INVALID_NUMBER' "$num")${LH_COLOR_RESET}"
                     fi
                 done
                 ;;
@@ -806,15 +817,15 @@ delete_btrfs_backups() {
                 # Automatically delete old snapshots
                 if [ "${#snapshots[@]}" -gt "$LH_RETENTION_BACKUP" ]; then
                     local excess_count=$((${#snapshots[@]} - LH_RETENTION_BACKUP))
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_DELETE_CURRENT_SNAPSHOTS')" "${#snapshots[@]}" "$LH_RETENTION_BACKUP")${LH_COLOR_RESET}"
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_DELETE_EXCESS_SNAPSHOTS')" "$excess_count")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_DELETE_CURRENT_SNAPSHOTS' "${#snapshots[@]}" "$LH_RETENTION_BACKUP")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_DELETE_EXCESS_SNAPSHOTS' "$excess_count")${LH_COLOR_RESET}"
                     
                     # Select the oldest excess snapshots
                     for ((i=${#snapshots[@]}-excess_count; i<${#snapshots[@]}; i++)); do
                         snapshots_to_delete+=("${snapshots[i]}")
                     done
                 else
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_DELETE_WITHIN_RETENTION')" "${#snapshots[@]}" "$LH_RETENTION_BACKUP")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_DELETE_WITHIN_RETENTION' "${#snapshots[@]}" "$LH_RETENTION_BACKUP")${LH_COLOR_RESET}"
                     echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_DELETE_NO_AUTO_DELETE')${LH_COLOR_RESET}"
                     continue
                 fi
@@ -824,7 +835,7 @@ delete_btrfs_backups() {
                 local days=$(lh_ask_for_input "$(lh_msg 'BTRFS_DELETE_OLDER_THAN_PROMPT')" "^[0-9]+$" "$(lh_msg 'BTRFS_PROMPT_DAYS_INPUT')")
                 if [ -n "$days" ]; then
                     local cutoff_date=$(date -d "$days days ago" +%Y-%m-%d_%H-%M-%S)
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_DELETE_OLDER_THAN_SEARCH')" "$days" "$cutoff_date")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_DELETE_OLDER_THAN_SEARCH' "$days" "$cutoff_date")${LH_COLOR_RESET}"
                     
                     for snapshot in "${snapshots[@]}"; do
                         local timestamp_part=$(echo "$snapshot" | sed "s/^$subvol-//")
@@ -835,7 +846,7 @@ delete_btrfs_backups() {
                     done
                     
                     if [ ${#snapshots_to_delete[@]} -eq 0 ]; then
-                        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_DELETE_NO_OLDER_FOUND')" "$days")${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_DELETE_NO_OLDER_FOUND' "$days")${LH_COLOR_RESET}"
                         continue
                     fi
                 else
@@ -846,9 +857,9 @@ delete_btrfs_backups() {
             4)
                 # Delete ALL snapshots
                 echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_DELETE_ALL_WARNING_HEADER')${LH_COLOR_RESET}"
-                echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_DELETE_ALL_WARNING_TEXT')" "${#snapshots[@]}" "$subvol")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_DELETE_ALL_WARNING_TEXT' "${#snapshots[@]}" "$subvol")${LH_COLOR_RESET}"
                 if lh_confirm_action "$(lh_msg 'BTRFS_DELETE_ALL_CONFIRM')" "n"; then
-                    if lh_confirm_action "$(printf "$(lh_msg 'BTRFS_DELETE_ALL_FINAL_CONFIRM')" "$subvol")" "n"; then
+                    if lh_confirm_action "$(lh_msg 'BTRFS_DELETE_ALL_FINAL_CONFIRM' "$subvol")" "n"; then
                         snapshots_to_delete=("${snapshots[@]}")
                     else
                         echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_CANCELLED')${LH_COLOR_RESET}"
@@ -861,7 +872,7 @@ delete_btrfs_backups() {
                 ;;
             0)
                 # Skip
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_DELETE_SUBVOLUME_SKIPPED')" "$subvol")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_DELETE_SUBVOLUME_SKIPPED' "$subvol")${LH_COLOR_RESET}"
                 continue
                 ;;
             *)
@@ -874,8 +885,8 @@ delete_btrfs_backups() {
         if [ ${#snapshots_to_delete[@]} -gt 0 ]; then
             echo ""
             echo -e "${LH_COLOR_HEADER}$(lh_msg 'BTRFS_DELETE_SNAPSHOTS_HEADER')${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_DELETE_SUBVOLUME_INFO')" "$subvol")${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_DELETE_COUNT_INFO')" "${#snapshots_to_delete[@]}")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_DELETE_SUBVOLUME_INFO' "$subvol")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_DELETE_COUNT_INFO' "${#snapshots_to_delete[@]}")${LH_COLOR_RESET}"
             echo ""
             echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_DELETE_LIST_INFO')${LH_COLOR_RESET}"
             for snapshot in "${snapshots_to_delete[@]}"; do
@@ -889,7 +900,7 @@ delete_btrfs_backups() {
             echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_DELETE_WARNING_IRREVERSIBLE')${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_DELETE_WARNING_PERMANENT')${LH_COLOR_RESET}"
             
-            if lh_confirm_action "$(printf "$(lh_msg 'BTRFS_DELETE_CONFIRM_COUNT')" "${#snapshots_to_delete[@]}")" "n"; then
+            if lh_confirm_action "$(lh_msg 'BTRFS_DELETE_CONFIRM_COUNT' "${#snapshots_to_delete[@]}")" "n"; then
                 echo ""
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_DELETE_DELETING')${LH_COLOR_RESET}"
                 
@@ -900,36 +911,36 @@ delete_btrfs_backups() {
                     local snapshot_path="$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol/$snapshot"
                     local marker_file_to_delete="${snapshot_path}.backup_complete"
                     
-                    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_DELETE_DELETING_SNAPSHOT')" "$snapshot")${LH_COLOR_RESET}"
-                    backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_DELETE_SNAPSHOT')" "$snapshot_path")"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_DELETE_DELETING_SNAPSHOT' "$snapshot")${LH_COLOR_RESET}"
+                    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_DELETE_SNAPSHOT' "$snapshot_path")"
                     
                     # Delete BTRFS subvolume
                     if btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1; then
                         # Also delete marker file
                         if [ -f "$marker_file_to_delete" ]; then
                             rm -f "$marker_file_to_delete"
-                            backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_DELETE_MARKER')" "$marker_file_to_delete")"
+                            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_DELETE_MARKER' "$marker_file_to_delete")"
                         fi
                         echo -e "  ${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_DELETE_SUCCESS_SINGLE')${LH_COLOR_RESET}"
-                        backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_DELETE_SNAPSHOT_SUCCESS')" "$snapshot_path")"
+                        backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_DELETE_SNAPSHOT_SUCCESS' "$snapshot_path")"
                         ((success_count++))
                     else
                         echo -e "  ${LH_COLOR_ERROR}$(lh_msg 'BTRFS_DELETE_ERROR_SINGLE')${LH_COLOR_RESET}"
-                        backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_DELETE_SNAPSHOT_ERROR')" "$snapshot_path")"
+                        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_DELETE_SNAPSHOT_ERROR' "$snapshot_path")"
                         ((error_count++))
                     fi
                 done
                 
                 echo ""
-                echo -e "${LH_COLOR_HEADER}$(printf "$(lh_msg 'BTRFS_DELETE_RESULT_HEADER')" "$subvol")${LH_COLOR_RESET}"
-                echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'BTRFS_DELETE_SUCCESS_COUNT')" "$success_count")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_HEADER}$(lh_msg 'BTRFS_DELETE_RESULT_HEADER' "$subvol")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_DELETE_SUCCESS_COUNT' "$success_count")${LH_COLOR_RESET}"
                 if [ $error_count -gt 0 ]; then
-                    echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'BTRFS_DELETE_ERROR_COUNT')" "$error_count")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_DELETE_ERROR_COUNT' "$error_count")${LH_COLOR_RESET}"
                 fi
                 
-                backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_DELETE_SUBVOL_COMPLETE')" "$subvol" "$success_count" "$error_count")"
+                backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_DELETE_SUBVOL_COMPLETE' "$subvol" "$success_count" "$error_count")"
             else
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_DELETE_ABORTED_FOR_SUBVOLUME')" "$subvol")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_DELETE_ABORTED_FOR_SUBVOLUME' "$subvol")${LH_COLOR_RESET}"
             fi
         fi
     done
@@ -1031,7 +1042,7 @@ check_backup_integrity() {
                     if [ "$current_size" -lt "$min_size" ] && [ "$avg_size" -gt 0 ]; then # avg_size > 0 to avoid false alarms with very small snapshots
                         local current_size_hr=$(echo "$current_size_str" | awk '{print $1}' | numfmt --to=iec-i --suffix=B 2>/dev/null || echo "${current_size}B")
                         local avg_size_hr=$(numfmt --to=iec-i --suffix=B --padding=5 "$avg_size" 2>/dev/null || echo "${avg_size}B")
-                        issues+=("$(printf "$(lh_msg 'BTRFS_INTEGRITY_UNUSUALLY_SMALL')" "$current_size_hr" "$avg_size_hr")")
+                        issues+=("$(lh_msg 'BTRFS_INTEGRITY_UNUSUALLY_SMALL' "$current_size_hr" "$avg_size_hr")")
                         # Only change status if it was previously OK (and marker is valid)
                         status="$(lh_msg 'BTRFS_STATUS_SUSPICIOUS')"
                     fi
@@ -1080,7 +1091,7 @@ create_backup_marker() {
     # Check if the directory is writable
     local parent_dir=$(dirname "$marker_file")
     if [ ! -w "$parent_dir" ]; then
-        backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_WRITE_PERMISSION_ERROR')" "$parent_dir")"
+        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_WRITE_PERMISSION_ERROR' "$parent_dir")"
         return 1
     fi
     
@@ -1098,10 +1109,10 @@ BACKUP_SIZE=$(du -sb "$snapshot_path" 2>/dev/null | cut -f1 || echo "unknown")
 EOF
     
     if [ $? -eq 0 ] && [ -f "$marker_file" ]; then
-        backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_MARKER_CREATE_SUCCESS')" "$marker_file")"
+        backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_MARKER_CREATE_SUCCESS' "$marker_file")"
         return 0
     else
-        backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_MARKER_CREATE_ERROR')" "$marker_file")"
+        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_MARKER_CREATE_ERROR' "$marker_file")"
         return 1
     fi
 }
@@ -1112,18 +1123,18 @@ list_snapshots_with_integrity() {
     local snapshot_dir="$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol"
     
     if [ ! -d "$snapshot_dir" ]; then
-        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_NO_SNAPSHOTS')" "$subvol")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_NO_SNAPSHOTS' "$subvol")${LH_COLOR_RESET}"
         return 1
     fi
     
     local snapshots=($(ls -1 "$snapshot_dir" 2>/dev/null | grep -v '\.backup_complete$' | sort -r))
     
     if [ ${#snapshots[@]} -eq 0 ]; then
-        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_NO_SNAPSHOTS')" "$subvol")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_NO_SNAPSHOTS' "$subvol")${LH_COLOR_RESET}"
         return 1
     fi
     
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_AVAILABLE_SNAPSHOTS')" "$subvol")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_AVAILABLE_SNAPSHOTS' "$subvol")${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_SNAPSHOT_LIST_NOTE')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_HEADER}$(lh_msg 'BTRFS_SNAPSHOT_LIST_HEADER')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SEPARATOR}---  ------------  ----------------------  ------------------------------  -------${LH_COLOR_RESET}"
@@ -1204,7 +1215,7 @@ show_backup_status() {
     lh_print_header "$(lh_msg 'STATUS_TITLE')"
     
     echo -e "${LH_COLOR_HEADER}$(lh_msg 'STATUS_CURRENT_SITUATION')${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'CONFIG_BACKUP_ROOT')" "")${LH_COLOR_RESET} $LH_BACKUP_ROOT"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'CONFIG_BACKUP_ROOT' "")${LH_COLOR_RESET} $LH_BACKUP_ROOT"
     
     if [ ! -d "$LH_BACKUP_ROOT" ]; then
         echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_STATUS_OFFLINE')${LH_COLOR_RESET}"
@@ -1229,23 +1240,23 @@ show_backup_status() {
         for subvol in @ @home; do
             if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" ]; then
                 local count=$(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" 2>/dev/null | grep -v '\.backup_complete$' | wc -l)
-                echo -e "  ${LH_COLOR_INFO}$subvol:${LH_COLOR_RESET} $(printf "$(lh_msg 'STATUS_BTRFS_SNAPSHOTS')" "$count")"
+                echo -e "  ${LH_COLOR_INFO}$subvol:${LH_COLOR_RESET} $(lh_msg 'STATUS_BTRFS_SNAPSHOTS' "$count")"
                 btrfs_count=$((btrfs_count + count))
             fi
         done
-        echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_STATUS_TOTAL_COUNT')${LH_COLOR_RESET} $(printf "$(lh_msg 'STATUS_BTRFS_TOTAL_COUNT')" "$btrfs_count")"
+        echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_STATUS_TOTAL_COUNT')${LH_COLOR_RESET} $(lh_msg 'STATUS_BTRFS_TOTAL_COUNT' "$btrfs_count")"
         
         # TAR Backups
         echo ""
         echo -e "${LH_COLOR_INFO}$(lh_msg 'STATUS_TAR_BACKUPS')${LH_COLOR_RESET}"
         local tar_count=$(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | wc -l)
-        echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_STATUS_TOTAL_COUNT')${LH_COLOR_RESET} $(printf "$(lh_msg 'STATUS_TAR_TOTAL')" "$tar_count")"
+        echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_STATUS_TOTAL_COUNT')${LH_COLOR_RESET} $(lh_msg 'STATUS_TAR_TOTAL' "$tar_count")"
         
         # RSYNC Backups
         echo ""
         echo -e "${LH_COLOR_INFO}$(lh_msg 'STATUS_RSYNC_BACKUPS')${LH_COLOR_RESET}"
         local rsync_count=$(ls -1d "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/rsync_backup_* 2>/dev/null | wc -l)
-        echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_STATUS_TOTAL_COUNT')${LH_COLOR_RESET} $(printf "$(lh_msg 'STATUS_RSYNC_TOTAL')" "$rsync_count")"
+        echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_STATUS_TOTAL_COUNT')${LH_COLOR_RESET} $(lh_msg 'STATUS_RSYNC_TOTAL' "$rsync_count")"
         
         # Newest backup
         echo ""
@@ -1278,7 +1289,7 @@ show_backup_status() {
     # Recent backup activities from log
     if [ -f "$LH_BACKUP_LOG" ]; then
         echo ""
-        echo -e "${LH_COLOR_HEADER}$(printf "$(lh_msg 'BACKUP_STATUS_LAST_ACTIVITIES')" "$LH_BACKUP_LOG")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_HEADER}$(lh_msg 'BACKUP_STATUS_LAST_ACTIVITIES' "$LH_BACKUP_LOG")${LH_COLOR_RESET}"
         grep -i "backup" "$LH_BACKUP_LOG" | tail -n 5
     fi
 }
@@ -1305,7 +1316,7 @@ cleanup_problematic_backups() {
     local subvols=($(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | grep -E '^(@|@home)$'))
     
     if [ ${#subvols[@]} -eq 0 ]; then
-        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_NO_BACKUPS_FOUND')" "$LH_BACKUP_ROOT$LH_BACKUP_DIR")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_NO_BACKUPS_FOUND' "$LH_BACKUP_ROOT$LH_BACKUP_DIR")${LH_COLOR_RESET}"
         return 1
     fi
     
@@ -1348,7 +1359,7 @@ cleanup_problematic_backups() {
         return 0
     fi
     
-    echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'BTRFS_CLEANUP_FOUND_PROBLEMS')" "$total_problematic")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_CLEANUP_FOUND_PROBLEMS' "$total_problematic")${LH_COLOR_RESET}"
     echo ""
     
     if lh_confirm_action "$(lh_msg 'BTRFS_CLEANUP_CONFIRM_DELETE')" "n"; then
@@ -1363,34 +1374,34 @@ cleanup_problematic_backups() {
             local subvol=$(echo "$entry" | cut -d'|' -f3)
             local marker_file_to_delete="${snapshot_path}.backup_complete"
             
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'BTRFS_CLEANUP_DELETING')" "$snapshot_name")${LH_COLOR_RESET}"
-            backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_CLEANUP_PROBLEMATIC_SNAPSHOT')" "$snapshot_path")"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_CLEANUP_DELETING' "$snapshot_name")${LH_COLOR_RESET}"
+            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_PROBLEMATIC_SNAPSHOT' "$snapshot_path")"
             
             if btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1; then
                 # Also delete marker file
                 if [ -f "$marker_file_to_delete" ]; then
                     rm -f "$marker_file_to_delete"
-                    backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_MARKER_DELETE_PROBLEMATIC')" "$marker_file_to_delete")"
+                    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_MARKER_DELETE_PROBLEMATIC' "$marker_file_to_delete")"
                 fi
 
                 echo -e "  ${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_CLEANUP_SUCCESS_SINGLE')${LH_COLOR_RESET}"
-                backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_CLEANUP_PROBLEMATIC_SUCCESS')" "$snapshot_path")"
+                backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_PROBLEMATIC_SUCCESS' "$snapshot_path")"
                 ((cleaned_count++))
             else
                 echo -e "  ${LH_COLOR_ERROR}$(lh_msg 'BTRFS_CLEANUP_ERROR_SINGLE')${LH_COLOR_RESET}"
-                backup_log_msg "ERROR" "$(printf "$(lh_msg 'BTRFS_LOG_CLEANUP_PROBLEMATIC_ERROR')" "$snapshot_path")"
+                backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_CLEANUP_PROBLEMATIC_ERROR' "$snapshot_path")"
                 ((error_count++))
             fi
         done
         
         echo ""
         echo -e "${LH_COLOR_HEADER}$(lh_msg 'BTRFS_CLEANUP_RESULT_HEADER')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'BTRFS_CLEANUP_SUCCESS_COUNT')" "$cleaned_count")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_CLEANUP_SUCCESS_COUNT' "$cleaned_count")${LH_COLOR_RESET}"
         if [ $error_count -gt 0 ]; then
-            echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'BTRFS_CLEANUP_ERROR_COUNT')" "$error_count")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_CLEANUP_ERROR_COUNT' "$error_count")${LH_COLOR_RESET}"
         fi
         
-        backup_log_msg "INFO" "$(printf "$(lh_msg 'BTRFS_LOG_CLEANUP_PROBLEMATIC_COMPLETE')" "$cleaned_count" "$error_count")"
+        backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_PROBLEMATIC_COMPLETE' "$cleaned_count" "$error_count")"
     else
         echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_CLEANUP_CANCELLED')${LH_COLOR_RESET}"
     fi

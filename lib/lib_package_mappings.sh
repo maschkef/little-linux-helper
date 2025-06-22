@@ -6,7 +6,7 @@
 #
 # Package name mappings for different package managers
 
-# Mapping von Programmnamen zu Paketnamen für verschiedene Paketmanager
+# Mapping of program names to package names for different package managers
 declare -A package_names_pacman=(
     ["smartctl"]="smartmontools"
     ["lsof"]="lsof"

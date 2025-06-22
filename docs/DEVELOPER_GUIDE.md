@@ -197,8 +197,17 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     - `LH_COLOR_WARNING` (for warning messages)
     - `LH_COLOR_INFO` (for informational messages)
     - `LH_COLOR_SEPARATOR` (for visual separators like "----")
-- **Usage:** Use with `echo -e` or `printf`. Always end a colored string with `${LH_COLOR_RESET}` to prevent color bleeding. Example: `echo -e "${LH_COLOR_ERROR}This is an error.${LH_COLOR_RESET}"`
+- **Usage:** Use with `echo -e` for colored output. Always end a colored string with `${LH_COLOR_RESET}` to prevent color bleeding. Example: `echo -e "${LH_COLOR_ERROR}$(lh_msg 'ERROR_MESSAGE')${LH_COLOR_RESET}"`
 - **Library Integration:** Many library functions like `lh_print_header`, `lh_print_menu_item`, `lh_log_msg`, `lh_confirm_action`, and `lh_ask_for_input` already incorporate these colors for their output. When using these functions, manual color application is often not needed for their standard output.
+
+**CRITICAL WARNING - Avoid printf/lh_msg Double Usage:**
+- **❌ NEVER USE:** `printf "$(lh_msg 'KEY')" "$VAR"` - This causes empty variable display due to double printf usage
+- **❌ NEVER USE:** `printf` with color variables and `lh_msg` together: `printf "${COLOR}$(lh_msg 'KEY')${RESET}" "$VAR"`
+- **✅ ALWAYS USE:** `lh_msg 'KEY' "$VAR"` - Pass parameters directly to lh_msg
+- **✅ FOR COLORS:** Use `echo -e` with color variables and `lh_msg`: `echo -e "${LH_COLOR_ERROR}$(lh_msg 'ERROR_MESSAGE')${LH_COLOR_RESET}"`
+- **✅ FOR COLORS + TRANSLATION + PARAMS:** `echo -e "${LH_COLOR_ERROR}$(lh_msg 'ERROR_WITH_FILE' "$filename")${LH_COLOR_RESET}"`
+- **Problem:** Using printf with lh_msg causes variables to display as empty strings in UI
+- **Reference:** See `debug_printf.md` for detailed explanation and systematic fix procedures
 
 **Functions:**
 *   `lh_initialize_logging()`
@@ -577,6 +586,15 @@ The i18n system implements a sophisticated multi-layer fallback mechanism to ens
 - **Robust Error Handling:** Missing translations return `[KEY_NAME]` placeholders and are logged for debugging.
 - **Parameter Support:** Translation functions support printf-style parameters: `lh_msg 'WELCOME_USER' "$username"`
 
+**CRITICAL WARNING - Avoid printf/lh_msg Double Usage:**
+- **❌ NEVER USE:** `printf "$(lh_msg 'KEY')" "$VAR"` - This causes empty variable display due to double printf usage
+- **❌ NEVER USE:** `printf` with color variables and `lh_msg` together: `printf "${COLOR}$(lh_msg 'KEY')${RESET}" "$VAR"`
+- **✅ ALWAYS USE:** `lh_msg 'KEY' "$VAR"` - Pass parameters directly to lh_msg
+- **✅ FOR COLORS:** Use `echo -e` with color variables and `lh_msg`: `echo -e "${LH_COLOR_ERROR}$(lh_msg 'ERROR_MESSAGE')${LH_COLOR_RESET}"`
+- **✅ FOR COLORS + TRANSLATION + PARAMS:** `echo -e "${LH_COLOR_ERROR}$(lh_msg 'ERROR_WITH_FILE' "$filename")${LH_COLOR_RESET}"`
+- **Problem:** Using printf with lh_msg causes variables to display as empty strings in UI
+- **Reference:** See `debug_printf.md` for detailed explanation and systematic fix procedures
+
 **Module-Specific Translations:**
 - Modules can load their specific translations using `lh_load_language_module "backup"`
 - This adds module-specific keys to the global `MSG` array without affecting common translations.
@@ -599,6 +617,23 @@ The i18n system implements a sophisticated multi-layer fallback mechanism to ens
 4. In the module script, call `lh_load_language_module "new_module"` after sourcing `lib_common.sh`
 5. Use the standard `lh_msg` function to access translations
 6. **Test Fallbacks:** Test your module with missing translation files to ensure graceful degradation
+
+**Standard Language Module Loading Practice:**
+All modules should follow this standard pattern for loading language modules:
+
+```bash
+# Load translations - standard practice for all modules
+lh_load_language_module "your_module_name"  # Module-specific translations
+lh_load_language_module "common"            # Common UI elements and messages  
+lh_load_language_module "lib"               # Library function messages
+```
+
+**Why load common and lib modules?**
+- **"common"**: Contains shared UI messages, confirmation prompts, error messages, and navigation text used across multiple modules
+- **"lib"**: Contains messages from library functions like logging, notifications, and utility functions
+- **Module-specific**: Contains translations unique to your module's functionality
+
+**Note**: While not all existing modules follow this pattern yet, it is the recommended standard for new modules and should be adopted when updating existing ones.
 
 ### 3. Configuration System
 
@@ -632,6 +667,8 @@ CFG_LH_LOG_TO_FILE="true"
 - **DEBUG**: All messages including debug information (verbose)
 
 Each level includes all levels above it in severity.
+
+**Developer Note:** The DEBUG level is designed to be used extensively throughout modules since it's hidden by default. See the "Debugging and Logging Best Practices" section for comprehensive guidelines on implementing debug logging in your modules.
 
 #### 3.2 Backup Configuration (`config/backup.conf`)
 
@@ -770,9 +807,12 @@ When creating a new module for the Little Linux Helper, follow these essential s
    # modules/mod_your_feature.sh
    #!/bin/bash
    source "$LH_ROOT_DIR/lib/lib_common.sh"
+   lh_detect_package_manager
    
-   # Load module-specific translations
-   lh_load_language_module "your_feature"
+   # Load translations - standard practice for all modules
+   lh_load_language_module "your_feature"  # Module-specific translations
+   lh_load_language_module "common"        # Common UI elements and messages
+   lh_load_language_module "lib"           # Library function messages
    
    # Your module code here
    echo "$(lh_msg 'YOUR_WELCOME_MESSAGE')"
@@ -808,10 +848,10 @@ When creating a new module for the Little Linux Helper, follow these essential s
 
 ### Essential Functions for Modules
 - `lh_msg "KEY"` or `lh_t "KEY"` - Get translated text
-- `lh_log_msg "INFO" "message"` - Write to log
-- `lh_confirm_action "question"` - Ask yes/no
-- `lh_check_command "program"` - Check if program exists
-- `lh_send_notification "type" "title" "message"` - Desktop notification
+- `lh_log_msg "INFO" "$(lh_msg 'LOG_MESSAGE_KEY')"` - Write internationalized log messages
+- `lh_confirm_action "$(lh_msg 'CONFIRMATION_QUESTION_KEY')"` - Ask yes/no with translated question
+- `lh_check_command "program"` - Check if program exists (program name doesn't need translation)
+- `lh_send_notification "info" "$(lh_msg 'NOTIFICATION_TITLE_KEY')" "$(lh_msg 'NOTIFICATION_MESSAGE_KEY')"` - Desktop notification with translated content
 
 ### Internationalization System Functions
 
@@ -849,3 +889,194 @@ When creating a new module for the Little Linux Helper, follow these essential s
         - **Explicit override:** Respects pre-set `LH_LANG` environment variable
     *   **Return Value:** Returns 0 (designed to always succeed with fallbacks).
     *   **Usage:** Called once during system initialization by `lh_finalize_initialization()`. Ensures the i18n system is fully operational regardless of configuration state.
+
+### Debugging and Logging Best Practices
+
+The Little Linux Helper includes a sophisticated logging system with configurable log levels. Since debugging information can be easily controlled through configuration (default level is "INFO"), developers should implement comprehensive debug logging throughout their modules.
+
+#### Log Level Usage Guidelines
+
+**ERROR Level - Critical Issues Only:**
+```bash
+lh_log_msg "ERROR" "$(lh_msg 'BACKUP_FAILED_CRITICAL' "$error_details")"
+```
+- Use for: Fatal errors that prevent operation completion
+- Examples: Cannot create backup directory, critical system commands fail, essential dependencies missing
+
+**WARN Level - Important Issues:**
+```bash
+lh_log_msg "WARN" "$(lh_msg 'BACKUP_PARTIAL_FAILURE' "$skipped_files")"
+```
+- Use for: Non-fatal issues that users should know about
+- Examples: Some files skipped, deprecated features used, potential security concerns
+
+**INFO Level - General Progress (Default Visible):**
+```bash
+lh_log_msg "INFO" "$(lh_msg 'BACKUP_STARTING' "$destination")"
+lh_log_msg "INFO" "$(lh_msg 'BACKUP_COMPLETED' "$file_count" "$total_size")"
+```
+- Use for: Key operation milestones, user-relevant status updates
+- Examples: Operation start/completion, important configuration changes, summary information
+
+**DEBUG Level - Detailed Information:**
+```bash
+lh_log_msg "DEBUG" "$(lh_msg 'PROCESSING_FILE' "$current_file")"
+lh_log_msg "DEBUG" "Command executed: $command_with_args"
+lh_log_msg "DEBUG" "Variable state: LH_BACKUP_ROOT=$LH_BACKUP_ROOT"
+```
+- Use for: Detailed execution flow, variable states, command details
+- Examples: File-by-file processing, variable values, command construction, loop iterations
+
+#### Comprehensive Debug Logging Strategy
+
+**Function Entry/Exit Debugging:**
+```bash
+function backup_create_snapshot() {
+    local snapshot_name="$1"
+    lh_log_msg "DEBUG" "Entering backup_create_snapshot with snapshot_name='$snapshot_name'"
+    
+    # Function logic here
+    local result=$?
+    
+    lh_log_msg "DEBUG" "Exiting backup_create_snapshot with return code: $result"
+    return $result
+}
+```
+
+**Variable State Logging:**
+```bash
+# Log important variable states at key points
+lh_log_msg "DEBUG" "Configuration loaded: BACKUP_ROOT='$LH_BACKUP_ROOT', RETENTION='$LH_RETENTION_BACKUP'"
+lh_log_msg "DEBUG" "Detected filesystem type: $filesystem_type for path: $backup_path"
+```
+
+**Command Execution Debugging:**
+```bash
+# Log commands before execution (sanitize sensitive data)
+local cmd="$LH_SUDO_CMD btrfs subvolume snapshot $source $destination"
+lh_log_msg "DEBUG" "Executing command: $cmd"
+
+# Log command results
+if $cmd; then
+    lh_log_msg "DEBUG" "Command succeeded: btrfs snapshot created"
+else
+    local exit_code=$?
+    lh_log_msg "DEBUG" "Command failed with exit code: $exit_code"
+fi
+```
+
+**Loop and Iteration Debugging:**
+```bash
+lh_log_msg "DEBUG" "Processing ${#backup_files[@]} files for backup"
+for file in "${backup_files[@]}"; do
+    lh_log_msg "DEBUG" "Processing file: $file (size: $(stat -f%z "$file" 2>/dev/null || echo 'unknown'))"
+    # Process file
+done
+lh_log_msg "DEBUG" "Completed processing all files"
+```
+
+**Conditional Logic Debugging:**
+```bash
+if [[ "$filesystem_type" == "btrfs" ]]; then
+    lh_log_msg "DEBUG" "Using btrfs-specific backup method"
+    # btrfs logic
+elif [[ "$filesystem_type" == "ext4" ]]; then
+    lh_log_msg "DEBUG" "Using standard rsync backup method for ext4"
+    # rsync logic
+else
+    lh_log_msg "DEBUG" "Unknown filesystem '$filesystem_type', falling back to rsync"
+    # fallback logic
+fi
+```
+
+#### Debug Configuration for Development
+
+**Enabling Debug Mode:**
+```bash
+# Method 1: Edit config/general.conf
+CFG_LH_LOG_LEVEL="DEBUG"
+
+# Method 2: Temporary environment override
+export LH_LOG_LEVEL="DEBUG"
+./help_master.sh
+
+# Method 3: Runtime testing of specific modules
+export LH_LOG_LEVEL="DEBUG" && bash modules/mod_backup.sh
+```
+
+**Debug Output Analysis:**
+```bash
+# Filter debug logs for specific analysis
+grep "DEBUG.*backup_create_snapshot" logs/$(date +%y%m)/$(date +%y%m%d)*_maintenance_script.log
+
+# Monitor real-time debug output
+tail -f logs/$(date +%y%m)/$(date +%y%m%d)*_maintenance_script.log | grep DEBUG
+```
+
+#### Performance and Debug Considerations
+
+**Debug Message Performance:**
+- Debug messages are filtered by `lh_should_log()` before processing
+- When DEBUG level is not active, debug messages have minimal performance impact
+- Use debug logging liberally - the overhead is negligible when disabled
+
+**Internationalized Debug Messages:**
+```bash
+# Prefer translatable debug messages for user-facing debugging
+lh_log_msg "DEBUG" "$(lh_msg 'DEBUG_PROCESSING_FILE' "$filename")"
+
+# Use English directly for developer-focused technical details
+lh_log_msg "DEBUG" "Internal state: phase=$phase, iteration=$i, exit_code=$?"
+```
+
+**Security Considerations:**
+```bash
+# ❌ NEVER log sensitive information
+lh_log_msg "DEBUG" "Password: $password"  # NEVER DO THIS
+
+# ✅ Sanitize or mask sensitive data
+lh_log_msg "DEBUG" "Authentication configured for user: ${username:0:2}***"
+lh_log_msg "DEBUG" "Config file contains ${#password} character password"
+```
+
+#### Module Debug Template
+
+**Recommended debug structure for new modules:**
+```bash
+#!/bin/bash
+source "$LH_ROOT_DIR/lib/lib_common.sh"
+lh_detect_package_manager
+
+# Load translations
+lh_load_language_module "your_module"
+lh_load_language_module "common"
+lh_load_language_module "lib"
+
+function main_module_function() {
+    lh_log_msg "DEBUG" "Starting module execution with parameters: $*"
+    
+    # Log configuration state
+    lh_log_msg "DEBUG" "Module configuration: PARAM1='$PARAM1', PARAM2='$PARAM2'"
+    
+    # Main logic with debug points
+    lh_log_msg "INFO" "$(lh_msg 'MODULE_STARTING')"
+    
+    for item in "${items[@]}"; do
+        lh_log_msg "DEBUG" "Processing item: $item"
+        # Process item
+        if [[ $? -eq 0 ]]; then
+            lh_log_msg "DEBUG" "Successfully processed: $item"
+        else
+            lh_log_msg "WARN" "$(lh_msg 'ITEM_PROCESSING_FAILED' "$item")"
+        fi
+    done
+    
+    lh_log_msg "INFO" "$(lh_msg 'MODULE_COMPLETED')"
+    lh_log_msg "DEBUG" "Module execution completed with return code: 0"
+}
+
+# Execute main function
+main_module_function "$@"
+```
+
+**Remember:** The goal is to make debugging easy and comprehensive. Since debug messages are hidden by default (INFO level), there's no reason to be sparing with debug output. Good debug logging dramatically reduces development and troubleshooting time.

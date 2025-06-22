@@ -7,20 +7,32 @@
 # This script is part of the 'little-linux-helper' collection.
 # Licensed under the MIT License. See the LICENSE file in the project root for more information.
 #
-# Docker Management Module - Übergeordnetes Modul für Docker-Operationen
+# Docker Management Module - Main module for Docker operations
 
-# Laden der gemeinsamen Bibliothek
-source "$(dirname "$0")/../lib/lib_common.sh"
-lh_detect_package_manager
+# Load common library
+# Use BASH_SOURCE to get the correct path when sourced
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
 
-# Sprach-Module laden
-lh_load_language_module "common"
-lh_load_language_module "docker"
+# Complete initialization when run directly (not via help_master.sh)
+if [[ -z "${LH_INITIALIZED:-}" ]]; then
+    lh_load_general_config        # Load general config first for log level
+    lh_initialize_logging
+    lh_detect_package_manager
+    lh_finalize_initialization
+    export LH_INITIALIZED=1
+fi
 
-# Docker Konfigurationsvariablen
+# Load translations if not already loaded
+if [[ -z "${MSG[DOCKER_MENU_TITLE]:-}" ]]; then
+    lh_load_language_module "common"
+    lh_load_language_module "docker"
+    lh_load_language_module "lib"
+fi
+
+# Docker configuration variables
 LH_DOCKER_CONFIG_FILE="$LH_CONFIG_DIR/docker.conf"
 
-# Docker Konfigurationsvariablen (Platzhalter, werden von _docker_load_config befüllt)
+# Docker configuration variables (placeholder, will be filled by _docker_load_config)
 CFG_LH_DOCKER_COMPOSE_ROOT=""
 CFG_LH_DOCKER_EXCLUDE_DIRS=""
 CFG_LH_DOCKER_SEARCH_DEPTH=""
@@ -30,22 +42,22 @@ CFG_LH_DOCKER_DEFAULT_PATTERNS=""
 CFG_LH_DOCKER_CHECK_MODE=""
 CFG_LH_DOCKER_ACCEPTED_WARNINGS=""
 
-# Funktion zum Laden der Docker-Konfiguration
+# Function to load the Docker configuration
 function _docker_load_config() {
-    lh_log_msg "DEBUG" "Starte Laden der Docker-Konfiguration"
-    lh_log_msg "DEBUG" "Konfigurationsdatei: $LH_DOCKER_CONFIG_FILE"
+    lh_log_msg "DEBUG" "Start loading Docker configuration"
+    lh_log_msg "DEBUG" "Configuration file: $LH_DOCKER_CONFIG_FILE"
     
-    # Konfigurationsdatei laden oder erstellen falls nicht vorhanden
+    # Load configuration file or create if not present
     if [ -f "$LH_DOCKER_CONFIG_FILE" ]; then
-        lh_log_msg "DEBUG" "Konfigurationsdatei gefunden, lade Variablen..."
+        lh_log_msg "DEBUG" "Configuration file found, loading variables..."
         source "$LH_DOCKER_CONFIG_FILE"
-        lh_log_msg "INFO" "Docker-Konfiguration geladen von: $LH_DOCKER_CONFIG_FILE"
+        lh_log_msg "INFO" "Docker configuration loaded from: $LH_DOCKER_CONFIG_FILE"
     else
-        lh_log_msg "WARN" "Docker-Konfigurationsdatei '$LH_DOCKER_CONFIG_FILE' nicht gefunden."
+        lh_log_msg "WARN" "Docker configuration file '$LH_DOCKER_CONFIG_FILE' not found."
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_CONFIG_NOT_FOUND')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_USING_DEFAULTS')${LH_COLOR_RESET}"
         
-        # Standard-Werte setzen
+        # Set default values
         CFG_LH_DOCKER_COMPOSE_ROOT="/home"
         CFG_LH_DOCKER_EXCLUDE_DIRS=".git,node_modules,.cache,venv,__pycache__,.npm,.yarn"
         CFG_LH_DOCKER_SEARCH_DEPTH="5"
@@ -57,65 +69,65 @@ function _docker_load_config() {
     fi
 }
 
-# Funktion zum Speichern der Docker-Konfiguration
+# Function to save the Docker configuration
 function _docker_save_config() {
-    lh_log_msg "DEBUG" "Speichere Docker-Konfiguration nach: $LH_DOCKER_CONFIG_FILE"
+    lh_log_msg "DEBUG" "Saving Docker configuration to: $LH_DOCKER_CONFIG_FILE"
     
     cat > "$LH_DOCKER_CONFIG_FILE" << EOF
-# Docker-Konfiguration für little-linux-helper
-# Automatisch generiert am $(date)
+# Docker configuration for little-linux-helper
+# Automatically generated on $(date)
 
-# Suchpfad für Docker Compose Dateien
+# Search path for Docker Compose files
 CFG_LH_DOCKER_COMPOSE_ROOT="$CFG_LH_DOCKER_COMPOSE_ROOT"
 
-# Ausgeschlossene Verzeichnisse (kommagetrennt)
+# Excluded directories (comma separated)
 CFG_LH_DOCKER_EXCLUDE_DIRS="$CFG_LH_DOCKER_EXCLUDE_DIRS"
 
-# Maximale Suchtiefe
+# Maximum search depth
 CFG_LH_DOCKER_SEARCH_DEPTH="$CFG_LH_DOCKER_SEARCH_DEPTH"
 
-# Übersprungene Warnungen (kommagetrennt)
+# Skipped warnings (comma separated)
 CFG_LH_DOCKER_SKIP_WARNINGS="$CFG_LH_DOCKER_SKIP_WARNINGS"
 
-# Laufende Container prüfen (true/false)
+# Check running containers (true/false)
 CFG_LH_DOCKER_CHECK_RUNNING="$CFG_LH_DOCKER_CHECK_RUNNING"
 
-# Standard-Passwort-Muster (kommagetrennt)
+# Default password patterns (comma separated)
 CFG_LH_DOCKER_DEFAULT_PATTERNS="$CFG_LH_DOCKER_DEFAULT_PATTERNS"
 
-# Prüfmodus (strict/normal)
+# Check mode (strict/normal)
 CFG_LH_DOCKER_CHECK_MODE="$CFG_LH_DOCKER_CHECK_MODE"
 
-# Akzeptierte Warnungen (kommagetrennt)
+# Accepted warnings (comma separated)
 CFG_LH_DOCKER_ACCEPTED_WARNINGS="$CFG_LH_DOCKER_ACCEPTED_WARNINGS"
 EOF
     
-    lh_log_msg "INFO" "Docker-Konfiguration gespeichert"
+    lh_log_msg "INFO" "Docker configuration saved"
 }
 
-# Funktion zur Anzeige laufender Docker Container
+# Function to display running Docker containers
 function show_running_containers() {
-    lh_log_msg "DEBUG" "Beginne show_running_containers Funktion"
+    lh_log_msg "DEBUG" "Begin show_running_containers function"
     lh_print_header "$(lh_msg 'DOCKER_RUNNING_CONTAINERS')"
     
-    # Prüfen ob Docker installiert ist
-    lh_log_msg "DEBUG" "Prüfe ob Docker installiert ist"
+    # Check if Docker is installed
+    lh_log_msg "DEBUG" "Check if Docker is installed"
     if ! lh_check_command "docker" true; then
-        lh_log_msg "ERROR" "Docker ist nicht installiert"
+        lh_log_msg "ERROR" "Docker is not installed"
         return 1
     fi
     
-    # Prüfen ob Docker läuft
-    lh_log_msg "DEBUG" "Prüfe ob Docker-Daemon läuft"
+    # Check if Docker is running
+    lh_log_msg "DEBUG" "Check if Docker daemon is running"
     if ! $LH_SUDO_CMD docker info >/dev/null 2>&1; then
-        lh_log_msg "DEBUG" "Docker-Daemon ist nicht erreichbar"
+        lh_log_msg "DEBUG" "Docker daemon is not reachable"
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_DAEMON_NOT_RUNNING')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_START_DAEMON_HINT')${LH_COLOR_RESET}"
-        lh_log_msg "DEBUG" "Beende show_running_containers mit return 1"
+        lh_log_msg "DEBUG" "End show_running_containers with return 1"
         return 1
     fi
     
-    # Laufende Container anzeigen
+    # Display running containers
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_RUNNING_CONTAINERS'):${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SEPARATOR}$(printf '%.0s-' {1..60})${LH_COLOR_RESET}"
     
@@ -137,18 +149,18 @@ function show_running_containers() {
     echo -e "${LH_COLOR_SEPARATOR}$(printf '%.0s-' {1..60})${LH_COLOR_RESET}"
 }
 
-# Funktion zur Konfigurationsverwaltung
+# Function for configuration management
 function manage_docker_config() {
     lh_print_header "$(lh_msg 'DOCKER_CONFIG_MANAGEMENT')"
     
-    # Konfiguration laden
+    # Load configuration
     _docker_load_config
     
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_DESCRIPTION')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_PURPOSE')${LH_COLOR_RESET}"
     echo ""
     
-    # Aktuelle Konfiguration anzeigen
+    # Show current configuration
     echo -e "${LH_COLOR_HEADER}$(lh_msg 'DOCKER_CONFIG_CURRENT')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SEPARATOR}$(printf '%.0s-' {1..50})${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_MENU_TEXT}$(lh_msg 'DOCKER_CONFIG_COMPOSE_PATH') ${LH_COLOR_SUCCESS}$CFG_LH_DOCKER_COMPOSE_ROOT${LH_COLOR_RESET}"
@@ -249,7 +261,7 @@ function manage_docker_config() {
     done
 }
 
-# Hauptmenü-Funktion
+# Main menu function
 function docker_functions_menu() {
     while true; do
         lh_print_header "$(lh_msg 'DOCKER_FUNCTIONS')"
@@ -264,18 +276,18 @@ function docker_functions_menu() {
         lh_print_menu_item "0" "$(lh_msg 'DOCKER_MENU_BACK')"
         echo ""
         
-        lh_log_msg "DEBUG" "Warte auf Benutzereingabe in Docker-Menü"
+        lh_log_msg "DEBUG" "Waiting for user input in Docker menu"
         if ! read -t 30 -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION'): ${LH_COLOR_RESET}")" choice; then
-            lh_log_msg "WARN" "Timeout beim Warten auf Eingabe - beende Docker-Menü"
+            lh_log_msg "WARN" "Timeout while waiting for input - exiting Docker menu"
             break
         fi
         
         # Check for empty input which could indicate input stream issues
         if [ -z "$choice" ]; then
-            lh_log_msg "DEBUG" "Leere Eingabe erhalten - prüfe Input-Stream"
+            lh_log_msg "DEBUG" "Received empty input - checking input stream"
             # If we get multiple empty inputs in a row, break to avoid infinite loop
             if [ "${empty_input_count:-0}" -gt 2 ]; then
-                lh_log_msg "WARN" "Mehrere leere Eingaben - Input-Stream möglicherweise korrupt, beende Menü"
+                lh_log_msg "WARN" "Multiple empty inputs - input stream may be corrupt, exiting menu"
                 break
             fi
             empty_input_count=$((${empty_input_count:-0} + 1))
@@ -284,55 +296,55 @@ function docker_functions_menu() {
             empty_input_count=0
         fi
         
-        lh_log_msg "DEBUG" "Eingabe erhalten: '$choice'"
+        lh_log_msg "DEBUG" "Input received: '$choice'"
         
         case $choice in
             1)
-                lh_log_msg "DEBUG" "Starte Anzeige laufender Container"
+                lh_log_msg "DEBUG" "Start displaying running containers"
                 show_running_containers
-                lh_log_msg "DEBUG" "Anzeige laufender Container beendet"
+                lh_log_msg "DEBUG" "Finished displaying running containers"
                 ;;
             2)
-                lh_log_msg "DEBUG" "Starte Docker-Konfigurationsverwaltung"
+                lh_log_msg "DEBUG" "Start Docker configuration management"
                 manage_docker_config
-                lh_log_msg "DEBUG" "Docker-Konfigurationsverwaltung beendet"
+                lh_log_msg "DEBUG" "Docker configuration management finished"
                 ;;
             3)
-                lh_log_msg "INFO" "Starte Docker Setup Modul"
+                lh_log_msg "INFO" "Start Docker setup module"
                 bash "$(dirname "$0")/mod_docker_setup.sh"
                 ;;
             4)
-                lh_log_msg "INFO" "Starte Docker Security Modul"
+                lh_log_msg "INFO" "Start Docker security module"
                 # Source the security module and call its function directly to avoid input buffer issues
                 source "$(dirname "$0")/mod_docker_security.sh"
                 docker_security_menu
                 # Clear any remaining input after returning from security module
-                lh_log_msg "DEBUG" "Bereinige Input-Buffer nach Security-Modul"
+                lh_log_msg "DEBUG" "Clear input buffer after security module"
                 while read -r -t 0; do
                     read -r
                 done
                 ;;
             0)
-                lh_log_msg "INFO" "Beende Docker-Funktionen"
+                lh_log_msg "INFO" "Exit Docker functions"
                 break
                 ;;
             *)
-                lh_log_msg "DEBUG" "Ungültige Eingabe: '$choice'"
+                lh_log_msg "DEBUG" "Invalid input: '$choice'"
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_INVALID_CHOICE')${LH_COLOR_RESET}"
                 ;;
         esac
         
         if [ "$choice" != "0" ]; then
             echo ""
-            lh_log_msg "DEBUG" "Warte auf Tasteneingabe zum Fortfahren"
+            lh_log_msg "DEBUG" "Waiting for key press to continue"
             # Use timeout to avoid hanging on empty input
             if ! read -t 1 -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")"; then
-                lh_log_msg "DEBUG" "Timeout beim Warten auf Eingabe - fahre automatisch fort"
+                lh_log_msg "DEBUG" "Timeout while waiting for input - continuing automatically"
             fi
-            lh_log_msg "DEBUG" "Fortfahren-Taste gedrückt oder Timeout"
+            lh_log_msg "DEBUG" "Continue key pressed or timeout"
         fi
     done
 }
 
-# Hauptprogramm starten
+# Start main program
 docker_functions_menu

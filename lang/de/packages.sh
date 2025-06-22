@@ -4,12 +4,12 @@
 # Copyright (c) 2025 wuldorf
 # SPDX-License-Identifier: MIT
 #
-# Deutsche Übersetzungen für das Paketverwaltungsmodul
+# German translations for the package management module
 
-# Sicherstellen, dass MSG_DE Array deklariert ist
+# Ensure MSG_DE array is declared
 [[ ! -v MSG_DE ]] && declare -A MSG_DE
 
-# Modul-Header
+# Module header
 MSG_DE[PKG_HEADER_MAIN]="Paketverwaltung & Updates"
 MSG_DE[PKG_HEADER_SYSTEM_UPDATE]="Systemaktualisierung"
 MSG_DE[PKG_HEADER_FIND_ORPHANS]="Nicht mehr benötigte Pakete suchen"
@@ -18,7 +18,7 @@ MSG_DE[PKG_HEADER_SEARCH_INSTALL]="Pakete suchen und installieren"
 MSG_DE[PKG_HEADER_LIST_INSTALLED]="Installierte Pakete anzeigen"
 MSG_DE[PKG_HEADER_SHOW_LOGS]="Paketmanager-Logs anzeigen"
 
-# Menü-Einträge
+# Menu entries
 MSG_DE[PKG_MENU_SYSTEM_UPDATE]="Systemaktualisierung"
 MSG_DE[PKG_MENU_FIND_ORPHANS]="Nicht mehr benötigte Pakete suchen"
 MSG_DE[PKG_MENU_CLEAN_CACHE]="Paket-Cache bereinigen"
@@ -28,7 +28,7 @@ MSG_DE[PKG_MENU_LIST_INSTALLED]="Installierte Pakete anzeigen"
 MSG_DE[PKG_MENU_SHOW_LOGS]="Paketmanager-Logs anzeigen"
 MSG_DE[PKG_MENU_BACK]="Zurück zum Hauptmenü"
 
-# Systemaktualisierung
+# System update
 MSG_DE[PKG_PROMPT_AUTO_CONFIRM]="Soll die Aktualisierung ohne weitere Bestätigung durchgeführt werden?"
 MSG_DE[PKG_INFO_GARUDA_SPECIAL]="Spezialbehandlung für Garuda Linux: 'garuda-update' wird verwendet."
 MSG_DE[PKG_INFO_BEGINNING_UPDATE]="Beginne mit der Aktualisierung..."
@@ -45,7 +45,7 @@ MSG_DE[PKG_ERROR_SYSTEM_UPDATE_FAILED]="Fehler: Systemaktualisierung fehlgeschla
 MSG_DE[PKG_PROMPT_UPDATE_ALTERNATIVE]="Möchten Sie auch %s-Pakete aktualisieren?"
 MSG_DE[PKG_PROMPT_FIND_ORPHANS_AFTER]="Möchten Sie nach nicht mehr benötigten Paketen suchen?"
 
-# Alternative Paketmanager-Updates
+# Alternative package manager updates
 MSG_DE[PKG_INFO_UPDATE_FLATPAK]="Aktualisiere Flatpak-Pakete..."
 MSG_DE[PKG_INFO_UPDATE_SNAP]="Aktualisiere Snap-Pakete..."
 MSG_DE[PKG_INFO_UPDATE_NIX]="Aktualisiere Nix-Pakete..."
@@ -53,7 +53,7 @@ MSG_DE[PKG_INFO_APPIMAGE_MANUAL]="AppImage-Updates müssen manuell durchgeführt
 MSG_DE[PKG_INFO_APPIMAGE_CHECK]="Bitte überprüfen Sie Ihre AppImage-Anwendungen:"
 MSG_DE[PKG_INFO_APPIMAGE_LOCATIONS]="Weitere AppImage-Speicherorte können manuell überprüft werden."
 
-# Waisenpakete
+# Orphaned packages
 MSG_DE[PKG_INFO_SEARCHING_ORPHANS]="Suche nach nicht mehr benötigten Paketen..."
 MSG_DE[PKG_INFO_ORPHANS_FOUND]="Folgende Pakete sind Waisenpakete und können entfernt werden:"
 MSG_DE[PKG_INFO_NO_ORPHANS]="Keine Waisenpakete gefunden."
@@ -66,7 +66,7 @@ MSG_DE[PKG_SUCCESS_UNNECESSARY_REMOVED]="Nicht mehr benötigte Pakete wurden ent
 MSG_DE[PKG_INFO_UNNECESSARY_CANCELLED]="Entfernung nicht mehr benötigter Pakete abgebrochen."
 MSG_DE[PKG_PROMPT_FIND_ALT_ORPHANS]="Möchten Sie auch nicht mehr benötigte %s-Pakete suchen?"
 
-# Alternative Waisenpakete
+# Alternative orphaned packages
 MSG_DE[PKG_INFO_FLATPAK_UNUSED_RUNTIMES]="Suche nach ungenutzten Flatpak-Laufzeitumgebungen..."
 MSG_DE[PKG_INFO_NO_FLATPAK_UNUSED]="Keine ungenutzten Flatpak-Laufzeitumgebungen gefunden."
 MSG_DE[PKG_PROMPT_REMOVE_FLATPAK_UNUSED]="Möchten Sie ungenutzte Flatpak-Laufzeitumgebungen entfernen?"
@@ -82,7 +82,7 @@ MSG_DE[PKG_PROMPT_NIX_GARBAGE_COLLECTION]="Möchten Sie die Garbage Collection f
 MSG_DE[PKG_SUCCESS_NIX_GARBAGE_COLLECTION]="Nix Garbage Collection durchgeführt."
 MSG_DE[PKG_INFO_APPIMAGE_MANUAL_CHECK]="AppImages müssen manuell überprüft werden."
 
-# Cache-Bereinigung
+# Cache cleaning
 MSG_DE[PKG_INFO_CACHE_EXPLANATION]="Der Paket-Cache enthält heruntergeladene Pakete, die Speicherplatz belegen."
 MSG_DE[PKG_INFO_CACHE_SAFE]="Das Bereinigen ist sicher, kann aber bei erneuter Installation gleicher Pakete zu erneutem Download führen."
 MSG_DE[PKG_PROMPT_CLEAN_CACHE]="Möchten Sie den Paket-Cache bereinigen?"
@@ -102,7 +102,7 @@ MSG_DE[PKG_WARN_INVALID_YAY_OPTION]="Ungültige Option. Verwende Option 1."
 MSG_DE[PKG_PROMPT_CLEAN_ALT_CACHE]="Möchten Sie auch den %s-Cache bereinigen?"
 MSG_DE[PKG_SUCCESS_CACHE_CLEANED]="Paket-Cache wurde bereinigt."
 
-# Alternative Cache-Bereinigung
+# Alternative cache cleaning
 MSG_DE[PKG_INFO_CLEANING_FLATPAK_CACHE]="Bereinige Flatpak-Cache..."
 MSG_DE[PKG_SUCCESS_FLATPAK_CACHE_CLEANED]="Flatpak-Cache wurde bereinigt."
 MSG_DE[PKG_INFO_SNAP_CACHE_MANAGED]="Snap-Cache wird automatisch von SnapD verwaltet."
@@ -113,7 +113,7 @@ MSG_DE[PKG_PROMPT_NIX_OPTIMIZE]="Möchten Sie auch den Nix-Store optimieren?"
 MSG_DE[PKG_SUCCESS_NIX_STORE_OPTIMIZED]="Nix-Store wurde optimiert."
 MSG_DE[PKG_INFO_APPIMAGE_CACHE_MINIMAL]="AppImage-Cache ist minimal und muss nicht bereinigt werden."
 
-# Paketsuche und Installation
+# Package search and installation
 MSG_DE[PKG_PROMPT_ENTER_PACKAGE_NAME]="Geben Sie den Namen oder Suchbegriff für das Paket ein"
 MSG_DE[PKG_INFO_NO_INPUT_ABORT]="Keine Eingabe. Operation abgebrochen."
 MSG_DE[PKG_INFO_SEARCHING_PACKAGES]="Suche nach Paketen mit '%s'..."
@@ -136,7 +136,7 @@ MSG_DE[PKG_PROMPT_INSTALL_NIX]="Möchten Sie %s von Nix installieren?"
 MSG_DE[PKG_INFO_APPIMAGE_RECOMMENDATION]="Für AppImages empfehlen wir direkte Downloads von den Anbieter-Websites."
 MSG_DE[PKG_INFO_APPIMAGE_CENTRAL_REPO]="Ein zentrales Repository wie https://appimage.github.io/apps/ kann hilfreich sein."
 
-# Installierte Pakete auflisten
+# List installed packages
 MSG_DE[PKG_PROMPT_HOW_TO_DISPLAY]="Wie möchten Sie die installierten Pakete anzeigen?"
 MSG_DE[PKG_MENU_LIST_ALL]="Alle installierten Pakete auflisten"
 MSG_DE[PKG_MENU_SEARCH_INSTALLED]="Nach installierten Paketen suchen"
@@ -161,7 +161,7 @@ MSG_DE[PKG_INFO_INSTALLED_NIX]="Installierte Nix-Pakete:"
 MSG_DE[PKG_INFO_FOUND_APPIMAGES]="Gefundene AppImages:"
 MSG_DE[PKG_INFO_APPIMAGE_OTHER_LOCATIONS]="Hinweis: Es können AppImages an anderen Orten installiert sein."
 
-# Paketmanager-Logs
+# Package manager logs
 MSG_DE[PKG_INFO_LAST_ENTRIES]="Letzte 50 Einträge des %s-Logs:"
 MSG_DE[PKG_WARN_LOG_NOT_FOUND]="Die Logdatei %s wurde nicht gefunden."
 MSG_DE[PKG_PROMPT_SEARCH_PACKAGE_LOG]="Möchten Sie nach einem bestimmten Paket im Log suchen?"
@@ -186,14 +186,14 @@ MSG_DE[PKG_INFO_NIX_CHANNEL_HISTORY]="Nix-Channel-Geschichte:"
 MSG_DE[PKG_INFO_APPIMAGE_NO_LOGS]="AppImages haben keine zentralen Logs."
 MSG_DE[PKG_INFO_APPIMAGE_CHECK_LOGS]="Überprüfen Sie individuelle Anwendungslogs in:"
 
-# Fehlermeldungen
+# Error messages
 MSG_DE[PKG_ERROR_NO_PACKAGE_MANAGER]="Kein unterstützter Paketmanager gefunden."
 MSG_DE[PKG_ERROR_UNKNOWN_PACKAGE_MANAGER]="Fehler: Unbekannter Paketmanager: %s"
 MSG_DE[PKG_ERROR_UNKNOWN_ALT_MANAGER]="Unbekannter alternativer Paketmanager: %s"
 MSG_DE[PKG_WARN_UNKNOWN_ALT_MANAGER]="Warnung: Unbekannter alternativer Paketmanager: %s"
 MSG_DE[PKG_ERROR_INVALID_SELECTION]="Ungültige Auswahl. Bitte versuchen Sie es erneut."
 
-# Allgemeine Eingabeaufforderungen und Nachrichten
+# General prompts and messages
 MSG_DE[PKG_PROMPT_OPTION]="Option (1-%d):"
 MSG_DE[PKG_PROMPT_CHOOSE_OPTION]="Wählen Sie eine Option:"
 MSG_DE[PKG_INFO_OPERATION_CANCELLED]="Operation abgebrochen."

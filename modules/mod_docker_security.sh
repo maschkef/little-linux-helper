@@ -10,12 +10,24 @@
 # Module for Docker Security Operations
 
 # Load common library
-source "$(dirname "$0")/../lib/lib_common.sh"
+# Use BASH_SOURCE to get the correct path when sourced
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
 
-# Load Docker module translations
-lh_load_language_module "docker"
+# Complete initialization when run directly (not via help_master.sh)
+if [[ -z "${LH_INITIALIZED:-}" ]]; then
+    lh_load_general_config        # Load general config first for log level
+    lh_initialize_logging
+    lh_detect_package_manager
+    lh_finalize_initialization
+    export LH_INITIALIZED=1
+fi
 
-lh_detect_package_manager
+# Load translations if not already loaded
+if [[ -z "${MSG[DOCKER_SECURITY_MENU_TITLE]:-}" ]]; then
+    lh_load_language_module "docker"
+    lh_load_language_module "common"
+    lh_load_language_module "lib"
+fi
 
 # Docker configuration file path
 LH_DOCKER_CONFIG_FILE="$LH_CONFIG_DIR/docker.conf"
@@ -39,10 +51,10 @@ function _docker_load_config() {
     if [ -f "$LH_DOCKER_CONFIG_FILE" ]; then
         lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_FOUND_LOADING')"
         source "$LH_DOCKER_CONFIG_FILE"
-        lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_CONFIG_PROCESSED')" "$LH_DOCKER_CONFIG_FILE")"
+        lh_log_msg "INFO" "$(lh_msg 'DOCKER_CONFIG_PROCESSED' "$LH_DOCKER_CONFIG_FILE")"
     else
-        lh_log_msg "ERROR" "$(printf "$(lh_msg 'DOCKER_CONFIG_NOT_FOUND_LONG')" "$LH_DOCKER_CONFIG_FILE")"
-        echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_CONFIG_NOT_FOUND_LONG')" "$LH_DOCKER_CONFIG_FILE")"
+        lh_log_msg "ERROR" "$(lh_msg 'DOCKER_CONFIG_NOT_FOUND_LONG' "$LH_DOCKER_CONFIG_FILE")"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_CONFIG_NOT_FOUND_LONG' "$LH_DOCKER_CONFIG_FILE")"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_CREATE_INFO')"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_REQUIRED_VARS')"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_VAR_LIST_HEADER')"
@@ -76,12 +88,12 @@ function _docker_load_config() {
     LH_DOCKER_ACCEPTED_WARNINGS_EFFECTIVE="${CFG_LH_DOCKER_ACCEPTED_WARNINGS:-}"
     
     lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_EFFECTIVE_CONFIG')"
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CONFIG_COMPOSE_ROOT_LOG')" "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")"
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CONFIG_EXCLUDE_DIRS_LOG')" "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE")"
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CONFIG_SEARCH_DEPTH_LOG')" "$LH_DOCKER_SEARCH_DEPTH_EFFECTIVE")"
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CONFIG_CHECK_MODE_LOG')" "$LH_DOCKER_CHECK_MODE_EFFECTIVE")"
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CONFIG_CHECK_RUNNING_LOG')" "$LH_DOCKER_CHECK_RUNNING_EFFECTIVE")"
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CONFIG_SKIP_WARNINGS_LOG')" "$LH_DOCKER_SKIP_WARNINGS_EFFECTIVE")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_COMPOSE_ROOT_LOG' "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_EXCLUDE_DIRS_LOG' "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_SEARCH_DEPTH_LOG' "$LH_DOCKER_SEARCH_DEPTH_EFFECTIVE")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_CHECK_MODE_LOG' "$LH_DOCKER_CHECK_MODE_EFFECTIVE")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_CHECK_RUNNING_LOG' "$LH_DOCKER_CHECK_RUNNING_EFFECTIVE")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_SKIP_WARNINGS_LOG' "$LH_DOCKER_SKIP_WARNINGS_EFFECTIVE")"
     lh_log_msg "INFO" "$(lh_msg 'DOCKER_CONFIG_PROCESSED')"
     
     return 0
@@ -94,8 +106,8 @@ function _docker_save_config() {
     lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_SAVE_PREP')"
     
     if [ ! -f "$LH_DOCKER_CONFIG_FILE" ]; then
-        lh_log_msg "ERROR" "$(printf "$(lh_msg 'DOCKER_CONFIG_SAVE_IMPOSSIBLE')" "$LH_DOCKER_CONFIG_FILE")"
-        echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_CONFIG_SAVE_IMPOSSIBLE')" "$LH_DOCKER_CONFIG_FILE")${LH_COLOR_RESET}"        
+        lh_log_msg "ERROR" "$(lh_msg 'DOCKER_CONFIG_SAVE_IMPOSSIBLE' "$LH_DOCKER_CONFIG_FILE")"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_CONFIG_SAVE_IMPOSSIBLE' "$LH_DOCKER_CONFIG_FILE")${LH_COLOR_RESET}"        
         return 1
     fi
     
@@ -120,18 +132,18 @@ function _docker_save_config() {
         current_var_name="LH_DOCKER_${var_name_cfg#CFG_LH_DOCKER_}_EFFECTIVE" # Creates the name of the corresponding effective variable, e.g. LH_DOCKER_COMPOSE_ROOT_EFFECTIVE from CFG_LH_DOCKER_COMPOSE_ROOT
         current_var_value="${!current_var_name}"     # Indirect expansion
         
-        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CONFIG_PROCESS_VAR')" "$var_name_cfg" "$current_var_value")"
+        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_PROCESS_VAR' "$var_name_cfg" "$current_var_value")"
 
         # Escape special characters for sed
         escaped_rhs_value=$(printf '%s\n' "$current_var_value" | sed -e 's/[\/&|]/\\&/g')
 
         # Check if the variable exists in the file and is not commented out
         if grep -q -E "^${var_name_cfg}=" "$LH_DOCKER_CONFIG_FILE"; then # Check against CFG_LH_DOCKER_COMPOSE_ROOT
-            lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CONFIG_VAR_EXISTS')" "$var_name_cfg")"
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_VAR_EXISTS' "$var_name_cfg")"
             # Variable exists, update value. The quotes around the value are preserved.
             sed -i "s|^${var_name_cfg}=.*|${var_name_cfg}=\"${escaped_rhs_value}\"|" "$LH_DOCKER_CONFIG_FILE"
         else # Variable does not exist (or is commented out)
-            lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CONFIG_VAR_NOT_EXISTS')" "$var_name_cfg")"
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_VAR_NOT_EXISTS' "$var_name_cfg")"
             # The quotes are explicitly placed around the value here.
             # If current_var_value itself could contain double quotes that would need to be
             # specially escaped in the file (e.g. "foo\"bar"), more logic for escaping
@@ -141,7 +153,7 @@ function _docker_save_config() {
         fi
     done
 
-    lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_CONFIG_UPDATED')" "$LH_DOCKER_CONFIG_FILE")"
+    lh_log_msg "INFO" "$(lh_msg 'DOCKER_CONFIG_UPDATED' "$LH_DOCKER_CONFIG_FILE")"
     return 0
 }
 
@@ -163,7 +175,7 @@ _docker_load_config || {
 function docker_should_skip_warning() {
     local warning_type="$1"
     
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_WARNING_CHECK_SKIP')" "$warning_type")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_WARNING_CHECK_SKIP' "$warning_type")"
     
     if [ -z "$LH_DOCKER_SKIP_WARNINGS_EFFECTIVE" ]; then
         lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_NO_SKIP_WARNINGS')"
@@ -173,10 +185,10 @@ function docker_should_skip_warning() {
     # Checks if warning_type is contained in the comma-separated list.
     # Adds commas at the beginning and end to ensure exact matches (e.g. to distinguish "test" from "test2").
     if [[ ",$LH_DOCKER_SKIP_WARNINGS_EFFECTIVE," == *",$warning_type,"* ]]; then
-        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_WARNING_SKIPPED')" "$warning_type" "$LH_DOCKER_SKIP_WARNINGS_EFFECTIVE")"
+        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_WARNING_SKIPPED' "$warning_type" "$LH_DOCKER_SKIP_WARNINGS_EFFECTIVE")"
         return 0 # Skip
     else
-        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_WARNING_NOT_SKIPPED')" "$warning_type")"
+        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_WARNING_NOT_SKIPPED' "$warning_type")"
         return 1 # Don't skip
     fi
 }
@@ -187,14 +199,14 @@ function _docker_is_warning_accepted() {
     local warning_type="$2"
     local accepted_entry
 
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_WARNING_CHECK_ACCEPTED')" "$warning_type" "$compose_dir")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_WARNING_CHECK_ACCEPTED' "$warning_type" "$compose_dir")"
 
     if [ -z "$LH_DOCKER_ACCEPTED_WARNINGS_EFFECTIVE" ]; then
         lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_NO_ACCEPTED_WARNINGS')"
         return 1 # Not accepted (no accepted warnings defined)
     fi
 
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_ACCEPTED_WARNINGS_LIST')" "$LH_DOCKER_ACCEPTED_WARNINGS_EFFECTIVE")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_ACCEPTED_WARNINGS_LIST' "$LH_DOCKER_ACCEPTED_WARNINGS_EFFECTIVE")"
     
     IFS=',' read -ra ACCEPTED_ARRAY <<< "$LH_DOCKER_ACCEPTED_WARNINGS_EFFECTIVE"
     for accepted_entry in "${ACCEPTED_ARRAY[@]}"; do
@@ -209,15 +221,15 @@ function _docker_is_warning_accepted() {
         accepted_dir=$(echo "$accepted_dir" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
         accepted_type=$(echo "$accepted_type" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
-        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_COMPARE_WARNING')" "$compose_dir" "$accepted_dir" "$warning_type" "$accepted_type")"
+        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_COMPARE_WARNING' "$compose_dir" "$accepted_dir" "$warning_type" "$accepted_type")"
         
         if [ "$compose_dir" == "$accepted_dir" ] && [ "$warning_type" == "$accepted_type" ]; then
-            lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_WARNING_ACCEPTED')" "$warning_type" "$compose_dir")"
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_WARNING_ACCEPTED' "$warning_type" "$compose_dir")"
             return 0 # Accepted
         fi
     done
     
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_WARNING_NOT_ACCEPTED')" "$warning_type" "$compose_dir")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_WARNING_NOT_ACCEPTED' "$warning_type" "$compose_dir")"
     return 1 # Not accepted
 }
 
@@ -226,37 +238,37 @@ function docker_find_compose_files() {
     local search_root="$1"
     local max_depth="${2:-$LH_DOCKER_SEARCH_DEPTH_EFFECTIVE}"
     
-    lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_SEARCH_START')" "$search_root")"
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_SEARCH_PARAMS')" "$search_root" "$max_depth")"
+    lh_log_msg "INFO" "$(lh_msg 'DOCKER_SEARCH_START' "$search_root")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_SEARCH_PARAMS' "$search_root" "$max_depth")"
     
     if [ ! -d "$search_root" ]; then
-        lh_log_msg "ERROR" "$(printf "$(lh_msg 'DOCKER_SEARCH_DIR_NOT_EXISTS')" "$search_root")"
-        echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_SEARCH_DIR_ERROR')" "$search_root")${LH_COLOR_RESET}"
+        lh_log_msg "ERROR" "$(lh_msg 'DOCKER_SEARCH_DIR_NOT_EXISTS' "$search_root")"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_SEARCH_DIR_ERROR' "$search_root")${LH_COLOR_RESET}"
         return 1
     fi
     
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_SEARCH_INFO')" "$search_root" "$max_depth")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_SEARCH_INFO' "$search_root" "$max_depth")${LH_COLOR_RESET}"
     
     # Standard excludes (global)
     local standard_excludes=".git node_modules .cache venv __pycache__"
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_SEARCH_STANDARD_EXCLUDES')" "$standard_excludes")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_SEARCH_STANDARD_EXCLUDES' "$standard_excludes")"
     
     # Configured excludes (relative to search path)
     local config_excludes=""
     if [ -n "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE" ]; then
         # Convert comma-separated list to space-separated
         config_excludes=$(echo "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE" | tr ',' ' ')
-        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_SEARCH_CONFIG_EXCLUDES')" "$config_excludes")"
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_SEARCH_EXCLUDED_DIRS')" "$config_excludes")${LH_COLOR_RESET}"
+        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_SEARCH_CONFIG_EXCLUDES' "$config_excludes")"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_SEARCH_EXCLUDED_DIRS' "$config_excludes")${LH_COLOR_RESET}"
     fi
     
     # Combine all excludes
     local all_excludes="$standard_excludes $config_excludes"
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_SEARCH_ALL_EXCLUDES')" "$all_excludes")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_SEARCH_ALL_EXCLUDES' "$all_excludes")"
     
     # Build find command with excludes
     local find_cmd="find \"$search_root\" -maxdepth $max_depth"
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_SEARCH_BASE_COMMAND')" "$find_cmd")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_SEARCH_BASE_COMMAND' "$find_cmd")"
     
     # Add excludes
     local first_exclude=true
@@ -278,7 +290,7 @@ function docker_find_compose_files() {
     # Add search for Compose files
     find_cmd="$find_cmd \\( -name \"docker-compose.yml\" -o -name \"compose.yml\" \\) -type f -print"
     
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_SEARCH_FULL_COMMAND')" "$find_cmd")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_SEARCH_FULL_COMMAND' "$find_cmd")"
     
     # Execute search
     local found_files
@@ -286,13 +298,13 @@ function docker_find_compose_files() {
     local find_exit_code=$?
     
     if [ $find_exit_code -ne 0 ]; then
-        lh_log_msg "WARN" "$(printf "$(lh_msg 'DOCKER_SEARCH_EXIT_CODE')" "$find_exit_code")"
+        lh_log_msg "WARN" "$(lh_msg 'DOCKER_SEARCH_EXIT_CODE' "$find_exit_code")"
     fi
     
     local file_count
     if [ -n "$found_files" ]; then
         file_count=$(echo "$found_files" | wc -l)
-        lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_SEARCH_COMPLETED_COUNT')" "$file_count")"
+        lh_log_msg "INFO" "$(lh_msg 'DOCKER_SEARCH_COMPLETED_COUNT' "$file_count")"
     else
         lh_log_msg "INFO" "$(lh_msg 'DOCKER_SEARCH_COMPLETED_NONE')"
         file_count=0
@@ -301,7 +313,7 @@ function docker_find_compose_files() {
     echo "$found_files"
 }
 
-# New function: Find only Compose files from running containers
+# Find only Compose files from running containers
 function docker_find_running_compose_files() {
     lh_log_msg "INFO" "$(lh_msg 'DOCKER_RUNNING_SEARCH_START')"
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_RUNNING_SEARCH_INFO')${LH_COLOR_RESET}"
@@ -326,8 +338,8 @@ function docker_find_running_compose_files() {
     
     local container_count
     container_count=$(echo "$running_containers" | wc -l)
-    lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_RUNNING_FOUND_COUNT')" "$container_count")"
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CONTAINER_DATA')" "$running_containers")"
+    lh_log_msg "INFO" "$(lh_msg 'DOCKER_RUNNING_FOUND_COUNT' "$container_count")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONTAINER_DATA' "$running_containers")"
     
     local found_compose_files=()
     local project_dirs=()
@@ -335,10 +347,10 @@ function docker_find_running_compose_files() {
     lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_COLLECT_PROJECT_DIRS')"
     # Collect unique project directories
     while IFS=$'\t' read -r container_name working_dir project_name; do
-        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_PROCESS_CONTAINER')" "$container_name" "$working_dir" "$project_name")"
+        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_PROCESS_CONTAINER' "$container_name" "$working_dir" "$project_name")"
         
         if [ -n "$working_dir" ] && [ "$working_dir" != "<no value>" ]; then
-            lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CONTAINER_HAS_WORKDIR')" "$container_name" "$working_dir")"
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONTAINER_HAS_WORKDIR' "$container_name" "$working_dir")"
             # Check if the directory is already in the list
             local already_added=false
             for existing_dir in "${project_dirs[@]}"; do
@@ -349,21 +361,21 @@ function docker_find_running_compose_files() {
             done
             
             if ! $already_added; then
-                lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_ADD_WORKDIR')" "$working_dir")"
+                lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_ADD_WORKDIR' "$working_dir")"
                 project_dirs+=("$working_dir")
             else
-                lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_WORKDIR_ALREADY_ADDED')" "$working_dir")"
+                lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_WORKDIR_ALREADY_ADDED' "$working_dir")"
             fi
         elif [ -n "$project_name" ] && [ "$project_name" != "<no value>" ]; then
-            lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CONTAINER_FALLBACK_SEARCH')" "$container_name" "$project_name")"
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONTAINER_FALLBACK_SEARCH' "$container_name" "$project_name")"
             # Fallback: Search for project name in configured directory
             local potential_dirs
             potential_dirs=$(find "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE" -maxdepth "$LH_DOCKER_SEARCH_DEPTH_EFFECTIVE" -type d -name "*$project_name*" 2>/dev/null || true)
             
             if [ -n "$potential_dirs" ]; then
-                lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_FALLBACK_SEARCH_RESULTS')" "$project_name" "$potential_dirs")"
+                lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_FALLBACK_SEARCH_RESULTS' "$project_name" "$potential_dirs")"
             else
-                lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_FALLBACK_SEARCH_NO_RESULTS')" "$project_name")"
+                lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_FALLBACK_SEARCH_NO_RESULTS' "$project_name")"
             fi
             
             while IFS= read -r potential_dir; do
@@ -377,42 +389,42 @@ function docker_find_running_compose_files() {
                     done
                     
                     if ! $already_added; then
-                        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_ADD_FALLBACK_DIR')" "$potential_dir")"
+                        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_ADD_FALLBACK_DIR' "$potential_dir")"
                         project_dirs+=("$potential_dir")
                     else
-                        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_FALLBACK_DIR_ALREADY_ADDED')" "$potential_dir")"
+                        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_FALLBACK_DIR_ALREADY_ADDED' "$potential_dir")"
                     fi
                 fi
             done <<< "$potential_dirs"
         else
-            lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CONTAINER_NO_INFO')" "$container_name")"
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONTAINER_NO_INFO' "$container_name")"
         fi
     done <<< "$running_containers"
     
-    lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_COLLECTED_DIRS_COUNT')" "${#project_dirs[@]}")"
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_PROJECT_DIRS_LIST')" "${project_dirs[*]}")"
+    lh_log_msg "INFO" "$(lh_msg 'DOCKER_COLLECTED_DIRS_COUNT' "${#project_dirs[@]}")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_PROJECT_DIRS_LIST' "${project_dirs[*]}")"
     
     # Search for Compose files in the found directories
     lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_SEARCH_IN_PROJECT_DIRS')"
     for project_dir in "${project_dirs[@]}"; do
-        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CHECK_DIRECTORY')" "$project_dir")"
+        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CHECK_DIRECTORY' "$project_dir")"
         if [ -d "$project_dir" ]; then
             # Search for docker-compose.yml or compose.yml in project directory
             if [ -f "$project_dir/docker-compose.yml" ]; then
-                lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_FOUND_COMPOSE_FILE')" "$project_dir/docker-compose.yml")"
+                lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_FOUND_COMPOSE_FILE' "$project_dir/docker-compose.yml")"
                 found_compose_files+=("$project_dir/docker-compose.yml")
             elif [ -f "$project_dir/compose.yml" ]; then
-                lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_FOUND_COMPOSE_FILE')" "$project_dir/compose.yml")"
+                lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_FOUND_COMPOSE_FILE' "$project_dir/compose.yml")"
                 found_compose_files+=("$project_dir/compose.yml")
             else
-                lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_NO_COMPOSE_IN_DIR')" "$project_dir")"
+                lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_NO_COMPOSE_IN_DIR' "$project_dir")"
             fi
         else
-            lh_log_msg "WARN" "$(printf "$(lh_msg 'DOCKER_PROJECT_DIR_NOT_EXISTS')" "$project_dir")"
+            lh_log_msg "WARN" "$(lh_msg 'DOCKER_PROJECT_DIR_NOT_EXISTS' "$project_dir")"
         fi
     done
     
-    lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_COMPOSE_SEARCH_COMPLETED')" "${#found_compose_files[@]}")"
+    lh_log_msg "INFO" "$(lh_msg 'DOCKER_COMPOSE_SEARCH_COMPLETED' "${#found_compose_files[@]}")"
     
     if [ ${#found_compose_files[@]} -eq 0 ]; then
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_NO_COMPOSE_FOR_RUNNING')${LH_COLOR_RESET}"
@@ -441,14 +453,14 @@ function docker_find_running_compose_files() {
 function docker_check_update_labels() {
     local compose_file="$1"
     
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CHECK_UPDATE_LABELS')" "$compose_file")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CHECK_UPDATE_LABELS' "$compose_file")"
     
     if docker_should_skip_warning "update-labels"; then
         lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_UPDATE_LABELS_SKIPPED')"
         return 0
     fi
     
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CHECK_UPDATE_LABELS_INFO')" "$(basename "$compose_file")")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CHECK_UPDATE_LABELS_INFO' "$(basename "$compose_file")")${LH_COLOR_RESET}"
     
     # Search for Diun or Watchtower labels
     lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_SEARCH_UPDATE_LABELS')"
@@ -473,17 +485,17 @@ function docker_check_env_permissions() {
     local compose_dir="$1"
     local issues_found=0
     
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CHECK_ENV_PERMS_START')" "$compose_dir")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CHECK_ENV_PERMS_START' "$compose_dir")"
     
     if docker_should_skip_warning "env-permissions"; then
         lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_ENV_PERMS_SKIPPED')"
         return 0
     fi
     
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CHECK_ENV_PERMS_INFO')" "$compose_dir")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CHECK_ENV_PERMS_INFO' "$compose_dir")${LH_COLOR_RESET}"
     
     # Search for .env files
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_SEARCH_ENV_FILES')" "$compose_dir")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_SEARCH_ENV_FILES' "$compose_dir")"
     local env_files
     env_files=$(find "$compose_dir" -maxdepth 1 -name ".env*" 2>/dev/null)
     
@@ -495,30 +507,30 @@ function docker_check_env_permissions() {
     
     local env_count
     env_count=$(echo "$env_files" | wc -l)
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_ENV_FILES_FOUND')" "$env_count")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_ENV_FILES_FOUND' "$env_count")"
     
     while IFS= read -r env_file; do
         if [ -f "$env_file" ]; then
             local perms
             perms=$(stat -c "%a" "$env_file" 2>/dev/null)
-            lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_CHECK_PERMS_FILE')" "$(basename "$env_file")" "$perms")"
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CHECK_PERMS_FILE' "$(basename "$env_file")" "$perms")"
             
             if [ "$perms" != "600" ]; then
-                lh_log_msg "WARN" "$(printf "$(lh_msg 'DOCKER_UNSAFE_PERMS')" "$env_file" "$perms")"
-                echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_UNSAFE_PERMS_WARNING')" "$env_file" "$perms")${LH_COLOR_RESET}"
-                echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_PERMS_RECOMMENDATION')" "$env_file")${LH_COLOR_RESET}"
+                lh_log_msg "WARN" "$(lh_msg 'DOCKER_UNSAFE_PERMS' "$env_file" "$perms")"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_UNSAFE_PERMS_WARNING' "$env_file" "$perms")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_PERMS_RECOMMENDATION' "$env_file")${LH_COLOR_RESET}"
                 
                 if lh_confirm_action "$(lh_msg 'DOCKER_CORRECT_PERMS_NOW')" "y"; then
-                    lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_CORRECTING_PERMS')" "$env_file")"
+                    lh_log_msg "INFO" "$(lh_msg 'DOCKER_CORRECTING_PERMS' "$env_file")"
                     $LH_SUDO_CMD chmod 600 "$env_file"
                     echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_PERMS_CORRECTED')${LH_COLOR_RESET}"
                 else
-                    lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_PERMS_NOT_CORRECTED')" "$env_file")"
+                    lh_log_msg "INFO" "$(lh_msg 'DOCKER_PERMS_NOT_CORRECTED' "$env_file")"
                     issues_found=1
                 fi
             else
-                lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_SAFE_PERMS')" "$(basename "$env_file")" "$perms")"
-                echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'DOCKER_SAFE_PERMS_SUCCESS')" "$(basename "$env_file")" "$perms")${LH_COLOR_RESET}"
+                lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_SAFE_PERMS' "$(basename "$env_file")" "$perms")"
+                echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_SAFE_PERMS_SUCCESS' "$(basename "$env_file")" "$perms")${LH_COLOR_RESET}"
             fi
         fi
     done <<< "$env_files"
@@ -530,27 +542,27 @@ function docker_check_env_permissions() {
 function docker_check_directory_permissions() {
     local compose_dir="$1"
     
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_DIR_PERMS_START')" "$compose_dir")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DIR_PERMS_START' "$compose_dir")"
     
     if docker_should_skip_warning "dir-permissions"; then
         lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DIR_PERMS_SKIPPED')"
         return 0
     fi
     
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_DIR_PERMS_CHECK')" "$compose_dir")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_DIR_PERMS_CHECK' "$compose_dir")${LH_COLOR_RESET}"
     
     local dir_perms
     dir_perms=$(stat -c "%a" "$compose_dir" 2>/dev/null)
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_DIR_PERMS_CURRENT')" "$dir_perms")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DIR_PERMS_CURRENT' "$dir_perms")"
     
     if [ "$dir_perms" = "777" ] || [ "$dir_perms" = "776" ] || [ "$dir_perms" = "766" ]; then
-        lh_log_msg "WARN" "$(printf "$(lh_msg 'DOCKER_DIR_PERMS_TOO_OPEN_LOG')" "$dir_perms")"
-        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_DIR_PERMS_TOO_OPEN')" "$dir_perms")${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_DIR_PERMS_RECOMMEND')" "$compose_dir")${LH_COLOR_RESET}"
+        lh_log_msg "WARN" "$(lh_msg 'DOCKER_DIR_PERMS_TOO_OPEN_LOG' "$dir_perms")"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_DIR_PERMS_TOO_OPEN' "$dir_perms")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_DIR_PERMS_RECOMMEND' "$compose_dir")${LH_COLOR_RESET}"
         return 1
     else
-        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_DIR_PERMS_ACCEPTABLE_LOG')" "$dir_perms")"
-        echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'DOCKER_DIR_PERMS_ACCEPTABLE')" "$dir_perms")${LH_COLOR_RESET}"
+        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DIR_PERMS_ACCEPTABLE_LOG' "$dir_perms")"
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_DIR_PERMS_ACCEPTABLE' "$dir_perms")${LH_COLOR_RESET}"
         return 0
     fi
 }
@@ -563,9 +575,9 @@ function docker_check_latest_images() {
         return 0
     fi
     
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_LATEST_IMAGES_CHECK')" "$(basename "$compose_file")")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_LATEST_IMAGES_CHECK' "$(basename "$compose_file")")${LH_COLOR_RESET}"
     
-    # Suche nach :latest oder fehlenden Tags
+    # Search for :latest or missing tags
     local latest_images
     latest_images=$(grep -E "image:\s*[^:]+$|image:\s*[^:]+:latest" "$compose_file" || true)
     
@@ -590,7 +602,7 @@ function docker_check_privileged_containers() {
         return 0
     fi
     
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_PRIVILEGED_CHECK')" "$(basename "$compose_file")")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_PRIVILEGED_CHECK' "$(basename "$compose_file")")${LH_COLOR_RESET}"
     
     if grep -q "privileged:\s*true" "$compose_file"; then
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_PRIVILEGED_FOUND')${LH_COLOR_RESET}"
@@ -613,9 +625,9 @@ function docker_check_host_volumes() {
         return 0
     fi
     
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_HOST_VOLUMES_CHECK')" "$(basename "$compose_file")")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_HOST_VOLUMES_CHECK' "$(basename "$compose_file")")${LH_COLOR_RESET}"
     
-    # Kritische Host-Pfade
+    # Critical host paths
     local critical_paths=(
         "/"
         "/etc" 
@@ -632,7 +644,7 @@ function docker_check_host_volumes() {
         if grep -qE "^\s*-\s+[\"']?${path}[\"']?:" "$compose_file" || \
         grep -qE "^\s*-\s+[\"']?${path}[\"']?\s*$" "$compose_file" || \
         grep -qE "source:\s*[\"']?${path}[\"']?" "$compose_file"; then
-            echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_HOST_VOLUMES_CRITICAL')" "$path")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_HOST_VOLUMES_CRITICAL' "$path")${LH_COLOR_RESET}"
             found_critical=true
         fi
     done
@@ -654,9 +666,9 @@ function docker_check_exposed_ports() {
         return 0
     fi
     
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_EXPOSED_PORTS_CHECK')" "$(basename "$compose_file")")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_EXPOSED_PORTS_CHECK' "$(basename "$compose_file")")${LH_COLOR_RESET}"
     
-    # Suche nach 0.0.0.0:port Expositionen
+    # Search for 0.0.0.0:port exposures
     local exposed_ports
     exposed_ports=$(grep -E "ports:|\"0\.0\.0\.0:" "$compose_file" || true)
     
@@ -681,14 +693,14 @@ function docker_check_capabilities() {
         return 0
     fi
     
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CAPABILITIES_CHECK')" "$(basename "$compose_file")")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CAPABILITIES_CHECK' "$(basename "$compose_file")")${LH_COLOR_RESET}"
     
     local dangerous_caps="SYS_ADMIN SYS_PTRACE SYS_MODULE NET_ADMIN"
     local found_dangerous=false
     
     for cap in $dangerous_caps; do
         if grep -q "cap_add:.*$cap\|cap_add:\s*-\s*$cap" "$compose_file"; then
-            echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_CAPABILITIES_DANGEROUS')" "$cap")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_CAPABILITIES_DANGEROUS' "$cap")${LH_COLOR_RESET}"
             case $cap in
                 SYS_ADMIN)
                     echo -e "${LH_COLOR_INFO}  $(lh_msg 'DOCKER_CAPABILITIES_SYS_ADMIN')${LH_COLOR_RESET}"
@@ -724,7 +736,7 @@ function docker_check_security_opt() {
         return 0
     fi
     
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_SECURITY_OPT_CHECK')" "$(basename "$compose_file")")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_SECURITY_OPT_CHECK' "$(basename "$compose_file")")${LH_COLOR_RESET}"
     
     if grep -q "apparmor:unconfined\|seccomp:unconfined" "$compose_file"; then
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_SECURITY_OPT_DISABLED')${LH_COLOR_RESET}"
@@ -743,22 +755,22 @@ function docker_check_security_opt() {
 function docker_check_default_passwords() {
     local compose_file="$1"
     
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_START')" "$compose_file")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_START' "$compose_file")"
     
     if docker_should_skip_warning "default-passwords"; then
         lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_SKIPPED')"
         return 0
     fi
     
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_CHECK')" "$(basename "$compose_file")")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_CHECK' "$(basename "$compose_file")")${LH_COLOR_RESET}"
     
     local found_defaults=false
     
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_PATTERNS')" "$LH_DOCKER_DEFAULT_PATTERNS_EFFECTIVE")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_PATTERNS' "$LH_DOCKER_DEFAULT_PATTERNS_EFFECTIVE")"
 
-    # Trenne die Patterns an Kommas
+    # Split the patterns at commas
     IFS=',' read -ra DEFAULT_PATTERNS_ARRAY <<< "$LH_DOCKER_DEFAULT_PATTERNS_EFFECTIVE"
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_COUNT')" "${#DEFAULT_PATTERNS_ARRAY[@]}")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_COUNT' "${#DEFAULT_PATTERNS_ARRAY[@]}")"
 
     for pattern_entry in "${DEFAULT_PATTERNS_ARRAY[@]}"; do
         if [ -z "$pattern_entry" ]; then
@@ -766,57 +778,57 @@ function docker_check_default_passwords() {
             continue
         fi
         
-        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_PROCESSING')" "$pattern_entry")"
+        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_PROCESSING' "$pattern_entry")"
 
-        # Trenne VARIABLE=REGEX_PATTERN
+        # Split VARIABLE=REGEX_PATTERN
         local var_name="${pattern_entry%%=*}"
         local value_regex="${pattern_entry#*=}"
 
         if [ -z "$var_name" ] || [ -z "$value_regex" ]; then
-            lh_log_msg "WARN" "$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_INVALID')" "$pattern_entry")"
+            lh_log_msg "WARN" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_INVALID' "$pattern_entry")"
             continue
         fi
         
-        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_VAR_PATTERN')" "$var_name" "$value_regex")"
+        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_VAR_PATTERN' "$var_name" "$value_regex")"
 
-        # Suche nach Zeilen, die die Variable definieren (z.B. VAR_NAME: wert oder VAR_NAME=wert)
+        # Search for lines that define the variable (e.g. VAR_NAME: value or VAR_NAME=value)
         # Extract the value after the colon or equals sign, trim spaces and quotes
         local found_lines
         found_lines=$(grep -E "^\s*${var_name}\s*[:=]\s*.*" "$compose_file" || true)
         
         if [ -n "$found_lines" ]; then
-            lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_FOUND_LINES')" "$var_name" "$found_lines")"
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_FOUND_LINES' "$var_name" "$found_lines")"
         else
-            lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_NO_LINES')" "$var_name")"
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_NO_LINES' "$var_name")"
         fi
 
         while IFS= read -r line; do
             if [ -z "$line" ]; then continue; fi
             
-            lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_CHECK_LINE')" "$line")"
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_CHECK_LINE' "$line")"
             # Extract the value. Remove leading/trailing spaces and quotes.
             local actual_value
             actual_value=$(echo "$line" | sed -E "s/^\s*${var_name}\s*[:=]\s*//; s/^\s*['\"]?//; s/['\"]?\s*$//")
             
-            lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_EXTRACTED_VALUE')" "$actual_value")"
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_EXTRACTED_VALUE' "$actual_value")"
             
             # Check if the extracted value matches the regex pattern
             if [[ "$actual_value" =~ $value_regex ]]; then
-                lh_log_msg "WARN" "$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_MATCH_LOG')" "$var_name" "$actual_value" "$value_regex")"
-                echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_MATCH')" "${LH_COLOR_PROMPT}${var_name}${LH_COLOR_ERROR}" "${LH_COLOR_PROMPT}${actual_value}${LH_COLOR_ERROR}" "${LH_COLOR_PROMPT}${value_regex}${LH_COLOR_ERROR}")${LH_COLOR_RESET}"
+                lh_log_msg "WARN" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_MATCH_LOG' "$var_name" "$actual_value" "$value_regex")"
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_MATCH' "${LH_COLOR_PROMPT}${var_name}${LH_COLOR_ERROR}" "${LH_COLOR_PROMPT}${actual_value}${LH_COLOR_ERROR}" "${LH_COLOR_PROMPT}${value_regex}${LH_COLOR_ERROR}")${LH_COLOR_RESET}"
                 found_defaults=true
             else
-                lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_NO_MATCH')" "$actual_value" "$value_regex")"
+                lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_NO_MATCH' "$actual_value" "$value_regex")"
             fi
         done <<< "$found_lines"
     done
     
     if $found_defaults; then
-        lh_log_msg "WARN" "$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_FOUND_LOG')" "$compose_file")"
+        lh_log_msg "WARN" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_FOUND_LOG' "$compose_file")"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_RECOMMEND')${LH_COLOR_RESET}"
         return 1
     else
-        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_NOT_FOUND_LOG')" "$compose_file")"
+        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_NOT_FOUND_LOG' "$compose_file")"
         echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_GOOD')${LH_COLOR_RESET}"
         return 0
     fi
@@ -830,7 +842,7 @@ function docker_check_sensitive_data() {
         return 0
     fi
     
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CHECK_SENSITIVE_DATA_INFO')" "$(basename "$compose_file")")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CHECK_SENSITIVE_DATA_INFO' "$(basename "$compose_file")")${LH_COLOR_RESET}"
     
     # Search for directly embedded API keys, tokens, etc.
     local sensitive_patterns="API_KEY=sk-|TOKEN=ey|SECRET=|KEY=-----BEGIN"
@@ -838,7 +850,7 @@ function docker_check_sensitive_data() {
     
     while IFS= read -r line; do
         if echo "$line" | grep -qE "$sensitive_patterns" && ! echo "$line" | grep -q '\${'; then
-            echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_SENSITIVE_DATA_FOUND')" "$line")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_SENSITIVE_DATA_FOUND' "$line")${LH_COLOR_RESET}"
             found_sensitive=true
         fi
     done < "$compose_file"
@@ -883,29 +895,29 @@ function docker_show_running_containers() {
 # Helper function: Validate and configure path
 function docker_validate_and_configure_path() {
     lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_PATH_VALIDATION_START')"
-    lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_PATH_CURRENT_LOG')" "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")"
+    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_PATH_CURRENT_LOG' "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")"
     
     # Check if the configured path exists
     if [ ! -d "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE" ]; then
-        lh_log_msg "WARN" "$(printf "$(lh_msg 'DOCKER_PATH_NOT_EXISTS')" "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")"
-        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_PATH_NOT_EXISTS_WARNING')" "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")${LH_COLOR_RESET}"
+        lh_log_msg "WARN" "$(lh_msg 'DOCKER_PATH_NOT_EXISTS' "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_PATH_NOT_EXISTS_WARNING' "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")${LH_COLOR_RESET}"
 
         if lh_confirm_action "$(lh_msg 'DOCKER_PATH_DEFINE_NEW')" "y"; then
             lh_log_msg "INFO" "$(lh_msg 'DOCKER_PATH_USER_WANTS_NEW')"
             local new_path
             while true; do
                 new_path=$(lh_ask_for_input "$(lh_msg 'DOCKER_PATH_ENTER_SEARCH_PATH')" "^/.*" "$(lh_msg 'DOCKER_PATH_MUST_START_SLASH')")
-                lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_PATH_USER_ENTERED')" "$new_path")"
+                lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_PATH_USER_ENTERED' "$new_path")"
                 
                 if [ -d "$new_path" ]; then
-                    lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_PATH_VALIDATED_SET')" "$new_path")"
+                    lh_log_msg "INFO" "$(lh_msg 'DOCKER_PATH_VALIDATED_SET' "$new_path")"
                     LH_DOCKER_COMPOSE_ROOT_EFFECTIVE="$new_path"
                     _docker_save_config
-                    echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'DOCKER_PATH_UPDATED_SAVED')" "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_PATH_UPDATED_SAVED' "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")${LH_COLOR_RESET}"
                     break
                 else
-                    lh_log_msg "WARN" "$(printf "$(lh_msg 'DOCKER_PATH_ENTERED_NOT_EXISTS')" "$new_path")"
-                    echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_PATH_DIRECTORY_NOT_EXISTS')" "$new_path")${LH_COLOR_RESET}"
+                    lh_log_msg "WARN" "$(lh_msg 'DOCKER_PATH_ENTERED_NOT_EXISTS' "$new_path")"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_PATH_DIRECTORY_NOT_EXISTS' "$new_path")${LH_COLOR_RESET}"
                     if ! lh_confirm_action "$(lh_msg 'DOCKER_PATH_TRY_ANOTHER')" "y"; then
                         lh_log_msg "INFO" "$(lh_msg 'DOCKER_PATH_USER_CANCELS')"
                         return 1
@@ -917,9 +929,9 @@ function docker_validate_and_configure_path() {
             return 1
         fi
     else
-        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_PATH_EXISTS_LOG')" "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")"
+        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_PATH_EXISTS_LOG' "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")"
         # Path exists and is valid - proceed automatically for testing
-        echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'DOCKER_PATH_CURRENT_SEARCH')" "${LH_COLOR_PROMPT}$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE${LH_COLOR_RESET}")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_PATH_CURRENT_SEARCH' "${LH_COLOR_PROMPT}$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE${LH_COLOR_RESET}")${LH_COLOR_RESET}"
         lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_PATH_USER_CONFIRMS_CURRENT')"
     fi
     
@@ -969,13 +981,13 @@ function security_check_docker() {
     if [ "$LH_DOCKER_CHECK_MODE_EFFECTIVE" = "running" ]; then
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CHECK_MODE_RUNNING_ONLY')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CHECK_COMPOSE_FROM_RUNNING')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CHECK_FALLBACK_SEARCH_PATH')" "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CHECK_FALLBACK_SEARCH_PATH' "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")${LH_COLOR_RESET}"
     else
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CHECK_MODE_ALL_FILES')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CHECK_COMPOSE_FILES_IN')" "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CHECK_SEARCH_DEPTH')" "$LH_DOCKER_SEARCH_DEPTH_EFFECTIVE")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CHECK_COMPOSE_FILES_IN' "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CHECK_SEARCH_DEPTH' "$LH_DOCKER_SEARCH_DEPTH_EFFECTIVE")${LH_COLOR_RESET}"
         if [ -n "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE" ]; then
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CHECK_EXCLUDED_DIRS')" "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CHECK_EXCLUDED_DIRS' "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE")${LH_COLOR_RESET}"
         fi
     fi
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CHECK_SECURITY_SETTINGS')${LH_COLOR_RESET}"
@@ -983,7 +995,7 @@ function security_check_docker() {
     echo ""
     
     # Find Docker Compose files based on mode
-    lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_DISCOVER_FILES_BY_MODE')" "$LH_DOCKER_CHECK_MODE_EFFECTIVE")"
+    lh_log_msg "INFO" "$(lh_msg 'DOCKER_DISCOVER_FILES_BY_MODE' "$LH_DOCKER_CHECK_MODE_EFFECTIVE")"
     local compose_files
     
     if [ "$LH_DOCKER_CHECK_MODE_EFFECTIVE" = "running" ]; then
@@ -995,7 +1007,7 @@ function security_check_docker() {
             return $find_result
         fi
     else
-        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_SEARCH_ALL_COMPOSE_IN')" "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")"
+        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_SEARCH_ALL_COMPOSE_IN' "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")"
         compose_files=$(docker_find_compose_files "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")
     fi
     
@@ -1005,25 +1017,25 @@ function security_check_docker() {
             lh_log_msg "INFO" "$(lh_msg 'DOCKER_NO_COMPOSE_FROM_RUNNING_FOUND')"
             echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_NO_COMPOSE_FROM_RUNNING_WARNING')${LH_COLOR_RESET}"
         else
-            lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_NO_COMPOSE_IN_PATH_FOUND')" "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")"
-            echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_NO_COMPOSE_IN_PATH_WARNING')" "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")${LH_COLOR_RESET}"
+            lh_log_msg "INFO" "$(lh_msg 'DOCKER_NO_COMPOSE_IN_PATH_FOUND' "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_NO_COMPOSE_IN_PATH_WARNING' "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_POSSIBLY_NEED_TO')${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIGURE_DIFFERENT_PATH')${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_INCREASE_SEARCH_DEPTH')" "$LH_DOCKER_SEARCH_DEPTH_EFFECTIVE")${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CHECK_EXCLUSIONS')" "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_INCREASE_SEARCH_DEPTH' "$LH_DOCKER_SEARCH_DEPTH_EFFECTIVE")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CHECK_EXCLUSIONS' "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE")${LH_COLOR_RESET}"
         fi
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CONFIG_FILE_LOCATION')" "$LH_DOCKER_CONFIG_FILE")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_FILE_LOCATION' "$LH_DOCKER_CONFIG_FILE")${LH_COLOR_RESET}"
         return 1
     fi
     
     local file_count
     file_count=$(echo "$compose_files" | wc -l)
-    lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_FOUND_COUNT_LOG')" "$file_count")"
+    lh_log_msg "INFO" "$(lh_msg 'DOCKER_FOUND_COUNT_LOG' "$file_count")"
     
     if [ "$LH_DOCKER_CHECK_MODE_EFFECTIVE" = "running" ]; then
-        echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'DOCKER_FOUND_FROM_RUNNING')" "$file_count")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_FOUND_FROM_RUNNING' "$file_count")${LH_COLOR_RESET}"
     else
-        echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'DOCKER_FOUND_TOTAL')" "$file_count")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_FOUND_TOTAL' "$file_count")${LH_COLOR_RESET}"
     fi
     echo ""
     
@@ -1053,10 +1065,10 @@ function security_check_docker() {
             local compose_dir
             compose_dir=$(dirname "$compose_file")
             
-            lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_ANALYZE_FILE')" "$current_file" "$file_count" "$compose_file")"
-            lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_COMPOSE_DIRECTORY')" "$compose_dir")"
+            lh_log_msg "INFO" "$(lh_msg 'DOCKER_ANALYZE_FILE' "$current_file" "$file_count" "$compose_file")"
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_COMPOSE_DIRECTORY' "$compose_dir")"
             
-            echo -e "${LH_COLOR_HEADER}$(printf "$(lh_msg 'DOCKER_FILE_HEADER')" "$current_file" "$file_count" "$compose_file")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_HEADER}$(lh_msg 'DOCKER_FILE_HEADER' "$current_file" "$file_count" "$compose_file")${LH_COLOR_RESET}"
             local current_dir_issue_messages=() # Array for messages of this directory
             local current_dir_critical_issues=() # Array for critical issues
             echo ""
@@ -1068,14 +1080,14 @@ function security_check_docker() {
                 local dir_perms # Get permissions again for the logic here
                 dir_perms=$(stat -c "%a" "$compose_dir" 2>/dev/null)
                 if _docker_is_warning_accepted "$compose_dir" "dir-permissions"; then
-                    echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'DOCKER_ACCEPTED_DIR_PERMISSIONS')" "$dir_perms" "$compose_dir")${LH_COLOR_RESET}"
-                    current_dir_issue_messages+=("$(printf "$(lh_msg 'DOCKER_ACCEPTED_DIR_PERMISSIONS_SHORT')" "$dir_perms")")
+                    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_ACCEPTED_DIR_PERMISSIONS' "$dir_perms" "$compose_dir")${LH_COLOR_RESET}"
+                    current_dir_issue_messages+=("$(lh_msg 'DOCKER_ACCEPTED_DIR_PERMISSIONS_SHORT' "$dir_perms")")
                 else
                     ((total_issues++))
                     ((issue_counts_by_type["dir-permissions"]++))
-                    current_dir_issue_messages+=("$(printf "$(lh_msg 'DOCKER_DIR_PERMISSIONS_ISSUE')" "$dir_perms")")
+                    current_dir_issue_messages+=("$(lh_msg 'DOCKER_DIR_PERMISSIONS_ISSUE' "$dir_perms")")
                     if [[ "$dir_perms" == "777" ]] || [[ "$dir_perms" == "776" ]] || [[ "$dir_perms" == "766" ]]; then
-                        current_dir_critical_issues+=("$(printf "$(lh_msg 'DOCKER_CRITICAL_DIR_PERMISSIONS')" "$compose_dir" "$dir_perms")")
+                        current_dir_critical_issues+=("$(lh_msg 'DOCKER_CRITICAL_DIR_PERMISSIONS' "$compose_dir" "$dir_perms")")
                     fi
                 fi
             fi
@@ -1095,7 +1107,7 @@ function security_check_docker() {
                         fi
                     fi
                 done <<< "$env_files"
-                current_dir_issue_messages+=("$(printf "$(lh_msg 'DOCKER_ENV_PERMISSIONS_ISSUE')" "${env_permission_issues[*]}")")
+                current_dir_issue_messages+=("$(lh_msg 'DOCKER_ENV_PERMISSIONS_ISSUE' "${env_permission_issues[*]}")")
             fi
             echo ""
             
@@ -1104,7 +1116,7 @@ function security_check_docker() {
             docker_check_update_labels "$compose_file" || update_labels_issue_code=$?
             if [ $update_labels_issue_code -ne 0 ]; then
                 if _docker_is_warning_accepted "$compose_dir" "update-labels"; then
-                    echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'DOCKER_ACCEPTED_UPDATE_LABELS')" "$(basename "$compose_file")")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_ACCEPTED_UPDATE_LABELS' "$(basename "$compose_file")")${LH_COLOR_RESET}"
                     current_dir_issue_messages+=("$(lh_msg 'DOCKER_ACCEPTED_UPDATE_LABELS_SHORT')")
                 else
                     ((total_issues++))
@@ -1120,7 +1132,7 @@ function security_check_docker() {
             docker_check_latest_images "$compose_file" || latest_images_issue_code=$?
             if [ $latest_images_issue_code -ne 0 ]; then
                 if _docker_is_warning_accepted "$compose_dir" "latest-images"; then
-                    echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'DOCKER_ACCEPTED_LATEST_IMAGES')" "$(basename "$compose_file")")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_ACCEPTED_LATEST_IMAGES' "$(basename "$compose_file")")${LH_COLOR_RESET}"
                     current_dir_issue_messages+=("$(lh_msg 'DOCKER_ACCEPTED_LATEST_IMAGES_SHORT')")
                 else
                     ((total_issues++))
@@ -1131,7 +1143,7 @@ function security_check_docker() {
                             latest_image_details+=("$image_name")
                         fi
                     done < <(grep -E "image:\s*[^:]+$|image:\s*[^:]+:latest" "$compose_file" || true)
-                    current_dir_issue_messages+=("$(printf "$(lh_msg 'DOCKER_LATEST_IMAGES_ISSUE')" "${latest_image_details[*]}")")
+                    current_dir_issue_messages+=("$(lh_msg 'DOCKER_LATEST_IMAGES_ISSUE' "${latest_image_details[*]}")")
                 fi
             fi
             echo ""
@@ -1141,12 +1153,12 @@ function security_check_docker() {
             docker_check_privileged_containers "$compose_file" || privileged_issue_code=$?
             if [ $privileged_issue_code -ne 0 ]; then
                 if _docker_is_warning_accepted "$compose_dir" "privileged"; then
-                    echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'DOCKER_ACCEPTED_PRIVILEGED')" "$(basename "$compose_file")")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_ACCEPTED_PRIVILEGED' "$(basename "$compose_file")")${LH_COLOR_RESET}"
                     current_dir_issue_messages+=("$(lh_msg 'DOCKER_ACCEPTED_PRIVILEGED_SHORT')")
                 else
                     ((total_issues++))
                     ((issue_counts_by_type["privileged"]++))
-                    current_dir_critical_issues+=("$(printf "$(lh_msg 'DOCKER_CRITICAL_PRIVILEGED')" "$(basename "$compose_file")")")
+                    current_dir_critical_issues+=("$(lh_msg 'DOCKER_CRITICAL_PRIVILEGED' "$(basename "$compose_file")")")
                     current_dir_issue_messages+=("$(lh_msg 'DOCKER_PRIVILEGED_ISSUE')")
                 fi
             fi
@@ -1158,7 +1170,7 @@ function security_check_docker() {
             docker_check_host_volumes "$compose_file" || host_volumes_issue_code=$?
             if [ $host_volumes_issue_code -ne 0 ]; then
                 if _docker_is_warning_accepted "$compose_dir" "host-volumes"; then
-                    echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'DOCKER_ACCEPTED_HOST_VOLUMES')" "$(basename "$compose_file")")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_ACCEPTED_HOST_VOLUMES' "$(basename "$compose_file")")${LH_COLOR_RESET}"
                     current_dir_issue_messages+=("$(lh_msg 'DOCKER_ACCEPTED_HOST_VOLUMES_SHORT')")
                 else
                     ((total_issues++))
@@ -1171,7 +1183,7 @@ function security_check_docker() {
                             host_volume_details+=("$path_check")
                         fi
                     done
-                    current_dir_issue_messages+=("$(printf "$(lh_msg 'DOCKER_HOST_VOLUMES_ISSUE')" "${host_volume_details[*]}")")
+                    current_dir_issue_messages+=("$(lh_msg 'DOCKER_HOST_VOLUMES_ISSUE' "${host_volume_details[*]}")")
                     local is_critical_mount=false
                     for mounted_path in "${host_volume_details[@]}"; do
                         if [[ "$mounted_path" == "/" ]] || [[ "$mounted_path" == "/var/run/docker.sock" ]] || [[ "$mounted_path" == "/etc" ]] || [[ "$mounted_path" == "/proc" ]] || [[ "$mounted_path" == "/sys" ]]; then
@@ -1180,7 +1192,7 @@ function security_check_docker() {
                         fi
                     done
                     if $is_critical_mount; then
-                        current_dir_critical_issues+=("$(printf "$(lh_msg 'DOCKER_CRITICAL_HOST_VOLUMES')" "$(basename "$compose_file")" "${host_volume_details[*]}")")
+                        current_dir_critical_issues+=("$(lh_msg 'DOCKER_CRITICAL_HOST_VOLUMES' "$(basename "$compose_file")" "${host_volume_details[*]}")")
                     fi
                 fi
             fi
@@ -1205,7 +1217,7 @@ function security_check_docker() {
                         dangerous_cap_details+=("$cap")
                     fi
                 done
-                current_dir_issue_messages+=("$(printf "$(lh_msg 'DOCKER_DANGEROUS_CAPABILITIES')" "${dangerous_cap_details[*]}")")
+                current_dir_issue_messages+=("$(lh_msg 'DOCKER_DANGEROUS_CAPABILITIES' "${dangerous_cap_details[*]}")")
                 if [[ " ${dangerous_cap_details[*]} " =~ " SYS_ADMIN " ]]; then
                     current_dir_critical_issues+=("$(lh_msg 'DOCKER_CRITICAL_SYS_ADMIN')")
                 fi
@@ -1233,8 +1245,8 @@ function security_check_docker() {
                         password_details+=("${pattern%%=*}")
                     fi
                 done
-                current_dir_critical_issues+=("$(printf "$(lh_msg 'DOCKER_CRITICAL_DEFAULT_PASSWORDS')" "${password_details[*]}")")
-                current_dir_issue_messages+=("$(printf "$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_ISSUE')" "${password_details[*]}")")
+                current_dir_critical_issues+=("$(lh_msg 'DOCKER_CRITICAL_DEFAULT_PASSWORDS' "${password_details[*]}")")
+                current_dir_issue_messages+=("$(lh_msg 'DOCKER_DEFAULT_PASSWORDS_ISSUE' "${password_details[*]}")")
             fi
             echo ""
             
@@ -1279,7 +1291,7 @@ function security_check_docker() {
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_INFRASTRUCTURE_FOLLOWS_PRACTICES')${LH_COLOR_RESET}"
         fi
     else
-        echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_FOUND_ISSUES')" "$total_issues" "$file_count")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_FOUND_ISSUES' "$total_issues" "$file_count")${LH_COLOR_RESET}"
         
         # Highlight critical issues
         local critical_count=0
@@ -1288,7 +1300,7 @@ function security_check_docker() {
         done
         
         if [ $critical_count -gt 0 ]; then
-            echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_CRITICAL_ISSUES_ATTENTION')" "$critical_count")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_CRITICAL_ISSUES_ATTENTION' "$critical_count")${LH_COLOR_RESET}"
         fi
     fi
     echo ""
@@ -1308,10 +1320,10 @@ function security_check_docker() {
         for type in "${critical_types[@]}"; do
             if [ ${issue_counts_by_type[$type]} -gt 0 ]; then
                 case $type in
-                    "default-passwords") echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_ISSUE_DEFAULT_PASSWORDS')" "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
-                    "sensitive-data")    echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_ISSUE_SENSITIVE_DATA')" "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
-                    "security-opt")      echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_ISSUE_SECURITY_OPT')" "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
-                    "privileged")        echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_ISSUE_PRIVILEGED')" "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
+                    "default-passwords") echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_ISSUE_DEFAULT_PASSWORDS' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
+                    "sensitive-data")    echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_ISSUE_SENSITIVE_DATA' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
+                    "security-opt")      echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_ISSUE_SECURITY_OPT' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
+                    "privileged")        echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_ISSUE_PRIVILEGED' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
                 esac
             fi
         done
@@ -1319,10 +1331,10 @@ function security_check_docker() {
         for type in "${warning_types[@]}"; do
             if [ ${issue_counts_by_type[$type]} -gt 0 ]; then
                 case $type in
-                    "host-volumes")      echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_ISSUE_HOST_VOLUMES')" "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
-                    "capabilities")      echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_ISSUE_CAPABILITIES')" "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
-                    "env-permissions")   echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_ISSUE_ENV_PERMISSIONS')" "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
-                    "dir-permissions")   echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_ISSUE_DIR_PERMISSIONS')" "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
+                    "host-volumes")      echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_ISSUE_HOST_VOLUMES' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
+                    "capabilities")      echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_ISSUE_CAPABILITIES' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
+                    "env-permissions")   echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_ISSUE_ENV_PERMISSIONS' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
+                    "dir-permissions")   echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_ISSUE_DIR_PERMISSIONS' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
                 esac
             fi
         done
@@ -1330,9 +1342,9 @@ function security_check_docker() {
         for type in "${info_types[@]}"; do
             if [ ${issue_counts_by_type[$type]} -gt 0 ]; then
                 case $type in
-                    "exposed-ports")     echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_ISSUE_EXPOSED_PORTS')" "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
-                    "latest-images")     echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_ISSUE_LATEST_IMAGES')" "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
-                    "update-labels")     echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_ISSUE_UPDATE_LABELS')" "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
+                    "exposed-ports")     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_ISSUE_EXPOSED_PORTS' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
+                    "latest-images")     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_ISSUE_LATEST_IMAGES' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
+                    "update-labels")     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_ISSUE_UPDATE_LABELS' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
                 esac
             fi
         done
@@ -1362,7 +1374,7 @@ function security_check_docker() {
         echo -e "${LH_COLOR_SEPARATOR}───────────────────────────────────────────────────────────────────${LH_COLOR_RESET}"
         local dir_number=1
         for dir_path in "${!detailed_issues_by_dir[@]}"; do
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_DIRECTORY_NUMBER')" "$dir_number" "${LH_COLOR_PROMPT}$dir_path${LH_COLOR_RESET}")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_DIRECTORY_NUMBER' "$dir_number" "${LH_COLOR_PROMPT}$dir_path${LH_COLOR_RESET}")${LH_COLOR_RESET}"
             printf '%s\n' "${detailed_issues_by_dir[$dir_path]}" | while IFS= read -r issue_item; do
                 echo -e "   $issue_item"
             done
@@ -1381,57 +1393,57 @@ function security_check_docker() {
         
         local step=1
         if [ ${issue_counts_by_type["default-passwords"]} -gt 0 ]; then
-            echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_STEP_REPLACE_PASSWORDS')" "$step")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_STEP_REPLACE_PASSWORDS' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
         if [ ${issue_counts_by_type["sensitive-data"]} -gt 0 ]; then
-            echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_STEP_REMOVE_SENSITIVE_DATA')" "$step")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_STEP_REMOVE_SENSITIVE_DATA' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
         if [ ${issue_counts_by_type["security-opt"]} -gt 0 ]; then
-            echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_STEP_ENABLE_SECURITY')" "$step")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_STEP_ENABLE_SECURITY' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
         if [ ${issue_counts_by_type["privileged"]} -gt 0 ]; then
-            echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_STEP_REMOVE_PRIVILEGED')" "$step")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_STEP_REMOVE_PRIVILEGED' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
         if [ ${issue_counts_by_type["capabilities"]} -gt 0 ]; then
-            echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_STEP_REVIEW_CAPABILITIES')" "$step")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_STEP_REVIEW_CAPABILITIES' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
         if [ ${issue_counts_by_type["env-permissions"]} -gt 0 ]; then
-            echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_STEP_FIX_ENV_PERMISSIONS')" "$step")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_STEP_FIX_ENV_PERMISSIONS' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
         if [ ${issue_counts_by_type["dir-permissions"]} -gt 0 ]; then
-            echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_STEP_FIX_PERMISSIONS')" "$step")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_STEP_FIX_PERMISSIONS' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
         if [ ${issue_counts_by_type["host-volumes"]} -gt 0 ]; then
-            echo -e "${LH_COLOR_WARNING}$(printf "$(lh_msg 'DOCKER_STEP_REVIEW_HOST_VOLUMES')" "$step")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_STEP_REVIEW_HOST_VOLUMES' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
         if [ ${issue_counts_by_type["exposed-ports"]} -gt 0 ]; then
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_STEP_BIND_LOCALHOST')" "$step")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_STEP_BIND_LOCALHOST' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
         if [ ${issue_counts_by_type["latest-images"]} -gt 0 ]; then
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_STEP_PIN_IMAGE_VERSIONS')" "$step")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_STEP_PIN_IMAGE_VERSIONS' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
         if [ ${issue_counts_by_type["update-labels"]} -gt 0 ]; then
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_STEP_ADD_UPDATE_LABELS')" "$step")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_STEP_ADD_UPDATE_LABELS' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         echo ""
@@ -1439,16 +1451,16 @@ function security_check_docker() {
     
     # Configuration information
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CURRENT_CONFIG_HEADER')${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CONFIG_SUMMARY_CHECK_MODE')" "${LH_COLOR_PROMPT}$LH_DOCKER_CHECK_MODE_EFFECTIVE${LH_COLOR_RESET}")${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CONFIG_SUMMARY_ANALYZED_FILES')" "$file_count")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_SUMMARY_CHECK_MODE' "${LH_COLOR_PROMPT}$LH_DOCKER_CHECK_MODE_EFFECTIVE${LH_COLOR_RESET}")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_SUMMARY_ANALYZED_FILES' "$file_count")${LH_COLOR_RESET}"
     if [ "$LH_DOCKER_CHECK_MODE_EFFECTIVE" = "all" ]; then
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CONFIG_SUMMARY_SEARCH_PATH')" "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CONFIG_SUMMARY_SEARCH_DEPTH')" "$LH_DOCKER_SEARCH_DEPTH_EFFECTIVE")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_SUMMARY_SEARCH_PATH' "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_SUMMARY_SEARCH_DEPTH' "$LH_DOCKER_SEARCH_DEPTH_EFFECTIVE")${LH_COLOR_RESET}"
         if [ -n "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE" ]; then
-            echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CONFIG_SUMMARY_EXCLUSIONS')" "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_SUMMARY_EXCLUSIONS' "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE")${LH_COLOR_RESET}"
         fi
     fi
-    echo -e "${LH_COLOR_INFO}$(printf "$(lh_msg 'DOCKER_CONFIG_SUMMARY_FILE')" "$LH_DOCKER_CONFIG_FILE")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_SUMMARY_FILE' "$LH_DOCKER_CONFIG_FILE")${LH_COLOR_RESET}"
     
     return 0
 }
@@ -1491,7 +1503,7 @@ function docker_security_menu() {
         else
             security_empty_input_count=0
         fi
-        lh_log_msg "DEBUG" "$(printf "$(lh_msg 'DOCKER_USER_SELECTED_OPTION')" "$option")"
+        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_USER_SELECTED_OPTION' "$option")"
 
         case $option in
             1)
@@ -1503,7 +1515,7 @@ function docker_security_menu() {
                 return 0
                 ;;
             *)
-                lh_log_msg "WARN" "$(printf "$(lh_msg 'DOCKER_INVALID_SELECTION')" "$option")"
+                lh_log_msg "WARN" "$(lh_msg 'DOCKER_INVALID_SELECTION' "$option")"
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_INVALID_SELECTION_MESSAGE')${LH_COLOR_RESET}"
                 ;;
         esac

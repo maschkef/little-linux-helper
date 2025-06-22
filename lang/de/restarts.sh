@@ -4,22 +4,22 @@
 # Copyright (c) 2025 wuldorf
 # SPDX-License-Identifier: MIT
 #
-# Deutsche Übersetzungen für das Restarts-Modul
+# German translations for the Restarts module
 
-# Bedingte Deklaration für Moduldateien
+# Conditional declaration for module files
 [[ ! -v MSG_DE ]] && declare -A MSG_DE
 
-# Modul-Titel und Menü
+# Module title and menu
 MSG_DE[RESTART_MODULE_TITLE]="Dienste & Desktop Neustart-Optionen"
 MSG_DE[RESTART_BACK_TO_MAIN]="Zurück zum Hauptmenü"
 
-# Menüelemente
+# Menu items
 MSG_DE[RESTART_LOGIN_MANAGER]="Login Manager neu starten (Alle Userprozesse werden beendet!)"
 MSG_DE[RESTART_SOUND_SYSTEM]="Sound-System neu starten"
 MSG_DE[RESTART_DESKTOP_ENVIRONMENT]="Desktop-Umgebung neu starten"
 MSG_DE[RESTART_NETWORK_SERVICES]="Netzwerkdienste neu starten"
 
-# Login Manager Neustart
+# Login Manager restart
 MSG_DE[RESTART_LOGIN_MANAGER_STARTING]="Login Manager wird neu gestartet..."
 MSG_DE[RESTART_DETECTED_INIT_SYSTEM]="Erkanntes Init-System: %s"
 MSG_DE[RESTART_DM_SERVICE_SYSTEMD_LINK]="Display Manager Service (via systemd link): %s"
@@ -44,7 +44,7 @@ MSG_DE[RESTART_DM_ERROR_SYSVINIT]="FEHLER beim Neustart des Login Managers (%s) 
 MSG_DE[RESTART_DM_INIT_SCRIPT_NOT_FOUND]="FEHLER: Init-Skript /etc/init.d/%s nicht gefunden."
 MSG_DE[RESTART_DM_UNKNOWN_INIT_SYSTEM]="FEHLER: Unbekanntes oder nicht unterstütztes Init-System: %s. Manueller Neustart erforderlich."
 
-# Sound System Neustart
+# Sound system restart
 MSG_DE[RESTART_SOUND_STARTING]="Versuche, das Sound-System neu zu starten..."
 MSG_DE[RESTART_SOUND_USER_CONTEXT_ERROR]="Konnte Benutzerkontext nicht ermitteln, versuche trotzdem Sound-System-Neustart."
 MSG_DE[RESTART_SOUND_PIPEWIRE_ACTIVE]="PipeWire-Dienst ist aktiv."
@@ -89,7 +89,7 @@ MSG_DE[RESTART_SOUND_ERROR_NO_ACTIVE]="Fehler: Es konnte kein aktives Sound-Syst
 MSG_DE[RESTART_SOUND_SUCCESS]="Sound-System wurde neu gestartet."
 MSG_DE[RESTART_SOUND_SUCCESS_DONE]="Sound-System wurde erfolgreich neu gestartet."
 
-# Desktop Environment Neustart
+# Desktop environment restart
 MSG_DE[RESTART_DE_STARTING]="Versuche, die Desktop-Umgebung neu zu starten..."
 MSG_DE[RESTART_DE_USER_ERROR]="Konnte keinen Desktop-Benutzer ermitteln. Abbruch."
 MSG_DE[RESTART_DE_ERROR_NO_USER]="Fehler: Konnte keinen Desktop-Benutzer ermitteln. Der Neustart ist nicht möglich."
@@ -108,7 +108,7 @@ MSG_DE[RESTART_DE_SOFT_RESTART]="Sanfter Neustart (versucht, Anwendungen nicht z
 MSG_DE[RESTART_DE_HARD_RESTART]="Harter Neustart (beendet ggf. Desktop-Komponenten erzwungen)"
 MSG_DE[RESTART_DE_CHOOSE_OPTION]="Wählen Sie eine Option (1-2): "
 
-# KDE Plasma Neustart
+# KDE Plasma restart
 MSG_DE[RESTART_DE_KDE_STARTING]="KDE Plasma wird für Benutzer '%s' neu gestartet..."
 MSG_DE[RESTART_DE_KDE_PLASMA6_TOOLS]="Plasma 6 Werkzeuge (kquitapp, kstart) gefunden."
 MSG_DE[RESTART_DE_KDE_PLASMA5_TOOLS]="Plasma 5 Werkzeuge (kquitapp5, kstart5) gefunden."
@@ -138,7 +138,7 @@ MSG_DE[RESTART_DE_KDE_NOT_RUNNING_AFTER]="plasmashell läuft nach dem Neustart n
 MSG_DE[RESTART_DE_KDE_ERROR_RESTART]="KDE Plasma konnte nicht zuverlässig neu gestartet werden."
 MSG_DE[RESTART_DE_KDE_ERROR]="Fehler: KDE Plasma konnte nicht neu gestartet werden."
 
-# GNOME Neustart
+# GNOME restart
 MSG_DE[RESTART_DE_GNOME_STARTING]="GNOME Shell wird für Benutzer '%s' neu gestartet..."
 MSG_DE[RESTART_DE_GNOME_WAYLAND_DETECTED]="GNOME unter Wayland erkannt."
 MSG_DE[RESTART_DE_GNOME_SOFT_RESTART_DBUS]="Versuche sanften Neustart via dbus..."
@@ -158,7 +158,7 @@ MSG_DE[RESTART_DE_GNOME_X11_SIGHUP_ERROR]="FEHLER: SIGHUP an gnome-shell konnte 
 MSG_DE[RESTART_DE_GNOME_X11_HARD_RESTART]="Führe harten Neustart von GNOME Shell (X11) durch..."
 MSG_DE[RESTART_DE_GNOME_X11_REPLACE_EXECUTED]="Befehl 'gnome-shell --replace' ausgeführt."
 
-# Andere Desktop-Umgebungen
+# Other desktop environments
 MSG_DE[RESTART_DE_XFCE_STARTING]="XFCE (xfce4-panel und xfwm4) wird für Benutzer '%s' neu gestartet..."
 MSG_DE[RESTART_DE_XFCE_COMMANDS_EXECUTED]="Befehle zum Neustart von xfce4-panel und xfwm4 wurden ausgeführt."
 MSG_DE[RESTART_DE_CINNAMON_STARTING]="Cinnamon wird für Benutzer '%s' neu gestartet..."
@@ -176,7 +176,7 @@ MSG_DE[RESTART_DE_UNKNOWN]="Unbekannte oder nicht direkt unterstützte Desktop-U
 MSG_DE[RESTART_DE_ERROR_UNKNOWN]="Fehler: Desktop-Umgebung '%s' wird nicht direkt unterstützt."
 MSG_DE[RESTART_DE_SUCCESS]="Neustart der Desktop-Umgebung wurde durchgeführt."
 
-# Netzwerkdienste Neustart
+# Network services restart
 MSG_DE[RESTART_NET_CHECKING]="Netzwerkdienste werden überprüft..."
 MSG_DE[RESTART_NET_NETWORKMANAGER_ACTIVE]="NetworkManager ist aktiv."
 MSG_DE[RESTART_NET_SYSTEMD_NETWORKD_ACTIVE]="systemd-networkd ist aktiv."
@@ -204,12 +204,12 @@ MSG_DE[RESTART_NET_SERVICE_ERROR]="FEHLER beim Neustart von %s."
 MSG_DE[RESTART_NET_ALL_SUCCESS]="Ausgewählte Netzwerkdienste erfolgreich neu gestartet."
 MSG_DE[RESTART_NET_SOME_FAILED]="Mindestens ein Netzwerkdienst konnte nicht erfolgreich neu gestartet werden."
 
-# Einzelne Dienste neu starten
+# Restart individual services
 MSG_DE[RESTART_SOUND_RESTARTING_SERVICE]="Starte %s neu..."
 MSG_DE[RESTART_SOUND_SERVICE_ERROR]="Fehler beim Neustart von %s"
 MSG_DE[RESTART_SOUND_SERVICE_SUCCESS]="Erfolgreich neu gestartet: %s"
 
-# Allgemeine Nachrichten
+# General messages
 MSG_DE[RESTART_CHOOSE_OPTION_PROMPT]="Wählen Sie eine Option: "
 MSG_DE[RESTART_INVALID_SELECTION]="Ungültige Auswahl. Bitte versuchen Sie es erneut."
 MSG_DE[RESTART_BACK_TO_MAIN_LOG]="Zurück zum Hauptmenü."

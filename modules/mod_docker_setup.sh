@@ -7,16 +7,29 @@
 # This script is part of the 'little-linux-helper' collection.
 # Licensed under the MIT License. See the LICENSE file in the project root for more information.
 #
-# Modul für Docker und Docker Compose Installation und Überprüfung
+# Module for Docker and Docker Compose installation and verification
 
-# Laden der gemeinsamen Bibliothek
-source "$(dirname "$0")/../lib/lib_common.sh"
+# Load common library
+# Use BASH_SOURCE to get the correct path when sourced
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
 
-# Sprach-Module laden
-lh_load_language_module "common"
-lh_load_language_module "docker_setup"
+# Complete initialization when run directly (not via help_master.sh)
+if [[ -z "${LH_INITIALIZED:-}" ]]; then
+    lh_load_general_config        # Load general config first for log level
+    lh_initialize_logging
+    lh_detect_package_manager
+    lh_finalize_initialization
+    export LH_INITIALIZED=1
+fi
 
-# Funktion zur Überprüfung ob Docker installiert ist
+# Load translations if not already loaded
+if [[ -z "${MSG[DOCKER_SETUP_CHECK_TITLE]:-}" ]]; then
+    lh_load_language_module "common"
+    lh_load_language_module "docker_setup"
+    lh_load_language_module "lib"
+fi
+
+# Function to check if Docker is installed
 function check_docker_installation() {
     lh_print_header "$(lh_msg 'DOCKER_SETUP_CHECK_TITLE')"
     
@@ -24,13 +37,13 @@ function check_docker_installation() {
     local docker_compose_installed=false
     local docker_compose_command=""
     
-    # Docker prüfen
+    # Check Docker
     if command -v docker >/dev/null 2>&1; then
         docker_installed=true
         lh_log_msg "INFO" "$(lh_msg 'DOCKER_SETUP_DOCKER_FOUND')"
         echo -e "${LH_COLOR_SUCCESS}✓ $(lh_msg 'DOCKER_SETUP_DOCKER_FOUND')${LH_COLOR_RESET}"
         
-        # Docker Version anzeigen
+        # Show Docker version
         local docker_version=$(docker --version 2>/dev/null)
         if [ $? -eq 0 ]; then
             echo -e "  ${LH_COLOR_INFO}$docker_version${LH_COLOR_RESET}"
@@ -40,26 +53,26 @@ function check_docker_installation() {
         echo -e "${LH_COLOR_ERROR}✗ $(lh_msg 'DOCKER_SETUP_DOCKER_NOT_FOUND')${LH_COLOR_RESET}"
     fi
     
-    # Docker Compose prüfen (neue Syntax)
+    # Check Docker Compose (new syntax)
     if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
         docker_compose_installed=true
         docker_compose_command="docker compose"
         lh_log_msg "INFO" "$(lh_msg 'DOCKER_SETUP_COMPOSE_FOUND') (docker compose)"
         echo -e "${LH_COLOR_SUCCESS}✓ $(lh_msg 'DOCKER_SETUP_COMPOSE_FOUND') (docker compose)${LH_COLOR_RESET}"
         
-        # Docker Compose Version anzeigen
+        # Show Docker Compose version
         local compose_version=$(docker compose version 2>/dev/null)
         if [ $? -eq 0 ]; then
             echo -e "  ${LH_COLOR_INFO}$compose_version${LH_COLOR_RESET}"
         fi
-    # Docker Compose prüfen (alte Syntax)
+    # Check Docker Compose (old syntax)
     elif command -v docker-compose >/dev/null 2>&1; then
         docker_compose_installed=true
         docker_compose_command="docker-compose"
         lh_log_msg "INFO" "$(lh_msg 'DOCKER_SETUP_COMPOSE_FOUND') (docker-compose)"
         echo -e "${LH_COLOR_SUCCESS}✓ $(lh_msg 'DOCKER_SETUP_COMPOSE_FOUND') (docker-compose)${LH_COLOR_RESET}"
         
-        # Docker Compose Version anzeigen
+        # Show Docker Compose version
         local compose_version=$(docker-compose --version 2>/dev/null)
         if [ $? -eq 0 ]; then
             echo -e "  ${LH_COLOR_INFO}$compose_version${LH_COLOR_RESET}"
@@ -71,7 +84,7 @@ function check_docker_installation() {
     
     echo ""
     
-    # Installation anbieten falls nötig
+    # Offer installation if needed
     if [ "$docker_installed" = false ] || [ "$docker_compose_installed" = false ]; then
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_SETUP_MISSING_COMPONENTS')${LH_COLOR_RESET}"
         echo ""
@@ -85,19 +98,19 @@ function check_docker_installation() {
     else
         echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_SETUP_ALL_INSTALLED')${LH_COLOR_RESET}"
         
-        # Docker Service Status prüfen
+        # Check Docker service status
         check_docker_service_status
     fi
 }
 
-# Funktion zur Installation von Docker Komponenten
+# Function for installing Docker components
 function install_docker_components() {
     local docker_installed="$1"
     local docker_compose_installed="$2"
     
     lh_print_header "$(lh_msg 'DOCKER_SETUP_INSTALL_TITLE')"
     
-    # Docker installieren falls nötig
+    # Install Docker if needed
     if [ "$docker_installed" = false ]; then
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_SETUP_INSTALLING_DOCKER')${LH_COLOR_RESET}"
         install_docker
@@ -110,7 +123,7 @@ function install_docker_components() {
         fi
     fi
     
-    # Docker Compose installieren falls nötig
+    # Install Docker Compose if needed
     if [ "$docker_compose_installed" = false ]; then
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_SETUP_INSTALLING_COMPOSE')${LH_COLOR_RESET}"
         install_docker_compose
@@ -127,7 +140,7 @@ function install_docker_components() {
     fi
 }
 
-# Funktion zur Docker Installation
+# Function for Docker installation
 function install_docker() {
     lh_log_msg "INFO" "$(lh_msg 'DOCKER_SETUP_STARTING_DOCKER_INSTALL')"
     
@@ -160,11 +173,11 @@ function install_docker() {
     return $?
 }
 
-# Funktion zur Docker Compose Installation
+# Function for Docker Compose installation
 function install_docker_compose() {
     lh_log_msg "INFO" "$(lh_msg 'DOCKER_SETUP_STARTING_COMPOSE_INSTALL')"
     
-    # Zuerst prüfen ob Docker Compose Plugin verfügbar ist (neuere Methode)
+    # First check if Docker Compose Plugin is available (newer method)
     if command -v docker >/dev/null 2>&1; then
         case "$LH_PKG_MANAGER" in
             "pacman"|"yay")
@@ -198,11 +211,11 @@ function install_docker_compose() {
     return $?
 }
 
-# Funktion zur manuellen Docker Compose Installation
+# Function for manual Docker Compose installation
 function install_docker_compose_manual() {
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_SETUP_COMPOSE_DOWNLOAD')${LH_COLOR_RESET}"
     
-    # Neueste Version von GitHub holen
+    # Get latest version from GitHub
     local compose_version
     if command -v curl >/dev/null 2>&1; then
         compose_version=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d'"' -f4)
@@ -215,12 +228,12 @@ function install_docker_compose_manual() {
     
     if [ -z "$compose_version" ]; then
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_SETUP_VERSION_DETECTION_FAILED')${LH_COLOR_RESET}"
-        compose_version="v2.24.6"  # Fallback Version
+        compose_version="v2.24.6"  # Fallback version
     fi
     
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_SETUP_DOWNLOADING_VERSION'): $compose_version${LH_COLOR_RESET}"
     
-    # Download und Installation
+    # Download and installation
     local download_url="https://github.com/docker/compose/releases/download/${compose_version}/docker-compose-$(uname -s)-$(uname -m)"
     
     if command -v curl >/dev/null 2>&1; then
@@ -241,11 +254,11 @@ function install_docker_compose_manual() {
     fi
 }
 
-# Funktion für Post-Installation Setup
+# Function for post-installation setup
 function post_install_setup() {
     lh_print_header "$(lh_msg 'DOCKER_SETUP_POST_INSTALL_TITLE')"
     
-    # Docker Service aktivieren und starten
+    # Enable and start Docker service
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_SETUP_ENABLING_SERVICE')${LH_COLOR_RESET}"
     
     if command -v systemctl >/dev/null 2>&1; then
@@ -259,7 +272,7 @@ function post_install_setup() {
         fi
     fi
     
-    # Benutzer zur Docker-Gruppe hinzufügen
+    # Add user to Docker group
     if [ -n "$SUDO_USER" ]; then
         local target_user="$SUDO_USER"
     elif [ -n "$USER" ] && [ "$USER" != "root" ]; then
@@ -276,7 +289,7 @@ function post_install_setup() {
     fi
 }
 
-# Funktion zur Überprüfung des Docker Service Status
+# Function for checking Docker service status
 function check_docker_service_status() {
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_SETUP_CHECKING_SERVICE')${LH_COLOR_RESET}"
     
@@ -311,7 +324,7 @@ function check_docker_service_status() {
     fi
 }
 
-# Hauptfunktion
+# Main function
 function main() {
     lh_print_header "$(lh_msg 'DOCKER_SETUP_MAIN_TITLE')"
     
@@ -324,5 +337,5 @@ function main() {
     lh_log_msg "INFO" "$(lh_msg 'DOCKER_SETUP_MODULE_COMPLETED')"
 }
 
-# Modul ausführen
+# Execute module
 main
