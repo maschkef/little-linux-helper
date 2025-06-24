@@ -29,136 +29,8 @@ if [[ -z "${MSG[DOCKER_SECURITY_MENU_TITLE]:-}" ]]; then
     lh_load_language_module "lib"
 fi
 
-# Docker configuration file path
-LH_DOCKER_CONFIG_FILE="$LH_CONFIG_DIR/docker.conf"
-
-# Docker configuration variables (placeholders, filled by _docker_load_config)
-CFG_LH_DOCKER_COMPOSE_ROOT=""
-CFG_LH_DOCKER_EXCLUDE_DIRS=""
-CFG_LH_DOCKER_SEARCH_DEPTH=""
-CFG_LH_DOCKER_SKIP_WARNINGS=""
-CFG_LH_DOCKER_CHECK_RUNNING=""
-CFG_LH_DOCKER_DEFAULT_PATTERNS=""
-CFG_LH_DOCKER_CHECK_MODE=""
-CFG_LH_DOCKER_ACCEPTED_WARNINGS=""
-
-# Function to load Docker configuration
-function _docker_load_config() {
-    lh_log_msg "DEBUG" "Starting Docker configuration loading"
-    lh_log_msg "DEBUG" "Configuration file: $LH_DOCKER_CONFIG_FILE"
-    
-    # Load configuration file or create if not available
-    if [ -f "$LH_DOCKER_CONFIG_FILE" ]; then
-        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_FOUND_LOADING')"
-        source "$LH_DOCKER_CONFIG_FILE"
-        lh_log_msg "INFO" "$(lh_msg 'DOCKER_CONFIG_PROCESSED' "$LH_DOCKER_CONFIG_FILE")"
-    else
-        lh_log_msg "ERROR" "$(lh_msg 'DOCKER_CONFIG_NOT_FOUND_LONG' "$LH_DOCKER_CONFIG_FILE")"
-        echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_CONFIG_NOT_FOUND_LONG' "$LH_DOCKER_CONFIG_FILE")"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_CREATE_INFO')"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_REQUIRED_VARS')"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_VAR_LIST_HEADER')"
-        echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_COMPOSE_ROOT"
-        echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_EXCLUDE_DIRS"
-        echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_SEARCH_DEPTH"
-        echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_SKIP_WARNINGS"
-        echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_CHECK_RUNNING"
-        echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_DEFAULT_PATTERNS"
-        echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_CHECK_MODE"
-        echo -e "${LH_COLOR_INFO}  CFG_LH_DOCKER_ACCEPTED_WARNINGS"
-        return 1
-    fi
-    
-    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_SET_EFFECTIVE')"
-    
-    # Debug: Show sourced config values
-    lh_log_msg "DEBUG" "CFG_LH_DOCKER_COMPOSE_ROOT='$CFG_LH_DOCKER_COMPOSE_ROOT'"
-    lh_log_msg "DEBUG" "CFG_LH_DOCKER_CHECK_MODE='$CFG_LH_DOCKER_CHECK_MODE'"
-    lh_log_msg "DEBUG" "CFG_LH_DOCKER_SEARCH_DEPTH='$CFG_LH_DOCKER_SEARCH_DEPTH'"
-    
-    # Transfer CFG_LH_* variables to local variables
-    # Fallback values if variables are missing or empty in configuration file
-    LH_DOCKER_COMPOSE_ROOT_EFFECTIVE="${CFG_LH_DOCKER_COMPOSE_ROOT:-/opt/containers}"
-    LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE="${CFG_LH_DOCKER_EXCLUDE_DIRS:-docker,.docker_archive,backup,archive,old,temp}"
-    LH_DOCKER_SEARCH_DEPTH_EFFECTIVE="${CFG_LH_DOCKER_SEARCH_DEPTH:-3}"
-    LH_DOCKER_SKIP_WARNINGS_EFFECTIVE="${CFG_LH_DOCKER_SKIP_WARNINGS:-}"
-    LH_DOCKER_CHECK_RUNNING_EFFECTIVE="${CFG_LH_DOCKER_CHECK_RUNNING:-true}"
-    LH_DOCKER_DEFAULT_PATTERNS_EFFECTIVE="${CFG_LH_DOCKER_DEFAULT_PATTERNS:-PASSWORD=password,MYSQL_ROOT_PASSWORD=root,POSTGRES_PASSWORD=postgres,ADMIN_PASSWORD=admin,POSTGRES_PASSWORD=password,MYSQL_PASSWORD=password,REDIS_PASSWORD=password}"
-    LH_DOCKER_CHECK_MODE_EFFECTIVE="${CFG_LH_DOCKER_CHECK_MODE:-running}"
-    LH_DOCKER_ACCEPTED_WARNINGS_EFFECTIVE="${CFG_LH_DOCKER_ACCEPTED_WARNINGS:-}"
-    
-    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_EFFECTIVE_CONFIG')"
-    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_COMPOSE_ROOT_LOG' "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")"
-    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_EXCLUDE_DIRS_LOG' "$LH_DOCKER_EXCLUDE_DIRS_EFFECTIVE")"
-    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_SEARCH_DEPTH_LOG' "$LH_DOCKER_SEARCH_DEPTH_EFFECTIVE")"
-    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_CHECK_MODE_LOG' "$LH_DOCKER_CHECK_MODE_EFFECTIVE")"
-    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_CHECK_RUNNING_LOG' "$LH_DOCKER_CHECK_RUNNING_EFFECTIVE")"
-    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_SKIP_WARNINGS_LOG' "$LH_DOCKER_SKIP_WARNINGS_EFFECTIVE")"
-    lh_log_msg "INFO" "$(lh_msg 'DOCKER_CONFIG_PROCESSED')"
-    
-    return 0
-}
-
-
-
-# Function to save Docker configuration
-function _docker_save_config() {
-    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_SAVE_PREP')"
-    
-    if [ ! -f "$LH_DOCKER_CONFIG_FILE" ]; then
-        lh_log_msg "ERROR" "$(lh_msg 'DOCKER_CONFIG_SAVE_IMPOSSIBLE' "$LH_DOCKER_CONFIG_FILE")"
-        echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_CONFIG_SAVE_IMPOSSIBLE' "$LH_DOCKER_CONFIG_FILE")${LH_COLOR_RESET}"        
-        return 1
-    fi
-    
-    lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_SAVE_PREP')"
-
-    local vars_to_save=(
-        "CFG_LH_DOCKER_COMPOSE_ROOT"
-        "CFG_LH_DOCKER_EXCLUDE_DIRS"
-        "CFG_LH_DOCKER_SEARCH_DEPTH"
-        "CFG_LH_DOCKER_SKIP_WARNINGS"
-        "CFG_LH_DOCKER_CHECK_RUNNING"
-        "CFG_LH_DOCKER_DEFAULT_PATTERNS"
-        "CFG_LH_DOCKER_CHECK_MODE"
-        "CFG_LH_DOCKER_ACCEPTED_WARNINGS"
-    )
-
-    local current_var_name
-    local current_var_value
-    local escaped_rhs_value_to_save
-
-    for var_name_cfg in "${vars_to_save[@]}"; do        
-        current_var_name="LH_DOCKER_${var_name_cfg#CFG_LH_DOCKER_}_EFFECTIVE" # Creates the name of the corresponding effective variable, e.g. LH_DOCKER_COMPOSE_ROOT_EFFECTIVE from CFG_LH_DOCKER_COMPOSE_ROOT
-        current_var_value="${!current_var_name}"     # Indirect expansion
-        
-        lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_PROCESS_VAR' "$var_name_cfg" "$current_var_value")"
-
-        # Escape special characters for sed
-        escaped_rhs_value=$(printf '%s\n' "$current_var_value" | sed -e 's/[\/&|]/\\&/g')
-
-        # Check if the variable exists in the file and is not commented out
-        if grep -q -E "^${var_name_cfg}=" "$LH_DOCKER_CONFIG_FILE"; then # Check against CFG_LH_DOCKER_COMPOSE_ROOT
-            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_VAR_EXISTS' "$var_name_cfg")"
-            # Variable exists, update value. The quotes around the value are preserved.
-            sed -i "s|^${var_name_cfg}=.*|${var_name_cfg}=\"${escaped_rhs_value}\"|" "$LH_DOCKER_CONFIG_FILE"
-        else # Variable does not exist (or is commented out)
-            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_VAR_NOT_EXISTS' "$var_name_cfg")"
-            # The quotes are explicitly placed around the value here.
-            # If current_var_value itself could contain double quotes that would need to be
-            # specially escaped in the file (e.g. "foo\"bar"), more logic for escaping
-            # current_var_value before inserting into the echo string would be needed here.
-            # For the current configuration values (paths, comma lists, simple strings) this is not the case.
-            echo "${var_name_cfg}=\"${current_var_value}\"" >> "$LH_DOCKER_CONFIG_FILE"
-        fi
-    done
-
-    lh_log_msg "INFO" "$(lh_msg 'DOCKER_CONFIG_UPDATED' "$LH_DOCKER_CONFIG_FILE")"
-    return 0
-}
-
 # Load Docker configuration
-_docker_load_config || {
+lh_load_docker_config || {
     lh_log_msg "WARN" "Failed to load Docker configuration, using defaults"
     # Set fallback values if configuration loading failed
     LH_DOCKER_COMPOSE_ROOT_EFFECTIVE="${CFG_LH_DOCKER_COMPOSE_ROOT:-/opt/containers}"
@@ -912,7 +784,7 @@ function docker_validate_and_configure_path() {
                 if [ -d "$new_path" ]; then
                     lh_log_msg "INFO" "$(lh_msg 'DOCKER_PATH_VALIDATED_SET' "$new_path")"
                     LH_DOCKER_COMPOSE_ROOT_EFFECTIVE="$new_path"
-                    _docker_save_config
+                    lh_save_docker_config
                     echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_PATH_UPDATED_SAVED' "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE")${LH_COLOR_RESET}"
                     break
                 else
