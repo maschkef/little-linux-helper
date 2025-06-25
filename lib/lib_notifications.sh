@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# little-linux-helper/lib/lib_notifications.sh
+# lib/lib_notifications.sh
 # Copyright (c) 2025 wuldorf
 # SPDX-License-Identifier: MIT
 #

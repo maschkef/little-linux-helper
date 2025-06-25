@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# little-linux-helper/lib/lib_system.sh
+# lib/lib_system.sh
 # Copyright (c) 2025 wuldorf
 # SPDX-License-Identifier: MIT
 #

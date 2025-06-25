@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# little-linux-helper/lib/lib_colors.sh
+# lib/lib_colors.sh
 # Copyright (c) 2025 wuldorf
 # SPDX-License-Identifier: MIT
 #

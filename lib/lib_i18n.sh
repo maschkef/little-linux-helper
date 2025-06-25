@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# little-linux-helper/lib/lib_i18n.sh
+# lib/lib_i18n.sh
 # Copyright (c) 2025 wuldorf
 # SPDX-License-Identifier: MIT
 #

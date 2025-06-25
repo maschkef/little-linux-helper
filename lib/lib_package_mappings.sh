@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# little-linux-helper/lib/lib_package_mappings.sh
+# lib/lib_package_mappings.sh
 # Copyright (c) 2025 wuldorf
 # SPDX-License-Identifier: MIT
 #

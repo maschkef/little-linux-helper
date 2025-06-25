@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# little-linux-helper/lib/lib_ui.sh
+# lib/lib_ui.sh
 # Copyright (c) 2025 wuldorf
 # SPDX-License-Identifier: MIT
 #

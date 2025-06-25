@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# little-linux-helper/lib/lib_logging.sh
+# lib/lib_logging.sh
 # Copyright (c) 2025 wuldorf
 # SPDX-License-Identifier: MIT
 #
