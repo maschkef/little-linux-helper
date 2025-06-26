@@ -32,19 +32,30 @@ MSG_EN[BACKUP_OPTION_ETC_ONLY]="Only /etc"
 MSG_EN[BACKUP_OPTION_HOME_ETC]="/home and /etc"
 MSG_EN[BACKUP_OPTION_FULL_SYSTEM]="Full system (except temporary files)"
 MSG_EN[BACKUP_OPTION_CUSTOM]="Custom directories"
-MSG_EN[BACKUP_CHOOSE_OPTION]="Choose an option:"
 MSG_EN[BACKUP_ENTER_CUSTOM_DIRS]="Custom directory selection:"
 MSG_EN[BACKUP_CUSTOM_INPUT]="Input (directories separated by spaces):"
-MSG_EN[BACKUP_INVALID_SELECTION]="Invalid selection."
 MSG_EN[BACKUP_NO_DIRS_SELECTED]="No directories selected."
 
+# === COMMON UI MESSAGES ===
+MSG_EN[CHOOSE_OPTION]="Choose an option:"
+MSG_EN[CHOOSE_OPTION_1_N]="Choose an option (1-%d):"
+MSG_EN[INVALID_SELECTION]="Invalid selection"
+MSG_EN[PRESS_KEY_CONTINUE]="Press any key to continue..."
+MSG_EN[BACK_TO_MAIN_MENU]="Back to Main Menu"
+MSG_EN[OPERATION_CANCELLED]="Operation cancelled"
+MSG_EN[OPERATION_ABORTED]="Operation aborted"
+
+# === COMMON SPACE CHECK MESSAGES ===
+MSG_EN[SPACE_CHECK_WARNING]="Could not reliably determine available space on %s."
+MSG_EN[SPACE_INSUFFICIENT_WARNING]="Possibly insufficient space on backup target (%s)."
+MSG_EN[SPACE_INFO]="Available: %s, Required (estimated): %s"
+MSG_EN[SPACE_SUFFICIENT]="Sufficient space available on %s (%s)."
+MSG_EN[CONFIRM_CONTINUE]="Continue anyway?"
+
 # Space checking
-MSG_EN[BACKUP_SPACE_CHECK_UNAVAILABLE]="WARNING: Could not reliably determine available space on %s."
-MSG_EN[BACKUP_SPACE_INSUFFICIENT]="WARNING: Possibly insufficient space on the backup target (%s)."
 MSG_EN[BACKUP_SPACE_AVAILABLE]="Available: %s, Required (estimated for selected directories): %s."
 MSG_EN[BACKUP_SPACE_CONTINUE_ANYWAY]="Continue with backup anyway?"
 MSG_EN[BACKUP_SPACE_CANCELLED_LOW]="Backup cancelled due to low disk space."
-MSG_EN[BACKUP_SPACE_SUFFICIENT]="Sufficient space available on %s (%s)."
 
 # Backup creation process
 MSG_EN[BACKUP_CREATING_TAR]="Creating TAR archive..."
@@ -100,12 +111,17 @@ MSG_EN[BACKUP_LOG_RSYNC_FAILED]="RSYNC backup failed (Exit code: %s)"
 MSG_EN[BACKUP_LOG_RSYNC_CLEANUP]="Cleaning up old RSYNC backups"
 MSG_EN[BACKUP_LOG_RSYNC_CLEANUP_REMOVE]="Removing old RSYNC backup: %s"
 
+# === COMMON PATH VALIDATION MESSAGES ===
+MSG_EN[PATH_EMPTY_ERROR]="Path cannot be empty. Please enter a valid path."
+MSG_EN[PATH_EMPTY_RETRY]="Path is required. Please enter the path to the backup target"
+MSG_EN[DIR_NOT_EXISTS_CREATE]="Directory '%s' does not exist. Create it?"
+MSG_EN[DIR_CREATE_ERROR]="Could not create directory '%s'. Please check permissions."
+MSG_EN[DIR_CREATE_RETRY]="Creation failed. Please enter a different path or check permissions"
+MSG_EN[PATH_NOT_ACCEPTED]="Path not accepted. Please enter a different path"
+
 # Path validation
 MSG_EN[BACKUP_PATH_EMPTY]="The path must not be empty. Please try again."
 MSG_EN[BACKUP_PATH_EMPTY_PROMPT]="Input must not be empty. Please enter the path to the backup target"
-MSG_EN[BACKUP_DIR_NOT_EXISTS]="The directory '%s' does not exist. Would you like to create it?"
-MSG_EN[BACKUP_DIR_CREATE_FAILED]="Error: Could not create directory '%s'. Please check the path and permissions."
-MSG_EN[BACKUP_DIR_CREATE_FAILED_PROMPT]="Creation failed. Please enter a different path or check permissions"
 MSG_EN[BACKUP_DIR_EXISTS_INFO]="Please enter an existing path or allow creation."
 MSG_EN[BACKUP_DIR_EXISTS_PROMPT]="Path not accepted. Please enter a different path"
 
@@ -132,13 +148,11 @@ MSG_EN[BACKUP_NOTIFICATION_FAILED_DETAILS]="Exit code: %s\nTimestamp: %s\nSee lo
 MSG_EN[BACKUP_ERROR_CREATE_DIR]="Could not create backup directory"
 MSG_EN[BACKUP_ERROR_NO_PKG_MANAGER]="No supported package manager found."
 MSG_EN[BACKUP_ERROR_OPERATION_CANCELLED]="Operation cancelled."
-MSG_EN[BACKUP_CANCELLED]="Backup cancelled."
 
 # RSYNC Backup additional messages
 MSG_EN[BACKUP_RSYNC_SELECT_TYPE_PROMPT]="Which backup type should be created?"
 MSG_EN[BACKUP_RSYNC_FULL_OPTION]="Full backup (copy everything)"
 MSG_EN[BACKUP_RSYNC_INCREMENTAL_OPTION]="Incremental backup (changes only)"
-MSG_EN[BACKUP_RSYNC_CHOOSE_OPTION]="Choose an option (1-2):"
 MSG_EN[BACKUP_RSYNC_ERROR_FAILED]="Error creating RSYNC backup."
 MSG_EN[BACKUP_RSYNC_ERROR_DRY_RUN_FAILED]="RSYNC dry run failed."
 
@@ -163,11 +177,9 @@ MSG_EN[RESTORE_OPTION_ORIGINAL]="To original location (overwrites existing files
 MSG_EN[RESTORE_OPTION_TEMP_TAR]="To temporary directory (/tmp/restore_tar)"
 MSG_EN[RESTORE_OPTION_TEMP_RSYNC]="To temporary directory (/tmp/restore_rsync)"
 MSG_EN[RESTORE_OPTION_CUSTOM]="Custom path"
-MSG_EN[RESTORE_CHOOSE_OPTION]="Choose an option (1-3):"
 MSG_EN[RESTORE_WARNING_TITLE]="=== WARNING ==="
 MSG_EN[RESTORE_WARNING_OVERWRITE]="This will overwrite existing files at their original location!"
 MSG_EN[RESTORE_CONFIRM_CONTINUE]="Do you really want to continue?"
-MSG_EN[RESTORE_CANCELLED]="Restore cancelled."
 MSG_EN[RESTORE_ENTER_TARGET_PATH_TAR]="Enter target path"
 MSG_EN[RESTORE_ENTER_TARGET_PATH_RSYNC]="Enter target path"
 MSG_EN[RESTORE_EXTRACTING_TAR]="Extracting archive..."
@@ -247,7 +259,6 @@ MSG_EN[MENU_RSYNC_BACKUP]="RSYNC Backup"
 MSG_EN[MENU_RESTORE]="Restore (TAR/RSYNC)"
 MSG_EN[MENU_BACKUP_STATUS]="Show Backup Status"
 MSG_EN[MENU_BACKUP_CONFIG]="Show/Change Backup Configuration"
-MSG_EN[MENU_BACK_TO_MAIN]="Back to Main Menu"
 
 # BTRFS specific translations
 MSG_EN[BTRFS_TOOLS_MISSING]="BTRFS tools are not available. This module requires btrfs-progs."
@@ -284,37 +295,30 @@ MSG_EN[BACKUP_CONFIG_RETENTION]="Retention (LH_RETENTION_BACKUP):"
 MSG_EN[BACKUP_CONFIG_LOGFILE]="Log file (LH_BACKUP_LOG):"
 
 # BTRFS Path Validation Messages
-MSG_EN[BACKUP_PATH_EMPTY_ERROR]="Path cannot be empty. Please enter a valid path."
-MSG_EN[BACKUP_PATH_EMPTY_RETRY]="Path is required. Please enter the path to the backup target"
-MSG_EN[BACKUP_CREATE_DIR_CONFIRM]="Directory '%s' does not exist. Create it?"
 MSG_EN[BACKUP_TARGET_SET_CREATED]="Backup target set to '%s' for this session (newly created)."
-MSG_EN[BACKUP_CREATE_DIR_ERROR]="Could not create directory '%s'. Please check permissions."
-MSG_EN[BACKUP_CREATE_DIR_RETRY]="Creation failed. Please enter a different path or check permissions"
 MSG_EN[BACKUP_SPECIFY_EXISTING_PATH]="Please specify an existing path or allow creation."
-MSG_EN[BACKUP_PATH_NOT_ACCEPTED]="Path not accepted. Please enter a different path"
 MSG_EN[BACKUP_TARGET_SET]="Backup target set to '%s' for this session."
 
 # BTRFS Space Check Messages
-MSG_EN[BACKUP_SPACE_CHECK_WARNING]="Could not reliably determine available space on %s."
-MSG_EN[BACKUP_CONFIRM_CONTINUE]="Continue anyway?"
 MSG_EN[BACKUP_SPACE_WARNING]="Possibly insufficient space on backup target (%s)."
-MSG_EN[BACKUP_SPACE_INFO]="Available: %s, Required (estimated): %s"
-MSG_EN[BACKUP_SUFFICIENT_SPACE]="Sufficient space available on %s (%s)."
 
 # BTRFS Error Messages
 MSG_EN[BTRFS_ERROR_CREATE_BACKUP_DIR]="Could not create backup directory. Please check permissions."
 MSG_EN[BTRFS_ERROR_CREATE_TEMP_DIR]="Could not create temporary snapshot directory. Please check permissions."
 
+# === COMMON SUCCESS/ERROR MESSAGES ===
+MSG_EN[SUCCESS_DELETED]="Successfully deleted"
+MSG_EN[ERROR_DELETION]="Error during deletion"
+MSG_EN[DELETION_ABORTED]="Deletion aborted"
+
 # BTRFS Deletion Messages
 MSG_EN[BTRFS_DELETE_HEADER]="Delete BTRFS Backups"
 MSG_EN[BTRFS_DELETE_NEEDS_ROOT]="Deleting BTRFS backups requires root permissions."
-MSG_EN[BTRFS_DELETE_ABORTED]="Deletion aborted."
 MSG_EN[BTRFS_NO_BACKUPS_FOUND]="No backups found in directory: %s"
 MSG_EN[BTRFS_AVAILABLE_SUBVOLUMES]="Available subvolumes:"
 MSG_EN[BTRFS_SNAPSHOT_DELETE_NONE_FOUND]="No snapshots found for deletion."
 MSG_EN[BTRFS_CHOOSE_SUBVOLUME]="Choose subvolume for backup deletion:"
 MSG_EN[BTRFS_ALL_SUBVOLUMES]="All subvolumes"
-MSG_EN[BACKUP_CHOOSE_OPTION_1_N]="Choose an option (1-%d):"
 MSG_EN[BTRFS_NO_SNAPSHOTS]="No snapshots found for subvolume: %s"
 MSG_EN[BTRFS_DELETE_OPTIONS]="Delete options for subvolume %s:"
 MSG_EN[BTRFS_DELETE_OPTION_SELECT]="Select specific snapshots"
@@ -349,8 +353,6 @@ MSG_EN[BTRFS_DELETE_WARNING_PERMANENT]="Deleted snapshots cannot be recovered!"
 MSG_EN[BTRFS_DELETE_CONFIRM_COUNT]="Proceed with deletion of %d snapshots?"
 MSG_EN[BTRFS_DELETE_DELETING]="Deleting snapshots..."
 MSG_EN[BTRFS_DELETE_DELETING_SNAPSHOT]="Deleting snapshot: %s"
-MSG_EN[BTRFS_DELETE_SUCCESS_SINGLE]="Successfully deleted"
-MSG_EN[BTRFS_DELETE_ERROR_SINGLE]="Error during deletion"
 MSG_EN[BTRFS_DELETE_RESULT_HEADER]="Deletion results for subvolume %s:"
 MSG_EN[BTRFS_DELETE_SUCCESS_COUNT]="Successfully deleted: %d snapshots"
 MSG_EN[BTRFS_DELETE_ERROR_COUNT]="Errors: %d snapshots"
@@ -362,8 +364,6 @@ MSG_EN[BTRFS_ORPHANED_SNAPSHOTS_FOUND]="Found %d orphaned temporary snapshots."
 MSG_EN[BTRFS_ORPHANED_SNAPSHOT_FOUND]="Found orphaned snapshot: %s"
 MSG_EN[BTRFS_CONFIRM_CLEANUP_ORPHANED]="Clean up orphaned snapshots?"
 MSG_EN[BTRFS_ORPHANED_SNAPSHOT_DELETE]="Deleting orphaned snapshot: %s"
-MSG_EN[BTRFS_ORPHANED_SNAPSHOT_DELETE_SUCCESS]="Successfully deleted"
-MSG_EN[BTRFS_ORPHANED_SNAPSHOT_DELETE_ERROR]="Error during deletion"
 MSG_EN[BTRFS_ORPHANED_SNAPSHOTS_CLEANED]="Successfully cleaned up %d orphaned snapshots."
 MSG_EN[BTRFS_ORPHANED_SNAPSHOTS_ERROR]="Errors with %d snapshots."
 MSG_EN[BTRFS_ORPHANED_SNAPSHOTS_CLEANUP_SKIPPED]="Orphaned snapshots cleanup skipped."
@@ -472,7 +472,6 @@ MSG_EN[BTRFS_STATUS_ACTIVE_EN]="CREATING"
 MSG_EN[BTRFS_STATUS_OK_EN]="OK"
 
 # Menu and UI Messages
-MSG_EN[MAIN_MENU_CHOOSE_OPTION]="Choose an option: "
 MSG_EN[MAIN_MENU_CONTINUE]="Press any key to continue..."
 
 # BTRFS Restore module translations
@@ -563,7 +562,6 @@ MSG_EN[BTRFS_RESTORE_TABLE_SNAPSHOT_NAME]="Snapshot Name"
 MSG_EN[BTRFS_RESTORE_TABLE_CREATED_AT]="Created At"
 MSG_EN[BTRFS_RESTORE_TABLE_SIZE]="Size"
 MSG_EN[BTRFS_RESTORE_SELECT_SNAPSHOT_NR]="Select snapshot number:"
-MSG_EN[BTRFS_RESTORE_INVALID_SNAPSHOT_SELECTION]="Invalid snapshot selection"
 
 # Final confirmation
 MSG_EN[BTRFS_RESTORE_FINAL_CONFIRMATION]="=== FINAL CONFIRMATION ==="
@@ -589,7 +587,6 @@ MSG_EN[BTRFS_RESTORE_SELECT_SOURCE_SUBVOL]="Select source subvolume:"
 MSG_EN[BTRFS_RESTORE_SYSTEM_LABEL]="System (@)"
 MSG_EN[BTRFS_RESTORE_HOME_LABEL]="Home (@home)"
 MSG_EN[BTRFS_RESTORE_SELECT_NUMBER]="Select number (1-2):"
-MSG_EN[BTRFS_RESTORE_INVALID_SELECTION]="Invalid selection"
 
 # Folder restore specific translations
 MSG_EN[BTRFS_RESTORE_FOLDER_PATH_PROMPT]="Enter the path to the folder to restore (e.g., /home/user/Documents):"
@@ -655,7 +652,6 @@ MSG_EN[BTRFS_RESTORE_LOG_USER_DENIED_SUDO]="User denied sudo privileges"
 MSG_EN[BTRFS_RESTORE_LOG_BTRFS_TOOLS_MISSING]="BTRFS tools not available"
 MSG_EN[BTRFS_RESTORE_UNDERSTAND_WARNING]="Do you understand the risks and want to continue?"
 MSG_EN[BTRFS_RESTORE_LOG_USER_ABORTED]="User aborted operation"
-MSG_EN[BTRFS_RESTORE_ABORTED]="Operation aborted"
 MSG_EN[BTRFS_RESTORE_LOG_SETUP_FAILED]="Setup failed"
 MSG_EN[BTRFS_RESTORE_LOG_MODULE_FINISHED]="BTRFS restore module finished"
 MSG_EN[BTRFS_RESTORE_MODULE_FINISHED]="BTRFS restore module completed"
@@ -674,12 +670,10 @@ MSG_EN[BACKUP_STATUS_TOTAL_SIZE]="Total size of all backups:"
 # BTRFS-specific menu and cleanup messages
 MSG_EN[BTRFS_BACKUP_TO_MAIN_MENU]="Return to main menu?"
 MSG_EN[BTRFS_CLEANUP_ALL_OK]="All snapshots are OK - no problems found."
-MSG_EN[BTRFS_CLEANUP_CANCELLED]="Cleanup cancelled."
 MSG_EN[BTRFS_CLEANUP_CLEANING]="Cleaning problematic snapshots..."
 MSG_EN[BTRFS_CLEANUP_CONFIRM_DELETE]="Delete all problematic snapshots?"
 MSG_EN[BTRFS_CLEANUP_DELETING]="Deleting problematic snapshot: %s"
 MSG_EN[BTRFS_CLEANUP_ERROR_COUNT]="Errors: %d snapshots"
-MSG_EN[BTRFS_CLEANUP_ERROR_SINGLE]="Error during deletion"
 MSG_EN[BTRFS_CLEANUP_FOUND_PROBLEMS]="Found %d problematic snapshots"
 MSG_EN[BTRFS_CLEANUP_NEEDS_ROOT]="Cleaning up problematic backups requires root permissions."
 MSG_EN[BTRFS_CLEANUP_NO_PROBLEMS]="No problems found in subvolume %s"
@@ -688,7 +682,6 @@ MSG_EN[BTRFS_CLEANUP_PROBLEMS_LABEL]="Problems:"
 MSG_EN[BTRFS_CLEANUP_RESULT_HEADER]="=== Cleanup Results ==="
 MSG_EN[BTRFS_CLEANUP_SEARCHING]="Searching for problematic snapshots..."
 MSG_EN[BTRFS_CLEANUP_SUCCESS_COUNT]="Successfully cleaned up: %d snapshots"
-MSG_EN[BTRFS_CLEANUP_SUCCESS_SINGLE]="Successfully deleted"
 MSG_EN[BTRFS_CLEANUP_WITH_SUDO]="Run cleanup with sudo?"
 
 # BTRFS menu items
@@ -699,7 +692,6 @@ MSG_EN[BTRFS_MENU_DELETE]="Delete BTRFS Backups"
 MSG_EN[BTRFS_MENU_CLEANUP]="Cleanup Problematic Backups"
 MSG_EN[BTRFS_MENU_RESTORE]="Restore BTRFS Backup"
 MSG_EN[BTRFS_MENU_SNAPSHOTS_CHECK]="Check Snapshot Environment"
-MSG_EN[BTRFS_MENU_BACK]="Back to Main Menu"
 
 # BTRFS snapshots environment check
 MSG_EN[BTRFS_SNAPSHOTS_CHECK_HEADER]="BTRFS Snapshot Environment Check"
@@ -725,11 +717,6 @@ MSG_EN[BTRFS_LOG_CLEANUP_PROBLEMATIC_ERROR]="Error cleaning up problematic snaps
 MSG_EN[BTRFS_LOG_CLEANUP_PROBLEMATIC_SNAPSHOT]="Cleaning up problematic snapshot: %s"
 MSG_EN[BTRFS_LOG_CLEANUP_PROBLEMATIC_SUCCESS]="Successfully cleaned up problematic snapshot: %s"
 MSG_EN[BTRFS_LOG_MARKER_DELETE_PROBLEMATIC]="Deleting problematic completion marker: %s"
-
-# Additional UI messages
-MSG_EN[CHOOSE_OPTION]="Choose an option:"
-MSG_EN[INVALID_SELECTION]="Invalid selection"
-MSG_EN[PRESS_KEY_CONTINUE]="Press any key to continue..."
 
 # Final missing BTRFS log messages
 MSG_EN[BTRFS_LOG_BACKUP_SUBVOL_DIR_ERROR]="Could not create backup subvolume directory for: %s"

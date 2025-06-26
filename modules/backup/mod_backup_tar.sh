@@ -150,7 +150,7 @@ tar_backup() {
     echo -e "  ${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg "BACKUP_OPTION_FULL_SYSTEM")${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_MENU_NUMBER}5.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg "BACKUP_OPTION_CUSTOM")${LH_COLOR_RESET}"
     
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg "BACKUP_CHOOSE_OPTION")${LH_COLOR_RESET}")" choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg "CHOOSE_OPTION")${LH_COLOR_RESET}")" choice
     lh_log_msg "DEBUG" "User selected option: '$choice'"
     
     local backup_dirs=()
@@ -192,7 +192,7 @@ tar_backup() {
             ;;
         *) 
             lh_log_msg "DEBUG" "Invalid selection: '$choice'"
-            echo -e "${LH_COLOR_ERROR}$(lh_msg 'BACKUP_INVALID_SELECTION')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
             return 1
             ;;
     esac
@@ -237,7 +237,7 @@ tar_backup() {
         if ! lh_confirm_action "$(lh_msg 'BACKUP_SPACE_CONTINUE_ANYWAY')" "n"; then
             lh_log_msg "DEBUG" "User chose not to continue due to space uncertainty"
             backup_log_msg "INFO" "$(lh_msg 'BACKUP_SPACE_CANCELLED_LOW')"
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_CANCELLED')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
             return 1
         fi
         lh_log_msg "DEBUG" "User chose to continue despite space uncertainty"
@@ -279,7 +279,7 @@ tar_backup() {
             echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_SPACE_AVAILABLE' "$available_hr" "$required_hr")${LH_COLOR_RESET}"
             if ! lh_confirm_action "$(lh_msg 'BACKUP_SPACE_CONTINUE_ANYWAY')" "n"; then
                 backup_log_msg "INFO" "$(lh_msg 'BACKUP_SPACE_CANCELLED_LOW')"
-                echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_CANCELLED')${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
                 return 1
             fi
         else

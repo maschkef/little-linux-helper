@@ -113,7 +113,7 @@ restore_rsync() {
         echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'RESTORE_OPTION_TEMP_RSYNC')${LH_COLOR_RESET}"
         echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'RESTORE_OPTION_CUSTOM')${LH_COLOR_RESET}"
         
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTORE_CHOOSE_OPTION') ${LH_COLOR_RESET}")" restore_choice
+        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" restore_choice
         lh_log_msg "DEBUG" "User selected restore option: '$restore_choice'"
         
         local restore_path="/"
@@ -126,7 +126,7 @@ restore_rsync() {
                 echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_WARNING_OVERWRITE')${LH_COLOR_RESET}"
                 if ! lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_CONTINUE')" "n"; then
                     lh_log_msg "DEBUG" "User cancelled restore after warning"
-                    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_CANCELLED')${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
                     return 0
                 fi
                 lh_log_msg "DEBUG" "User confirmed restore to original location"

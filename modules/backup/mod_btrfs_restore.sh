@@ -137,7 +137,7 @@ backup_or_delete_child_snapshots() {
     lh_print_menu_item 2 "$(lh_msg 'BTRFS_RESTORE_DELETE_ALL_SNAPSHOTS')"
     lh_print_menu_item 0 "$(lh_msg 'BTRFS_RESTORE_ABORT')"
     local action
-    action=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_OPTION_SELECT')" "^[0-2]$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
+    action=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_OPTION_SELECT')" "^[0-2]$" "$(lh_msg 'INVALID_SELECTION')")
     case $action in
         1)
             echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_BACKING_UP_SNAPSHOTS' "$backup_dir")${LH_COLOR_RESET}"
@@ -169,7 +169,7 @@ backup_or_delete_child_snapshots() {
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_RESTORE_ALL_SNAPSHOTS_DELETED')${LH_COLOR_RESET}"
             ;;
         0|*)
-            echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_RESTORE_OPERATION_ABORTED')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'OPERATION_ABORTED')${LH_COLOR_RESET}"
             return 1
             ;;
     esac
@@ -318,7 +318,7 @@ select_restore_type_and_snapshot() {
     lh_print_menu_item 3 "$(lh_msg 'BTRFS_RESTORE_HOME_ONLY')"
     
     local choice
-    choice=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_OPTION')" "^[1-3]$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
+    choice=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_OPTION')" "^[1-3]$" "$(lh_msg 'INVALID_SELECTION')")
     if [ -z "$choice" ]; then return 1; fi
 
     local subvol_to_list_snapshots=""
@@ -356,9 +356,9 @@ select_restore_type_and_snapshot() {
     done
 
     local snap_choice
-    snap_choice=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_SNAPSHOT_NR')" "^[0-9]+$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
+    snap_choice=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_SNAPSHOT_NR')" "^[0-9]+$" "$(lh_msg 'INVALID_SELECTION')")
     if [ -z "$snap_choice" ] || [ "$snap_choice" -lt 1 ] || [ "$snap_choice" -gt ${#snapshots[@]} ]; then
-        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_INVALID_SNAPSHOT_SELECTION')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
         return 1
     fi
     
@@ -411,12 +411,12 @@ restore_folder_from_snapshot() {
     echo -e "${LH_COLOR_PROMPT}$(lh_msg 'BTRFS_RESTORE_SELECT_SOURCE_SUBVOL')${LH_COLOR_RESET}"
     lh_print_menu_item 1 "$(lh_msg 'BTRFS_RESTORE_SYSTEM_LABEL')"
     lh_print_menu_item 2 "$(lh_msg 'BTRFS_RESTORE_HOME_LABEL')"
-    subvol_choice=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_NUMBER')" "^[1-2]$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
+    subvol_choice=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_NUMBER')" "^[1-2]$" "$(lh_msg 'INVALID_SELECTION')")
     local subvol_name
     case $subvol_choice in
         1) subvol_name="@";;
         2) subvol_name="@home";;
-        *) echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_INVALID_SELECTION')${LH_COLOR_RESET}"; return 1;;
+        *) echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"; return 1;;
     esac
     # List snapshots
     local snapshots=()
@@ -440,7 +440,7 @@ restore_folder_from_snapshot() {
         printf "%-4s %-30s %-18s %-10s\n" "$((i+1))" "$snapshot_name" "$created_at" "$snapshot_size"
     done
     local snap_choice
-    snap_choice=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_SNAPSHOT_NR')" "^[0-9]+$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
+    snap_choice=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_SNAPSHOT_NR')" "^[0-9]+$" "$(lh_msg 'INVALID_SELECTION')")
     if [ -z "$snap_choice" ] || [ "$snap_choice" -lt 1 ] || [ "$snap_choice" -gt ${#snapshots[@]} ]; then
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RESTORE_INVALID_SNAPSHOT_SELECTION')${LH_COLOR_RESET}"
         return 1
@@ -537,7 +537,7 @@ setup_recovery_environment() {
         done
         lh_print_menu_item 0 "$(lh_msg 'BTRFS_RESTORE_MANUAL_INPUT')"
         local sel
-        sel=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_NUMBER')" "^[0-9]+$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
+        sel=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_NUMBER')" "^[0-9]+$" "$(lh_msg 'INVALID_SELECTION')")
         if [ "$sel" = "0" ]; then
             backup_root_path=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_BACKUP_MOUNT_PROMPT')")
         elif [ "$sel" -ge 1 ] && [ "$sel" -le ${#backup_drives[@]} ]; then
@@ -565,7 +565,7 @@ setup_recovery_environment() {
         done
         lh_print_menu_item 0 "$(lh_msg 'BTRFS_RESTORE_MANUAL_INPUT')"
         local sel
-        sel=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_NUMBER')" "^[0-9]+$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
+        sel=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_SELECT_NUMBER')" "^[0-9]+$" "$(lh_msg 'INVALID_SELECTION')")
         if [ "$sel" = "0" ]; then
             target_root_path=$(lh_ask_for_input "$(lh_msg 'BTRFS_RESTORE_TARGET_MOUNT_PROMPT')")
         elif [ "$sel" -ge 1 ] && [ "$sel" -le ${#target_drives[@]} ]; then
@@ -611,11 +611,11 @@ main_menu() {
         lh_print_menu_item 2 "$(lh_msg 'BTRFS_RESTORE_MENU_FOLDER_RESTORE')"
         lh_print_menu_item 3 "$(lh_msg 'BTRFS_RESTORE_MENU_DISK_INFO')"
         lh_print_menu_item 4 "$(lh_msg 'BTRFS_RESTORE_MENU_SETUP_AGAIN')"
-        lh_print_menu_item 0 "$(lh_msg 'BTRFS_RESTORE_MENU_BACK')"
+        lh_print_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
         echo ""
 
         local option
-        option=$(lh_ask_for_input "$(lh_msg 'CHOOSE_OPTION')" "^[0-4]$" "$(lh_msg 'BACKUP_INVALID_SELECTION')")
+        option=$(lh_ask_for_input "$(lh_msg 'CHOOSE_OPTION')" "^[0-4]$" "$(lh_msg 'INVALID_SELECTION')")
 
         case $option in
             1)
@@ -642,7 +642,7 @@ main_menu() {
                 return 0
                 ;;
             *)
-                echo -e "${LH_COLOR_ERROR}$(lh_msg 'BACKUP_INVALID_SELECTION')${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
                 ;;
         esac
 
@@ -695,7 +695,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
     if ! lh_confirm_action "$(lh_msg 'BTRFS_RESTORE_UNDERSTAND_WARNING')" "n"; then
         restore_log_msg "INFO" "$(lh_msg 'BTRFS_RESTORE_LOG_USER_ABORTED')"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RESTORE_ABORTED')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_ABORTED')${LH_COLOR_RESET}"
         exit 0
     fi
     

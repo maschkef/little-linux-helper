@@ -155,7 +155,7 @@ rsync_backup() {
     echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BACKUP_OPTION_FULL_SYSTEM')${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BACKUP_OPTION_CUSTOM')${LH_COLOR_RESET}"
     
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'BACKUP_CHOOSE_OPTION') (1-3): ${LH_COLOR_RESET}")" choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') (1-3): ${LH_COLOR_RESET}")" choice
     lh_log_msg "DEBUG" "User selected option: '$choice'"
     
     local source_dirs=()
@@ -229,7 +229,7 @@ rsync_backup() {
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'BACKUP_SPACE_CHECK_UNAVAILABLE' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
         if ! lh_confirm_action "$(lh_msg 'BACKUP_SPACE_CONTINUE_ANYWAY')" "n"; then
             backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_SPACE_CANCELLED_LOW')"
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_CANCELLED')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
             return 1
         fi
     else
@@ -258,7 +258,7 @@ rsync_backup() {
             echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_SPACE_AVAILABLE' "$available_hr" "$required_hr")${LH_COLOR_RESET}"
             if ! lh_confirm_action "$(lh_msg 'BACKUP_SPACE_CONTINUE_ANYWAY')" "n"; then
                 backup_log_msg "INFO" "$(lh_msg 'BACKUP_SPACE_CANCELLED_LOW')"
-                echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_CANCELLED')${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
                 return 1
             fi
         else
@@ -279,7 +279,7 @@ rsync_backup() {
     echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BACKUP_RSYNC_FULL_OPTION')${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BACKUP_RSYNC_INCREMENTAL_OPTION')${LH_COLOR_RESET}"
     
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'BACKUP_RSYNC_CHOOSE_OPTION') ${LH_COLOR_RESET}")" backup_type
+    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" backup_type
     lh_log_msg "DEBUG" "User selected backup type: '$backup_type'"
     
     # Additional exclusions

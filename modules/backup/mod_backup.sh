@@ -351,7 +351,7 @@ backup_menu() {
         lh_print_menu_item 4 "$(lh_msg "MENU_RESTORE")"
         lh_print_menu_item 6 "$(lh_msg "MENU_BACKUP_STATUS")"
         lh_print_menu_item 7 "$(lh_msg "MENU_BACKUP_CONFIG")"
-        lh_print_menu_item 0 "$(lh_msg "MENU_BACK_TO_MAIN")"
+        lh_print_menu_item 0 "$(lh_msg "BACK_TO_MAIN_MENU")"
         echo ""
         
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg "CHOOSE_OPTION") ${LH_COLOR_RESET}")" option
