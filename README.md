@@ -33,7 +33,7 @@ This project is licensed under the MIT License. For more information, see the `L
 
 Here is a list of known issues, limitations, or behaviors you might encounter when using the scripts.
 * **Backups:**
-    * **BTRFS Backup:** The BTRFS backup and restore functions are now moved to the modules `mod_btrfs_backup.sh` and `mod_btrfs_restore.sh`. The other backup methods (TAR, RSYNC) are less intensively tested.
+    * **BTRFS Backup:** The BTRFS backup and restore functions are now moved to the modules `modules/backup/mod_btrfs_backup.sh` and `modules/backup/mod_btrfs_restore.sh`. The other backup methods (TAR, RSYNC) are less intensively tested.
 * **Advanced Log Analysis (`scripts/advanced_log_analyzer.py`):**
     * This script is less intensively tested and has known limitations regarding log format recognition, character encoding, and the complexity of its regular expressions (see `docs/advanced_log_analyzer.md` for details).
 
@@ -56,17 +56,17 @@ The main script `help_master.sh` serves as the central entry point and provides 
 <details>
 <summary>💾 Backup & Restore</summary>
 
-* **BTRFS Snapshot Backup & Restore** (`mod_btrfs_backup.sh`, `mod_btrfs_restore.sh`):
+* **BTRFS Snapshot Backup & Restore** (`modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`):
     * Creation and management of snapshots for subvolumes `@` and `@home`.
     * Transfer of snapshots to backup destination using `btrfs send/receive`.
     * Integrated integrity checking, marker files, automatic cleanup, manual and automatic deletion, status display, and desktop notifications.
     * Restoration of complete systems, individual subvolumes, or individual folders from snapshots – with dry-run support.
     * Detailed technical description: see `docs/mod_btrfs_backup.md` and `docs/mod_btrfs_restore.md`.
-* **TAR Archive Backup & Restore** (`mod_backup.sh`):
+* **TAR Archive Backup & Restore** (`modules/backup/mod_backup.sh`):
     * Creation of compressed TAR archives (`.tar.gz`) from selected directories.
     * Configurable exclusion lists and retention policies.
     * Restoration to original location, temporary directory, or custom path.
-* **RSYNC Backup & Restore** (`mod_backup.sh`):
+* **RSYNC Backup & Restore** (`modules/backup/mod_backup.sh`):
     * Backups with `rsync` (full or incremental, with hardlinks for space savings).
     * Selection of source directories and exclusion lists.
     * Restoration to original location, temporary directory, or custom path.
@@ -253,7 +253,7 @@ When the main script (`help_master.sh`) is started for the first time, default c
 
 Configuration files are currently used for the following modules:
 * **General Settings (`help_master.sh`)**: Language, logging behavior, and other basic settings (`config/general.conf`).
-* **Backup & Restore (`mod_backup.sh`, `mod_btrfs_backup.sh`, `mod_btrfs_restore.sh`)**: Settings for backup paths, retention policies, etc. (`config/backup.conf`).
+* **Backup & Restore (`modules/backup/mod_backup.sh`, `modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`)**: Settings for backup paths, retention policies, etc. (`config/backup.conf`).
 * **Docker Security Check (`mod_security.sh`)**: Settings for search paths, warnings to skip, etc. (`config/docker.conf`).
 
 </details>
@@ -274,9 +274,9 @@ The project is divided into modules to organize functionality:
     * Complex logic for determining the active desktop user.
     * The ability to send **desktop notifications** to the user.
 * **`modules/mod_restarts.sh`**: Provides options for restarting services and the desktop environment.
-* **`modules/mod_backup.sh`**: Provides backup and restore functions using TAR and RSYNC.
-* **`modules/mod_btrfs_backup.sh`**: BTRFS-specific backup functions (snapshots, transfer, integrity checking, markers, cleanup, status, etc.).
-* **`modules/mod_btrfs_restore.sh`**: BTRFS-specific restore functions (complete system, individual subvolumes, folders, and dry-run).
+* **`modules/backup/mod_backup.sh`**: Provides backup and restore functions using TAR and RSYNC.
+* **`modules/backup/mod_btrfs_backup.sh`**: BTRFS-specific backup functions (snapshots, transfer, integrity checking, markers, cleanup, status, etc.).
+* **`modules/backup/mod_btrfs_restore.sh`**: BTRFS-specific restore functions (complete system, individual subvolumes, folders, and dry-run).
 * **`modules/mod_system_info.sh`**: Displays detailed system information.
 * **`modules/mod_disk.sh`**: Tools for disk analysis and maintenance.
 * **`modules/mod_logs.sh`**: Analysis of system and application logs.

@@ -239,7 +239,7 @@ while true; do
             bash "$LH_ROOT_DIR/modules/mod_security.sh"
             ;;
         7)
-            bash "$LH_ROOT_DIR/modules/mod_backup.sh"
+            bash "$LH_ROOT_DIR/modules/backup/mod_backup.sh"
             ;;
         8)
             bash "$LH_ROOT_DIR/modules/mod_docker.sh"

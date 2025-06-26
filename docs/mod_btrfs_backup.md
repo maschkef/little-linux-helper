@@ -7,7 +7,7 @@ This project is part of the 'little-linux-helper' collection.
 Licensed under the MIT License. See the LICENSE file in the project root for more information.
 -->
 
-## Module: `modules/mod_btrfs_backup.sh` - BTRFS Snapshot-Based Backup Operations
+## Module: `modules/backup/mod_btrfs_backup.sh` - BTRFS Snapshot-Based Backup Operations
 
 **1. Purpose:**
 This module provides comprehensive BTRFS snapshot-based backup functionality. It creates read-only snapshots of BTRFS subvolumes (`@` and `@home`) and transfers them to a backup destination using `btrfs send/receive`. The module includes integrity checking, cleanup mechanisms, and management tools for BTRFS backups. It is designed to work with standard BTRFS subvolume layouts commonly used by distributions like openSUSE, Arch Linux, and others.

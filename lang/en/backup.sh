@@ -71,8 +71,7 @@ MSG_EN[BACKUP_RSYNC_SUCCESS]="RSYNC backup created successfully!"
 MSG_EN[BACKUP_RSYNC_DRY_RUN_SUCCESS]="RSYNC dry run completed successfully!"
 
 # Common backup messages
-MSG_EN[BACKUP_LOG_WARN_CREATE]="WARN (mod_backup): Could not create/touch backup log file %s."
-MSG_EN[BACKUP_LOG_WARN_CREATE]="WARN (mod_backup): Could not create/touch backup log file %s."
+MSG_EN[BACKUP_LOG_WARN_CREATE]="WARN (modules/backup/mod_backup): Could not create/touch backup log file %s."
 MSG_EN[BACKUP_LOG_STARTING]="Starting %s backup to %s"
 MSG_EN[BACKUP_LOG_SUCCESS]="Successfully created %s backup: %s"
 MSG_EN[BACKUP_LOG_FAILED]="Failed to create %s backup (Exit code: %s)"
@@ -477,7 +476,7 @@ MSG_EN[MAIN_MENU_CHOOSE_OPTION]="Choose an option: "
 MSG_EN[MAIN_MENU_CONTINUE]="Press any key to continue..."
 
 # BTRFS Restore module translations
-MSG_EN[BTRFS_RESTORE_LOG_WARN_CREATE]="WARN (mod_btrfs_restore): Could not create/touch restore log file %s."
+MSG_EN[BTRFS_RESTORE_LOG_WARN_CREATE]="WARN (modules/backup/mod_btrfs_restore): Could not create/touch restore log file %s."
 
 
 # Read-only subvolume handling
@@ -735,3 +734,9 @@ MSG_EN[PRESS_KEY_CONTINUE]="Press any key to continue..."
 # Final missing BTRFS log messages
 MSG_EN[BTRFS_LOG_BACKUP_SUBVOL_DIR_ERROR]="Could not create backup subvolume directory for: %s"
 MSG_EN[BTRFS_LOG_TRANSFER_SNAPSHOT]="Transferring snapshot for subvolume: %s"
+
+# Sub-module information messages
+MSG_EN[BACKUP_TAR_MODULE_INFO]="Starting TAR backup operations..."
+MSG_EN[BACKUP_RSYNC_MODULE_INFO]="Starting RSYNC backup operations..."
+MSG_EN[RESTORE_TAR_MODULE_INFO]="Starting TAR restore operations..."
+MSG_EN[RESTORE_RSYNC_MODULE_INFO]="Starting RSYNC restore operations..."

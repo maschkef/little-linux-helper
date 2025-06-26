@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# modules/mod_btrfs_restore.sh
+# modules/backup/mod_btrfs_restore.sh
 # Copyright (c) 2025 wuldorf
 # SPDX-License-Identifier: MIT
 #
@@ -13,7 +13,7 @@
 # --- Initialization ---
 # Load common library and configurations
 # Use BASH_SOURCE to get the correct path when sourced
-source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then

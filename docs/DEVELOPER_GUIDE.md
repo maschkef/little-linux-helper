@@ -1001,7 +1001,7 @@ export LH_LOG_LEVEL="DEBUG"
 ./help_master.sh
 
 # Method 3: Runtime testing of specific modules
-export LH_LOG_LEVEL="DEBUG" && bash modules/mod_backup.sh
+export LH_LOG_LEVEL="DEBUG" && bash modules/backup/mod_backup.sh
 ```
 
 **Debug Output Analysis:**

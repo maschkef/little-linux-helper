@@ -7,7 +7,7 @@ This project is part of the 'little-linux-helper' collection.
 Licensed under the MIT License. See the LICENSE file in the project root for more information.
 -->
 
-## Module: `modules/mod_backup.sh` – TAR & RSYNC Backup/Restore Operations
+## Module: `modules/backup/mod_backup.sh` – TAR & RSYNC Backup/Restore Operations
 
 **1. Purpose:**
 This module provides comprehensive backup and restore functionalities for TAR archives and RSYNC-based backups. It offers a user-friendly interface for creating, managing, and restoring data, with built-in safety checks and configuration options. BTRFS operations are no longer part of this module but can be reached from the Menu.
@@ -114,4 +114,4 @@ This is the entry point and main interactive loop for the backup module. It pres
 *   **User Prompts for Paths:** When the configured `$LH_BACKUP_ROOT` is unavailable or the user wishes to change it for the session, the script uses `lh_ask_for_input` and includes logic to validate paths and offer to create directories.
 
 **6. Integration with BTRFS Modules:**
-*   The main menu of `mod_backup.sh` provides an entry point to launch the BTRFS backup and restore modules (`mod_btrfs_backup.sh`, `mod_btrfs_restore.sh`). For all BTRFS snapshot-based backup and restore operations, refer to the documentation of those modules.
+*   The main menu of `mod_backup.sh` provides an entry point to launch the BTRFS backup and restore modules (`modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`). For all BTRFS snapshot-based backup and restore operations, refer to the documentation of those modules.

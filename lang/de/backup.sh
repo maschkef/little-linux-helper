@@ -71,7 +71,7 @@ MSG_DE[BACKUP_RSYNC_SUCCESS]="RSYNC-Backup erfolgreich erstellt!"
 MSG_DE[BACKUP_RSYNC_DRY_RUN_SUCCESS]="RSYNC-Testlauf erfolgreich abgeschlossen!"
 
 # Common backup messages
-MSG_DE[BACKUP_LOG_WARN_CREATE]="WARNUNG (mod_backup): Backup-Logdatei %s konnte nicht erstellt/berührt werden."
+MSG_DE[BACKUP_LOG_WARN_CREATE]="WARNUNG (modules/backup/mod_backup): Backup-Logdatei %s konnte nicht erstellt/berührt werden."
 MSG_DE[BACKUP_LOG_STARTING]="Starte %s Backup nach %s"
 MSG_DE[BACKUP_LOG_SUCCESS]="Erfolgreich erstelltes %s Backup: %s"
 MSG_DE[BACKUP_LOG_FAILED]="Fehler beim Erstellen des %s Backups (Exit-Code: %s)"
@@ -477,7 +477,7 @@ MSG_DE[MAIN_MENU_CHOOSE_OPTION]="Wählen Sie eine Option: "
 MSG_DE[MAIN_MENU_CONTINUE]="Drücken Sie eine beliebige Taste zum Fortfahren..."
 
 # BTRFS Restore module translations
-MSG_DE[BTRFS_RESTORE_LOG_WARN_CREATE]="WARNUNG (mod_btrfs_restore): Wiederherstellungs-Logdatei %s konnte nicht erstellt/berührt werden."
+MSG_DE[BTRFS_RESTORE_LOG_WARN_CREATE]="WARNUNG (modules/backup/mod_btrfs_restore): Wiederherstellungs-Logdatei %s konnte nicht erstellt/berührt werden."
 
 # Read-only subvolume handling
 MSG_DE[BTRFS_RESTORE_LOG_CHECKING_READONLY]="Checking read-only status of subvolume: %s"
@@ -733,3 +733,9 @@ MSG_DE[INVALID_SELECTION]="Ungültige Auswahl"
 MSG_DE[PRESS_KEY_CONTINUE]="Drücken Sie eine beliebige Taste zum Fortfahren..."
 MSG_DE[BTRFS_LOG_BACKUP_SUBVOL_DIR_ERROR]="Backup-Subvolume-Verzeichnis für %s konnte nicht erstellt werden"
 MSG_DE[BTRFS_LOG_TRANSFER_SNAPSHOT]="Übertrage Snapshot für Subvolume: %s"
+
+# Sub-module information messages
+MSG_DE[BACKUP_TAR_MODULE_INFO]="Starte TAR-Backup-Operationen..."
+MSG_DE[BACKUP_RSYNC_MODULE_INFO]="Starte RSYNC-Backup-Operationen..."
+MSG_DE[RESTORE_TAR_MODULE_INFO]="Starte TAR-Wiederherstellungsoperationen..."
+MSG_DE[RESTORE_RSYNC_MODULE_INFO]="Starte RSYNC-Wiederherstellungsoperationen..."

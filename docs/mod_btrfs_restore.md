@@ -7,12 +7,12 @@ This project is part of the 'little-linux-helper' collection.
 Licensed under the MIT License. See the LICENSE file in the project root for more information.
 -->
 
-## Module: `modules/mod_btrfs_restore.sh` - BTRFS Snapshot-Based Restore Operations
+## Module: `modules/backup/mod_btrfs_restore.sh` - BTRFS Snapshot-Based Restore Operations
 
 **WARNING:** This module performs destructive operations on the target system. It is designed to be run from a live environment (e.g., live USB) and should NOT be executed on the running system that you want to restore.
 
 **1. Purpose:**
-This module provides comprehensive BTRFS snapshot-based restore functionality. It allows restoring complete systems, individual subvolumes, or specific folders from BTRFS backup snapshots created by the `mod_btrfs_backup.sh` module. The module includes safety mechanisms, dry-run capabilities, and interactive checkpoints to prevent accidental data loss. It is designed to work in recovery scenarios where the primary system needs to be restored from BTRFS snapshots.
+This module provides comprehensive BTRFS snapshot-based restore functionality. It allows restoring complete systems, individual subvolumes, or specific folders from BTRFS backup snapshots created by the `modules/backup/mod_btrfs_backup.sh` module. The module includes safety mechanisms, dry-run capabilities, and interactive checkpoints to prevent accidental data loss. It is designed to work in recovery scenarios where the primary system needs to be restored from BTRFS snapshots.
 
 **2. Initialization & Dependencies:**
 *   **Library Source:** The module begins by sourcing the common library: `source "$(dirname "$0")/../lib/lib_common.sh"`.
@@ -167,7 +167,7 @@ This is the entry point and main interactive loop for the BTRFS restore module. 
 *   **Cross-timestamp Consistency:** Automatic matching of root and home snapshots by timestamp for system restore
 
 **10. Integration Points:**
-*   **Backup Module Compatibility:** Designed to work with snapshots created by `mod_btrfs_backup.sh`
+*   **Backup Module Compatibility:** Designed to work with snapshots created by `modules/backup/mod_btrfs_backup.sh`
 *   **Marker File Recognition:** Understands and validates `.backup_complete` marker files
 *   **Configuration Integration:** Uses shared backup configuration from `lib_common.sh`
 *   **Logging Integration:** Integrates with the common logging system while maintaining separate restore logs

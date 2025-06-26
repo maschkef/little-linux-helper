@@ -35,7 +35,7 @@ Dieses Projekt steht unter der MIT-Lizenz. Weitere Informationen findest du in d
 
 Hier ist eine Liste von bekannten Problemen, Einschränkungen oder Verhaltensweisen, die dir bei der Nutzung der Skripte auffallen könnten.
 * **Backups:**
-    * **BTRFS-Backup:** Die BTRFS-Backup- und Restore-Funktionen sind jetzt in den Modulen `mod_btrfs_backup.sh` und `mod_btrfs_restore.sh` ausgelagert. Die anderen Backup-Methoden (TAR, RSYNC) sind weniger intensiv getestet.
+    * **BTRFS-Backup:** Die BTRFS-Backup- und Restore-Funktionen sind jetzt in den Modulen `modules/backup/mod_btrfs_backup.sh` und `modules/backup/mod_btrfs_restore.sh` ausgelagert. Die anderen Backup-Methoden (TAR, RSYNC) sind weniger intensiv getestet.
 * **Erweiterte Log-Analyse (`scripts/advanced_log_analyzer.py`):**
     * Dieses Skript ist weniger intensiv getestet und hat bekannte Einschränkungen bezüglich Log-Format-Erkennung, Zeichenkodierung und der Komplexität seiner regulären Ausdrücke (Details siehe `docs/advanced_log_analyzer.md`).
 
@@ -58,17 +58,17 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
 <details>
 <summary>💾 Backup & Wiederherstellung</summary>
 
-* **BTRFS Snapshot Backup & Restore** (`mod_btrfs_backup.sh`, `mod_btrfs_restore.sh`):
+* **BTRFS Snapshot Backup & Restore** (`modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`):
     * Erstellung und Verwaltung von Snapshots der Subvolumes `@` und `@home`.
     * Übertragung der Snapshots zum Backup-Ziel mittels `btrfs send/receive`.
     * Integrierte Integritätsprüfung, Marker-Dateien, automatische Bereinigung, manuelles und automatisches Löschen, Statusanzeige und Desktop-Benachrichtigungen.
     * Wiederherstellung kompletter Systeme, einzelner Subvolumes oder einzelner Ordner aus Snapshots – mit Dry-Run-Unterstützung.
     * Ausführliche technische Beschreibung: siehe `docs/mod_btrfs_backup.md` und `docs/mod_btrfs_restore.md`.
-* **TAR Archiv Backup & Restore** (`mod_backup.sh`):
+* **TAR Archiv Backup & Restore** (`modules/backup/mod_backup.sh`):
     * Erstellung komprimierter TAR-Archive (`.tar.gz`) von ausgewählten Verzeichnissen.
     * Konfigurierbare Ausschlusslisten und Aufbewahrungsrichtlinien.
     * Wiederherstellung an ursprünglichen Ort, temporäres Verzeichnis oder benutzerdefinierten Pfad.
-* **RSYNC Backup & Restore** (`mod_backup.sh`):
+* **RSYNC Backup & Restore** (`modules/backup/mod_backup.sh`):
     * Backups mit `rsync` (Voll- oder inkrementell, mit Hardlinks für Speicherersparnis).
     * Auswahl von Quellverzeichnissen und Ausschlusslisten.
     * Wiederherstellung an ursprünglichen Ort, temporäres Verzeichnis oder benutzerdefinierten Pfad.
@@ -255,7 +255,7 @@ Beim ersten Start des Hauptskripts (`help_master.sh`) werden automatisch Standar
 
 Aktuell werden Konfigurationsdateien für folgende Module verwendet:
 *   **Allgemeine Einstellungen (`help_master.sh`)**: Sprache, Logging-Verhalten und andere grundlegende Einstellungen (`config/general.conf`).
-*   **Backup & Wiederherstellung (`mod_backup.sh`, `mod_btrfs_backup.sh`, `mod_btrfs_restore.sh`)**: Einstellungen für Backup-Pfade, Aufbewahrungsrichtlinien etc. (`config/backup.conf`).
+*   **Backup & Wiederherstellung (`modules/backup/mod_backup.sh`, `modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`)**: Einstellungen für Backup-Pfade, Aufbewahrungsrichtlinien etc. (`config/backup.conf`).
 *   **Docker Security Überprüfung (`mod_security.sh`)**: Einstellungen für Suchpfade, zu überspringende Warnungen etc. (`config/docker.conf`).
 
 </details>
@@ -276,9 +276,9 @@ Das Projekt ist in Module unterteilt, um die Funktionalität zu organisieren:
     * Komplexe Logik zur Ermittlung des aktiven Desktop-Ben utzers.
     * Die Fähigkeit, **Desktop-Benachrichtigungen** an den Benutzer zu senden.
 * **`modules/mod_restarts.sh`**: Bietet Optionen zum Neustarten von Diensten und der Desktop-Umgebung.
-* **`modules/mod_backup.sh`**: Stellt Backup- und Restore-Funktionen mittels TAR und RSYNC bereit.
-* **`modules/mod_btrfs_backup.sh`**: BTRFS-spezifische Backup-Funktionen (Snapshots, Transfer, Integritätsprüfung, Marker, Bereinigung, Status, uvm.).
-* **`modules/mod_btrfs_restore.sh`**: BTRFS-spezifische Restore-Funktionen (komplettes System, einzelne Subvolumes, Ordner und Dry-Run).
+* **`modules/backup/mod_backup.sh`**: Stellt Backup- und Restore-Funktionen mittels TAR und RSYNC bereit.
+* **`modules/backup/mod_btrfs_backup.sh`**: BTRFS-spezifische Backup-Funktionen (Snapshots, Transfer, Integritätsprüfung, Marker, Bereinigung, Status, uvm.).
+* **`modules/backup/mod_btrfs_restore.sh`**: BTRFS-spezifische Restore-Funktionen (komplettes System, einzelne Subvolumes, Ordner und Dry-Run).
 * **`modules/mod_system_info.sh`**: Zeigt detaillierte Systeminformationen an.
 * **`modules/mod_disk.sh`**: Werkzeuge zur Festplattenanalyse und -wartung.
 * **`modules/mod_logs.sh`**: Analyse von System- und Anwendungsprotokollen.
