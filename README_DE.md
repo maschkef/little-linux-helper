@@ -2,7 +2,7 @@
 
 > **⚠️ Dokumentationsstatus-Hinweis:**
 > 1. **Dokumentation muss aktualisiert werden**: Die Dokumentation (einschließlich dieser README_DE.md) muss aktualisiert werden, um aktuelle Änderungen und Verbesserungen zu reflektieren.
-> 2. **Docker Security Modul Problem**: Das Modul `mod_docker_security.sh` funktioniert nicht vollständig. Die alte funktionierende Version (nur auf Deutsch) ist als `modules/mod_security_old.sh` enthalten, aber nicht in die Menüstruktur integriert.
+> 2. **BTRFS Module benötigen Tests**: Die BTRFS Backup- und Restore-Module müssen noch umfassend getestet werden. Das Backup-Modul wurde erweitert und verbessert, während das Restore-Modul komplett neu erstellt wurde. Bitte mit Vorsicht verwenden und vorher gründlich testen.
 
 ## Beschreibung
 
@@ -11,7 +11,7 @@ Little Linux Helper ist eine Sammlung von Bash-Skripten, die entwickelt wurden, 
 Eine detailliertere technische englische Dokumentation der einzelnen Module und Kernkomponenten befindet sich im `docs`-Verzeichnis, 
 diese wurde mitunter erstellt um einer KI den kontext eines modules bzw einer Datei zu geben ohne dieses selbst komplett lesen zu müssen und kontext zusparen.
 Die `docs/DEVELOPER_GUIDE.md` enthält alle Informationen zu `lib/lib_common.sh` und `help_master.sh` die benötigt werden um ein neues Modul zu erstellen. 
-Hinweis: Die ursprüngliche `lib_common.sh` wurde zur besseren Organisation in mehrere spezialisierte Bibliotheken aufgeteilt (z.B. `lib_colors.sh`, `lib_i18n.sh`, `lib_notifications.sh`, etc.), aber `lib_common.sh` bleibt der Haupteinstiegspunkt und lädt alle anderen Bibliotheken automatisch.
+Hinweis: Die ursprüngliche `lib_common.sh` wurde zur besseren Organisation in mehrere spezialisierte Bibliotheken aufgeteilt (z.B. `lib_colors.sh`, `lib_i18n.sh`, `lib_notifications.sh`, etc.), aber `lib_common.sh` bleibt der Haupteinstiegspunkt und lädt alle anderen Kern-Bibliotheken automatisch. Zusätzlich ist `lib_btrfs.sh` eine spezialisierte Bibliothek, die ausschließlich von BTRFS-Modulen verwendet wird und nicht Teil des Kern-Bibliothekssystems ist.
 
 Meine Umgebung ist i.d.R. Arch (hauptsystem) oder Debian (diverse Dienste auf meinem Proxmox - daher auch die docker-Anteile), entsprechend kann es unter anderen Distributionen noch unbekannte Probleme geben, auch wenn ich versuche, alles kompatibel zu halten.
 
@@ -267,18 +267,20 @@ Aktuell werden Konfigurationsdateien für folgende Module verwendet:
 
 Das Projekt ist in Module unterteilt, um die Funktionalität zu organisieren:
 
-* ** `lib/lib_common.sh`**: Das Herzstück des Projekts. Enthält zentrale, von allen Modulen genutzte Funktionen wie:
+* **`lib/lib_common.sh`**: Das Herzstück des Projekts. Enthält zentrale, von allen Modulen genutzte Funktionen wie:
     *  Ein einheitliches Logging-System.
     * Funktionen zur Befehlsüberprüfung und automatischen Installation von Abhängigkeiten.
-    * Standardisierte Benutzer interaktionen (Ja/Nein-Fragen, Eingabeaufforderungen).
-    * Die Erkennung von Systemkomponenten (Paketmanager, etc .).
+    * Standardisierte Benutzerinteraktionen (Ja/Nein-Fragen, Eingabeaufforderungen).
+    * Die Erkennung von Systemkomponenten (Paketmanager, etc.).
     * Verwaltung von farbiger Terminalausgabe für eine bessere Lesbarkeit.
-    * Komplexe Logik zur Ermittlung des aktiven Desktop-Ben utzers.
+    * Komplexe Logik zur Ermittlung des aktiven Desktop-Benutzers.
     * Die Fähigkeit, **Desktop-Benachrichtigungen** an den Benutzer zu senden.
+    * **Kern-Bibliothekssystem**: Lädt automatisch spezialisierte Bibliothekskomponenten (`lib_colors.sh`, `lib_i18n.sh`, `lib_ui.sh`, etc.).
+* **`lib/lib_btrfs.sh`**: **Spezialisierte BTRFS-Bibliothek** (nicht Teil des Kern-Bibliothekssystems). Stellt erweiterte BTRFS-spezifische Funktionen für atomare Backup-Operationen, inkrementelle Kettenvalidierung und umfassende BTRFS-Sicherheitsmechanismen bereit. Wird ausschließlich von BTRFS-Modulen verwendet und muss explizit eingebunden werden.
 * **`modules/mod_restarts.sh`**: Bietet Optionen zum Neustarten von Diensten und der Desktop-Umgebung.
 * **`modules/backup/mod_backup.sh`**: Stellt Backup- und Restore-Funktionen mittels TAR und RSYNC bereit.
-* **`modules/backup/mod_btrfs_backup.sh`**: BTRFS-spezifische Backup-Funktionen (Snapshots, Transfer, Integritätsprüfung, Marker, Bereinigung, Status, uvm.).
-* **`modules/backup/mod_btrfs_restore.sh`**: BTRFS-spezifische Restore-Funktionen (komplettes System, einzelne Subvolumes, Ordner und Dry-Run).
+* **`modules/backup/mod_btrfs_backup.sh`**: BTRFS-spezifische Backup-Funktionen (Snapshots, Transfer, Integritätsprüfung, Marker, Bereinigung, Status, uvm.). Verwendet `lib_btrfs.sh` für erweiterte BTRFS-Operationen.
+* **`modules/backup/mod_btrfs_restore.sh`**: BTRFS-spezifische Restore-Funktionen (komplettes System, einzelne Subvolumes, Ordner und Dry-Run). Verwendet `lib_btrfs.sh` für atomare Restore-Operationen.
 * **`modules/mod_system_info.sh`**: Zeigt detaillierte Systeminformationen an.
 * **`modules/mod_disk.sh`**: Werkzeuge zur Festplattenanalyse und -wartung.
 * **`modules/mod_logs.sh`**: Analyse von System- und Anwendungsprotokollen.

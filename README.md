@@ -2,6 +2,7 @@
 
 > **⚠️ Documentation Status Notice:**
 > - **Documentation Update Needed**: The documentation (including this README.md) needs to be updated to reflect recent changes and improvements.
+> - **BTRFS Modules Need Testing**: The BTRFS backup and restore modules require comprehensive testing. The backup module has been enhanced and improved, while the restore module has been completely recreated. Please use with caution and test thoroughly beforehand.
 
 ## Description
 
@@ -9,7 +10,7 @@ Little Linux Helper is a collection of Bash scripts designed to simplify various
 
 More detailed technical English documentation for individual modules and core components can be found in the `docs` directory. This documentation was created in part to provide AI with the context of a module or file without having to read it completely and to save context.
 The `docs/DEVELOPER_GUIDE.md` contains all the information about `lib/lib_common.sh` and `help_master.sh` needed to create a new module.
-Note: The original `lib_common.sh` has been split into multiple specialized libraries for better organization (e.g., `lib_colors.sh`, `lib_i18n.sh`, `lib_notifications.sh`, etc.), but `lib_common.sh` remains the main entry point and automatically loads all other libraries.
+Note: The original `lib_common.sh` has been split into multiple specialized libraries for better organization (e.g., `lib_colors.sh`, `lib_i18n.sh`, `lib_notifications.sh`, etc.), but `lib_common.sh` remains the main entry point and automatically loads all other core libraries. Additionally, `lib_btrfs.sh` is a specialized library used exclusively by BTRFS modules and is not part of the core library system.
 
 My environment is typically Arch (main system) or Debian (various services on my Proxmox - hence the Docker components), so there may be unknown issues on other distributions, although I try to keep everything compatible.
 
@@ -273,10 +274,12 @@ The project is divided into modules to organize functionality:
     * Management of colored terminal output for better readability.
     * Complex logic for determining the active desktop user.
     * The ability to send **desktop notifications** to the user.
+    * **Core Library System**: Automatically loads specialized library components (`lib_colors.sh`, `lib_i18n.sh`, `lib_ui.sh`, etc.).
+* **`lib/lib_btrfs.sh`**: **Specialized BTRFS library** (not part of core library system). Provides advanced BTRFS-specific functions for atomic backup operations, incremental chain validation, and comprehensive BTRFS safety mechanisms. Used exclusively by BTRFS modules and must be explicitly sourced.
 * **`modules/mod_restarts.sh`**: Provides options for restarting services and the desktop environment.
 * **`modules/backup/mod_backup.sh`**: Provides backup and restore functions using TAR and RSYNC.
-* **`modules/backup/mod_btrfs_backup.sh`**: BTRFS-specific backup functions (snapshots, transfer, integrity checking, markers, cleanup, status, etc.).
-* **`modules/backup/mod_btrfs_restore.sh`**: BTRFS-specific restore functions (complete system, individual subvolumes, folders, and dry-run).
+* **`modules/backup/mod_btrfs_backup.sh`**: BTRFS-specific backup functions (snapshots, transfer, integrity checking, markers, cleanup, status, etc.). Uses `lib_btrfs.sh` for advanced BTRFS operations.
+* **`modules/backup/mod_btrfs_restore.sh`**: BTRFS-specific restore functions (complete system, individual subvolumes, folders, and dry-run). Uses `lib_btrfs.sh` for atomic restore operations.
 * **`modules/mod_system_info.sh`**: Displays detailed system information.
 * **`modules/mod_disk.sh`**: Tools for disk analysis and maintenance.
 * **`modules/mod_logs.sh`**: Analysis of system and application logs.

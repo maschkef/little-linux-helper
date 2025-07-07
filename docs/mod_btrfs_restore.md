@@ -9,167 +9,288 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 
 ## Module: `modules/backup/mod_btrfs_restore.sh` - BTRFS Snapshot-Based Restore Operations
 
-**WARNING:** This module performs destructive operations on the target system. It is designed to be run from a live environment (e.g., live USB) and should NOT be executed on the running system that you want to restore.
-
 **1. Purpose:**
-This module provides comprehensive BTRFS snapshot-based restore functionality. It allows restoring complete systems, individual subvolumes, or specific folders from BTRFS backup snapshots created by the `modules/backup/mod_btrfs_backup.sh` module. The module includes safety mechanisms, dry-run capabilities, and interactive checkpoints to prevent accidental data loss. It is designed to work in recovery scenarios where the primary system needs to be restored from BTRFS snapshots.
+This module provides comprehensive BTRFS snapshot-based restore functionality designed to safely restore system subvolumes from BTRFS backups. It implements atomic restore operations following a documented 4-step workflow with enhanced safety features including live environment detection, filesystem health checking, intelligent cleanup, and received_uuid protection to prevent incremental backup chain breaks. The module is specifically designed for disaster recovery scenarios and should be run from a live environment.
+
+**WARNING: This module performs destructive operations on the target system. It is designed to be run from a live environment (e.g., live USB) and should NOT be executed on the running system that you want to restore.**
 
 **2. Initialization & Dependencies:**
-*   **Library Source:** The module begins by sourcing the common library: `source "$(dirname "$0")/../lib/lib_common.sh"`.
-*   **Package Manager Detection:** It calls `lh_detect_package_manager()` to set up `LH_PKG_MANAGER` for potential package installations (e.g., `btrfs-progs`).
-*   **Backup Configuration:** It loads backup-specific configurations by calling `lh_load_backup_config`. This function populates variables like `LH_BACKUP_DIR`.
+
+*   **Library Source:** The module sources two critical libraries:
+    *   `lib_common.sh`: For general helper functions and system utilities
+    *   `lib_btrfs.sh`: For BTRFS-specific atomic operations and safety functions
+*   **BTRFS Library Validation:** The module performs comprehensive validation of all required BTRFS library functions at startup, ensuring critical atomic functions are available before proceeding.
+*   **Required BTRFS Library Functions:**
+    *   `atomic_receive_with_validation`: Atomic snapshot restore operations
+    *   `validate_parent_snapshot_chain`: Incremental backup chain validation
+    *   `intelligent_cleanup`: Safe cleanup respecting backup chains
+    *   `check_btrfs_space`: Space checking with metadata exhaustion detection
+    *   `get_btrfs_available_space`: Available space calculation
+    *   `check_filesystem_health`: Comprehensive BTRFS health checking
+    *   `handle_btrfs_error`: BTRFS-specific error handling
+    *   `verify_received_uuid_integrity`: Received UUID integrity verification
+    *   `protect_received_snapshots`: Protection for received snapshots
+*   **Configuration Management:** 
+    *   Loads general configuration for logging and system settings
+    *   Loads backup-specific configuration from `backup.conf`
+    *   Initializes restore-specific logging system
 *   **Core Library Functions Used:**
-    *   `lh_log_msg`: For general logging to the main log file.
-    *   `lh_print_header`: For displaying section titles.
-    *   `lh_print_menu_item`: For constructing menus.
-    *   `lh_confirm_action`: For user yes/no confirmations.
-    *   `lh_ask_for_input`: For prompting user for specific text input.
-    *   `lh_check_command`: To verify and optionally install required commands (e.g., `btrfs`).
-    *   Color variables (e.g., `LH_COLOR_INFO`, `LH_COLOR_ERROR`, `LH_COLOR_PROMPT`, `LH_COLOR_BOLD_RED`).
-    *   Global variables: `LH_PKG_MANAGER`, `LH_SUDO_CMD`, `EUID`.
-*   **Key System Commands:** `btrfs`, `mount`, `grep`, `awk`, `sort`, `head`, `tail`, `mkdir`, `rm`, `mv`, `cp`, `date`, `stat`, `df`, `du`, `find`, `basename`, `dirname`, `touch`, `lsblk`.
+    *   `lh_print_header`: For displaying section titles and operation phases
+    *   `lh_log_msg`: For comprehensive logging throughout operations
+    *   `lh_confirm_action`: For critical safety confirmations
+    *   `lh_check_command`: For verifying BTRFS tools availability
+    *   `lh_ask_for_input`: For interactive configuration and selections
+    *   Color variables: For styled terminal output and safety warnings
+    *   `lh_load_language_module`: For internationalization support
+*   **Key System Commands:** `btrfs`, `mount`, `find`, `mv`, `mkdir`, `date`.
+*   **Critical Dependencies:** BTRFS utilities must be available; module exits if `btrfs` command is not found.
 
-**3. Main Menu Function: `main_menu()`**
-This is the entry point and main interactive loop for the BTRFS restore module. It presents a menu with options for system/subvolume restoration, folder restoration, disk information display, and setup configuration.
+**3. Global Variables and State Management:**
 
-**4. Global Variables:**
-*   `BACKUP_ROOT`: Path to the mount point of the backup medium (set during setup).
-*   `TARGET_ROOT`: Path to the mount point of the target system (set during setup).
-*   `TEMP_SNAPSHOT_DIR`: Temporary directory for restoration on the target system (typically `$TARGET_ROOT/.snapshots_recovery`).
-*   `DRY_RUN`: Boolean flag indicating whether to simulate operations without making actual changes.
-*   `LH_RESTORE_LOG`: Path to the restore-specific log file (created at script start).
+*   **`BACKUP_ROOT`**: Path to backup source mount point (configured interactively)
+*   **`TARGET_ROOT`**: Path to target system mount point (configured interactively)  
+*   **`TEMP_SNAPSHOT_DIR`**: Temporary directory for restoration operations (`${TARGET_ROOT}/.snapshots_recovery`)
+*   **`DRY_RUN`**: Boolean flag for dry-run mode (user configurable)
+*   **`LH_RESTORE_LOG`**: Path to restore-specific log file with timestamp
 
-**5. Module Functions:**
+**4. Core Safety and Validation Functions:**
 
-*   **`restore_log_msg(level, message)`**
-    *   **Purpose:** Custom logging function for restore operations. It logs messages to both the standard log (via `lh_log_msg`) and a restore-specific log file (`$LH_RESTORE_LOG`).
-    *   **Mechanism:** Appends a timestamped message to `$LH_RESTORE_LOG`. Attempts to create the log file if it doesn't exist.
-
-*   **`fix_readonly_subvolume(subvol_path, subvol_name)`**
-    *   **Purpose:** Safely removes the read-only flag from a restored BTRFS subvolume.
-    *   **Mechanism:** Uses `btrfs property get/set` to check and modify the read-only property. Includes dry-run support.
-    *   **Interaction:** Logs the operation and provides user feedback. Essential for making restored subvolumes writable.
-
-*   **`pause_for_manual_check(context_msg)`**
-    *   **Purpose:** Creates manual checkpoints during critical operations to allow user verification.
-    *   **Mechanism:** Displays a warning message and waits for user input before continuing.
-    *   **Interaction:** Provides time for users to manually inspect the system state in a second shell before proceeding with destructive operations.
-
-*   **`backup_or_delete_child_snapshots(parent_path, parent_name)`**
-    *   **Purpose:** Handles child snapshots (e.g., Snapper, Timeshift snapshots) before subvolume operations.
-    *   **Mechanism:** 
-        *   Searches for child snapshots in `.snapshots` directories and snapshot-related subdirectories (max 3 levels deep).
-        *   Offers options to backup child snapshots using `btrfs send` or delete them.
-        *   Creates timestamped backup directory structure if backing up.
-    *   **Interaction:** Presents a menu for user choice and includes a manual checkpoint before proceeding.
-
-*   **`safe_subvolume_replacement(existing_subvol, subvol_name, timestamp)`**
-    *   **Purpose:** Safely handles the replacement of an existing subvolume by renaming it as a backup.
+*   **`check_live_environment()`**
+    *   **Purpose:** Detects if running in a live environment and warns users about risks of running on active systems.
     *   **Mechanism:**
-        *   Checks if the target subvolume exists using `btrfs subvolume show`.
-        *   Calls `backup_or_delete_child_snapshots` to handle any child snapshots.
-        *   Renames the existing subvolume with a timestamp suffix as a backup.
-        *   Includes manual checkpoint and user confirmation.
-    *   **Interaction:** Provides detailed information and multiple confirmation steps before proceeding.
+        *   Checks for live environment indicators: `/run/archiso`, `/etc/calamares`, `/live`, `/rofs`, `/casper`
+        *   Provides clear warnings and recommendations if not in live environment
+        *   Allows user override with explicit confirmation for non-live environments
+    *   **Safety Features:** Prevents accidental execution on running systems
+    *   **Dependencies (internal):** `lh_print_header`, `lh_confirm_action`, `restore_log_msg`
 
-*   **`perform_subvolume_restore(subvol_to_restore, snapshot_to_use, target_subvol_name)`**
-    *   **Purpose:** Core function that performs the actual restoration of a single BTRFS subvolume.
+*   **`validate_filesystem_health()`**
+    *   **Purpose:** Validates BTRFS filesystem health using comprehensive library functions before operations.
     *   **Mechanism:**
-        *   Validates the source snapshot path exists.
-        *   Calls `safe_subvolume_replacement` to handle existing target subvolume.
-        *   Uses `btrfs send/receive` to transfer the snapshot from backup to target.
-        *   Moves the received snapshot to the final target location.
-        *   Calls `fix_readonly_subvolume` to make the restored subvolume writable.
-        *   Includes manual checkpoint before the actual restore operation.
-    *   **Interaction:** Provides progress information, size estimates, and calls child snapshot restoration menu after completion.
+        *   Uses `check_filesystem_health()` from BTRFS library for comprehensive health checks
+        *   Handles different error conditions with specific user guidance
+        *   Provides options to continue despite minor issues or abort on critical problems
+    *   **Error Handling:**
+        *   Exit code 0: Health check passed
+        *   Exit code 1: Health issues detected (user can choose to continue)
+        *   Exit code 2: Filesystem read-only or corrupted (operation aborted)
+        *   Exit code 4: Filesystem corruption detected (operation aborted)
+    *   **Dependencies (internal):** `check_filesystem_health`, `lh_confirm_action`, `restore_log_msg`
+    *   **Dependencies (system):** `btrfs`
 
-*   **`select_restore_type_and_snapshot()`**
-    *   **Purpose:** Interactive menu for selecting restoration type (complete system, root only, home only) and specific snapshot.
+*   **`check_restore_space()`**
+    *   **Purpose:** Checks BTRFS space availability with metadata exhaustion detection.
     *   **Mechanism:**
-        *   Scans the backup directory for available subvolumes (`@`, `@home`).
-        *   Presents restoration options (complete system, root only, home only).
-        *   Lists available snapshots with metadata (name, creation date, size).
-        *   Handles complete system restoration by restoring both `@` and `@home` subvolumes using matching timestamps.
-    *   **Interaction:** Provides formatted snapshot listings and final confirmation dialog with color-coded warnings.
+        *   Uses `check_btrfs_space()` and `get_btrfs_available_space()` from BTRFS library
+        *   Provides detailed space information and warnings
+        *   Handles BTRFS-specific space conditions including metadata exhaustion
+    *   **Error Handling:**
+        *   Exit code 0: Space check passed with available space display
+        *   Exit code 1: Space issues detected (user can choose to continue)
+        *   Exit code 2: Critical metadata exhaustion (operation aborted with solution guidance)
+    *   **Dependencies (internal):** `check_btrfs_space`, `get_btrfs_available_space`, `restore_log_msg`
 
-*   **`restore_folder_from_snapshot()`**
-    *   **Purpose:** Allows selective restoration of individual folders from snapshots without restoring entire subvolumes.
+*   **`display_safety_warnings()`**
+    *   **Purpose:** Displays critical safety warnings about destructive operations.
     *   **Mechanism:**
-        *   Prompts user to select source subvolume (`@` or `@home`).
-        *   Lists available snapshots for the selected subvolume.
-        *   Prompts for specific folder path to restore.
-        *   Verifies the folder exists in the snapshot.
-        *   Creates backup of existing target folder if it exists.
-        *   Uses `cp -a` to copy the folder while preserving permissions and attributes.
-    *   **Interaction:** Includes path validation and backup confirmation. Supports dry-run mode.
+        *   Shows formatted warning box with critical information
+        *   Details specific risks: subvolume replacement, received_uuid impacts, bootloader considerations
+        *   Requires explicit user acknowledgment before proceeding
+    *   **Safety Features:** Ensures users understand the destructive nature of operations
+    *   **Dependencies (internal):** `lh_confirm_action`, `restore_log_msg`
 
-*   **`lh_check_live_environment()`**
-    *   **Purpose:** Detects whether the script is running in a live environment suitable for recovery operations.
-    *   **Mechanism:** Checks for common live environment indicators (`/run/archiso`, `/etc/calamares`, `/live`).
-    *   **Interaction:** Warns users if not running in a live environment and provides option to abort.
+**5. Interactive Setup and Configuration:**
 
-*   **`lh_detect_backup_drives()`**
-    *   **Purpose:** Automatically detects mounted drives that contain backup directories.
-    *   **Mechanism:** Scans mounted filesystems for the presence of `$LH_BACKUP_DIR`.
-    *   **Output:** Returns array of potential backup drive mount points.
+*   **`setup_restore_environment()`**
+    *   **Purpose:** Interactive setup of complete restore environment with auto-detection and validation.
+    *   **Configuration Steps:**
+        1. **Backup Source Configuration:**
+            *   Auto-detects mounted BTRFS filesystems with backup directories
+            *   Presents detected options or allows manual path entry
+            *   Validates backup source existence and filesystem health
+        2. **Target System Configuration:**
+            *   Auto-detects BTRFS filesystems with standard subvolume layouts (`@`, `@home`)
+            *   Allows manual target path configuration
+            *   Creates target directories if needed with user confirmation
+            *   Validates target filesystem health and available space
+        3. **Operation Mode Selection:**
+            *   Dry-run mode: Shows what would be done without making changes
+            *   Actual mode: Performs real restore operations
+        4. **Configuration Summary:**
+            *   Displays complete configuration for user verification
+            *   Requires final confirmation before proceeding
+    *   **Auto-Detection Features:**
+        *   `detect_backup_drives()`: Scans for BTRFS filesystems containing backup directories
+        *   `detect_target_drives()`: Scans for BTRFS filesystems with standard subvolume layouts
+    *   **Dependencies (internal):** Multiple validation functions, `lh_ask_for_input`, `lh_confirm_action`
 
-*   **`lh_detect_target_drives()`**
-    *   **Purpose:** Automatically detects mounted drives that contain BTRFS subvolumes suitable as restore targets.
-    *   **Mechanism:** Scans mounted filesystems for the presence of `@` or `@home` directories.
-    *   **Output:** Returns array of potential target drive mount points.
+**6. Snapshot and Subvolume Management:**
 
-*   **`setup_recovery_environment()`**
-    *   **Purpose:** Interactive setup function to configure backup source, target system, and operation mode.
+*   **`handle_child_snapshots()`**
+    *   **Purpose:** Safely handles child snapshots (Snapper, Timeshift) before subvolume operations.
     *   **Mechanism:**
-        *   Calls `lh_detect_backup_drives()` and presents auto-detected options or manual input.
-        *   Calls `lh_detect_target_drives()` and presents auto-detected options or manual input.
-        *   Validates that backup directory exists on the selected source.
-        *   Creates target directory if it doesn't exist (with user confirmation).
-        *   Sets up temporary snapshot directory path.
-        *   Prompts for dry-run vs. actual operation mode.
-    *   **Interaction:** Provides step-by-step guided setup with automatic detection and fallback to manual configuration.
+        *   Searches for snapshot directories: `.snapshots`, `.timeshift`, `snapshots`
+        *   Provides three handling options: backup, delete, or skip operation
+        *   Uses recursive search up to 3 levels deep for comprehensive detection
+    *   **User Options:**
+        1. Backup child snapshots using `btrfs send`
+        2. Delete child snapshots to proceed with restore
+        3. Skip operation to avoid conflicts
+    *   **Dependencies (internal):** `backup_child_snapshots`, `delete_child_snapshots`, `create_manual_checkpoint`
 
-**6. Special Considerations:**
-*   **Root Privileges:** All restore operations require root privileges. The script checks `$EUID` and prompts for `sudo` if necessary.
-*   **Live Environment Safety:** The script is designed to run from a live environment and includes checks to warn users if they're not in one.
-*   **Destructive Operations Warning:** Multiple warning screens and confirmations are presented to prevent accidental data loss.
-*   **Dry-Run Support:** All critical operations support dry-run mode for testing and verification before actual execution.
-*   **Manual Checkpoints:** Critical operations include manual checkpoints where users can inspect the system state before proceeding.
-*   **Child Snapshot Handling:** Comprehensive support for backing up or removing child snapshots (Snapper, Timeshift) before subvolume operations.
-*   **Error Handling:** Extensive error checking with detailed logging and user-friendly error messages.
-*   **Rollback Safety:** Existing subvolumes are renamed (not deleted) to provide a rollback option in case of issues.
+*   **`safely_replace_subvolume()`**
+    *   **Purpose:** Safely replaces existing subvolumes with backups using atomic operations.
+    *   **Mechanism:**
+        *   Checks if target subvolume exists
+        *   Handles child snapshots first
+        *   Creates timestamped backup of existing subvolume
+        *   Uses atomic `mv` operation for safe replacement
+    *   **Safety Features:**
+        *   Creates backup copies before replacement
+        *   Uses atomic operations to prevent partial states
+        *   Includes manual checkpoints for user verification
+    *   **Dependencies (internal):** `handle_child_snapshots`, `create_manual_checkpoint`
 
-**7. Restore Process Flow:**
-1. **Safety Checks:** Verify root privileges, BTRFS tools, live environment
-2. **Warning Display:** Show critical warnings about destructive operations
-3. **Environment Setup:** Configure backup source and target system paths
-4. **Operation Selection:** Choose between full system, subvolume, or folder restore
-5. **Snapshot Selection:** Browse and select specific snapshots with metadata
-6. **Pre-restore Safety:** Handle child snapshots and existing data
-7. **Manual Checkpoints:** Allow user verification at critical points
-8. **Restore Execution:** Perform actual restore using `btrfs send/receive`
-9. **Post-restore Cleanup:** Fix permissions, handle read-only flags
-10. **Verification:** Provide completion status and recommendations
+*   **`remove_readonly_flag()`**
+    *   **Purpose:** Removes read-only flags from restored subvolumes with received_uuid protection.
+    *   **Mechanism:**
+        *   Checks current read-only status using `btrfs property`
+        *   Uses `verify_received_uuid_integrity()` to check for received snapshots
+        *   Warns about potential impacts on incremental backup chains
+        *   Logs received_uuid information before modification
+    *   **Safety Features:**
+        *   Verifies received_uuid integrity before modification
+        *   Warns about impacts on incremental backup chains
+        *   Provides detailed logging of received_uuid status
+    *   **Dependencies (internal):** `verify_received_uuid_integrity`, `restore_log_msg`
+    *   **Dependencies (system):** `btrfs property`, `btrfs subvolume show`
 
-**8. Safety Features:**
-*   **Multiple Confirmation Dialogs:** Critical operations require explicit user confirmation
-*   **Backup Before Replace:** Existing subvolumes are backed up, not deleted
-*   **Child Snapshot Protection:** Automatic detection and safe handling of nested snapshots
-*   **Live Environment Detection:** Warns if not running in a safe environment
-*   **Dry-Run Mode:** Complete simulation capability for testing
-*   **Manual Checkpoints:** Built-in pause points for user verification
-*   **Comprehensive Logging:** All operations logged to dedicated restore log file
+**7. Atomic Restore Operations:**
 
-**9. Supported Recovery Scenarios:**
-*   **Complete System Restore:** Full restoration of both `@` (root) and `@home` subvolumes
-*   **Selective Subvolume Restore:** Individual restoration of either root or home subvolume
-*   **Granular Folder Restore:** Restoration of specific directories without affecting entire subvolumes
-*   **Cross-timestamp Consistency:** Automatic matching of root and home snapshots by timestamp for system restore
+*   **`perform_subvolume_restore()`**
+    *   **Purpose:** Performs the actual atomic subvolume restore using library functions.
+    *   **Mechanism:**
+        *   Validates source snapshot existence and BTRFS subvolume status
+        *   Handles existing subvolume replacement safely
+        *   Creates temporary directories for receive operations
+        *   Validates target filesystem health before operations
+        *   Uses library's atomic operations for safe restore
+    *   **Atomic Workflow:**
+        1. Validation of source and target
+        2. Safe replacement of existing subvolumes
+        3. Filesystem health validation
+        4. Manual checkpoint for user verification
+        5. Atomic restore operation execution
+    *   **Dependencies (internal):** `safely_replace_subvolume`, `validate_filesystem_health`, `create_manual_checkpoint`
+    *   **Dependencies (library):** `atomic_receive_with_validation` (from lib_btrfs.sh)
 
-**10. Integration Points:**
-*   **Backup Module Compatibility:** Designed to work with snapshots created by `modules/backup/mod_btrfs_backup.sh`
-*   **Marker File Recognition:** Understands and validates `.backup_complete` marker files
-*   **Configuration Integration:** Uses shared backup configuration from `lib_common.sh`
-*   **Logging Integration:** Integrates with the common logging system while maintaining separate restore logs
+**8. Logging and Manual Checkpoints:**
 
-This module provides a robust, safety-focused BTRFS restore solution with comprehensive error handling, multiple safety checks, and user-friendly guided recovery processes suitable for both novice and expert users in emergency recovery situations.
+*   **`init_restore_log()`**
+    *   **Purpose:** Initializes restore-specific log file with timestamp.
+    *   **Mechanism:**
+        *   Creates timestamped log file in format: `YYMMDD-HHMM_btrfs_restore.log`
+        *   Handles log creation failures gracefully
+        *   Integrates with main logging system
+    *   **Dependencies (internal):** `lh_log_msg`
+
+*   **`restore_log_msg()`**
+    *   **Purpose:** Enhanced logging function for restore operations.
+    *   **Mechanism:**
+        *   Logs to both standard system log and restore-specific log
+        *   Provides dual-channel logging for comprehensive audit trails
+        *   Includes timestamps and log levels
+    *   **Dependencies (internal):** `lh_log_msg`
+
+*   **`create_manual_checkpoint()`**
+    *   **Purpose:** Creates manual verification points during critical operations.
+    *   **Mechanism:**
+        *   Displays formatted checkpoint information
+        *   Provides context-specific instructions
+        *   Pauses operation for user verification
+        *   Logs checkpoint creation for audit trail
+    *   **Safety Features:** Allows users to verify operations at critical points
+
+**9. Child Snapshot Handling Functions:**
+
+*   **`backup_child_snapshots()`**
+    *   **Purpose:** Creates backups of child snapshots using `btrfs send`.
+    *   **Mechanism:**
+        *   Creates timestamped backup directory
+        *   Uses `btrfs send` to create portable backups
+        *   Handles multiple snapshot types and locations
+        *   Provides detailed success/failure reporting
+    *   **Dependencies (system):** `btrfs send`
+
+*   **`delete_child_snapshots()`**
+    *   **Purpose:** Safely deletes child snapshots to prevent conflicts.
+    *   **Mechanism:**
+        *   Attempts `btrfs subvolume delete` first
+        *   Falls back to regular directory deletion if not a subvolume
+        *   Provides detailed operation logging
+        *   Handles both dry-run and actual operations
+    *   **Dependencies (system):** `btrfs subvolume delete`, `rm`
+
+**10. Integration with BTRFS Library:**
+
+The module heavily integrates with `lib_btrfs.sh` for critical operations:
+
+*   **Atomic Operations:** Uses `atomic_receive_with_validation()` for safe snapshot restoration
+*   **Chain Validation:** Uses `validate_parent_snapshot_chain()` for incremental backup integrity
+*   **Space Management:** Uses `check_btrfs_space()` and `get_btrfs_available_space()` for comprehensive space checking
+*   **Health Monitoring:** Uses `check_filesystem_health()` for BTRFS-specific health validation
+*   **Error Handling:** Uses `handle_btrfs_error()` for specialized BTRFS error management
+*   **UUID Protection:** Uses `verify_received_uuid_integrity()` and `protect_received_snapshots()` for backup chain protection
+
+**11. Configuration Integration:**
+
+*   **Backup Configuration:** Loads settings from `backup.conf` including:
+    *   `LH_BACKUP_DIR`: Backup directory structure
+    *   `LH_BACKUP_ROOT`: Default backup root path
+*   **General Configuration:** Inherits logging settings and system configuration
+*   **Language Support:** Integrated with internationalization system for multi-language support
+
+**12. Safety Features and Error Handling:**
+
+*   **Live Environment Detection:** Prevents accidental execution on running systems
+*   **Comprehensive Validation:** Validates all components before operations
+*   **Atomic Operations:** Uses atomic patterns to prevent partial states
+*   **Manual Checkpoints:** Provides verification points during critical operations
+*   **Received UUID Protection:** Preserves incremental backup chain integrity
+*   **Child Snapshot Handling:** Safely manages existing snapshots
+*   **Dual Logging:** Comprehensive audit trail with restore-specific logging
+*   **Graceful Degradation:** Handles missing components and configuration issues
+*   **User Confirmations:** Requires explicit confirmation for destructive operations
+
+**13. Operation Modes:**
+
+*   **Dry-Run Mode:** 
+    *   Shows what operations would be performed without making changes
+    *   Provides detailed logging of intended operations
+    *   Allows safe testing of restore procedures
+*   **Actual Mode:**
+    *   Performs real restore operations with full safety checks
+    *   Includes all validation and checkpoint mechanisms
+    *   Creates comprehensive audit trails
+
+**14. Integration with Main System:**
+
+*   **Module Loading:** Can be run standalone or integrated with main helper system
+*   **Configuration Sharing:** Shares configuration with backup module and main system
+*   **Language Integration:** Uses centralized language and messaging system
+*   **Logging Integration:** Integrates with main logging infrastructure
+*   **Error Handling:** Follows project standards for error reporting and user feedback
+
+**15. Special Considerations:**
+
+*   **Live Environment Requirement:** Designed specifically for live environment usage
+*   **BTRFS Expertise:** Implements advanced BTRFS features and safety patterns
+*   **Destructive Operations:** All operations are potentially destructive and require careful validation
+*   **Incremental Backup Awareness:** Respects and protects incremental backup chains
+*   **Space Efficiency:** Handles BTRFS-specific space conditions including metadata exhaustion
+*   **Child Snapshot Compatibility:** Compatible with Snapper, Timeshift, and other snapshot tools
+*   **Audit Requirements:** Provides comprehensive logging for compliance and troubleshooting
+*   **Recovery Focus:** Designed specifically for disaster recovery scenarios
+
+---
+*This document provides a comprehensive technical overview of the `mod_btrfs_restore.sh` module. The module requires both `lib_common.sh` and `lib_btrfs.sh` libraries and is designed for expert-level BTRFS operations in disaster recovery scenarios. All operations should be thoroughly tested in safe environments before production use.*

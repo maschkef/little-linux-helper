@@ -38,6 +38,16 @@ This is the entry point and main interactive loop for the BTRFS backup module. I
     *   **Purpose:** Custom logging function for backup operations. It logs messages to both the standard log (via `lh_log_msg`) and a backup-specific log file (`$LH_BACKUP_LOG`).
     *   **Mechanism:** Appends a timestamped message to `$LH_BACKUP_LOG`. Attempts to create the log file if it doesn't exist.
 
+*   **`check_received_uuid_protection(snapshot_path, action_description)`**
+    *   **Purpose:** Protects against accidentally modifying received snapshots that contain `received_uuid`, which would break incremental backup chains.
+    *   **Mechanism:** Checks if a snapshot has `received_uuid` using `btrfs subvolume show`. If found, warns the user about the consequences and requests explicit confirmation.
+    *   **Usage:** Called before any operation that might modify received snapshots (deletion, property changes).
+
+*   **`create_safe_writable_snapshot(received_snapshot, new_name)`**
+    *   **Purpose:** Creates a safe writable copy of a received snapshot without destroying the original's `received_uuid`.
+    *   **Mechanism:** Uses `btrfs subvolume snapshot` to create a new snapshot from the received one, preserving the original for future incremental operations.
+    *   **Usage:** Recommended method for creating modifiable copies of received backups.
+
 *   **`find_btrfs_root(subvol_path)`**
     *   **Purpose:** Locates the mount point of the BTRFS filesystem root that contains the given subvolume path.
     *   **Mechanism:** Parses the output of `mount` command, looking for BTRFS filesystems. It first checks for a direct match and then iterates through BTRFS mount points to find a parent mount if `subvol_path` is a sub-path.
@@ -88,7 +98,9 @@ This is the entry point and main interactive loop for the BTRFS backup module. I
             *   Sets `CURRENT_TEMP_SNAPSHOT`.
             *   Calls `create_direct_snapshot()` to create a read-only snapshot.
             *   Creates the target directory for the subvolume in the backup location.
-            *   Transfers the snapshot using `btrfs send "$snapshot_path" | btrfs receive "$backup_subvol_dir"`. (Note: Currently implements full backups only; incremental logic is planned but not fully implemented).
+            *   **Atomic Transfer**: Uses the atomic `btrfs send/receive` pattern with temporary naming and atomic rename to prevent corrupted backups.
+            *   **Incremental Logic**: Automatically detects suitable parent snapshots and performs incremental transfers when possible, falling back to full transfers when necessary.
+            *   **received_uuid Protection**: Validates parent snapshots have proper `received_uuid` before attempting incremental operations.
             *   Calls `create_backup_marker()` upon successful transfer.
             *   Calls `safe_cleanup_temp_snapshot()` for the temporary snapshot.
             *   Cleans old backups for the subvolume based on `$LH_RETENTION_BACKUP` using `ls`, `sort`, `head`, and `btrfs subvolume delete`. Also removes corresponding `.backup_complete` marker files.
@@ -177,9 +189,11 @@ This is the entry point and main interactive loop for the BTRFS backup module. I
 *   **Error Handling:** The script uses `backup_log_msg` for logging errors. Return codes from critical commands are checked. Some functions like `safe_cleanup_temp_snapshot` implement retries. User-facing error messages are printed with `LH_COLOR_ERROR`.
 *   **Temporary Snapshots:** BTRFS backups utilize a temporary snapshot directory (`$LH_TEMP_SNAPSHOT_DIR`). Cleanup mechanisms (`cleanup_on_exit`, `cleanup_orphaned_temp_snapshots`, `safe_cleanup_temp_snapshot`) are in place to manage these.
 *   **Backup Markers:** BTRFS backups use `.backup_complete` marker files to indicate a successful transfer and store metadata. These are used by `check_backup_integrity` to verify backup completeness.
-*   **Space Estimation:** Before backup, the module estimates required space by calculating the size of `/` (excluding `/home`, cache directories, pseudo-filesystems, and the backup destination) and `/home` separately, adding a 20% margin for BTRFS overhead.
-*   **Incremental Backups:** The current implementation performs full backups using `btrfs send/receive`. Incremental backup logic is planned but not yet implemented.
-*   **Signal Handling:** The module uses trap handlers to ensure temporary snapshots are cleaned up if the backup process is interrupted.
+*   **Space Estimation:** Before backup, the module estimates required space by calculating the size of `/` (excluding `/home`, cache directories, pseudo-filesystems, and the backup destination) and `/home` separately. It intelligently adjusts estimates for incremental vs. full backups and adds appropriate BTRFS overhead margins.
+*   **Incremental Backups:** The implementation now supports both full and incremental backups using `btrfs send/receive`. Incremental backups are automatically used when a valid parent snapshot with `received_uuid` is available, significantly reducing transfer size and time.
+*   **Atomic Operations:** All backup transfers use the atomic pattern recommended by BTRFS documentation, ensuring no corrupted or incomplete backups remain on the destination.
+*   **received_uuid Protection:** The module includes comprehensive protection against accidentally modifying received snapshots, which would destroy the `received_uuid` and break incremental backup chains.
+*   **Signal Handling:** The module uses robust trap handlers with proper cleanup to ensure temporary snapshots are cleaned up if the backup process is interrupted. Traps are properly reset to prevent recursive calls.
 *   **Hardcoded Subvolumes:** The BTRFS backup logic primarily targets `@` and `@home` subvolumes. Other BTRFS configurations might require script modification.
 *   **Integration with Snapper/Timeshift:** The module includes functionality to check and repair the `.snapshots` subvolume used by these snapshot management tools.
 
@@ -195,10 +209,10 @@ The module is designed to work with the common BTRFS subvolume layout used by ma
 
 **8. Backup Process Flow:**
 1. **Pre-flight checks:** Verify BTRFS support, root privileges, backup destination
-2. **Space estimation:** Calculate required space with safety margin
+2. **Space estimation:** Calculate required space with safety margin, intelligently adjusting for incremental vs. full backups
 3. **Cleanup:** Remove any orphaned temporary snapshots from previous runs
 4. **Snapshot creation:** Create read-only snapshots of target subvolumes
-5. **Transfer:** Use `btrfs send/receive` to transfer snapshots to backup destination
+5. **Transfer:** Use atomic `btrfs send/receive` operations with incremental transfer support when suitable parent snapshots are available
 6. **Verification:** Create completion markers and verify successful transfer
 7. **Cleanup:** Remove temporary snapshots and old backups beyond retention limit
 8. **Reporting:** Log results and send desktop notifications

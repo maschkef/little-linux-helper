@@ -24,6 +24,7 @@ MSG_DE[PLEASE_WAIT]="Bitte warten..."
 MSG_DE[DONE]="Fertig"
 MSG_DE[CONTINUE]="Fortfahren"
 MSG_DE[BACK]="Zurück"
+MSG_DE[BACK_TO_MAIN_MENU]="Zurück zum Hauptmenü"
 MSG_DE[EXIT]="Beenden"
 MSG_DE[QUIT]="Verlassen"
 
@@ -78,13 +79,18 @@ MSG_DE[RENAME]="Umbenennen"
 # Common questions and prompts
 MSG_DE[CONFIRM_ACTION]="Möchten Sie fortfahren?"
 MSG_DE[ARE_YOU_SURE]="Sind Sie sicher?"
+MSG_DE[CONFIRM_CONTINUE]="Möchten Sie fortfahren?"
+MSG_DE[CONFIRM_CONTINUE_DESPITE_WARNINGS]="Trotz Warnungen fortfahren?"
 MSG_DE[PRESS_KEY_CONTINUE]="Drücken Sie eine Taste, um fortzufahren..."
 MSG_DE[PRESS_ENTER]="Drücken Sie Enter..."
 MSG_DE[CHOOSE_OPTION]="Wählen Sie eine Option:"
+MSG_DE[CHOOSE_OPTION_1_N]="Wählen Sie eine Option (1-%d):"
 MSG_DE[INVALID_SELECTION]="Ungültige Auswahl. Bitte versuchen Sie es erneut."
 MSG_DE[ENTER_VALUE]="Geben Sie einen Wert ein:"
 MSG_DE[ENTER_PATH]="Geben Sie einen Pfad ein:"
 MSG_DE[ENTER_FILENAME]="Geben Sie einen Dateinamen ein:"
+MSG_DE[OPERATION_CANCELLED]="Operation abgebrochen"
+MSG_DE[STATUS]="Status"
 
 # Menu navigation
 MSG_DE[MENU_CHOICE]="Ihre Wahl"
@@ -120,3 +126,23 @@ MSG_DE[SECONDS]="Sekunden"
 MSG_DE[MINUTES]="Minuten"
 MSG_DE[HOURS]="Stunden"
 MSG_DE[DAYS]="Tage"
+
+# Path and directory operations
+MSG_DE[PATH_EMPTY_ERROR]="Pfad darf nicht leer sein"
+MSG_DE[PATH_EMPTY_RETRY]="Pfad darf nicht leer sein. Bitte versuchen Sie es erneut."
+MSG_DE[PATH_NOT_ACCEPTED]="Pfad nicht akzeptiert"
+MSG_DE[DIR_CREATE_ERROR]="Fehler beim Erstellen des Verzeichnisses"
+MSG_DE[DIR_CREATE_RETRY]="Verzeichnis konnte nicht erstellt werden. Bitte versuchen Sie es erneut."
+MSG_DE[DIR_NOT_EXISTS_CREATE]="Verzeichnis existiert nicht. Soll es erstellt werden?"
+
+# Deletion operations
+MSG_DE[DELETION_ABORTED]="Löschvorgang abgebrochen"
+MSG_DE[DELETION_ABORTED_FOR_SUBVOLUME]="Löschvorgang für Subvolume abgebrochen"
+MSG_DE[ERROR_DELETION]="Fehler beim Löschen"
+MSG_DE[SUCCESS_DELETED]="Erfolgreich gelöscht"
+
+# Space operations
+MSG_DE[SPACE_CHECK_WARNING]="Verfügbarer Speicherplatz auf %s konnte nicht zuverlässig ermittelt werden"
+MSG_DE[SPACE_INFO]="Verfügbar: %s, Benötigt (geschätzt): %s"
+MSG_DE[SPACE_INSUFFICIENT_WARNING]="Möglicherweise unzureichender Speicherplatz auf dem Backup-Ziel (%s)"
+MSG_DE[SPACE_SUFFICIENT]="Ausreichend Speicherplatz verfügbar auf %s (%s)"

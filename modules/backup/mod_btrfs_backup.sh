@@ -9,9 +9,25 @@
 #
 # Module for BTRFS related backup functions
 
+# Critical: Enable pipeline failure detection 
+set -o pipefail
+
 # Load common library
 # Use BASH_SOURCE to get the correct path when sourced
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
+
+# Load BTRFS-specific library functions
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_btrfs.sh"
+
+# Load BTRFS recovery module for comprehensive recovery functionality
+# This implements the 'btrfs subvolume set-default' functionality
+RECOVERY_MODULE="$(dirname "${BASH_SOURCE[0]}")/mod_btrfs_recovery.sh"
+if [[ -f "$RECOVERY_MODULE" ]]; then
+    source "$RECOVERY_MODULE"
+else
+    echo -e "${LH_COLOR_WARNING}BTRFS recovery module not found. Some recovery functions may be unavailable.${LH_COLOR_RESET}"
+    # Will log properly after backup_log_msg is defined
+fi
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
@@ -41,6 +57,13 @@ if ! lh_check_command "btrfs" "true"; then
     exit 1
 fi
 
+# Validate BTRFS implementation
+if ! validate_btrfs_implementation; then
+    echo -e "${LH_COLOR_ERROR}BTRFS implementation validation failed - critical functions missing${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_WARNING}Please check the lib_btrfs.sh implementation${LH_COLOR_RESET}"
+    exit 1
+fi
+
 # Function for logging with backup-specific messages
 backup_log_msg() {
     local level="$1"
@@ -58,13 +81,49 @@ backup_log_msg() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$LH_BACKUP_LOG"
 }
 
-# Function to find the BTRFS root of a subvolume
+# Log warning about missing recovery module if needed
+if [[ -n "$RECOVERY_MODULE" && ! -f "$RECOVERY_MODULE" ]]; then
+    backup_log_msg "WARN" "BTRFS recovery module not found: $RECOVERY_MODULE"
+fi
+
+# Function to find the BTRFS root of a subvolume (improved detection)
 find_btrfs_root() {
     local subvol_path="$1"
-    local mount_point=$(mount | grep " on $subvol_path " | grep "btrfs" | awk '{print $3}')
-
+    local mount_point=""
+    
+    # Method 1: Use findmnt for reliable detection (preferred)
+    if command -v findmnt >/dev/null 2>&1; then
+        mount_point=$(findmnt -n -o TARGET -T "$subvol_path" 2>/dev/null | head -n1)
+        if [ -n "$mount_point" ]; then
+            # Verify it's actually BTRFS
+            local fstype=$(findmnt -n -o FSTYPE -T "$subvol_path" 2>/dev/null)
+            if [ "$fstype" = "btrfs" ]; then
+                echo "$mount_point"
+                return 0
+            fi
+        fi
+    fi
+    
+    # Method 2: Use btrfs filesystem show (fallback)
+    if command -v btrfs >/dev/null 2>&1; then
+        local btrfs_info=$(btrfs filesystem show "$subvol_path" 2>/dev/null)
+        if [ -n "$btrfs_info" ]; then
+            # Extract mount point from /proc/mounts using the device
+            local device=$(echo "$btrfs_info" | grep -o '/dev/[^ ]*' | head -n1)
+            if [ -n "$device" ]; then
+                mount_point=$(grep "^$device " /proc/mounts | grep btrfs | awk '{print $2}' | head -n1)
+                if [ -n "$mount_point" ]; then
+                    echo "$mount_point"
+                    return 0
+                fi
+            fi
+        fi
+    fi
+    
+    # Method 3: Legacy mount parsing (last resort)
+    mount_point=$(mount | grep " on $subvol_path " | grep "btrfs" | awk '{print $3}' | head -n1)
     if [ -z "$mount_point" ]; then
-        # If not found directly, it could be a subpath
+        # If not found directly, check parent paths
         for mp in $(mount | grep "btrfs" | awk '{print $3}' | sort -r); do
             if [[ "$subvol_path" == "$mp"* ]]; then
                 mount_point="$mp"
@@ -72,8 +131,14 @@ find_btrfs_root() {
             fi
         done
     fi
-
-    echo "$mount_point"
+    
+    if [ -n "$mount_point" ]; then
+        echo "$mount_point"
+        return 0
+    fi
+    
+    backup_log_msg "ERROR" "Could not determine BTRFS root for: $subvol_path"
+    return 1
 }
 
 
@@ -187,6 +252,9 @@ create_direct_snapshot() {
     local snapshot_name="${subvol}-${timestamp}"
     local snapshot_path="$LH_TEMP_SNAPSHOT_DIR/$snapshot_name"
 
+    backup_log_msg "DEBUG" "Creating snapshot: subvol=$subvol, timestamp=$timestamp"
+    backup_log_msg "DEBUG" "Snapshot path: $snapshot_path"
+
     # Determine mount point for the subvolume
     local mount_point=""
     if [ "$subvol" == "@" ]; then
@@ -197,6 +265,7 @@ create_direct_snapshot() {
         mount_point="/$subvol"
     fi
 
+    backup_log_msg "DEBUG" "Determined mount point: $mount_point"
     backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CREATE_DIRECT_SNAPSHOT' "$subvol" "$mount_point")"
 
     # Find BTRFS root
@@ -217,16 +286,68 @@ create_direct_snapshot() {
 
     backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SUBVOLUME_PATH' "$subvol_path")"
 
-    # Create read-only snapshot
-    mkdir -p "$LH_TEMP_SNAPSHOT_DIR"
-    btrfs subvolume snapshot -r "$mount_point" "$snapshot_path"
-
-    if [ $? -ne 0 ]; then
+    # Create read-only snapshot with enhanced validation
+    backup_log_msg "DEBUG" "Creating read-only snapshot (mandatory for btrfs send operations)"
+    if ! mkdir -p "$LH_TEMP_SNAPSHOT_DIR"; then
+        backup_log_msg "ERROR" "Failed to create temporary snapshot directory: $LH_TEMP_SNAPSHOT_DIR"
+        return 1
+    fi
+    
+    # Critical: Use -r flag as
+    # "Die Verwendung von schreibgeschützten (-r) Snapshots ist keine bloße Empfehlung, 
+    # sondern eine technische Notwendigkeit für die Konsistenz von btrfs send"
+    if ! btrfs subvolume snapshot -r "$mount_point" "$snapshot_path"; then
         backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_SNAPSHOT_ERROR' "$subvol")"
         return 1
     fi
 
+    # Enhanced verification: Ensure snapshot is actually read-only and valid for send
+    backup_log_msg "DEBUG" "Performing comprehensive snapshot validation"
+    if ! verify_snapshot_for_send "$snapshot_path"; then
+        backup_log_msg "ERROR" "Snapshot verification failed: $snapshot_path"
+        backup_log_msg "ERROR" "This violates BTRFS requirements for send operations"
+        # Cleanup failed snapshot
+        btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1 || true
+        return 1
+    fi
+
     backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SNAPSHOT_SUCCESS' "$snapshot_path")"
+    return 0
+}
+
+# Function to verify snapshot is read-only and suitable for btrfs send
+verify_snapshot_for_send() {
+    local snapshot_path="$1"
+    
+    # Check 1: Verify snapshot exists and is a valid BTRFS subvolume
+    if ! btrfs subvolume show "$snapshot_path" >/dev/null 2>&1; then
+        backup_log_msg "ERROR" "Snapshot is not a valid BTRFS subvolume: $snapshot_path"
+        return 1
+    fi
+    
+    # Check 2: Verify snapshot is read-only (critical for btrfs send)
+    local ro_status=$(btrfs property get "$snapshot_path" ro 2>/dev/null | awk '{print $2}')
+    if [ "$ro_status" != "true" ]; then
+        backup_log_msg "ERROR" "Snapshot is not read-only (ro=$ro_status): $snapshot_path"
+        backup_log_msg "ERROR" "Read-only snapshots are mandatory for btrfs send operations"
+        return 1
+    fi
+    
+    # Check 3: Verify snapshot has valid generation number
+    local generation=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Generation:" | awk '{print $2}')
+    if [ -z "$generation" ] || ! [[ "$generation" =~ ^[0-9]+$ ]]; then
+        backup_log_msg "ERROR" "Snapshot has invalid generation number: $snapshot_path (gen=$generation)"
+        return 1
+    fi
+    
+    # Check 4: Verify snapshot has valid UUID for chain integrity
+    local snapshot_uuid=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}')
+    if [ -z "$snapshot_uuid" ] || ! [[ "$snapshot_uuid" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+        backup_log_msg "ERROR" "Snapshot has invalid UUID: $snapshot_path (UUID=$snapshot_uuid)"
+        return 1
+    fi
+    
+    backup_log_msg "DEBUG" "Snapshot verification passed: ro=true, generation=$generation, UUID=$snapshot_uuid"
     return 0
 }
 
@@ -273,16 +394,23 @@ BACKUP_START_TIME=""
 
 # BTRFS Backup main function
 btrfs_backup() {
-    lh_print_header "BTRFS Snapshot Backup"
+    lh_print_header "$(lh_msg 'BTRFS_BACKUP_HEADER')"
+    backup_log_msg "DEBUG" "=== BTRFS Backup Session Started ==="
+    backup_log_msg "DEBUG" "Configuration: BACKUP_ROOT=$LH_BACKUP_ROOT, BACKUP_DIR=$LH_BACKUP_DIR"
+    backup_log_msg "DEBUG" "Configuration: TEMP_SNAPSHOT_DIR=$LH_TEMP_SNAPSHOT_DIR, RETENTION=$LH_RETENTION_BACKUP"
     
     # Signal handler for clean cleanup on interruption
     trap cleanup_on_exit INT TERM EXIT
+    backup_log_msg "DEBUG" "Signal handlers installed"
 
     # Capture start time
     BACKUP_START_TIME=$(date +%s)
+    backup_log_msg "DEBUG" "Backup start time: $(date -d "@$BACKUP_START_TIME" '+%Y-%m-%d %H:%M:%S')"
 
     # Check BTRFS support
+    backup_log_msg "DEBUG" "Checking BTRFS support..."
     local btrfs_supported=$(check_btrfs_support)
+    backup_log_msg "DEBUG" "BTRFS support check result: $btrfs_supported"
     if [ "$btrfs_supported" = "false" ]; then
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_NOT_SUPPORTED')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_TOOLS_MISSING')${LH_COLOR_RESET}"
@@ -290,9 +418,14 @@ btrfs_backup() {
         return 1
     fi
     
-    # Check root privileges
-    if [ "$EUID" -ne 0 ]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_BACKUP_NEEDS_ROOT')${LH_COLOR_RESET}"
+    # Enhanced proactive checks
+    backup_log_msg "INFO" "Performing enhanced proactive validation checks"
+    
+    # 1. Root-Rechte prüfen
+    backup_log_msg "DEBUG" "Checking root privileges (EUID=$EUID)..."
+    if [ "$(id -u)" -ne 0 ]; then
+        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_ERROR_NEED_ROOT')"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_NEED_ROOT')${LH_COLOR_RESET}" >&2
         if lh_confirm_action "$(lh_msg 'BTRFS_RUN_WITH_SUDO')" "y"; then
             backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_BACKUP_WITH_SUDO')"
             trap - INT TERM EXIT
@@ -304,6 +437,9 @@ btrfs_backup() {
             return 1
         fi
     fi
+    
+    backup_log_msg "DEBUG" "✓ Root privileges confirmed"
+    
     
     # Check backup target and adapt for this session if necessary
     echo "$(lh_msg 'BACKUP_CURRENT_TARGET' "$LH_BACKUP_ROOT")"
@@ -356,11 +492,89 @@ btrfs_backup() {
             fi
         done
     fi
+
+    # Enhanced proactive validation
+    backup_log_msg "INFO" "Performing comprehensive proactive validation checks"
+    
+    # 2. Check target mount point
+    backup_log_msg "DEBUG" "Checking if backup target is properly mounted: $LH_BACKUP_ROOT"
+    if ! mountpoint -q "$LH_BACKUP_ROOT"; then
+        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_ERROR_BACKUP_NOT_MOUNTED' "$LH_BACKUP_ROOT")"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_BACKUP_NOT_MOUNTED' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}" >&2
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ERROR_CHECK_MOUNT_ADVICE')${LH_COLOR_RESET}"
+        trap - INT TERM EXIT
+        return 1
+    fi
+    backup_log_msg "DEBUG" "✓ Backup target is properly mounted"
+    
+    # 3. Check write access to target
+    backup_log_msg "DEBUG" "Testing write access to backup target: $LH_BACKUP_ROOT"
+    local write_test_file="${LH_BACKUP_ROOT}/.write_test_$$"
+    if ! touch "$write_test_file" 2>/dev/null; then
+        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_ERROR_NO_WRITE_ACCESS' "$LH_BACKUP_ROOT")"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_NO_WRITE_ACCESS' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}" >&2
         
-    # Space check
+        # Enhanced diagnosis per error table
+        local mount_opts
+        mount_opts=$(findmnt -n -o OPTIONS -T "$LH_BACKUP_ROOT" 2>/dev/null)
+        if [[ "$mount_opts" =~ ro(,|$) ]]; then
+            backup_log_msg "ERROR" "Filesystem mounted read-only - mount options: $mount_opts"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_FILESYSTEM_READONLY')${LH_COLOR_RESET}"
+        fi
+        
+        trap - INT TERM EXIT
+        return 1
+    else
+        rm -f "$write_test_file" 2>/dev/null
+    fi
+    backup_log_msg "DEBUG" "✓ Write access to backup target confirmed"
+        
+    # Critical proactive checks
+    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_HEALTH_CHECK' "$LH_BACKUP_ROOT")"
+    if ! check_filesystem_health "$LH_BACKUP_ROOT"; then
+        local health_exit_code=$?
+        if [ $health_exit_code -eq 2 ]; then
+            backup_log_msg "ERROR" "Critical filesystem health issue: read-only or corrupted filesystem"
+            echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_ERROR_CRITICAL_HEALTH_ISSUE')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_HEALTH_CHECK_FAILED')${LH_COLOR_RESET}"
+            trap - INT TERM EXIT
+            return 1
+        else
+            backup_log_msg "WARN" "Filesystem health check detected issues (exit code: $health_exit_code)"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_WARNING_HEALTH_ISSUES')${LH_COLOR_RESET}"
+            if ! lh_confirm_action "$(lh_msg 'CONFIRM_CONTINUE_DESPITE_WARNINGS')" "n"; then
+                backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_OPERATION_CANCELLED_HEALTH')"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
+                trap - INT TERM EXIT
+                return 1
+            fi
+        fi
+    fi
+
+    # Enhanced BTRFS-specific space check (Critical Fix #2)
     backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CHECK_SPACE' "$LH_BACKUP_ROOT")"
+    local space_check_result
+    space_check_result=$(check_btrfs_space "$LH_BACKUP_ROOT")
+    local space_exit_code=$?
+    
+    if [ $space_exit_code -eq 2 ]; then
+        backup_log_msg "ERROR" "Critical BTRFS metadata exhaustion detected"
+        echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_ERROR_METADATA_EXHAUSTION')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_BALANCE_REQUIRED')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ERROR_BALANCE_COMMAND' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+        trap - INT TERM EXIT
+        return 1
+    elif [ $space_exit_code -ne 0 ]; then
+        backup_log_msg "ERROR" "BTRFS space check failed for $LH_BACKUP_ROOT"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_SPACE_CHECK_FAILED')${LH_COLOR_RESET}"
+        trap - INT TERM EXIT
+        return 1
+    fi
+    
+    # Get accurate BTRFS available space
     local available_space_bytes
-    available_space_bytes=$(df --output=avail -B1 "$LH_BACKUP_ROOT" 2>/dev/null | tail -n1)
+    available_space_bytes=$(get_btrfs_available_space "$LH_BACKUP_ROOT")
+    local space_get_exit_code=$?
 
     local numfmt_avail=false
     if command -v numfmt >/dev/null 2>&1; then
@@ -375,9 +589,10 @@ btrfs_backup() {
         fi
     }
 
-    if ! [[ "$available_space_bytes" =~ ^[0-9]+$ ]]; then
+    if [ $space_get_exit_code -ne 0 ] || ! [[ "$available_space_bytes" =~ ^[0-9]+$ ]]; then
         backup_log_msg "WARN" "$(lh_msg 'BTRFS_LOG_SPACE_CHECK_ERROR' "$LH_BACKUP_ROOT")"
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'SPACE_CHECK_WARNING' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_SPACE_CHECK_FALLBACK_MSG')${LH_COLOR_RESET}"
         if ! lh_confirm_action "$(lh_msg 'CONFIRM_CONTINUE')" "n"; then
             backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_OPERATION_CANCELLED_SPACE')"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
@@ -416,12 +631,53 @@ btrfs_backup() {
 
         backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SIZE_ROOT_CALC')"
         estimated_size_val=$(du -sb "${root_exclude_opts_array[@]}" / 2>/dev/null | awk '{print $1}')
-        if [[ "$estimated_size_val" =~ ^[0-9]+$ ]]; then required_space_bytes=$((required_space_bytes + estimated_size_val)); else backup_log_msg "WARN" "$(lh_msg 'BTRFS_LOG_SIZE_ROOT_ERROR')"; fi
+        if [[ "$estimated_size_val" =~ ^[0-9]+$ ]]; then 
+            required_space_bytes=$((required_space_bytes + estimated_size_val))
+            backup_log_msg "DEBUG" "Root filesystem estimated size: $(numfmt --to=iec-i --suffix=B "$estimated_size_val" 2>/dev/null || echo "${estimated_size_val}B")"
+        else 
+            backup_log_msg "WARN" "$(lh_msg 'BTRFS_LOG_SIZE_ROOT_ERROR')"
+        fi
+        
         backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SIZE_HOME_CALC')"
         estimated_size_val=$(du -sb "${exclude_opts_array[@]}" /home 2>/dev/null | awk '{print $1}')
-        if [[ "$estimated_size_val" =~ ^[0-9]+$ ]]; then required_space_bytes=$((required_space_bytes + estimated_size_val)); else backup_log_msg "WARN" "$(lh_msg 'BTRFS_LOG_SIZE_HOME_ERROR')"; fi
+        if [[ "$estimated_size_val" =~ ^[0-9]+$ ]]; then 
+            required_space_bytes=$((required_space_bytes + estimated_size_val))
+            backup_log_msg "DEBUG" "Home filesystem estimated size: $(numfmt --to=iec-i --suffix=B "$estimated_size_val" 2>/dev/null || echo "${estimated_size_val}B")"
+        else 
+            backup_log_msg "WARN" "$(lh_msg 'BTRFS_LOG_SIZE_HOME_ERROR')"
+        fi
         
-        local margin_percentage=120 # 20% margin for BTRFS
+        # Check if we have previous backups to estimate incremental size
+        local incremental_adjustment=1.0  # Default: assume full backup
+        local backup_history_count=0
+        
+        for subvol in @ @home; do
+            local backup_subvol_dir="$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol"
+            if [ -d "$backup_subvol_dir" ]; then
+                local existing_backups=$(ls -1 "$backup_subvol_dir" 2>/dev/null | grep -v '\.backup_complete$' | wc -l)
+                backup_history_count=$((backup_history_count + existing_backups))
+            fi
+        done
+        
+        # If we have backup history, estimate incremental size (typically 10-30% of full)
+        if [ $backup_history_count -gt 0 ]; then
+            incremental_adjustment=0.25  # Conservative estimate: 25% of full size for incremental
+            backup_log_msg "DEBUG" "Found $backup_history_count existing backups, using incremental estimate (25% of full size)"
+        else
+            backup_log_msg "DEBUG" "No existing backups found, using full backup estimate"
+        fi
+        
+        # Apply incremental adjustment and BTRFS overhead margin
+        local base_required=$required_space_bytes
+        # Use bc if available, otherwise use shell arithmetic (less precise)
+        if command -v bc >/dev/null 2>&1; then
+            required_space_bytes=$(echo "$required_space_bytes * $incremental_adjustment" | bc 2>/dev/null | cut -d. -f1 || echo "$required_space_bytes")
+        else
+            # Fallback: convert to percentage for shell arithmetic
+            local adjustment_percent=$(echo "$incremental_adjustment * 100" | bc 2>/dev/null | cut -d. -f1 || echo "100")
+            required_space_bytes=$((required_space_bytes * adjustment_percent / 100))
+        fi
+        local margin_percentage=150 # 50% margin for BTRFS overhead, metadata, and safety
         local required_with_margin=$((required_space_bytes * margin_percentage / 100))
 
         local available_hr=$(format_bytes_for_display "$available_space_bytes")
@@ -443,26 +699,67 @@ btrfs_backup() {
         fi
     fi
 
-    # Ensure backup directory
-    $LH_SUDO_CMD mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
-    if [ $? -ne 0 ]; then
+    # Ensure backup directory with proper BTRFS validation
+    if ! $LH_SUDO_CMD mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"; then
         backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_BACKUP_DIR_ERROR')"
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_CREATE_BACKUP_DIR')${LH_COLOR_RESET}"
         trap - INT TERM EXIT
         return 1
     fi
     
-    # Ensure temporary snapshot directory
-    $LH_SUDO_CMD mkdir -p "$LH_TEMP_SNAPSHOT_DIR"
-    if [ $? -ne 0 ]; then
+    # Verify backup directory is on BTRFS filesystem
+    local backup_dir_fstype
+    backup_dir_fstype=$(findmnt -n -o FSTYPE -T "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null)
+    if [[ "$backup_dir_fstype" != "btrfs" ]]; then
+        backup_log_msg "ERROR" "Backup directory is not on BTRFS filesystem: $LH_BACKUP_ROOT$LH_BACKUP_DIR (detected: $backup_dir_fstype)"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_BACKUP_DIR_NOT_BTRFS')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ERROR_DESTINATION_NOT_BTRFS')${LH_COLOR_RESET}"
+        trap - INT TERM EXIT
+        return 1
+    fi
+    
+    backup_log_msg "DEBUG" "Backup directory validated: $LH_BACKUP_ROOT$LH_BACKUP_DIR (BTRFS filesystem confirmed)"
+    
+    # Ensure temporary snapshot directory with proper BTRFS structure
+    if ! $LH_SUDO_CMD mkdir -p "$LH_TEMP_SNAPSHOT_DIR"; then
         backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_TEMP_DIR_ERROR')"
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_CREATE_TEMP_DIR')${LH_COLOR_RESET}"
         trap - INT TERM EXIT
         return 1
     fi
     
+    # Verify temporary directory is on BTRFS and writable
+    local temp_dir_fstype
+    temp_dir_fstype=$(findmnt -n -o FSTYPE -T "$LH_TEMP_SNAPSHOT_DIR" 2>/dev/null)
+    if [[ "$temp_dir_fstype" != "btrfs" ]]; then
+        backup_log_msg "WARN" "Temporary snapshot directory is not on BTRFS filesystem: $LH_TEMP_SNAPSHOT_DIR (detected: $temp_dir_fstype)"
+        backup_log_msg "WARN" "This may cause issues with snapshot operations"
+    fi
+    
+    # Test write access to temporary directory
+    local test_file="$LH_TEMP_SNAPSHOT_DIR/.write_test_$$"
+    if ! touch "$test_file" 2>/dev/null; then
+        backup_log_msg "ERROR" "Cannot write to temporary snapshot directory: $LH_TEMP_SNAPSHOT_DIR"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_TEMP_DIR_NOT_WRITABLE')${LH_COLOR_RESET}"
+        trap - INT TERM EXIT
+        return 1
+    else
+        rm -f "$test_file" 2>/dev/null
+    fi
+    
     # Clean up orphaned temporary snapshots
     cleanup_orphaned_temp_snapshots
+    
+    # Critical: Check received_uuid integrity
+    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CHECK_RECEIVED_UUID_INTEGRITY')"
+    if ! protect_received_snapshots "$LH_BACKUP_ROOT$LH_BACKUP_DIR"; then
+        backup_log_msg "WARN" "Received UUID integrity issues detected - incremental chains may be broken"
+        backup_log_msg "WARN" "This backup session will use full backups to re-establish chains"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_WARNING_CHAIN_INTEGRITY')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_INFO_FULL_BACKUP_RECOVERY')${LH_COLOR_RESET}"
+    else
+        backup_log_msg "DEBUG" "Received UUID integrity check passed - incremental chains intact"
+    fi
     
     backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_USING_DIRECT_SNAPSHOTS')"
     
@@ -497,9 +794,9 @@ btrfs_backup() {
         
         # Prepare backup directory for this subvolume
         local backup_subvol_dir="$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol"
-        mkdir -p "$backup_subvol_dir"
-        if [ $? -ne 0 ]; then
+        if ! mkdir -p "$backup_subvol_dir"; then
             backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_BACKUP_SUBVOL_DIR_ERROR' "$subvol")"
+            echo -e "${LH_COLOR_ERROR}Failed to create backup directory: $backup_subvol_dir${LH_COLOR_RESET}"
             # Safe cleanup of temporary snapshot
             safe_cleanup_temp_snapshot "$snapshot_path"
             CURRENT_TEMP_SNAPSHOT=""
@@ -509,35 +806,305 @@ btrfs_backup() {
         # Search for last backup for incremental transfer
         local last_backup=$(ls -1d "$backup_subvol_dir/$subvol-"* 2>/dev/null | sort -r | head -n1)
         
-        # Transfer snapshot to backup target
+        # Transfer snapshot to backup target using atomic operations
         backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_TRANSFER_SNAPSHOT' "$subvol")"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_TRANSFER_SUBVOLUME' "$subvol")${LH_COLOR_RESET}"
         
-        if [ -n "$last_backup" ]; then
-            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_PREVIOUS_BACKUP_FOUND' "$last_backup")"
-            # Currently only full backups, incremental for later
-            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SEND_FULL_SNAPSHOT_PREV')"
-            btrfs send "$snapshot_path" | btrfs receive "$backup_subvol_dir"
-            local send_status=$?
+        # Implement true atomic backup pattern
+        # Note: btrfs receive creates snapshots with their original names, not custom paths
+        local final_backup_path="$backup_subvol_dir/$snapshot_name"
+        
+        backup_log_msg "DEBUG" "Atomic transfer target: $final_backup_path"
+        
+        # Determine if we can do incremental backup with enhanced validation
+        # Critical Fix #1: Comprehensive Parent Snapshot Selection using BTRFS requirements
+        local use_incremental=false
+        local parent_snapshot=""
+        
+        if [ -n "$last_backup" ] && [ -d "$last_backup" ]; then
+            backup_log_msg "DEBUG" "Evaluating parent snapshot for incremental backup: $last_backup"
+            
+            # Enhanced Step 1: Verify destination parent has valid received_uuid (critical requirement)
+            backup_log_msg "DEBUG" "Step 1: Verifying destination parent received_uuid integrity"
+            local dest_received_uuid
+            dest_received_uuid=$(btrfs subvolume show "$last_backup" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+            
+            if [ -z "$dest_received_uuid" ] || [ "$dest_received_uuid" = "-" ]; then
+                backup_log_msg "WARN" "Destination parent missing received_uuid, cannot use for incremental backup"
+                backup_log_msg "DEBUG" "received_uuid permanently deleted - chain broken"
+                backup_log_msg "DEBUG" "This indicates the parent was modified after receive, breaking incremental chain"
+                
+                # Check if this snapshot was created by our backup system but corrupted
+                if ! verify_received_uuid_integrity "$last_backup"; then
+                    backup_log_msg "ERROR" "Critical: Received snapshot lost its received_uuid!"
+                    backup_log_msg "ERROR" "This breaks incremental backup chains"
+                    backup_log_msg "WARN" "All subsequent backups for this subvolume will be full backups until chain is re-established"
+                fi
+            else
+                backup_log_msg "DEBUG" "✓ Destination parent has valid received_uuid: $dest_received_uuid"
+                
+                # Enhanced Step 2: Find SOURCE parent that matches destination's received_uuid with comprehensive search
+                local parent_basename=$(basename "$last_backup")
+                local parent_timestamp=$(echo "$parent_basename" | sed "s/^$subvol-//")
+                
+                backup_log_msg "DEBUG" "Step 2: Searching for source parent matching received_uuid"
+                backup_log_msg "DEBUG" "Looking for source snapshot with UUID: $dest_received_uuid"
+                
+                # Comprehensive search for source parent snapshots
+                local source_parent_candidates=(
+                    "/.snapshots/${parent_basename}"
+                    "$LH_TEMP_SNAPSHOT_DIR/../.snapshots/${parent_basename}"
+                    "$LH_TEMP_SNAPSHOT_DIR/${parent_basename}"
+                    "/.snapshots/$subvol-$parent_timestamp"
+                    "/tmp/.snapshots/${parent_basename}"
+                )
+                
+                # Add more potential locations based on common snapshot naming patterns
+                for common_location in /.snapshots /var/snapshots /backup/.snapshots; do
+                    if [[ -d "$common_location" ]]; then
+                        source_parent_candidates+=("$common_location/${parent_basename}")
+                        source_parent_candidates+=("$common_location/$subvol-$parent_timestamp")
+                    fi
+                done
+                
+                local source_parent_path=""
+                local candidates_checked=0
+                
+                for candidate in "${source_parent_candidates[@]}"; do
+                    ((candidates_checked++))
+                    backup_log_msg "DEBUG" "Checking candidate $candidates_checked: $candidate"
+                    
+                    if [ -d "$candidate" ] && btrfs subvolume show "$candidate" >/dev/null 2>&1; then
+                        # Verify this source snapshot's UUID matches destination's received_uuid
+                        local source_uuid
+                        source_uuid=$(btrfs subvolume show "$candidate" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
+                        
+                        if [ "$source_uuid" = "$dest_received_uuid" ]; then
+                            backup_log_msg "DEBUG" "✓ Found matching source parent: $candidate (UUID: $source_uuid)"
+                            source_parent_path="$candidate"
+                            break
+                        else
+                            backup_log_msg "DEBUG" "✗ UUID mismatch: $candidate (UUID: $source_uuid vs expected: $dest_received_uuid)"
+                        fi
+                    else
+                        backup_log_msg "DEBUG" "✗ Not accessible or not BTRFS subvolume: $candidate"
+                    fi
+                done
+                
+                # Enhanced Step 3: Use comprehensive validation from lib_btrfs.sh with additional checks
+                if [ -n "$source_parent_path" ]; then
+                    backup_log_msg "DEBUG" "Step 3: Performing comprehensive incremental backup chain validation"
+                    
+                    # Additional validation: Check both snapshots are read-only
+                    local source_ro_status dest_ro_status
+                    source_ro_status=$(btrfs property get "$source_parent_path" ro 2>/dev/null | awk '{print $2}')
+                    dest_ro_status=$(btrfs property get "$last_backup" ro 2>/dev/null | awk '{print $2}')
+                    
+                    if [[ "$source_ro_status" != "true" ]]; then
+                        backup_log_msg "WARN" "Source parent is not read-only: $source_parent_path"
+                        backup_log_msg "WARN" "Read-only status is mandatory for send operations"
+                    fi
+                    
+                    if [[ "$dest_ro_status" != "true" ]]; then
+                        backup_log_msg "WARN" "Destination parent is not read-only: $last_backup"
+                        backup_log_msg "WARN" "This may indicate the received snapshot was modified"
+                    fi
+                    
+                    # Use the comprehensive validate_parent_snapshot_chain function
+                    if validate_parent_snapshot_chain "$source_parent_path" "$last_backup" "$snapshot_path"; then
+                        parent_snapshot="$source_parent_path"
+                        use_incremental=true
+                        backup_log_msg "INFO" "✓ Incremental backup enabled: parent=$(basename "$source_parent_path")"
+                        backup_log_msg "DEBUG" "✓ Chain validation passed: source->dest UUID consistency verified"
+                        backup_log_msg "DEBUG" "✓ Generation sequence validated"
+                        backup_log_msg "DEBUG" "✓ Received_uuid integrity confirmed"
+                    else
+                        backup_log_msg "WARN" "Parent snapshot chain validation failed, falling back to full backup"
+                        backup_log_msg "DEBUG" "Validation failure ensures backup integrity by preventing corrupted incrementals"
+                        backup_log_msg "DEBUG" "This prevents 'cannot find parent subvolume' errors"
+                    fi
+                else
+                    backup_log_msg "WARN" "No matching source parent found for received_uuid $dest_received_uuid"
+                    backup_log_msg "DEBUG" "Searched $candidates_checked locations: ${source_parent_candidates[*]}"
+                    backup_log_msg "INFO" "This may occur if source snapshots were cleaned up or moved"
+                fi
+            fi
         else
-            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SEND_FULL_SNAPSHOT_NEW')"
-            btrfs send "$snapshot_path" | btrfs receive "$backup_subvol_dir"
-            local send_status=$?
+            backup_log_msg "DEBUG" "No destination parent snapshot found, performing initial full backup"
         fi
         
-        # Check success
-        if [ $send_status -ne 0 ]; then
+        # Validate incremental backup chain integrity with enhanced checks
+        if [ "$use_incremental" = true ]; then
+            backup_log_msg "DEBUG" "Performing comprehensive incremental chain validation..."
+            
+            # Enhanced validation
+            if ! validate_parent_snapshot_chain "$parent_snapshot" "$last_backup" "$snapshot_path"; then
+                backup_log_msg "WARN" "Parent snapshot chain validation failed"
+                backup_log_msg "WARN" "Falling back to full backup to ensure integrity"
+                use_incremental=false
+                parent_snapshot=""
+            else
+                backup_log_msg "DEBUG" "Parent snapshot chain validation passed"
+            fi
+        fi
+        
+        # Perform backup transfer using proper atomic pattern
+        backup_log_msg "DEBUG" "Starting atomic send/receive operation"
+        
+        local send_result=0
+        local final_snapshot_path=""
+        
+        if [ "$use_incremental" = true ]; then
+            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SEND_INCREMENTAL')"
+            backup_log_msg "DEBUG" "Incremental: parent=$(basename "$parent_snapshot"), current=$snapshot_name"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_INCREMENTAL_BACKUP' "$(basename "$parent_snapshot")")${LH_COLOR_RESET}"
+            
+            # Use atomic pattern for incremental backup with comprehensive error handling
+            if atomic_receive_with_validation "$snapshot_path" "$final_backup_path" "$parent_snapshot"; then
+                backup_log_msg "INFO" "Incremental backup completed successfully"
+                final_snapshot_path="$final_backup_path"
+                send_result=0
+            else
+                local atomic_exit_code=$?
+                backup_log_msg "WARN" "Incremental backup failed (exit code: $atomic_exit_code)"
+                
+                # Handle specific BTRFS error cases from Error Table
+                case $atomic_exit_code in
+                    2)
+                        backup_log_msg "WARN" "Parent snapshot validation failed - incremental chain integrity issue detected"
+                        backup_log_msg "INFO" "Attempting automatic fallback to full backup"
+                        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_INCREMENTAL_CHAIN_BROKEN')${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_FALLBACK_TO_FULL')${LH_COLOR_RESET}"
+                        
+                        # Fallback to full backup
+                        if atomic_receive_with_validation "$snapshot_path" "$final_backup_path"; then
+                            backup_log_msg "INFO" "Fallback to full backup succeeded - incremental chain re-established"
+                            final_snapshot_path="$final_backup_path"
+                            send_result=0
+                        else
+                            backup_log_msg "ERROR" "Fallback full backup also failed - manual intervention may be required"
+                            send_result=1
+                        fi
+                        ;;
+                    3)
+                        backup_log_msg "ERROR" "BTRFS metadata exhaustion detected during backup transfer"
+                        backup_log_msg "ERROR" "This is not a simple disk full condition - requires immediate attention"
+                        backup_log_msg "ERROR" "Often not a lack of total memory, but of metadata chunks"
+                        echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_ERROR_METADATA_EXHAUSTION')${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_BALANCE_REQUIRED')${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_BALANCE_METADATA_COMMAND' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ERROR_FILESYSTEM_USAGE_COMMAND' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+                        send_result=1
+                        ;;
+                    4)
+                        backup_log_msg "ERROR" "BTRFS filesystem corruption detected during backup transfer"
+                        backup_log_msg "ERROR" "This indicates serious filesystem integrity issues"
+                        backup_log_msg "ERROR" "parent transid verify failed or checksum errors detected"
+                        echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_ERROR_CORRUPTION_DETECTED')${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_MANUAL_REPAIR_NEEDED')${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_CHECK_READONLY_COMMAND')${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_EMERGENCY_RECOVERY_SEVERE')${LH_COLOR_RESET}"
+                        send_result=1
+                        ;;
+                    *)
+                        backup_log_msg "ERROR" "Incremental backup failed with unrecognized error (exit code: $atomic_exit_code)"
+                        backup_log_msg "INFO" "Attempting fallback to full backup as safety measure"
+                        
+                        # Enhanced error capture for analysis
+                        local error_details recent_dmesg
+                        recent_dmesg=$(dmesg | tail -10 | grep -i "btrfs\|error" || echo "No specific BTRFS errors in dmesg")
+                        backup_log_msg "DEBUG" "Recent system errors: $recent_dmesg"
+                        
+                        # Try fallback anyway
+                        if atomic_receive_with_validation "$snapshot_path" "$final_backup_path"; then
+                            backup_log_msg "INFO" "Fallback to full backup succeeded despite unknown error"
+                            final_snapshot_path="$final_backup_path"
+                            send_result=0
+                        else
+                            backup_log_msg "ERROR" "Both incremental and fallback full backup failed"
+                            backup_log_msg "ERROR" "Check: 1) Available space, 2) Filesystem health, 3) Permission issues"
+                            send_result=1
+                        fi
+                        ;;
+                esac
+            fi
+        else
+            if [ -n "$last_backup" ]; then
+                backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SEND_FULL_SNAPSHOT_PREV')"
+                backup_log_msg "DEBUG" "Performing full backup (previous backup exists but not suitable for incremental)"
+            else
+                backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SEND_FULL_SNAPSHOT_NEW')"
+                backup_log_msg "DEBUG" "Performing initial full backup"
+            fi
+            
+            # Use atomic pattern for full backup with error handling
+            if atomic_receive_with_validation "$snapshot_path" "$final_backup_path"; then
+                backup_log_msg "INFO" "Full backup completed successfully"
+                final_snapshot_path="$final_backup_path"
+                send_result=0
+            else
+                local atomic_exit_code=$?
+                backup_log_msg "ERROR" "Full backup failed (exit code: $atomic_exit_code)"
+                
+                # Handle specific BTRFS error cases Error Table
+                case $atomic_exit_code in
+                    3)
+                        backup_log_msg "ERROR" "BTRFS metadata exhaustion detected during full backup"
+                        backup_log_msg "ERROR" "This requires immediate manual intervention"
+                        backup_log_msg "ERROR" "The file system is internally fragmented and cannot assign new metadata blocks"
+                        echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_ERROR_METADATA_EXHAUSTION')${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_BALANCE_METADATA_COMMAND' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ERROR_DIAGNOSIS_COMMAND' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+                        ;;
+                    4)
+                        backup_log_msg "ERROR" "BTRFS filesystem corruption detected during full backup"
+                        backup_log_msg "ERROR" "Critical filesystem integrity issue detected"
+                        backup_log_msg "ERROR" "parent transid verify failed - indicates serious metadata corruption"
+                        echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_ERROR_CORRUPTION_DETECTED')${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_CHECK_READONLY_COMMAND')${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_EMERGENCY_RECOVERY')${LH_COLOR_RESET}"
+                        ;;
+                    *)
+                        backup_log_msg "ERROR" "Full backup failed with error code: $atomic_exit_code"
+                        backup_log_msg "ERROR" "Check available space and filesystem health"
+                        
+                        # Enhanced diagnosis
+                        backup_log_msg "INFO" "Performing enhanced diagnosis "
+                        
+                        # Check for common error patterns
+                        local recent_errors
+                        recent_errors=$(dmesg | tail -20 | grep -i "btrfs.*error\|no space left\|read-only\|permission denied" || echo "")
+                        if [[ -n "$recent_errors" ]]; then
+                            backup_log_msg "WARN" "Recent system errors detected:"
+                            echo "$recent_errors" | while IFS= read -r error_line; do
+                                backup_log_msg "WARN" "  $error_line"
+                            done
+                        fi
+                        
+                        # Suggest specific diagnostic commands
+                        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ERROR_DIAGNOSTIC_HEADER')${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_INFO}  $(lh_msg 'BTRFS_ERROR_CMD_FILESYSTEM_USAGE' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_INFO}  $(lh_msg 'BTRFS_ERROR_CMD_CHECK_MOUNT' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_INFO}  $(lh_msg 'BTRFS_ERROR_CMD_MOUNTPOINT' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_INFO}  $(lh_msg 'BTRFS_ERROR_CMD_WHOAMI')${LH_COLOR_RESET}"
+                        ;;
+                esac
+                send_result=1
+            fi
+        fi
+        
+        # Check success and create marker
+        if [ $send_result -ne 0 ]; then
             backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_TRANSFER_ERROR' "$subvol")"
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_TRANSFER_ERROR' "$subvol")${LH_COLOR_RESET}"
         else
-            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_TRANSFER_SUCCESS' "$backup_subvol_dir/$snapshot_name")"
+            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_TRANSFER_SUCCESS' "$final_snapshot_path")"
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_BACKUP_SUCCESS' "$subvol")${LH_COLOR_RESET}"
             
             # Create backup marker
-            if ! create_backup_marker "$backup_subvol_dir/$snapshot_name" "$timestamp" "$subvol"; then
-                backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_MARKER_ERROR' "$backup_subvol_dir/$snapshot_name")"
+            if ! create_backup_marker "$final_snapshot_path" "$timestamp" "$subvol"; then
+                backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_MARKER_ERROR' "$final_snapshot_path")"
                 echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_MARKER_CREATE_WARNING' "$snapshot_name")${LH_COLOR_RESET}"
-                # Optional: Here we could set send_status to an error code to mark the overall backup session as failed
             else
                 backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_MARKER_SUCCESS' "$snapshot_name")"
             fi
@@ -549,17 +1116,9 @@ btrfs_backup() {
         # Reset variable
         CURRENT_TEMP_SNAPSHOT=""
         
-        # Clean up old backups
+        # Intelligent cleanup that respects incremental chains (Critical Fix #4)
         backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_OLD_BACKUPS' "$subvol")"
-        ls -1d "$backup_subvol_dir/$subvol-"* 2>/dev/null | sort | head -n "-$LH_RETENTION_BACKUP" | while read backup; do
-            local marker_file_to_delete="${backup}.backup_complete"
-            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_DELETE_OLD_BACKUP' "$backup" "$marker_file_to_delete")"
-            if btrfs subvolume delete "$backup"; then
-                rm -f "$marker_file_to_delete"
-            else
-                backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_DELETE_ERROR' "$backup")"
-            fi
-        done
+        intelligent_cleanup "$subvol" "$backup_subvol_dir"
         
         echo "" # Empty line for spacing
     done
@@ -588,13 +1147,6 @@ btrfs_backup() {
     local duration=$((end_time - BACKUP_START_TIME))
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_DURATION')${LH_COLOR_RESET} $(printf '%02dh %02dm %02ds' $((duration/3600)) $((duration%3600/60)) $((duration%60)))${LH_COLOR_RESET}"
     
-    # Error checking
-    if grep -q "ERROR" "$LH_BACKUP_LOG"; then # Check for errors in the current session's log entries
-        echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_STATUS')${LH_COLOR_RESET} ${LH_COLOR_ERROR}$(lh_msg 'BACKUP_SUMMARY_STATUS_ERROR' "$LH_BACKUP_LOG")${LH_COLOR_RESET}"
-    else
-        echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_STATUS')${LH_COLOR_RESET} ${LH_COLOR_SUCCESS}$(lh_msg 'BACKUP_SUMMARY_STATUS_OK')${LH_COLOR_RESET}"
-    fi
-    
     # Error checking and desktop notification
     if grep -q "ERROR" "$LH_BACKUP_LOG"; then
         echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_STATUS')${LH_COLOR_RESET} ${LH_COLOR_ERROR}$(lh_msg 'BACKUP_SUMMARY_STATUS_ERROR' "$LH_BACKUP_LOG")${LH_COLOR_RESET}"
@@ -606,6 +1158,8 @@ btrfs_backup() {
 $(lh_msg 'BTRFS_NOTIFICATION_ERROR_TIME' "$timestamp")
 $(lh_msg 'BACKUP_NOTIFICATION_SEE_LOG' "$(basename "$LH_BACKUP_LOG")")" 
     else
+        echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_STATUS')${LH_COLOR_RESET} ${LH_COLOR_SUCCESS}$(lh_msg 'BACKUP_SUMMARY_STATUS_OK')${LH_COLOR_RESET}"
+        
         lh_send_notification "success" \
             "$(lh_msg 'BTRFS_NOTIFICATION_SUCCESS_TITLE')" \
             "$(lh_msg 'BTRFS_NOTIFICATION_SUCCESS_BODY' "${subvolumes[*]}")
@@ -614,6 +1168,114 @@ $(lh_msg 'BTRFS_NOTIFICATION_SUCCESS_TIME' "$timestamp")"
     fi
     
     return 0
+}
+
+# Enhanced received_uuid protection
+check_received_uuid_protection() {
+    local snapshot_path="$1"
+    local action_description="$2"
+    
+    backup_log_msg "DEBUG" "Checking received_uuid protection for: $snapshot_path (action: $action_description)"
+    
+    # Check if this is a received snapshot by looking for received_uuid
+    local uuid_info
+    uuid_info=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Received UUID:")
+    if [ -n "$uuid_info" ]; then
+        local received_uuid
+        received_uuid=$(echo "$uuid_info" | awk '{print $3}')
+        
+        if [ "$received_uuid" != "-" ] && [ -n "$received_uuid" ]; then
+            backup_log_msg "DEBUG" "PROTECTION: Snapshot $snapshot_path has received_uuid: $received_uuid"
+            
+            # Classify operations
+            case "$action_description" in
+                "create safe writable copy"|"read snapshot information"|"list snapshots"|"backup validation")
+                    backup_log_msg "DEBUG" "PROTECTION: Safe read-only operation allowed: $action_description"
+                    return 0
+                    ;;
+                "delete this backup snapshot"|"cleanup old backup"|"remove during rotation")
+                    # Deletion is allowed for backup cleanup - received snapshots in backup location
+                    # are expected to be deleted as part of retention policy
+                    backup_log_msg "DEBUG" "PROTECTION: Backup cleanup deletion allowed: $action_description"
+                    return 0
+                    ;;
+                "remove read-only flag"|"modify properties"|"make writable")
+                    # CRITICAL: These operations destroy received_uuid
+                    backup_log_msg "ERROR" "CRITICAL PROTECTION: Cannot $action_description on received snapshot"
+                    backup_log_msg "ERROR" "This would permanently destroy received_uuid: $received_uuid"
+                    backup_log_msg "ERROR" "CONSEQUENCE: Incremental backup chain would be broken forever"
+                    backup_log_msg "INFO" "SOLUTION: Create writable copy instead: btrfs subvolume snapshot $snapshot_path <new_name>"
+                    echo -e "${LH_COLOR_BOLD_RED}BTRFS received_uuid PROTECTION VIOLATION${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RECEIVED_UUID_WARNING' "$(basename "$snapshot_path")")${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RECEIVED_UUID_CONSEQUENCES')${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RECEIVED_UUID_ALTERNATIVE')${LH_COLOR_RESET}"
+                    echo ""
+                    echo -e "${LH_COLOR_BOLD_RED}OPERATION BLOCKED: Cannot $action_description - would break incremental backup chain!${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}Use 'create_safe_writable_snapshot' instead to create a writable copy.${LH_COLOR_RESET}"
+                    
+                    backup_log_msg "ERROR" "PROTECTION: Operation blocked to protect received_uuid integrity: $action_description on $snapshot_path"
+                    return 1
+                    ;;
+                *)
+                    backup_log_msg "WARN" "PROTECTION: Unknown operation on received snapshot: $action_description"
+                    backup_log_msg "WARN" "Proceeding with caution - verify this won't modify received_uuid"
+                    return 0
+                    ;;
+            esac
+        fi
+    fi
+    
+    backup_log_msg "DEBUG" "No received_uuid protection needed for: $snapshot_path"
+    return 0
+}
+
+# Comprehensive received_uuid validation
+validate_received_uuid_integrity() {
+    local snapshot_path="$1"
+    
+    # Check if snapshot has received_uuid
+    local uuid_info=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Received UUID:")
+    if [ -z "$uuid_info" ]; then
+        backup_log_msg "DEBUG" "Snapshot has no received_uuid: $snapshot_path"
+        return 1
+    fi
+    
+    local received_uuid=$(echo "$uuid_info" | awk '{print $3}')
+    if [ "$received_uuid" = "-" ] || [ -z "$received_uuid" ]; then
+        backup_log_msg "WARN" "Snapshot has invalid received_uuid: $snapshot_path"
+        return 1
+    fi
+    
+    # Check if snapshot is read-only (required for received snapshots)
+    local ro_status=$(btrfs property get "$snapshot_path" ro 2>/dev/null | awk '{print $2}')
+    if [ "$ro_status" != "true" ]; then
+        backup_log_msg "WARN" "Received snapshot is not read-only (received_uuid may be corrupted): $snapshot_path"
+        return 1
+    fi
+    
+    backup_log_msg "DEBUG" "Received_uuid integrity validated: $snapshot_path (UUID: $received_uuid)"
+    return 0
+}
+
+# Function to create safe writable snapshot from received backup
+create_safe_writable_snapshot() {
+    local received_snapshot="$1"
+    local new_name="${2:-$(basename "$received_snapshot")_writable_$(date +%Y%m%d_%H%M%S)}"
+    local parent_dir="$(dirname "$received_snapshot")"
+    local safe_snapshot_path="$parent_dir/$new_name"
+    
+    backup_log_msg "INFO" "Creating safe writable snapshot: $safe_snapshot_path"
+    
+    if btrfs subvolume snapshot "$received_snapshot" "$safe_snapshot_path"; then
+        backup_log_msg "INFO" "Safe writable snapshot created successfully: $safe_snapshot_path"
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_SAFE_SNAPSHOT_CREATED' "$safe_snapshot_path")${LH_COLOR_RESET}"
+        echo "$safe_snapshot_path"
+        return 0
+    else
+        backup_log_msg "ERROR" "Failed to create safe writable snapshot: $safe_snapshot_path"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_SAFE_SNAPSHOT_FAILED')${LH_COLOR_RESET}"
+        return 1
+    fi
 }
 
 # Function to clean up orphaned temporary snapshots
@@ -700,6 +1362,9 @@ safe_cleanup_temp_snapshot() {
 cleanup_on_exit() {
     local exit_code=$?
     
+    # Reset trap to prevent recursive calls
+    trap - INT TERM EXIT
+    
     if [ -n "$CURRENT_TEMP_SNAPSHOT" ] && [ -d "$CURRENT_TEMP_SNAPSHOT" ]; then
         echo ""
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_BACKUP_INTERRUPTED')${LH_COLOR_RESET}"
@@ -715,6 +1380,7 @@ cleanup_on_exit() {
         fi
     fi
     
+    # Exit with the original exit code
     exit $exit_code
 }
 
@@ -914,6 +1580,13 @@ delete_btrfs_backups() {
                     echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_DELETE_DELETING_SNAPSHOT' "$snapshot")${LH_COLOR_RESET}"
                     backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_DELETE_SNAPSHOT' "$snapshot_path")"
                     
+                    # Check for received_uuid protection before deletion
+                    if ! check_received_uuid_protection "$snapshot_path" "delete this backup snapshot"; then
+                        echo -e "  ${LH_COLOR_WARNING}$(lh_msg 'BTRFS_DELETE_SKIPPED_PROTECTION')${LH_COLOR_RESET}"
+                        backup_log_msg "INFO" "Snapshot deletion skipped due to received_uuid protection: $snapshot_path"
+                        continue
+                    fi
+                    
                     # Delete BTRFS subvolume
                     if btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1; then
                         # Also delete marker file
@@ -950,6 +1623,70 @@ delete_btrfs_backups() {
     backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_DELETE_COMPLETE')"
     
     return 0
+}
+
+# Enhanced error handling based on BTRFS documentation error table
+handle_btrfs_error() {
+    local error_output="$1"
+    local operation="$2"
+    local exit_code="$3"
+    
+    backup_log_msg "DEBUG" "Analyzing BTRFS error: exit_code=$exit_code, operation=$operation"
+    
+    # Critical error patterns
+    if echo "$error_output" | grep -qi "cannot find parent subvolume"; then
+        backup_log_msg "ERROR" "BTRFS ERROR: Parent subvolume not found on destination"
+        backup_log_msg "ERROR" "This indicates broken incremental backup chain"
+        backup_log_msg "WARN" "RECOVERY: Attempting fallback to full backup"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_ERROR_PARENT_NOT_FOUND')${LH_COLOR_RESET}"
+        return 2  # Special code for parent not found - allows fallback
+        
+    elif echo "$error_output" | grep -qi "no space left on device"; then
+        # Check if this is metadata exhaustion (common BTRFS issue)
+        local fs_usage=$(btrfs filesystem usage "$LH_BACKUP_ROOT" 2>/dev/null)
+        if echo "$fs_usage" | grep -q "Metadata," && echo "$fs_usage" | grep -A5 "Metadata," | grep -q "100%"; then
+            backup_log_msg "ERROR" "CRITICAL: BTRFS metadata chunk exhaustion detected"
+            backup_log_msg "ERROR" "This is not a lack of storage space but metadata fragmentation"
+            backup_log_msg "ERROR" "REQUIRED ACTION: Run 'btrfs balance' to reclaim metadata space"
+            echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_ERROR_METADATA_EXHAUSTION')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ERROR_BALANCE_REQUIRED')${LH_COLOR_RESET}"
+        else
+            backup_log_msg "ERROR" "BTRFS ERROR: Insufficient storage space"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_NO_SPACE')${LH_COLOR_RESET}"
+        fi
+        return 1  # Fatal error
+        
+    elif echo "$error_output" | grep -qi "read-only file system"; then
+        backup_log_msg "ERROR" "CRITICAL: Filesystem in read-only mode"
+        backup_log_msg "ERROR" "This may indicate filesystem corruption or explicit read-only mount"
+        backup_log_msg "ERROR" "Check: mount options, filesystem errors, hardware issues"
+        echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_ERROR_READONLY')${LH_COLOR_RESET}"
+        return 1  # Fatal error
+        
+    elif echo "$error_output" | grep -qi "parent transid verify failed"; then
+        backup_log_msg "ERROR" "CRITICAL: BTRFS metadata corruption detected"
+        backup_log_msg "ERROR" "This indicates serious filesystem inconsistency"
+        backup_log_msg "ERROR" "MANUAL INTERVENTION REQUIRED: Consider btrfs check or mount with -o usebackuproot"
+        echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_ERROR_TRANSID_FAILED')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_MANUAL_REPAIR_NEEDED')${LH_COLOR_RESET}"
+        return 1  # Fatal error
+        
+    elif echo "$error_output" | grep -qi "operation not permitted\|permission denied"; then
+        if [ "$EUID" -ne 0 ]; then
+            backup_log_msg "ERROR" "Insufficient privileges for BTRFS operations (not running as root)"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_NO_ROOT')${LH_COLOR_RESET}"
+        else
+            backup_log_msg "ERROR" "Permission denied despite root privileges (filesystem or SELinux restrictions)"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_PERMISSION_DENIED')${LH_COLOR_RESET}"
+        fi
+        return 1  # Fatal error
+        
+    else
+        backup_log_msg "ERROR" "BTRFS operation failed with unknown error:"
+        backup_log_msg "ERROR" "$error_output"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_UNKNOWN')${LH_COLOR_RESET}"
+        return 1  # Fatal error
+    fi
 }
 
 # Function to detect incomplete BTRFS backups
@@ -1080,6 +1817,7 @@ check_backup_integrity() {
 }
 
 # Create marker file (must be called at the end of successful backup transfer)
+# Create marker file (must be called at the end of successful backup transfer)
 create_backup_marker() {
     local snapshot_path="$1"
     local timestamp="$2"
@@ -1098,7 +1836,7 @@ create_backup_marker() {
     # Create marker file
     cat > "$marker_file" << EOF
 # BTRFS Backup Completion Marker
-# Generated by little-linux-helper modules/backup/mod_backup.sh
+# Generated by little-linux-helper modules/backup/mod_btrfs_backup.sh
 BACKUP_TIMESTAMP=$timestamp
 BACKUP_SUBVOLUME=$subvol
 BACKUP_COMPLETED=$(date '+%Y-%m-%d %H:%M:%S')
@@ -1377,6 +2115,13 @@ cleanup_problematic_backups() {
             echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_CLEANUP_DELETING' "$snapshot_name")${LH_COLOR_RESET}"
             backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_PROBLEMATIC_SNAPSHOT' "$snapshot_path")"
             
+            # Check for received_uuid protection before deletion
+            if ! check_received_uuid_protection "$snapshot_path" "delete this problematic backup"; then
+                echo -e "  ${LH_COLOR_WARNING}$(lh_msg 'BTRFS_CLEANUP_SKIPPED_PROTECTION')${LH_COLOR_RESET}"
+                backup_log_msg "INFO" "Problematic snapshot deletion skipped due to received_uuid protection: $snapshot_path"
+                continue
+            fi
+            
             if btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1; then
                 # Also delete marker file
                 if [ -f "$marker_file_to_delete" ]; then
@@ -1479,7 +2224,7 @@ main_menu() {
         lh_print_menu_item 3 "$(lh_msg 'BTRFS_MENU_STATUS')"
         lh_print_menu_item 4 "$(lh_msg 'BTRFS_MENU_DELETE')"
         lh_print_menu_item 5 "$(lh_msg 'BTRFS_MENU_CLEANUP')"
-        lh_print_menu_item 6 "$(lh_msg 'BTRFS_MENU_RESTORE')"
+        lh_print_menu_item 6 "$(lh_msg 'BTRFS_MENU_RESTORE') - Enhanced Recovery (with set-default)"
         lh_print_menu_item 7 "$(lh_msg 'BTRFS_MENU_SNAPSHOTS_CHECK')"
         lh_print_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
         echo ""
@@ -1503,7 +2248,8 @@ main_menu() {
                 cleanup_problematic_backups
                 ;;
             6)
-                bash "$LH_ROOT_DIR/modules/backup/mod_btrfs_restore.sh"
+                # Use enhanced recovery module with btrfs subvolume set-default support
+                show_recovery_menu
                 ;;
             7)
                 check_and_fix_snapshots
