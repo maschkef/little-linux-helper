@@ -298,6 +298,7 @@ MSG_EN[DOCKER_DEFAULT_PASSWORDS_NO_MATCH]="Value '%s' does not match pattern '%s
 MSG_EN[DOCKER_DEFAULT_PASSWORDS_FOUND_LOG]="Default passwords found in %s"
 MSG_EN[DOCKER_DEFAULT_PASSWORDS_NOT_FOUND_LOG]="No default passwords found in %s"
 MSG_EN[DOCKER_DEFAULT_PASSWORDS_GOOD]="✓ No known default passwords found"
+MSG_EN[DOCKER_DEFAULT_PASSWORDS_RECOMMEND]="Recommendation: Change default passwords to secure values"
 
 # Security checks - Sensitive data check
 MSG_EN[DOCKER_CHECK_SENSITIVE_DATA_INFO]="Checking sensitive data in: %s"

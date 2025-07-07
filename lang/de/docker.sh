@@ -467,7 +467,41 @@ MSG_DE[DOCKER_COUNT_HEADER]="Anzahl"
 MSG_DE[DOCKER_DETAILED_ISSUES_BY_DIR]="📋 DETAILLIERTE PROBLEME NACH VERZEICHNIS:"
 MSG_DE[DOCKER_DIRECTORY_NUMBER]="📁 Verzeichnis %s: %s"
 MSG_DE[DOCKER_CURRENT_CONFIG_HEADER]="⚙️  AKTUELLE KONFIGURATION:"
+MSG_DE[DOCKER_CONFIG_SUMMARY_CHECK_MODE]="   • Prüfmodus: %s"
+MSG_DE[DOCKER_CONFIG_SUMMARY_EXCLUSIONS]="   • Ausschlüsse: %s"
+MSG_DE[DOCKER_CONFIG_SUMMARY_FILE]="   • Konfiguration: %s"
+MSG_DE[DOCKER_CONFIG_SUMMARY_SEARCH_DEPTH]="   • Suchtiefe: %s"
+MSG_DE[DOCKER_CONFIG_SUMMARY_SEARCH_PATH]="   • Suchpfad: %s"
 MSG_DE[DOCKER_CONFIG_SUMMARY_ANALYZED_FILES]="   • Analysierte Dateien: %s Docker-Compose Datei(en)"
+
+# Critical security issues
+MSG_DE[DOCKER_CRITICAL_SECURITY_ISSUES]="🚨 KRITISCHE SICHERHEITSPROBLEME (Sofortige Maßnahmen erforderlich):"
+
+# Issue categories
+MSG_DE[DOCKER_ISSUE_CAPABILITIES]="│ 🔧 Gefährliche Capabilities            │   %s   │"
+MSG_DE[DOCKER_ISSUE_DEFAULT_PASSWORDS]="│ 🔑 Standard-Passwörter                 │   %s   │"
+MSG_DE[DOCKER_ISSUE_DIR_PERMISSIONS]="│ 🔒 Verzeichnisberechtigungen           │   %s   │"
+MSG_DE[DOCKER_ISSUE_ENV_PERMISSIONS]="│ 🔐 .env-Dateiberechtigungen            │   %s   │"
+MSG_DE[DOCKER_ISSUE_EXPOSED_PORTS]="│ 🌐 Exponierte Ports                    │   %s   │"
+MSG_DE[DOCKER_ISSUE_HOST_VOLUMES]="│ 💾 Host-Volume-Mounts                  │   %s   │"
+MSG_DE[DOCKER_ISSUE_LATEST_IMAGES]="│ 🏷️  Latest-Image-Verwendung            │   %s   │"
+MSG_DE[DOCKER_ISSUE_PRIVILEGED]="│ ⚠️  Privilegierte Container             │   %s   │"
+MSG_DE[DOCKER_ISSUE_SECURITY_OPT]="│ 🛡️  Deaktivierte Sicherheitsmaßnahmen   │   %s   │"
+MSG_DE[DOCKER_ISSUE_SENSITIVE_DATA]="│ 🔐 Sensible Daten                      │   %s   │"
+MSG_DE[DOCKER_ISSUE_UPDATE_LABELS]="│ 📦 Update-Management-Labels            │   %s   │"
+
+# Next steps prioritized
+MSG_DE[DOCKER_NEXT_STEPS_PRIORITIZED]="🎯 NÄCHSTE SCHRITTE (Priorisiert):"
+MSG_DE[DOCKER_STEP_ADD_UPDATE_LABELS]="   %s. 📦 NIEDRIG: Update-Management-Labels hinzufügen"
+MSG_DE[DOCKER_STEP_BIND_LOCALHOST]="   %s. 🌐 MITTEL: Ports nur an localhost binden (127.0.0.1)"
+MSG_DE[DOCKER_STEP_ENABLE_SECURITY]="   %s. 🛡️  SOFORT: Sicherheitsmaßnahmen aktivieren (AppArmor/Seccomp)"
+MSG_DE[DOCKER_STEP_FIX_PERMISSIONS]="   %s. 🔒 MITTEL: Verzeichnisberechtigungen korrigieren (empfohlen: 755)"
+MSG_DE[DOCKER_STEP_PIN_IMAGE_VERSIONS]="   %s. 🏷️  NIEDRIG: Spezifische Image-Versionen statt 'latest' verwenden"
+MSG_DE[DOCKER_STEP_REMOVE_PRIVILEGED]="   %s. ⚠️  HOCH: Privilegierte Container entfernen oder Zugriff beschränken"
+MSG_DE[DOCKER_STEP_REMOVE_SENSITIVE_DATA]="   %s. 🔐 SOFORT: Sensible Daten in Umgebungsvariablen verschieben"
+MSG_DE[DOCKER_STEP_REPLACE_PASSWORDS]="   %s. 🔑 SOFORT: Standard-Passwörter durch sichere ersetzen"
+MSG_DE[DOCKER_STEP_REVIEW_CAPABILITIES]="   %s. 🔧 HOCH: Gefährliche Capabilities überprüfen und einschränken"
+MSG_DE[DOCKER_STEP_REVIEW_HOST_VOLUMES]="   %s. 💾 MITTEL: Host-Volume-Mounts überprüfen und minimieren"
 MSG_DE[DOCKER_STEP_FIX_ENV_PERMISSIONS]="   %s. 🔒 HOCH: .env Dateiberechtigungen auf 600 setzen (chmod 600)"
 
 # Additional menu keys
