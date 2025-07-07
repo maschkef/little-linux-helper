@@ -688,6 +688,9 @@ remove_readonly_flag() {
 }
 
 # Safely replace existing subvolume with backup
+# CRITICAL FIX: Enhanced to handle received_uuid protection
+# Using mv on BTRFS subvolumes with received_uuid fails due to filesystem protection
+# This function now uses proper BTRFS snapshot operations when needed
 safely_replace_subvolume() {
     local existing_subvol="$1"
     local subvol_name="$2"
@@ -713,16 +716,49 @@ safely_replace_subvolume() {
     echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_BACKING_UP_EXISTING' "$existing_subvol" "$backup_name")${LH_COLOR_RESET}"
     
     if [[ "$DRY_RUN" == "false" ]]; then
-        # Rename existing subvolume as backup (atomic operation)
-        if mv "$existing_subvol" "$backup_name"; then
-            restore_log_msg "INFO" "Successfully renamed existing subvolume to: $backup_name"
-            echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_EXISTING_BACKED_UP')${LH_COLOR_RESET}"
+        # Check if existing subvolume has received_uuid (critical for BTRFS)
+        local existing_received_uuid=$(sudo btrfs subvolume show "$existing_subvol" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+        
+        if [[ -n "$existing_received_uuid" && "$existing_received_uuid" != "-" ]]; then
+            restore_log_msg "WARN" "Existing subvolume has received_uuid: $existing_received_uuid"
+            restore_log_msg "WARN" "Using BTRFS snapshot instead of mv to preserve metadata integrity"
+            
+            # Use BTRFS snapshot to preserve all metadata including received_uuid
+            if btrfs subvolume snapshot "$existing_subvol" "$backup_name"; then
+                # Now safely delete the original
+                if btrfs subvolume delete "$existing_subvol"; then
+                    restore_log_msg "INFO" "Successfully created BTRFS snapshot backup: $backup_name"
+                    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_EXISTING_BACKED_UP')${LH_COLOR_RESET}"
+                else
+                    restore_log_msg "ERROR" "Failed to delete original subvolume after snapshot: $existing_subvol"
+                    # Clean up the snapshot backup
+                    btrfs subvolume delete "$backup_name" 2>/dev/null || true
+                    return 1
+                fi
+            else
+                restore_log_msg "ERROR" "Failed to create BTRFS snapshot backup: $backup_name"
+                return 1
+            fi
         else
-            restore_log_msg "ERROR" "Failed to rename existing subvolume: $existing_subvol"
-            return 1
+            # Standard rename for subvolumes without received_uuid
+            if mv "$existing_subvol" "$backup_name"; then
+                restore_log_msg "INFO" "Successfully renamed existing subvolume to: $backup_name"
+                echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_EXISTING_BACKED_UP')${LH_COLOR_RESET}"
+            else
+                restore_log_msg "ERROR" "Failed to rename existing subvolume: $existing_subvol"
+                return 1
+            fi
         fi
     else
-        restore_log_msg "INFO" "DRY-RUN: Would rename $existing_subvol to $backup_name"
+        # Enhanced dry-run logging with received_uuid awareness
+        local existing_received_uuid=$(sudo btrfs subvolume show "$existing_subvol" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+        
+        if [[ -n "$existing_received_uuid" && "$existing_received_uuid" != "-" ]]; then
+            restore_log_msg "INFO" "DRY-RUN: Would create BTRFS snapshot $existing_subvol -> $backup_name (preserving received_uuid: $existing_received_uuid)"
+            restore_log_msg "INFO" "DRY-RUN: Would then delete original $existing_subvol"
+        else
+            restore_log_msg "INFO" "DRY-RUN: Would rename $existing_subvol to $backup_name (no received_uuid)"
+        fi
     fi
     
     create_manual_checkpoint "$(lh_msg 'RESTORE_CHECKPOINT_SUBVOLUME_REPLACED' "$subvol_name")"
@@ -737,9 +773,13 @@ perform_subvolume_restore() {
     
     restore_log_msg "INFO" "Starting restore of $subvol_to_restore from $snapshot_to_use"
     
+    # Prevent system standby during restore operations
+    lh_prevent_standby "BTRFS restore of $subvol_to_restore"
+    
     # Validate source snapshot exists
     if [[ ! -d "$snapshot_to_use" ]]; then
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_SNAPSHOT_NOT_FOUND' "$snapshot_to_use")${LH_COLOR_RESET}"
+        lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
         return 1
     fi
     
@@ -747,6 +787,7 @@ perform_subvolume_restore() {
     if ! btrfs subvolume show "$snapshot_to_use" >/dev/null 2>&1; then
         restore_log_msg "ERROR" "Source is not a valid BTRFS subvolume: $snapshot_to_use"
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_INVALID_SOURCE_SUBVOLUME' "$snapshot_to_use")${LH_COLOR_RESET}"
+        lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
         return 1
     fi
     
@@ -757,6 +798,7 @@ perform_subvolume_restore() {
     local target_path="${TARGET_ROOT}/${target_subvol_name}"
     if ! safely_replace_subvolume "$target_path" "$target_subvol_name" "$operation_timestamp"; then
         restore_log_msg "ERROR" "Failed to safely replace existing subvolume"
+        lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
         return 1
     fi
     
@@ -767,6 +809,7 @@ perform_subvolume_restore() {
     
     # Validate target filesystem health before operation
     if ! validate_filesystem_health "$TARGET_ROOT" "restore target"; then
+        lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
         return 1
     fi
     
@@ -828,6 +871,7 @@ perform_subvolume_restore() {
                     echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_UNKNOWN_ERROR')${LH_COLOR_RESET}"
                     ;;
             esac
+            lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
             return 1
         fi
     else
@@ -844,6 +888,9 @@ perform_subvolume_restore() {
     
     restore_log_msg "INFO" "Subvolume restore completed: $subvol_to_restore"
     echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_SUBVOLUME_COMPLETED' "$target_subvol_name")${LH_COLOR_RESET}"
+    
+    # Re-enable system standby after restore completion
+    lh_allow_standby "BTRFS restore of $subvol_to_restore"
     
     return 0
 }

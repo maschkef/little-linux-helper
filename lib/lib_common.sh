@@ -108,6 +108,9 @@ function lh_finalize_initialization() {
     export -f lh_check_root_privileges
     export -f lh_get_target_user_info
     export -f lh_run_command_as_target_user
+    export -f lh_prevent_standby
+    export -f lh_allow_standby
+    export -f lh_check_power_management_tools
     # Export filesystem functions
     export -f lh_get_filesystem_type
     export -f lh_cleanup_old_backups

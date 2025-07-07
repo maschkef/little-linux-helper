@@ -188,19 +188,36 @@ atomic_receive_with_validation() {
                 return 1
             fi
             
-            # Step 3: Atomic rename using mv (atomic for BTRFS subvolumes)
-            lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 3 - Performing atomic move to final destination"
-            if mv "$temp_received_snapshot" "$final_destination"; then
-                # Clean up temporary directory
-                rmdir "$temp_receive_dir" 2>/dev/null || true
-                lh_log_msg "INFO" "atomic_receive_with_validation: Atomic incremental backup completed successfully"
-                return 0
+            # Step 3: Direct atomic receive to final destination directory
+            # This follows the pattern from the German documentation exactly
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 3 - Direct receive to final destination directory"
+            
+            # Clean up temporary attempt - we'll use direct receive instead
+            btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
+            rmdir "$temp_receive_dir" 2>/dev/null || true
+            
+            # Receive directly to the parent directory of final destination
+            # btrfs receive will create the snapshot with its original name
+            local final_parent_dir=$(dirname "$final_destination")
+            local expected_name=$(basename "$source_snapshot")
+            local expected_received_path="$final_parent_dir/$expected_name"
+            
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Receiving to parent directory: $final_parent_dir"
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Expected received path: $expected_received_path"
+            
+            if btrfs send -p "$parent_snapshot" "$source_snapshot" | btrfs receive "$final_parent_dir"; then
+                # Verify the received snapshot exists
+                if [[ -d "$expected_received_path" ]]; then
+                    lh_log_msg "INFO" "atomic_receive_with_validation: Incremental backup completed successfully at: $expected_received_path"
+                    return 0
+                else
+                    lh_log_msg "ERROR" "atomic_receive_with_validation: Snapshot not found at expected location: $expected_received_path"
+                    return 1
+                fi
             else
-                lh_log_msg "ERROR" "atomic_receive_with_validation: Atomic move failed from $temp_received_snapshot to $final_destination"
-                # Step 4: Clean up temporary files on failure
-                btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                rmdir "$temp_receive_dir" 2>/dev/null || true
-                return 1
+                local send_result=$?
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Direct incremental send/receive failed with exit code: $send_result"
+                return $send_result
             fi
         else
             send_result=$?
@@ -273,19 +290,34 @@ atomic_receive_with_validation() {
                 return 1
             fi
             
-            # Step 3: Atomic rename using mv (atomic for BTRFS subvolumes)
-            lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 3 - Performing atomic move to final destination"
-            if mv "$temp_received_snapshot" "$final_destination"; then
-                # Clean up temporary directory
-                rmdir "$temp_receive_dir" 2>/dev/null || true
-                lh_log_msg "INFO" "atomic_receive_with_validation: Atomic full backup completed successfully"
-                return 0
+            # Step 3: Direct receive to final destination directory (full backup)
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 3 - Direct receive for full backup"
+            
+            # Clean up temporary attempt - use direct receive instead
+            btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
+            rmdir "$temp_receive_dir" 2>/dev/null || true
+            
+            # Receive directly to the parent directory of final destination
+            local final_parent_dir=$(dirname "$final_destination")
+            local expected_name=$(basename "$source_snapshot")
+            local expected_received_path="$final_parent_dir/$expected_name"
+            
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Receiving full backup to parent directory: $final_parent_dir"
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Expected received path: $expected_received_path"
+            
+            if btrfs send "$source_snapshot" | btrfs receive "$final_parent_dir"; then
+                # Verify the received snapshot exists
+                if [[ -d "$expected_received_path" ]]; then
+                    lh_log_msg "INFO" "atomic_receive_with_validation: Full backup completed successfully at: $expected_received_path"
+                    return 0
+                else
+                    lh_log_msg "ERROR" "atomic_receive_with_validation: Snapshot not found at expected location: $expected_received_path"
+                    return 1
+                fi
             else
-                lh_log_msg "ERROR" "atomic_receive_with_validation: Atomic move failed from $temp_received_snapshot to $final_destination"
-                # Step 4: Clean up temporary files on failure
-                btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                rmdir "$temp_receive_dir" 2>/dev/null || true
-                return 1
+                local send_result=$?
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Direct full send/receive failed with exit code: $send_result"
+                return $send_result
             fi
         else
             send_result=$?

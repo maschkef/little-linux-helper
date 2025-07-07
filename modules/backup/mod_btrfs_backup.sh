@@ -326,9 +326,17 @@ verify_snapshot_for_send() {
     fi
     
     # Check 2: Verify snapshot is read-only (critical for btrfs send)
-    local ro_status=$(btrfs property get "$snapshot_path" ro 2>/dev/null | awk '{print $2}')
+    local ro_output=$(btrfs property get "$snapshot_path" ro 2>/dev/null)
+    local ro_status=$(echo "$ro_output" | cut -d'=' -f2)
+    
+    # Handle edge case where property get might fail or return unexpected format
+    if [ -z "$ro_output" ] || [[ ! "$ro_output" =~ ^ro= ]]; then
+        backup_log_msg "ERROR" "Failed to get read-only property for snapshot: $snapshot_path (output='$ro_output')"
+        return 1
+    fi
+    
     if [ "$ro_status" != "true" ]; then
-        backup_log_msg "ERROR" "Snapshot is not read-only (ro=$ro_status): $snapshot_path"
+        backup_log_msg "ERROR" "Snapshot is not read-only (ro=$ro_status, output='$ro_output'): $snapshot_path"
         backup_log_msg "ERROR" "Read-only snapshots are mandatory for btrfs send operations"
         return 1
     fi
@@ -763,6 +771,9 @@ btrfs_backup() {
     
     backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_USING_DIRECT_SNAPSHOTS')"
     
+    # Prevent system standby during backup operations
+    lh_prevent_standby "BTRFS backup"
+    
     # Timestamp for this backup session
     local timestamp=$(date +%Y-%m-%d_%H-%M-%S)
     
@@ -897,8 +908,8 @@ btrfs_backup() {
                     
                     # Additional validation: Check both snapshots are read-only
                     local source_ro_status dest_ro_status
-                    source_ro_status=$(btrfs property get "$source_parent_path" ro 2>/dev/null | awk '{print $2}')
-                    dest_ro_status=$(btrfs property get "$last_backup" ro 2>/dev/null | awk '{print $2}')
+                    source_ro_status=$(btrfs property get "$source_parent_path" ro 2>/dev/null | cut -d'=' -f2)
+                    dest_ro_status=$(btrfs property get "$last_backup" ro 2>/dev/null | cut -d'=' -f2)
                     
                     if [[ "$source_ro_status" != "true" ]]; then
                         backup_log_msg "WARN" "Source parent is not read-only: $source_parent_path"
@@ -1167,6 +1178,9 @@ $(lh_msg 'BTRFS_NOTIFICATION_SUCCESS_TARGET' "$LH_BACKUP_ROOT$LH_BACKUP_DIR")
 $(lh_msg 'BTRFS_NOTIFICATION_SUCCESS_TIME' "$timestamp")"
     fi
     
+    # Re-enable system standby after backup completion
+    lh_allow_standby "BTRFS backup"
+    
     return 0
 }
 
@@ -1247,7 +1261,7 @@ validate_received_uuid_integrity() {
     fi
     
     # Check if snapshot is read-only (required for received snapshots)
-    local ro_status=$(btrfs property get "$snapshot_path" ro 2>/dev/null | awk '{print $2}')
+    local ro_status=$(btrfs property get "$snapshot_path" ro 2>/dev/null | cut -d'=' -f2)
     if [ "$ro_status" != "true" ]; then
         backup_log_msg "WARN" "Received snapshot is not read-only (received_uuid may be corrupted): $snapshot_path"
         return 1
@@ -1379,6 +1393,9 @@ cleanup_on_exit() {
             backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_CLEANUP_INTERRUPTED_ERROR' "$CURRENT_TEMP_SNAPSHOT")"
         fi
     fi
+    
+    # Re-enable system standby in case of interruption
+    lh_allow_standby "BTRFS backup (interrupted)"
     
     # Exit with the original exit code
     exit $exit_code
