@@ -1016,3 +1016,12 @@ MSG_EN[RESTORE_SETUP_REQUIRED]="Please run environment setup first (option 1)"
 # General messages
 MSG_EN[RESTORE_ROOT_REQUIRED]="Root privileges required for BTRFS restore operations"
 MSG_EN[RESTORE_RETURN_TO_MENU]="Return to restore menu?"
+
+# Debug logging configuration
+MSG_EN[CONFIG_DEBUG_LOG_LIMIT_TITLE]="Debug Log Limit Configuration"
+MSG_EN[CONFIG_DEBUG_LOG_LIMIT_CURRENT]="Maximum debug entries per backup"
+MSG_EN[CONFIG_ENTER_DEBUG_LIMIT]="Enter maximum number of debug entries to log (0 = unlimited)"
+MSG_EN[CONFIG_NEW_DEBUG_LIMIT]="New debug log limit set to"
+MSG_EN[CONFIG_VALIDATION_DEBUG_LIMIT]="Please enter a valid number (0 or greater)"
+MSG_EN[BTRFS_DEBUG_LOG_LIMITED]="Debug logging limited to %d entries (found %d candidates)"
+MSG_EN[BTRFS_DEBUG_LOG_REMAINING]="... and %d more (limited by debug log settings)"
