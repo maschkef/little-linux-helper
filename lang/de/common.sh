@@ -146,3 +146,4 @@ MSG_DE[SPACE_CHECK_WARNING]="Verfügbarer Speicherplatz auf %s konnte nicht zuve
 MSG_DE[SPACE_INFO]="Verfügbar: %s, Benötigt (geschätzt): %s"
 MSG_DE[SPACE_INSUFFICIENT_WARNING]="Möglicherweise unzureichender Speicherplatz auf dem Backup-Ziel (%s)"
 MSG_DE[SPACE_SUFFICIENT]="Ausreichend Speicherplatz verfügbar auf %s (%s)"
+MSG_DE[CONFIG_UNLIMITED]="unbegrenzt"
