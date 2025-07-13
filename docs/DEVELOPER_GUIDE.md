@@ -11,9 +11,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 
 This document provides a streamlined guide for developers to understand and work with the Little Linux Helper system. It focuses on practical information needed to create or modify modules without overwhelming detail.
 
-**Why Two Documents?** During documentation revision, the attempt to create a "shorter, streamlined" version accidentally resulted in a longer, more comprehensive reference manual. Rather than discard either version, both are maintained: this guide for quick learning and practical development, and `DEVELOPER_REFERENCE.md` for complete technical specifications.
 
-**For Detailed Reference**: See `DEVELOPER_REFERENCE.md` for comprehensive API documentation with full function signatures and implementation details.
 
 **This Guide Contains**: Essential concepts, common patterns, practical examples, and the most frequently needed functions. Use this when you want to get started quickly or need a focused overview of the system.
 
@@ -67,15 +65,13 @@ After initialization, the script enters an infinite loop that displays the main 
     *   **Dependencies (Library):** `lh_print_header`, `lh_log_msg`, `lh_confirm_action`.
     *   **Dependencies (System Commands):** `date`, `hostname`, `whoami`, `cat`, `uname`, `lscpu`, `grep`, `free`, `df`, `journalctl`, `tail`, `ps`, `ip`, `ss`, `netstat`, `less`.
     *   **Side Effects:**
-        - Creates a file in the `$LH_LOG_DIR` directory with a name based on date and hostname (format: `debug_report_HOSTNAME_YYYYMMDD-HHMM.txt`).
-        - Writes various system information (OS, kernel, CPU, memory, disk), package manager info, log excerpts (system, Xorg), running processes, network info, and desktop environment info into this file.
-        - Outputs status messages to the console and the main log (`$LH_LOG_FILE`).
-        - Optionally offers the user to view the created file with `less` (`lh_confirm_action`).
+        - Creates a file in the `$LH_LOG_DIR` directory with a name based on date and hostname.
+        - Optionally offers the user to view the created file with `less`.
     *   **Usage:** Called directly from the main menu.
 
 ### 4. The Library System: Modular Architecture
 
-The Little Linux Helper now uses a modular library system organized in separate, focused files within the `lib/` directory. This design improves maintainability, code organization, and development workflow while maintaining full backward compatibility.
+The Little Linux Helper uses a modular library system organized in separate, focused files within the `lib/` directory. This design improves maintainability, code organization, and development workflow while maintaining full backward compatibility.
 
 #### 4.1 Core Library File: `lib/lib_common.sh`
 
@@ -129,7 +125,7 @@ The library system is split into the following specialized modules:
 - `lh_send_notification()`
 - `lh_check_notification_tools()`
 
-#### 2.3 Library Loading Order
+#### 4.3 Library Loading Order
 
 The modular components are loaded in this specific order in `lib_common.sh`:
 1. `lib_colors.sh` - Required by other components for colored output
@@ -140,7 +136,7 @@ The modular components are loaded in this specific order in `lib_common.sh`:
 
 This loading order ensures that dependencies between modules are properly resolved.
 
-#### 2.4 Backward Compatibility
+#### 4.4 Backward Compatibility
 
 **Complete Compatibility:** All existing functions and variables remain available exactly as before. The modular structure is completely transparent to calling code:
 - **Same API:** All calling code continues to work without modification
@@ -200,23 +196,12 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
 - **Usage:** Use with `echo -e` for colored output. Always end a colored string with `${LH_COLOR_RESET}` to prevent color bleeding. Example: `echo -e "${LH_COLOR_ERROR}$(lh_msg 'ERROR_MESSAGE')${LH_COLOR_RESET}"`
 - **Library Integration:** Many library functions like `lh_print_header`, `lh_print_menu_item`, `lh_log_msg`, `lh_confirm_action`, and `lh_ask_for_input` already incorporate these colors for their output. When using these functions, manual color application is often not needed for their standard output.
 
-**CRITICAL WARNING - Avoid printf/lh_msg Double Usage:**
-- **❌ NEVER USE:** `printf "$(lh_msg 'KEY')" "$VAR"` - This causes empty variable display due to double printf usage
-- **❌ NEVER USE:** `printf` with color variables and `lh_msg` together: `printf "${COLOR}$(lh_msg 'KEY')${RESET}" "$VAR"`
-- **✅ ALWAYS USE:** `lh_msg 'KEY' "$VAR"` - Pass parameters directly to lh_msg
-- **✅ FOR COLORS:** Use `echo -e` with color variables and `lh_msg`: `echo -e "${LH_COLOR_ERROR}$(lh_msg 'ERROR_MESSAGE')${LH_COLOR_RESET}"`
-- **✅ FOR COLORS + TRANSLATION + PARAMS:** `echo -e "${LH_COLOR_ERROR}$(lh_msg 'ERROR_WITH_FILE' "$filename")${LH_COLOR_RESET}"`
-- **Problem:** Using printf with lh_msg causes variables to display as empty strings in UI
-- **Reference:** See `debug_printf.md` for detailed explanation and systematic fix procedures
-
 **Functions:**
 *   `lh_initialize_logging()`
     *   **Purpose:** Sets up the logging system.
     *   **Dependencies:** `date`, `mkdir`, `touch`, `lh_log_msg`.
     *   **Side Effects:**
-        - Creates the monthly log directory (`$LH_LOG_DIR`) if it doesn't exist (e.g., `.../logs/YYYY-MM`).
-        - Sets the global variable `LH_LOG_FILE` to a path in the format `$LH_LOG_DIR/YYMMDD-HHMM_maintenance_script.log`.
-        - Creates the `$LH_LOG_FILE` file if it doesn't exist.
+        - Creates the monthly log directory (`$LH_LOG_DIR`) if it doesn't exist.
         - Writes an info message to the log.
     *   **Usage:** Should be called once at the beginning of the main script.
 
@@ -225,8 +210,6 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Dependencies:** `source`, `basename`, `lh_log_msg`.
     *   **Side Effects:**
         - Sets the global variables `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_TIMESHIFT_BASE_DIR`, `LH_RETENTION_BACKUP`, and `LH_BACKUP_LOG_BASENAME`.
-        - If the configuration file exists, the `CFG_LH_*` variables defined there are read and override the default values.
-        - Sets the global variable `LH_BACKUP_LOG` to a timestamped path within the current monthly log directory (`$LH_LOG_DIR`).
         - Writes info messages to the log.
     *   **Usage:** Should be called once during initialization.
 
@@ -235,8 +218,6 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Dependencies:** `mkdir`, `echo`, `basename`, `lh_log_msg`.
     *   **Side Effects:**
         - Creates the `$LH_CONFIG_DIR` directory if it doesn't exist.
-        - Writes the current values of `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_TIMESHIFT_BASE_DIR`, `LH_RETENTION_BACKUP`, and `LH_BACKUP_LOG_BASENAME` to the configuration file.
-        - Overwrites the file if it exists.
         - Writes an info message to the log.
     *   **Usage:** Can be called by modules that modify the backup configuration.
 
@@ -248,10 +229,6 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Dependencies:** `date`, `echo`, `lh_should_log`.
     *   **Side Effects:**
         - Checks if the message should be logged based on current `LH_LOG_LEVEL` setting.
-        - Formats the message with a timestamp and level.
-        - Outputs the formatted message to standard output (console) if `LH_LOG_TO_CONSOLE` is 'true'.
-        - Appends the formatted message to the `$LH_LOG_FILE` file if `LH_LOG_TO_FILE` is 'true' and the file exists.
-        - Applies color coding based on the log level for console output.
         - Returns early if the log level doesn't meet the configured threshold.
     *   **Usage:** Should be used for all output that needs to appear on the console and be logged. The log level hierarchy is: ERROR < WARN < INFO < DEBUG.
 
@@ -271,8 +248,6 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Dependencies:** `date`, `touch`, `echo`, `tee`.
     *   **Side Effects:**
         - Creates the `$LH_BACKUP_LOG` file if it doesn't exist.
-        - Formats the message with a timestamp and level.
-        - Outputs the formatted message to standard output (console).
         - Appends the formatted message to the `$LH_BACKUP_LOG` file.
     *   **Usage:** Should be used for all log messages specifically related to backup operations.
 
@@ -288,7 +263,7 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Purpose:** Removes old directories or files based on a pattern in a given directory, retaining a specified number of the newest ones.
     *   **Parameters:**
         - `$1` (`backup_dir`): The directory to clean up.
-        - `$2` (`retention_count`): The number of newest items to retain (default: 10).
+        - `$2` (`retention_count`): The number of newest items to retain.
         - `$3` (`pattern`): A shell pattern (glob) identifying the items to be cleaned (e.g., `snapshot_*`).
     *   **Dependencies:** `ls`, `sort`, `tail`, `read`, `rm`, `lh_log_msg`.
     *   **Side Effects:**
@@ -330,7 +305,6 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Return Value:** Returns 0 if the command/script was found or successfully installed. Returns 1 if the command/script is missing and could not be installed or installation was declined.
     *   **Side Effects:**
         - Outputs warnings/errors to the console and log.
-        - May prompt the user for installation (`read`).
         - May execute package manager commands with `sudo` to install packages.
     *   **Usage:** Should be called before executing external commands to ensure necessary programs are available.
 
@@ -342,8 +316,6 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Dependencies:** `read`, `echo`, `tr`, `LH_LANG` environment variable.
     *   **Language-Aware Input:** Accepts different responses based on the current language setting (`LH_LANG`):
         - **English (`en`)**: Accepts `y`, `yes`
-        - **German (`de`)**: Accepts `j`, `ja`, `y`, `yes`  
-        - **Spanish (`es`)**: Accepts `s`, `si`, `sí`, `y`, `yes`
         - **Other languages**: Default to English behavior (`y`, `yes` only)
     *   **Return Value:** Returns 0 if the user answers yes with language-appropriate responses. Returns 1 if the user answers no or the default choice is no and Enter was pressed.
     *   **Usage:** For interactive decisions requiring confirmation. The function automatically adapts to the user's language setting to accept natural yes/no responses.
@@ -352,8 +324,8 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Purpose:** Prompts the user for input and optionally validates it against a regular expression.
     *   **Parameters:**
         - `$1` (`prompt_message`): The message to display as a prompt.
-        - `$2` (`validation_regex`): Optional, a regular expression to validate the input. If empty, any input is accepted.
-        - `$3` (`error_message`): Optional, the error message to display for invalid input (default: "Invalid input. Please try again.").
+        - `$2` (`validation_regex`): Optional, a regular expression to validate the input.
+        - `$3` (`error_message`): Optional, the error message to display for invalid input.
     *   **Dependencies:** `read`, `echo`.
     *   **Output:** Prints the user-entered (and validated) string to standard output.
     *   **Usage:** For safely querying user input that must conform to a specific format.
@@ -363,8 +335,6 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Dependencies:** `loginctl`, `sudo`, `ps`, `grep`, `awk`, `head`, `cut`, `id`, `env`, `who`, `sed`, `basename`, `tr`, `cat`, `lh_log_msg`.
     *   **Side Effects:**
         - Populates the global associative array `LH_TARGET_USER_INFO` with the keys `TARGET_USER`, `USER_DISPLAY`, `USER_XDG_RUNTIME_DIR`, `USER_DBUS_SESSION_BUS_ADDRESS`, `USER_XAUTHORITY`.
-        - Uses various methods (loginctl, SUDO_USER, USER, ps, who) to find the user.
-        - Tries to determine the necessary environment variables (DISPLAY, XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS, XAUTHORITY) from the target user's environment or uses default fallback paths.
         - Writes info/warning messages to the log.
     *   **Return Value:** Returns 0 if a target user could be determined, 1 otherwise.
     *   **Usage:** Must be called before `lh_run_command_as_target_user`. The determined information is cached.
@@ -375,7 +345,7 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
         - `$1` (`command_to_run`): The shell command as a string to be executed.
     *   **Dependencies:** `lh_get_target_user_info`, `sudo`, `sh -c`.
     *   **Return Value:** Returns the exit code of the executed command.
-    *   **Side Effects:** Executes the command as the user stored in `LH_TARGET_USER_INFO[TARGET_USER]`, with the environment variables stored there. Writes debug messages to the log.
+    *   **Side Effects:** Executes the command as the user stored in `LH_TARGET_USER_INFO[TARGET_USER]`, with the environment variables stored there.
     *   **Usage:** For executing commands that need to run in the context of the desktop user (e.g., GUI notifications, commands accessing their home directory).
 
 *   `lh_send_notification(type, title, message, urgency)`
@@ -387,14 +357,14 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
         - `$4` (`urgency`): Optional. Urgency level ("low", "normal", "critical"). If omitted, it's inferred from the type.
     *   **Dependencies:** `lh_get_target_user_info`, `lh_run_command_as_target_user`. System commands like `notify-send`, `zenity`, `kdialog`.
     *   **Return Value:** Returns 0 on success, 1 on failure (e.g., no target user or no notification tool found).
-    *   **Side Effects:** Tries to send a notification using available tools (`notify-send`, `zenity`, `kdialog`) in the context of the target user. Logs the success or failure.
+    *   **Side Effects:** Tries to send a notification using available tools (`notify-send`, `zenity`, `kdialog`) in the context of the target user.
     *   **Usage:** To provide non-interactive feedback to the desktop user about the result of a long-running or background task.
 
 *   `lh_check_notification_tools()`
     *   **Purpose:** Checks for available desktop notification tools, reports their status, and offers to install them.
     *   **Dependencies:** `lh_get_target_user_info`, `lh_run_command_as_target_user`, `lh_confirm_action`, package manager commands.
     *   **Return Value:** Returns 0 if at least one tool is available, 1 otherwise.
-    *   **Side Effects:** Prints the status of available tools to the console. May prompt the user to install missing tools (`libnotify-bin`/`libnotify`, `zenity`). May offer to send a test notification.
+    *   **Side Effects:** Prints the status of available tools to the console. May prompt the user to install missing tools.
     *   **Usage:** Can be used in a settings or diagnostics module to ensure the notification system is working.
 
 *   `lh_print_header(title)`
@@ -419,8 +389,6 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Dependencies:** `lh_load_backup_config`, `lh_initialize_i18n`, `export`.
     *   **Side Effects:**
         - Calls `lh_load_backup_config`.
-        - Calls `lh_initialize_i18n` to initialize the internationalization system.
-        - Exports several key global variables such as `LH_LOG_DIR`, `LH_LOG_FILE`, `LH_SUDO_CMD`, `LH_LANG`, `LH_LOG_LEVEL`, `LH_LOG_TO_CONSOLE`, `LH_LOG_TO_FILE`, all `LH_BACKUP_*` variables, and color variables, making them available in the environment of sub-shells (the module scripts).
         - **Exports the functions** `lh_send_notification`, `lh_check_notification_tools`, `lh_t`, `lh_should_log`, and other core functions using `export -f`, making them directly callable by module scripts.
     *   **Usage:** Should be called once at the end of the initialization sequence in the main script.
 
@@ -429,10 +397,6 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Dependencies:** `source`, `lh_log_msg`.
     *   **Side Effects:**
         - Sets the global variable `LH_GENERAL_CONFIG_FILE` to the general configuration file path.
-        - Reads language, log level, and logging output settings from the configuration file.
-        - Sets global variables `LH_LANG`, `LH_LOG_LEVEL`, `LH_LOG_TO_CONSOLE`, `LH_LOG_TO_FILE`.
-        - Uses default values if no configuration file is found.
-        - Validates log level settings and falls back to 'INFO' for invalid values.
         - Logs the configuration loading operation (using direct echo for early initialization).
     *   **Usage:** Should be called early during initialization, before `lh_initialize_logging`.
 
@@ -441,9 +405,6 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Dependencies:** `mkdir`, `cp`, `sed`, `lh_log_msg`.
     *   **Side Effects:**
         - Creates the `$LH_CONFIG_DIR` directory if it doesn't exist.
-        - Copies the example configuration file and updates values, or creates a simple configuration file.
-        - Writes current language, log level, and logging output settings to `$LH_GENERAL_CONFIG_FILE`.
-        - Overwrites the file if it exists.
         - Logs the configuration save operation.
     *   **Usage:** Called when the user changes settings and wants to save them permanently.
 
@@ -456,10 +417,6 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Side Effects:** None.
     *   **Usage:** Called internally by `lh_log_msg` to filter messages. Available for external use.
 
-*   `lh_load_language_config()` *(Deprecated)*
-    *   **Purpose:** Legacy function for loading language configuration. Replaced by `lh_load_general_config()`.
-    *   **Status:** Removed in favor of the unified general configuration system.
-
 *   `lh_load_language(lang)`
     *   **Purpose:** Loads translation strings for the specified language into the global `MSG` array with comprehensive fallback support.
     *   **Parameters:**
@@ -467,9 +424,6 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Dependencies:** `source`, `lh_log_msg`.
     *   **Side Effects:**
         - **Always loads English first:** Sources all English language files as a baseline, ensuring every key has at least an English translation.
-        - **Overlays target language:** If target language is not English, sources all files in the appropriate language directory (`$LH_ROOT_DIR/lang/${lang}/`) and overlays them on the English base.
-        - **Directory fallback:** If the requested language directory is not found, gracefully falls back to English while logging the issue.
-        - **Populates MSG array:** Updates the global associative array `MSG` with the merged translations (English + target language).
         - **Comprehensive logging:** Logs the language loading operation, any fallbacks, and final language state.
     *   **Return Value:** Returns 0 on success, 1 on critical errors (e.g., English directory missing).
     *   **Usage:** Called by `lh_initialize_i18n` and when switching languages dynamically. Provides robust operation even with incomplete language directories.
@@ -482,9 +436,6 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Dependencies:** `source`, `lh_log_msg`.
     *   **Side Effects:**
         - **English module first:** Always attempts to load the English version of the module (`$LH_ROOT_DIR/lang/en/${module_name}.sh`) as a baseline.
-        - **Target language overlay:** If target language is not English, attempts to load the target language version (`$LH_ROOT_DIR/lang/${lang}/${module_name}.sh`) and overlays it.
-        - **File-level fallback:** If the target language module file is missing, continues with only the English version while logging the fallback.
-        - **Preserves existing translations:** Module loading does not affect previously loaded translations from other modules or core language files.
         - **Updates MSG array:** Adds module-specific translations to the global `MSG` array.
     *   **Return Value:** Returns 0 on success, 1 if English module file is also missing.
     *   **Usage:** Called by modules that need additional translations beyond the common ones. Ensures graceful operation even with missing module translation files.
@@ -501,7 +452,6 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
         - **Empty key:** Returns `[KEY_NAME]` as a placeholder and logs the empty key issue (once per session).
     *   **Advanced Features:**
         - **Deduplication:** Missing/empty keys are logged only once per session to prevent log spam.
-        - **Parameter support:** Supports printf-style formatting: `lh_msg 'WELCOME_USER' "$username"`
         - **Debug assistance:** Clearly differentiates between missing keys (not defined) and empty keys (defined but blank).
     *   **Usage:** Used throughout the application to display localized text: `echo "$(lh_msg 'WELCOME_MESSAGE')"` or `lh_msg 'USER_COUNT' "$count"`.
 
@@ -557,20 +507,6 @@ The i18n system implements a sophisticated multi-layer fallback mechanism to ens
   MSG_DE[BACKUP_STARTING]="Backup wird gestartet..."
   MSG_DE[BACKUP_COMPLETED]="Backup erfolgreich abgeschlossen"
   ```
-
-**Enhanced Loading Functions:**
-
-- **`lh_load_language(lang_code)`**: Main language loading function with comprehensive fallback logic:
-  - Always loads English first as a baseline (even when English is the target language)
-  - Overlays target language translations on top of English base
-  - Handles missing language directories gracefully
-  - Supports proper fallback messaging and logging
-
-- **`lh_load_language_module(module_name, lang_code)`**: Module-specific translation loading with fallback:
-  - Loads English version of the module first as baseline
-  - Attempts to load target language version and overlays it
-  - Gracefully handles missing module translation files
-  - Preserves previously loaded translations from other modules
 
 **Configuration and Initialization:**
 - The language setting is stored in `config/general.conf`.
@@ -635,11 +571,11 @@ lh_load_language_module "lib"               # Library function messages
 
 **Note**: While not all existing modules follow this pattern yet, it is the recommended standard for new modules and should be adopted when updating existing ones.
 
-### 3. Configuration System
+### 5. Configuration System
 
 The Little Linux Helper uses a configuration system based on files in the `config/` directory. Configuration files follow the naming convention `<name>.conf` with corresponding example files `<name>.conf.example`.
 
-#### 3.1 General Configuration (`config/general.conf`)
+#### 5.1 General Configuration (`config/general.conf`)
 
 The main configuration file that replaces the previous `language.conf` and includes general settings for the application.
 
@@ -670,7 +606,7 @@ Each level includes all levels above it in severity.
 
 **Developer Note:** The DEBUG level is designed to be used extensively throughout modules since it's hidden by default. See the "Debugging and Logging Best Practices" section for comprehensive guidelines on implementing debug logging in your modules.
 
-#### 3.2 Backup Configuration (`config/backup.conf`)
+#### 5.2 Backup Configuration (`config/backup.conf`)
 
 Configuration file for backup-related settings.
 
@@ -681,37 +617,33 @@ Configuration file for backup-related settings.
 - `CFG_LH_RETENTION_BACKUP`: Number of backups to retain
 - `CFG_LH_BACKUP_LOG_BASENAME`: Basename for backup log files
 
-#### 3.3 Configuration File Management
+#### 5.3 Configuration File Management
 
 The system automatically ensures configuration files exist by copying example files when needed. Users can modify settings either by editing files directly or through functions like `lh_save_general_config()` and `lh_save_backup_config()`.
 
-**Migration Notes:**
-- The old `language.conf` is no longer supported. Settings should be migrated to `general.conf`.
-- Example files serve as templates and documentation for available settings.
+### 6. Benefits of the Modular Library Architecture
 
-### 3. Benefits of the Modular Library Architecture
+The modular library system provides several significant advantages:
 
-The refactoring to a modular library system provides several significant advantages:
-
-#### 3.1 Improved Maintainability
+#### 6.1 Improved Maintainability
 - **Single Responsibility:** Each library file has a clear, focused purpose
 - **Easier Navigation:** Developers can quickly locate specific functionality 
 - **Reduced Complexity:** Smaller files are easier to understand and modify
 - **Better Organization:** Related functions and variables are grouped logically
 
-#### 3.2 Enhanced Development Workflow  
+#### 6.2 Enhanced Development Workflow  
 - **Reduced Merge Conflicts:** Multiple developers can work on different library components simultaneously
 - **Faster Load Times:** Only necessary components need to be loaded for specific use cases
 - **Easier Testing:** Individual components can be tested in isolation
 - **Better Code Reuse:** Specific components can be imported into other projects if needed
 
-#### 3.3 Future Extensibility
+#### 6.3 Future Extensibility
 - **Selective Loading:** Potential for loading only required components
 - **Plugin Architecture:** New functionality can be added as separate modules
 - **Conditional Features:** Components can be enabled/disabled based on system capabilities
 - **Lazy Loading:** Heavy components can be loaded on-demand
 
-#### 3.4 Development Recommendations
+#### 6.4 Development Recommendations
 
 **For New Features:**
 - Consider if new functionality belongs in an existing library component or requires a new one
@@ -729,41 +661,7 @@ The refactoring to a modular library system provides several significant advanta
 - Custom loading orders can be implemented for specialized requirements
 - Components can be easily mocked or stubbed for testing purposes
 
----
-
-## Library Refactoring Information
-
-### Recent Improvements (June 2025)
-The Little Linux Helper has undergone a significant library refactoring to improve maintainability and development workflow:
-
-**Key Changes:**
-- **Reduced main library size:** From 1,358 lines to 601 lines (56% reduction)
-- **Modular architecture:** Functionality split into 6 focused library files
-- **Zero breaking changes:** All existing functionality preserved
-- **Improved organization:** Related functions grouped logically
-
-**New File Structure:**
-```
-lib/
-├── lib_common.sh          # Core coordination and functions (601 lines)
-├── lib_colors.sh          # Color definitions (38 lines)
-├── lib_package_mappings.sh # Package name mappings (253 lines) 
-├── lib_i18n.sh           # Internationalization (288 lines)
-├── lib_ui.sh             # User interface functions (100 lines)
-└── lib_notifications.sh   # Desktop notifications (215 lines)
-```
-
-**Benefits for Developers:**
-- **Easier navigation:** Find specific functionality faster
-- **Better maintainability:** Work on focused components
-- **Reduced complexity:** Understand smaller, cohesive files
-- **Future extensibility:** Add new components easily
-
-**Compatibility:** All existing modules and scripts continue to work without any modifications. The modular structure is completely transparent to calling code.
-
-**Documentation:** See `docs/LIBRARY_REFACTORING.md` for detailed information about the refactoring process and recommendations for future development.
-
-### 4. External Dependencies (System Commands)
+### 7. External Dependencies (System Commands)
 
 The project uses a number of standard Linux commands. Some of the most important ones are:
 - `sudo`: For operations requiring root privileges.
@@ -852,43 +750,6 @@ When creating a new module for the Little Linux Helper, follow these essential s
 - `lh_confirm_action "$(lh_msg 'CONFIRMATION_QUESTION_KEY')"` - Ask yes/no with translated question
 - `lh_check_command "program"` - Check if program exists (program name doesn't need translation)
 - `lh_send_notification "info" "$(lh_msg 'NOTIFICATION_TITLE_KEY')" "$(lh_msg 'NOTIFICATION_MESSAGE_KEY')"` - Desktop notification with translated content
-
-### Internationalization System Functions
-
-*   `lh_detect_system_language()`
-    *   **Purpose:** Automatically detects the appropriate language setting from system environment variables with comprehensive fallback logic.
-    *   **Dependencies:** Environment variables (`LANG`, `LC_ALL`, `LC_MESSAGES`), `lh_log_msg`.
-    *   **Side Effects:**
-        - **Multi-source detection:** Checks environment variables in priority order: `LANG`, `LC_ALL`, `LC_MESSAGES`.
-        - **Language mapping:** Maps locale patterns (e.g., `de_DE.UTF-8`, `en_US`) to supported language codes.
-        - **Fallback to English:** If no recognizable language is found, defaults to English ('en').
-        - **Sets LH_LANG:** Exports the detected language code to the `LH_LANG` environment variable.
-        - **Comprehensive logging:** Logs the detection process and final language selection.
-    *   **Supported Detection Patterns:**
-        - **English:** `en_*`, `en.*`, `en`, `C.UTF-8`, `C`
-        - **German:** `de_*`, `de.*`, `de`
-        - **Spanish:** `es_*`, `es.*`, `es`
-        - **French:** `fr_*`, `fr.*`, `fr`
-    *   **Return Value:** Returns 0 (always succeeds with fallback).
-    *   **Usage:** Called automatically by `lh_initialize_i18n()` when `CFG_LH_LANG="auto"` is configured.
-
-*   `lh_initialize_i18n()`
-    *   **Purpose:** Comprehensive internationalization system initialization with robust error handling and configuration management.
-    *   **Dependencies:** `mkdir`, `source`, `lh_detect_system_language`, `lh_load_language`, configuration files.
-    *   **Side Effects:**
-        - **Directory creation:** Ensures the `lang/` directory exists.
-        - **Configuration loading:** Loads language setting from `general.conf` if available.
-        - **Automatic detection:** Uses `lh_detect_system_language()` when `CFG_LH_LANG="auto"` is configured.
-        - **Language loading:** Calls `lh_load_language()` to populate the translation system.
-        - **Environment setup:** Ensures `LH_LANG` has a valid value, defaulting to English if necessary.
-        - **Error recovery:** Continues operation even with missing configuration files or directories.
-    *   **Configuration Handling:**
-        - **Config file present:** Reads `CFG_LH_LANG` from `general.conf`
-        - **Auto detection:** Processes `CFG_LH_LANG="auto"` by calling language detection
-        - **No config file:** Falls back to automatic system language detection
-        - **Explicit override:** Respects pre-set `LH_LANG` environment variable
-    *   **Return Value:** Returns 0 (designed to always succeed with fallbacks).
-    *   **Usage:** Called once during system initialization by `lh_finalize_initialization()`. Ensures the i18n system is fully operational regardless of configuration state.
 
 ### Debugging and Logging Best Practices
 
