@@ -19,13 +19,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
 # Load BTRFS-specific library functions
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_btrfs.sh"
 
-# Load BTRFS recovery module for comprehensive recovery functionality
+# Load BTRFS restore module for comprehensive restore functionality
 # This implements the 'btrfs subvolume set-default' functionality
-RECOVERY_MODULE="$(dirname "${BASH_SOURCE[0]}")/mod_btrfs_recovery.sh"
-if [[ -f "$RECOVERY_MODULE" ]]; then
-    source "$RECOVERY_MODULE"
+RESTORE_MODULE="$(dirname "${BASH_SOURCE[0]}")/mod_btrfs_restore.sh"
+if [[ -f "$RESTORE_MODULE" ]]; then
+    source "$RESTORE_MODULE"
 else
-    echo -e "${LH_COLOR_WARNING}BTRFS recovery module not found. Some recovery functions may be unavailable.${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_WARNING}BTRFS restore module not found. Some restore functions may be unavailable.${LH_COLOR_RESET}"
     # Will log properly after backup_log_msg is defined
 fi
 
@@ -81,9 +81,9 @@ backup_log_msg() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$LH_BACKUP_LOG"
 }
 
-# Log warning about missing recovery module if needed
-if [[ -n "$RECOVERY_MODULE" && ! -f "$RECOVERY_MODULE" ]]; then
-    backup_log_msg "WARN" "BTRFS recovery module not found: $RECOVERY_MODULE"
+# Log warning about missing restore module if needed
+if [[ -n "$RESTORE_MODULE" && ! -f "$RESTORE_MODULE" ]]; then
+    backup_log_msg "WARN" "BTRFS restore module not found: $RESTORE_MODULE"
 fi
 
 # Function to find the BTRFS root of a subvolume (improved detection)
@@ -2241,7 +2241,7 @@ main_menu() {
         lh_print_menu_item 3 "$(lh_msg 'BTRFS_MENU_STATUS')"
         lh_print_menu_item 4 "$(lh_msg 'BTRFS_MENU_DELETE')"
         lh_print_menu_item 5 "$(lh_msg 'BTRFS_MENU_CLEANUP')"
-        lh_print_menu_item 6 "$(lh_msg 'BTRFS_MENU_RESTORE') - Enhanced Recovery (with set-default)"
+        lh_print_menu_item 6 "$(lh_msg 'BTRFS_MENU_RESTORE') - Enhanced Restore (with set-default)"
         lh_print_menu_item 7 "$(lh_msg 'BTRFS_MENU_SNAPSHOTS_CHECK')"
         lh_print_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
         echo ""
@@ -2265,8 +2265,8 @@ main_menu() {
                 cleanup_problematic_backups
                 ;;
             6)
-                # Use enhanced recovery module with btrfs subvolume set-default support
-                show_recovery_menu
+                # Use enhanced restore module with btrfs subvolume set-default support
+                show_restore_menu
                 ;;
             7)
                 check_and_fix_snapshots

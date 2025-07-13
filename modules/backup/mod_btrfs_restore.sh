@@ -1464,8 +1464,8 @@ show_disk_information() {
     fi
 }
 
-# Main menu function
-main_menu() {
+# Restore menu function
+show_restore_menu() {
     while true; do
         lh_print_header "$(lh_msg 'RESTORE_MENU_TITLE') - BTRFS"
         
@@ -1554,7 +1554,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     fi
     
     while true; do
-        main_menu
+        show_restore_menu
         echo ""
         if ! lh_confirm_action "$(lh_msg 'RESTORE_RETURN_TO_MENU')" "y"; then
             break

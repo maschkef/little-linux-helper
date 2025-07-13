@@ -24,6 +24,16 @@ fi
 # Critical: Enable pipeline failure detection
 set -o pipefail
 
+# Re-enable pipefail after sourcing dependencies (may be disabled by other scripts)
+ensure_pipefail() {
+    local pipefail_status
+    pipefail_status=$(set -o | grep pipefail | awk '{print $2}' 2>/dev/null || echo "off")
+    if [[ "$pipefail_status" != "on" ]]; then
+        set -o pipefail
+    fi
+}
+ensure_pipefail
+
 # =============================================================================
 # ATOMIC BACKUP OPERATIONS
 # =============================================================================
@@ -1307,23 +1317,6 @@ protect_received_snapshots() {
         return 0
     fi
 }
-# =============================================================================
-# INITIALIZATION AND EXPORT
-# =============================================================================
-
-# Export functions for use by other modules
-export -f atomic_receive_with_validation
-export -f validate_parent_snapshot_chain
-export -f intelligent_cleanup
-export -f check_btrfs_space
-export -f get_btrfs_available_space
-export -f check_filesystem_health
-export -f handle_btrfs_error
-export -f verify_received_uuid_integrity
-export -f protect_received_snapshots
-export -f validate_btrfs_implementation
-
-lh_log_msg "DEBUG" "lib_btrfs.sh: BTRFS library loaded successfully"
 
 # =============================================================================
 # COMPREHENSIVE VALIDATION
@@ -1345,6 +1338,9 @@ lh_log_msg "DEBUG" "lib_btrfs.sh: BTRFS library loaded successfully"
 #   validate_btrfs_implementation
 #
 validate_btrfs_implementation() {
+    # Ensure pipefail is set for this validation
+    ensure_pipefail
+    
     lh_log_msg "INFO" "validate_btrfs_implementation: Starting comprehensive BTRFS implementation validation"
     
     local validation_errors=0
@@ -1379,10 +1375,11 @@ validate_btrfs_implementation() {
         lh_log_msg "ERROR" "CRITICAL: handle_btrfs_error function not found"
         ((validation_errors++))
     else
-        # Test critical error pattern recognition
-        local test_output
-        test_output=$(handle_btrfs_error "ERROR: cannot find parent subvolume" "test" "1" 2>/dev/null || echo "")
-        local test_exit_code=$?
+        # Test critical error pattern recognition with proper isolation
+        local test_exit_code
+        # Use a subshell to isolate the test and capture only the exit code
+        (handle_btrfs_error "ERROR: cannot find parent subvolume" "test" "1" >/dev/null 2>&1)
+        test_exit_code=$?
         
         if [[ "$test_exit_code" -eq 2 ]]; then
             lh_log_msg "DEBUG" "✓ handle_btrfs_error correctly identifies parent subvolume errors"
@@ -1434,8 +1431,24 @@ validate_btrfs_implementation() {
     fi
     
     # Test 9: Check if set -o pipefail is active (critical)
-    if [[ ! "$-" =~ o.*pipefail ]]; then
+    # Ensure pipefail is set before checking
+    ensure_pipefail
+    lh_log_msg "DEBUG" "Current bash options: $-"
+    
+    # Check pipefail using set -o instead of $- which only shows short options
+    local pipefail_status
+    pipefail_status=$(set -o | grep pipefail | awk '{print $2}')
+    
+    if [[ "$pipefail_status" != "on" ]]; then
         lh_log_msg "WARN" "pipefail not set - this may cause issues with pipe error detection"
+        lh_log_msg "DEBUG" "Attempting to set pipefail again"
+        set -o pipefail
+        pipefail_status=$(set -o | grep pipefail | awk '{print $2}')
+        if [[ "$pipefail_status" != "on" ]]; then
+            lh_log_msg "WARN" "Unable to enable pipefail - may be a shell limitation"
+        else
+            lh_log_msg "DEBUG" "pipefail successfully enabled on retry"
+        fi
         ((validation_warnings++))
     else
         lh_log_msg "DEBUG" "✓ pipefail is properly set for pipe error detection"
@@ -1483,3 +1496,21 @@ validate_btrfs_implementation() {
         return 1
     fi
 }
+
+# =============================================================================
+# INITIALIZATION AND EXPORT
+# =============================================================================
+
+# Export functions for use by other modules
+export -f atomic_receive_with_validation
+export -f validate_parent_snapshot_chain
+export -f intelligent_cleanup
+export -f check_btrfs_space
+export -f get_btrfs_available_space
+export -f check_filesystem_health
+export -f handle_btrfs_error
+export -f verify_received_uuid_integrity
+export -f protect_received_snapshots
+export -f validate_btrfs_implementation
+
+lh_log_msg "DEBUG" "lib_btrfs.sh: BTRFS library loaded successfully"
