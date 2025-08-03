@@ -29,6 +29,7 @@ MSG_DE[MENU_PACKAGE_MGMT]="Paketverwaltung & Updates"
 MSG_DE[MENU_SECURITY]="Sicherheitsüberprüfungen"
 MSG_DE[MENU_BACKUP]="Backup & Wiederherstellung"
 MSG_DE[MENU_DOCKER]="Docker-Funktionen"
+MSG_DE[MENU_ENERGY]="Energieverwaltung"
 MSG_DE[MENU_DEBUG_BUNDLE]="Wichtige Debug-Infos in Datei sammeln"
 
 # Debug bundle messages

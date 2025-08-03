@@ -74,11 +74,22 @@ backup_log_msg() {
 
     # Additionally write to backup-specific log.
     # The directory for LH_BACKUP_LOG ($LH_LOG_DIR) should already exist.
-    if [ -n "$LH_BACKUP_LOG" ] && [ ! -f "$LH_BACKUP_LOG" ]; then
-        # Try to create the file if it doesn't exist yet.
-        touch "$LH_BACKUP_LOG" || echo "$(lh_msg 'BACKUP_LOG_WARN_CREATE' "$LH_BACKUP_LOG")" >&2
+    if [ -n "$LH_BACKUP_LOG" ] && [ "$LH_LOG_TO_FILE" = "true" ]; then
+        # Ensure the log file exists before writing
+        if [ ! -f "$LH_BACKUP_LOG" ]; then
+            touch "$LH_BACKUP_LOG"
+        fi
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [$level] $message" >> "$LH_BACKUP_LOG"
     fi
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$LH_BACKUP_LOG"
+}
+
+# Helper function to display debug log limit in a consistent way
+display_debug_log_limit() {
+    if [ "$LH_DEBUG_LOG_LIMIT" -eq 0 ]; then
+        echo "$LH_DEBUG_LOG_LIMIT ($(lh_msg 'CONFIG_UNLIMITED'))"
+    else
+        echo "$LH_DEBUG_LOG_LIMIT"
+    fi
 }
 
 # Log warning about missing restore module if needed
@@ -151,6 +162,7 @@ configure_backup() {
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_BACKUP_DIR')${LH_COLOR_RESET} $LH_BACKUP_DIR ($(lh_msg 'CONFIG_RELATIVE_TO_TARGET'))"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_TEMP_SNAPSHOT_DIR'):${LH_COLOR_RESET} $LH_TEMP_SNAPSHOT_DIR"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_RETENTION')${LH_COLOR_RESET} $(lh_msg 'CONFIG_BACKUPS_COUNT' "$LH_RETENTION_BACKUP")"
+    echo -e "  ${LH_COLOR_INFO}$(lh_msg 'CONFIG_DEBUG_LOG_LIMIT_CURRENT'):${LH_COLOR_RESET} $(display_debug_log_limit)"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_LOGFILE')${LH_COLOR_RESET} $LH_BACKUP_LOG ($(lh_msg 'CONFIG_FILENAME' "$(basename "$LH_BACKUP_LOG")"))"
     echo ""
     
@@ -226,6 +238,19 @@ configure_backup() {
             changed=true
         fi
         
+        # Change debug log limit
+        echo ""
+        echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CONFIG_DEBUG_LOG_LIMIT_TITLE')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'CONFIG_CURRENT_VALUE'):${LH_COLOR_RESET} $(display_debug_log_limit)"
+        if lh_confirm_action "$(lh_msg 'CONFIG_CHANGE_QUESTION_SHORT')" "n"; then
+            local new_debug_limit=$(lh_ask_for_input "$(lh_msg 'CONFIG_ENTER_DEBUG_LIMIT')" "^[0-9]+$" "$(lh_msg 'CONFIG_VALIDATION_DEBUG_LIMIT')")
+            if [ -n "$new_debug_limit" ]; then
+                LH_DEBUG_LOG_LIMIT="$new_debug_limit"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'CONFIG_NEW_DEBUG_LIMIT'):${LH_COLOR_RESET} $(display_debug_log_limit)"
+                changed=true
+            fi
+        fi
+        
         # Additional parameters could be added here (e.g. LH_BACKUP_LOG_BASENAME)
         if [ "$changed" = true ]; then
             echo ""
@@ -235,6 +260,7 @@ configure_backup() {
             echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_TEMP_SNAPSHOT_DIR'):${LH_COLOR_RESET} $LH_TEMP_SNAPSHOT_DIR"
             echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_RETENTION')${LH_COLOR_RESET} $LH_RETENTION_BACKUP"
             echo -e "  ${LH_COLOR_INFO}$(lh_msg 'CONFIG_NEW_EXCLUDES'):${LH_COLOR_RESET} $LH_TAR_EXCLUDES"
+            echo -e "  ${LH_COLOR_INFO}$(lh_msg 'CONFIG_DEBUG_LOG_LIMIT_CURRENT'):${LH_COLOR_RESET} $(display_debug_log_limit)"
             if lh_confirm_action "$(lh_msg 'CONFIG_SAVE_PERMANENTLY')" "y"; then
                 lh_save_backup_config
                 echo "$(lh_msg 'CONFIG_SAVED' "$LH_BACKUP_CONFIG_FILE")"
@@ -252,8 +278,22 @@ create_direct_snapshot() {
     local snapshot_name="${subvol}-${timestamp}"
     local snapshot_path="$LH_TEMP_SNAPSHOT_DIR/$snapshot_name"
 
-    backup_log_msg "DEBUG" "Creating snapshot: subvol=$subvol, timestamp=$timestamp"
-    backup_log_msg "DEBUG" "Snapshot path: $snapshot_path"
+    backup_log_msg "DEBUG" "Creating snapshot: subvol=$subvol, timestamp=$timestamp" >&2
+    backup_log_msg "DEBUG" "Snapshot path: $snapshot_path" >&2
+
+    # First, try to find existing snapshots from BTRFS Assistant or other snapshot tools
+    backup_log_msg "INFO" "Checking for existing snapshots from BTRFS Assistant or other snapshot tools..." >&2
+    local existing_snapshot
+    existing_snapshot=$(find_existing_snapshots "$subvol")
+    
+    if [[ -n "$existing_snapshot" && -d "$existing_snapshot" ]]; then
+        backup_log_msg "INFO" "Using existing snapshot instead of creating new one: $existing_snapshot" >&2
+        # Return the path to the existing snapshot
+        echo "$existing_snapshot"
+        return 0
+    fi
+
+    backup_log_msg "INFO" "No suitable existing snapshots found, creating new temporary snapshot" >&2
 
     # Determine mount point for the subvolume
     local mount_point=""
@@ -265,53 +305,54 @@ create_direct_snapshot() {
         mount_point="/$subvol"
     fi
 
-    backup_log_msg "DEBUG" "Determined mount point: $mount_point"
-    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CREATE_DIRECT_SNAPSHOT' "$subvol" "$mount_point")"
+    backup_log_msg "DEBUG" "Determined mount point: $mount_point" >&2
+    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CREATE_DIRECT_SNAPSHOT' "$subvol" "$mount_point")" >&2
 
     # Find BTRFS root
     local btrfs_root=$(find_btrfs_root "$mount_point")
     if [ -z "$btrfs_root" ]; then
-        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_ROOT_NOT_FOUND' "$mount_point")"
+        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_ROOT_NOT_FOUND' "$mount_point")" >&2
         return 1
     fi
 
-    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_ROOT_FOUND' "$btrfs_root")"
+    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_ROOT_FOUND' "$btrfs_root")" >&2
 
     # Determine subvolume path relative to BTRFS root
     local subvol_path=$(btrfs subvolume show "$mount_point" | grep "^[[:space:]]*Name:" | awk '{print $2}')
     if [ -z "$subvol_path" ]; then
-        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_SUBVOLUME_PATH_ERROR' "$mount_point")"
+        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_SUBVOLUME_PATH_ERROR' "$mount_point")" >&2
         return 1
     fi
 
-    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SUBVOLUME_PATH' "$subvol_path")"
+    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SUBVOLUME_PATH' "$subvol_path")" >&2
 
     # Create read-only snapshot with enhanced validation
-    backup_log_msg "DEBUG" "Creating read-only snapshot (mandatory for btrfs send operations)"
+    backup_log_msg "DEBUG" "Creating read-only snapshot (mandatory for btrfs send operations)" >&2
     if ! mkdir -p "$LH_TEMP_SNAPSHOT_DIR"; then
-        backup_log_msg "ERROR" "Failed to create temporary snapshot directory: $LH_TEMP_SNAPSHOT_DIR"
+        backup_log_msg "ERROR" "Failed to create temporary snapshot directory: $LH_TEMP_SNAPSHOT_DIR" >&2
         return 1
     fi
     
     # Critical: Use -r flag as
     # "Die Verwendung von schreibgeschützten (-r) Snapshots ist keine bloße Empfehlung, 
     # sondern eine technische Notwendigkeit für die Konsistenz von btrfs send"
-    if ! btrfs subvolume snapshot -r "$mount_point" "$snapshot_path"; then
-        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_SNAPSHOT_ERROR' "$subvol")"
+    if ! btrfs subvolume snapshot -r "$mount_point" "$snapshot_path" >&2; then
+        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_SNAPSHOT_ERROR' "$subvol")" >&2
         return 1
     fi
 
     # Enhanced verification: Ensure snapshot is actually read-only and valid for send
-    backup_log_msg "DEBUG" "Performing comprehensive snapshot validation"
+    backup_log_msg "INFO" "Performing comprehensive snapshot validation" >&2
     if ! verify_snapshot_for_send "$snapshot_path"; then
-        backup_log_msg "ERROR" "Snapshot verification failed: $snapshot_path"
-        backup_log_msg "ERROR" "This violates BTRFS requirements for send operations"
+        backup_log_msg "ERROR" "Snapshot verification failed: $snapshot_path" >&2
+        backup_log_msg "ERROR" "This violates BTRFS requirements for send operations" >&2
         # Cleanup failed snapshot
         btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1 || true
         return 1
     fi
 
-    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SNAPSHOT_SUCCESS' "$snapshot_path")"
+    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SNAPSHOT_SUCCESS' "$snapshot_path")" >&2
+    echo "$snapshot_path"
     return 0
 }
 
@@ -321,7 +362,7 @@ verify_snapshot_for_send() {
     
     # Check 1: Verify snapshot exists and is a valid BTRFS subvolume
     if ! btrfs subvolume show "$snapshot_path" >/dev/null 2>&1; then
-        backup_log_msg "ERROR" "Snapshot is not a valid BTRFS subvolume: $snapshot_path"
+        backup_log_msg "ERROR" "Snapshot is not a valid BTRFS subvolume: $snapshot_path" >&2
         return 1
     fi
     
@@ -331,31 +372,31 @@ verify_snapshot_for_send() {
     
     # Handle edge case where property get might fail or return unexpected format
     if [ -z "$ro_output" ] || [[ ! "$ro_output" =~ ^ro= ]]; then
-        backup_log_msg "ERROR" "Failed to get read-only property for snapshot: $snapshot_path (output='$ro_output')"
+        backup_log_msg "ERROR" "Failed to get read-only property for snapshot: $snapshot_path (output='$ro_output')" >&2
         return 1
     fi
     
     if [ "$ro_status" != "true" ]; then
-        backup_log_msg "ERROR" "Snapshot is not read-only (ro=$ro_status, output='$ro_output'): $snapshot_path"
-        backup_log_msg "ERROR" "Read-only snapshots are mandatory for btrfs send operations"
+        backup_log_msg "ERROR" "Snapshot is not read-only (ro=$ro_status, output='$ro_output'): $snapshot_path" >&2
+        backup_log_msg "ERROR" "Read-only snapshots are mandatory for btrfs send operations" >&2
         return 1
     fi
     
     # Check 3: Verify snapshot has valid generation number
     local generation=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Generation:" | awk '{print $2}')
     if [ -z "$generation" ] || ! [[ "$generation" =~ ^[0-9]+$ ]]; then
-        backup_log_msg "ERROR" "Snapshot has invalid generation number: $snapshot_path (gen=$generation)"
+        backup_log_msg "ERROR" "Snapshot has invalid generation number: $snapshot_path (gen=$generation)" >&2
         return 1
     fi
     
     # Check 4: Verify snapshot has valid UUID for chain integrity
     local snapshot_uuid=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}')
     if [ -z "$snapshot_uuid" ] || ! [[ "$snapshot_uuid" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-        backup_log_msg "ERROR" "Snapshot has invalid UUID: $snapshot_path (UUID=$snapshot_uuid)"
+        backup_log_msg "ERROR" "Snapshot has invalid UUID: $snapshot_path (UUID=$snapshot_uuid)" >&2
         return 1
     fi
     
-    backup_log_msg "DEBUG" "Snapshot verification passed: ro=true, generation=$generation, UUID=$snapshot_uuid"
+    backup_log_msg "INFO" "Snapshot verification passed: ro=true, generation=$generation, UUID=$snapshot_uuid" >&2
     return 0
 }
 
@@ -437,7 +478,7 @@ btrfs_backup() {
         if lh_confirm_action "$(lh_msg 'BTRFS_RUN_WITH_SUDO')" "y"; then
             backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_BACKUP_WITH_SUDO')"
             trap - INT TERM EXIT
-            sudo "$0" btrfs-backup
+            sudo "$0" "$@"
             return $?
         else
             echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
@@ -789,18 +830,26 @@ btrfs_backup() {
         
         # Define snapshot names and paths
         local snapshot_name="$subvol-$timestamp"
-        local snapshot_path="$LH_TEMP_SNAPSHOT_DIR/$snapshot_name"
+        local expected_snapshot_path="$LH_TEMP_SNAPSHOT_DIR/$snapshot_name"
         
-        # Global variable for cleanup on interruption
-        CURRENT_TEMP_SNAPSHOT="$snapshot_path"
-        
-        # Create direct snapshot
-        create_direct_snapshot "$subvol" "$timestamp"
-        if [ $? -ne 0 ]; then
+        # Create direct snapshot or use existing one
+        local actual_snapshot_path
+        actual_snapshot_path=$(create_direct_snapshot "$subvol" "$timestamp")
+        if [ $? -ne 0 ] || [ -z "$actual_snapshot_path" ]; then
             # create_direct_snapshot already outputs error message and logs
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_SNAPSHOT_CREATE_ERROR' "$subvol")${LH_COLOR_RESET}"
-            CURRENT_TEMP_SNAPSHOT="" # Ensure no cleanup is attempted for a non-created snapshot
             continue
+        fi
+        
+        # Update variables to use the actual snapshot path
+        local snapshot_path="$actual_snapshot_path"
+        snapshot_name=$(basename "$snapshot_path")
+        
+        # Global variable for cleanup on interruption (only if we created a temp snapshot)
+        if [[ "$snapshot_path" == "$LH_TEMP_SNAPSHOT_DIR"* ]]; then
+            CURRENT_TEMP_SNAPSHOT="$snapshot_path"
+        else
+            CURRENT_TEMP_SNAPSHOT=""  # Don't cleanup existing snapshots from other tools
         fi
         
         # Prepare backup directory for this subvolume
@@ -814,8 +863,79 @@ btrfs_backup() {
             continue
         fi
         
-        # Search for last backup for incremental transfer
-        local last_backup=$(ls -1d "$backup_subvol_dir/$subvol-"* 2>/dev/null | sort -r | head -n1)
+        # Enhanced search for last backup for incremental transfer
+        # incremental backups require perfect chain integrity
+        backup_log_msg "DEBUG" "Searching for existing backups in: $backup_subvol_dir"
+        
+        # Search for existing backups with comprehensive pattern matching
+        local backup_candidates=()
+        if [ -d "$backup_subvol_dir" ]; then
+            # Search for direct pattern matches first
+            while IFS= read -r -d '' backup_path; do
+                backup_candidates+=("$backup_path")
+            done < <(find "$backup_subvol_dir" -maxdepth 1 -name "$subvol-*" -type d -print0 2>/dev/null)
+            
+            # Also search for any subdirectories that might contain backups
+            while IFS= read -r -d '' backup_path; do
+                if [[ "$(basename "$backup_path")" =~ ^${subvol}- ]]; then
+                    backup_candidates+=("$backup_path")
+                fi
+            done < <(find "$backup_subvol_dir" -maxdepth 1 -type d -print0 2>/dev/null)
+        fi
+        
+        # Sort candidates by modification time (newest first) for better incremental chain detection
+        local last_backup=""
+        if [ ${#backup_candidates[@]} -gt 0 ]; then
+            backup_log_msg "DEBUG" "Sorting ${#backup_candidates[@]} backup candidates by modification time"
+            
+            # Use find -printf and sort to efficiently get the most recent backup
+            local sorted_candidates=()
+            while IFS= read -r -d '' line; do
+                sorted_candidates+=("$(echo "$line" | cut -f2-)")
+            done < <(
+                find "${backup_candidates[@]}" -maxdepth 0 -type d -printf '%T@\t%p\0' 2>/dev/null | sort -zr | cut -z -f2-
+            )
+
+            if [ ${#sorted_candidates[@]} -gt 0 ]; then
+                last_backup="${sorted_candidates[0]}"
+                backup_log_msg "DEBUG" "Found ${#sorted_candidates[@]} existing backup(s), most recent: $(basename "$last_backup")"
+
+                # Log candidates for debugging, respecting debug limit setting
+                local candidates_logged=0
+                local total_candidates=${#sorted_candidates[@]}
+                
+                if [ "$LH_DEBUG_LOG_LIMIT" -eq 0 ]; then
+                    # No limit - log all candidates
+                    for candidate in "${sorted_candidates[@]}"; do
+                        backup_log_msg "DEBUG" "  Backup candidate: $(basename "$candidate")"
+                    done
+                elif [ "$total_candidates" -le "$LH_DEBUG_LOG_LIMIT" ]; then
+                    # Total candidates within limit - log all
+                    for candidate in "${sorted_candidates[@]}"; do
+                        backup_log_msg "DEBUG" "  Backup candidate: $(basename "$candidate")"
+                    done
+                else
+                    # Too many candidates - log up to limit and show summary
+                    backup_log_msg "DEBUG" "$(lh_msg 'BTRFS_DEBUG_LOG_LIMITED' "$LH_DEBUG_LOG_LIMIT" "$total_candidates")"
+                    for candidate in "${sorted_candidates[@]}"; do
+                        if [ "$candidates_logged" -lt "$LH_DEBUG_LOG_LIMIT" ]; then
+                            backup_log_msg "DEBUG" "  Backup candidate: $(basename "$candidate")"
+                            ((candidates_logged++))
+                        else
+                            break
+                        fi
+                    done
+                    local remaining=$((total_candidates - candidates_logged))
+                    if [ "$remaining" -gt 0 ]; then
+                        backup_log_msg "DEBUG" "$(lh_msg 'BTRFS_DEBUG_LOG_REMAINING' "$remaining")"
+                    fi
+                fi
+            fi
+        fi
+        
+        if [ -z "$last_backup" ]; then
+            backup_log_msg "DEBUG" "No existing backups found for $subvol - will perform initial backup"
+        fi
         
         # Transfer snapshot to backup target using atomic operations
         backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_TRANSFER_SNAPSHOT' "$subvol")"
@@ -858,28 +978,67 @@ btrfs_backup() {
                 local parent_basename=$(basename "$last_backup")
                 local parent_timestamp=$(echo "$parent_basename" | sed "s/^$subvol-//")
                 
-                backup_log_msg "DEBUG" "Step 2: Searching for source parent matching received_uuid"
-                backup_log_msg "DEBUG" "Looking for source snapshot with UUID: $dest_received_uuid"
-                
-                # Comprehensive search for source parent snapshots
-                local source_parent_candidates=(
-                    "/.snapshots/${parent_basename}"
-                    "$LH_TEMP_SNAPSHOT_DIR/../.snapshots/${parent_basename}"
-                    "$LH_TEMP_SNAPSHOT_DIR/${parent_basename}"
-                    "/.snapshots/$subvol-$parent_timestamp"
-                    "/tmp/.snapshots/${parent_basename}"
+                # Refactored: Build source_parent_candidates by iterating over base directories and patterns
+                local base_dirs=(
+                    "$LH_TEMP_SNAPSHOT_DIR"
+                    "$LH_TEMP_SNAPSHOT_DIR/.."
+                    "/.snapshots"
+                    "/.snapshots_backup"
+                    "$LH_TEMP_SNAPSHOT_DIR/../.snapshots"
+                    "$LH_TEMP_SNAPSHOT_DIR/../.snapshots_backup"
+                    "/tmp/.snapshots"
+                    "/tmp/.snapshots_backup"
+                    "/var/snapshots"
+                    "/backup/.snapshots"
                 )
-                
-                # Add more potential locations based on common snapshot naming patterns
-                for common_location in /.snapshots /var/snapshots /backup/.snapshots; do
-                    if [[ -d "$common_location" ]]; then
-                        source_parent_candidates+=("$common_location/${parent_basename}")
-                        source_parent_candidates+=("$common_location/$subvol-$parent_timestamp")
+                local source_parent_candidates=()
+                local name_patterns=(
+                    "$parent_basename"
+                    "$subvol-$parent_timestamp"
+                    "${subvol}_${parent_timestamp}"
+                    "${subvol}.${parent_timestamp}"
+                )
+                for dir in "${base_dirs[@]}"; do
+                    if [[ -d "$dir" ]]; then
+                        for pat in "${name_patterns[@]}"; do
+                            source_parent_candidates+=("$dir/$pat")
+                        done
                     fi
                 done
                 
+                # Add BTRFS Assistant style snapshots (numbered directories with snapshot subdirectory)
+                if [[ -d "/.snapshots" ]]; then
+                    backup_log_msg "DEBUG" "Searching for BTRFS Assistant snapshots in /.snapshots"
+                    while IFS= read -r -d '' numbered_dir; do
+                        local btrfs_assistant_snapshot="$numbered_dir/snapshot"
+                        if [[ -d "$btrfs_assistant_snapshot" ]]; then
+                            source_parent_candidates+=("$btrfs_assistant_snapshot")
+                        fi
+                    done < <(find "/.snapshots" -maxdepth 1 -type d -name "[0-9]*" -print0 2>/dev/null)
+                fi
+                
+                # Additionally search for any snapshot with matching UUID in the temporary area
+                # This handles cases where snapshots might have been moved or renamed
+                if [ -d "$LH_TEMP_SNAPSHOT_DIR" ]; then
+                    while IFS= read -r -d '' potential_source; do
+                        # Only add if it's not already in the candidate list
+                        local already_added=false
+                        for existing_candidate in "${source_parent_candidates[@]}"; do
+                            if [ "$existing_candidate" = "$potential_source" ]; then
+                                already_added=true
+                                break
+                            fi
+                        done
+                        if [ "$already_added" = false ]; then
+                            source_parent_candidates+=("$potential_source")
+                        fi
+                    done < <(find "$LH_TEMP_SNAPSHOT_DIR" -maxdepth 2 -name "*$subvol*" -type d -print0 2>/dev/null)
+                fi
+                
                 local source_parent_path=""
                 local candidates_checked=0
+                
+                backup_log_msg "DEBUG" "Checking ${#source_parent_candidates[@]} source parent candidates"
                 
                 for candidate in "${source_parent_candidates[@]}"; do
                     ((candidates_checked++))
@@ -901,6 +1060,45 @@ btrfs_backup() {
                         backup_log_msg "DEBUG" "✗ Not accessible or not BTRFS subvolume: $candidate"
                     fi
                 done
+                
+                # If we still haven't found a match, try a more intelligent search
+                # Look for snapshots with similar names but different timestamps
+                if [ -z "$source_parent_path" ]; then
+                    backup_log_msg "DEBUG" "No exact match found, trying intelligent search for similar snapshots"
+                    
+                    # Search for any snapshot of the same subvolume that might be suitable
+                    local all_temp_snapshots=()
+                    if [ -d "$LH_TEMP_SNAPSHOT_DIR" ]; then
+                        while IFS= read -r -d '' snap_path; do
+                            if [[ "$(basename "$snap_path")" =~ ^${subvol}- ]]; then
+                                all_temp_snapshots+=("$snap_path")
+                            fi
+                        done < <(find "$LH_TEMP_SNAPSHOT_DIR" -maxdepth 1 -name "${subvol}-*" -type d -print0 2>/dev/null)
+                    fi
+                    
+                    # Sort by modification time (newest first) and try each
+                    if [ ${#all_temp_snapshots[@]} -gt 0 ]; then
+                        local sorted_temp_snapshots
+                        sorted_temp_snapshots=($(printf '%s\n' "${all_temp_snapshots[@]}" | while read -r path; do
+                            if [ -d "$path" ]; then
+                                printf '%s %s\n' "$(stat -c '%Y' "$path" 2>/dev/null || echo 0)" "$path"
+                            fi
+                        done | sort -nr | cut -d' ' -f2-))
+                        
+                        for temp_snap in "${sorted_temp_snapshots[@]}"; do
+                            if [ -d "$temp_snap" ] && btrfs subvolume show "$temp_snap" >/dev/null 2>&1; then
+                                local temp_uuid
+                                temp_uuid=$(btrfs subvolume show "$temp_snap" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
+                                
+                                if [ "$temp_uuid" = "$dest_received_uuid" ]; then
+                                    backup_log_msg "DEBUG" "✓ Found matching source parent via intelligent search: $temp_snap"
+                                    source_parent_path="$temp_snap"
+                                    break
+                                fi
+                            fi
+                        done
+                    fi
+                fi
                 
                 # Enhanced Step 3: Use comprehensive validation from lib_btrfs.sh with additional checks
                 if [ -n "$source_parent_path" ]; then
@@ -938,10 +1136,16 @@ btrfs_backup() {
                     backup_log_msg "WARN" "No matching source parent found for received_uuid $dest_received_uuid"
                     backup_log_msg "DEBUG" "Searched $candidates_checked locations: ${source_parent_candidates[*]}"
                     backup_log_msg "INFO" "This may occur if source snapshots were cleaned up or moved"
+                    
+                    # Enhanced diagnosis
+                    debug_incremental_backup_chain "$subvol" "$backup_subvol_dir" "$LH_TEMP_SNAPSHOT_DIR"
                 fi
             fi
         else
             backup_log_msg "DEBUG" "No destination parent snapshot found, performing initial full backup"
+            
+            # Debug: Show what we're looking for
+            debug_incremental_backup_chain "$subvol" "$backup_subvol_dir" "$LH_TEMP_SNAPSHOT_DIR"
         fi
         
         # Validate incremental backup chain integrity with enhanced checks
@@ -1121,19 +1325,40 @@ btrfs_backup() {
             fi
         fi
         
-        # Safe cleanup of temporary snapshot
+        # Critical: Preserve source parent snapshots for incremental chain integrity
+        # According to German BTRFS documentation, source snapshots must be preserved
+        # for incremental backup chains to work properly
+        if [ "$use_incremental" = true ] && [ -n "$parent_snapshot" ]; then
+            backup_log_msg "INFO" "Preserving source parent snapshot for incremental chain: $(basename "$parent_snapshot")"
+            
+            # Create a marker to indicate this snapshot is needed for incremental chains
+            local parent_marker="${parent_snapshot}.chain_parent"
+            if ! touch "$parent_marker" 2>/dev/null; then
+                backup_log_msg "WARN" "Could not create chain parent marker: $parent_marker"
+            else
+                backup_log_msg "DEBUG" "Created chain parent marker: $parent_marker"
+            fi
+        fi
+        
+        # Preserve source parent snapshots globally for all subvolumes
+        preserve_source_parent_snapshots "$LH_TEMP_SNAPSHOT_DIR" "$snapshot_name"
+        
+        # Safe cleanup of temporary snapshot (but preserve parent chain snapshots)
         safe_cleanup_temp_snapshot "$snapshot_path"
         
         # Reset variable
         CURRENT_TEMP_SNAPSHOT=""
         
-        # Intelligent cleanup that respects incremental chains (Critical Fix #4)
+        # Enhanced cleanup that respects incremental chains and preserves source parents
         backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_OLD_BACKUPS' "$subvol")"
         intelligent_cleanup "$subvol" "$backup_subvol_dir"
         
         echo "" # Empty line for spacing
     done
   
+    # Clean up old chain parent markers before finishing
+    cleanup_old_chain_markers "$LH_TEMP_SNAPSHOT_DIR"
+    
     # Reset trap
     trap - INT TERM EXIT
     
@@ -1216,6 +1441,7 @@ check_received_uuid_protection() {
                 "remove read-only flag"|"modify properties"|"make writable")
                     # CRITICAL: These operations destroy received_uuid
                     backup_log_msg "ERROR" "CRITICAL PROTECTION: Cannot $action_description on received snapshot"
+
                     backup_log_msg "ERROR" "This would permanently destroy received_uuid: $received_uuid"
                     backup_log_msg "ERROR" "CONSEQUENCE: Incremental backup chain would be broken forever"
                     backup_log_msg "INFO" "SOLUTION: Create writable copy instead: btrfs subvolume snapshot $snapshot_path <new_name>"
@@ -1292,7 +1518,7 @@ create_safe_writable_snapshot() {
     fi
 }
 
-# Function to clean up orphaned temporary snapshots
+# Function to clean up orphaned temporary snapshots and marker files
 cleanup_orphaned_temp_snapshots() {
     backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CHECK_ORPHANED')"
     
@@ -1300,30 +1526,78 @@ cleanup_orphaned_temp_snapshots() {
         return 0
     fi
     
-    # Search for temporary snapshots (pattern: @-YYYY-MM-DD_HH-MM-SS or @home-YYYY-MM-DD_HH-MM-SS)
-    local orphaned_snapshots=($(find "$LH_TEMP_SNAPSHOT_DIR" -maxdepth 1 -name "@-20*" -o -name "@home-20*" 2>/dev/null))
+    # Search for temporary snapshots and orphaned marker files
+    local orphaned_subvolumes=()
+    local orphaned_markers=()
+    local total_orphaned=0
     
-    if [ ${#orphaned_snapshots[@]} -gt 0 ]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_ORPHANED_SNAPSHOTS_FOUND' "${#orphaned_snapshots[@]}")${LH_COLOR_RESET}"
+    # Find orphaned subvolumes (directories that are BTRFS subvolumes)
+    while IFS= read -r -d '' item; do
+        if [ -d "$item" ] && btrfs subvolume show "$item" >/dev/null 2>&1; then
+            orphaned_subvolumes+=("$item")
+            ((total_orphaned++))
+        fi
+    done < <(find "$LH_TEMP_SNAPSHOT_DIR" -maxdepth 1 -name "@-20*" -o -name "@home-20*" -print0 2>/dev/null)
+    
+    # Find orphaned chain parent marker files
+    while IFS= read -r -d '' marker_file; do
+        local snapshot_path="${marker_file%.chain_parent}"
+        # If the corresponding snapshot doesn't exist, it's orphaned
+        if [ ! -d "$snapshot_path" ]; then
+            orphaned_markers+=("$marker_file")
+            ((total_orphaned++))
+        fi
+    done < <(find "$LH_TEMP_SNAPSHOT_DIR" -maxdepth 1 -name "*.chain_parent" -type f -print0 2>/dev/null)
+    
+    if [ $total_orphaned -gt 0 ]; then
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_ORPHANED_SNAPSHOTS_FOUND' "$total_orphaned")${LH_COLOR_RESET}"
         
-        for snapshot in "${orphaned_snapshots[@]}"; do
+        # Show orphaned subvolumes
+        for snapshot in "${orphaned_subvolumes[@]}"; do
             echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ORPHANED_SNAPSHOT_FOUND' "$(basename "$snapshot")")${LH_COLOR_RESET}"
+        done
+        
+        # Show orphaned marker files
+        for marker in "${orphaned_markers[@]}"; do
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ORPHANED_SNAPSHOT_FOUND' "$(basename "$marker")")${LH_COLOR_RESET}"
         done
         
         if lh_confirm_action "$(lh_msg 'BTRFS_CONFIRM_CLEANUP_ORPHANED')" "y"; then
             local cleaned_count=0
             local error_count=0
             
-            for snapshot in "${orphaned_snapshots[@]}"; do
+            # Clean up orphaned subvolumes
+            for snapshot in "${orphaned_subvolumes[@]}"; do
                 backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_ORPHANED' "$snapshot")"
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ORPHANED_SNAPSHOT_DELETE' "$(basename "$snapshot")")${LH_COLOR_RESET}"
                 
                 if btrfs subvolume delete "$snapshot" >/dev/null 2>&1; then
                     echo -e "  ${LH_COLOR_SUCCESS}$(lh_msg 'SUCCESS_DELETED')${LH_COLOR_RESET}"
                     ((cleaned_count++))
+                    
+                    # Also remove any associated marker file
+                    local associated_marker="${snapshot}.chain_parent"
+                    if [ -f "$associated_marker" ]; then
+                        rm -f "$associated_marker" 2>/dev/null
+                    fi
                 else
                     echo -e "  ${LH_COLOR_ERROR}$(lh_msg 'ERROR_DELETION')${LH_COLOR_RESET}"
                     backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_DELETE_ORPHANED_ERROR' "$snapshot")"
+                    ((error_count++))
+                fi
+            done
+            
+            # Clean up orphaned marker files
+            for marker in "${orphaned_markers[@]}"; do
+                backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_ORPHANED' "$marker")"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ORPHANED_SNAPSHOT_DELETE' "$(basename "$marker")")${LH_COLOR_RESET}"
+                
+                if rm -f "$marker" 2>/dev/null; then
+                    echo -e "  ${LH_COLOR_SUCCESS}$(lh_msg 'SUCCESS_DELETED')${LH_COLOR_RESET}"
+                    ((cleaned_count++))
+                else
+                    echo -e "  ${LH_COLOR_ERROR}$(lh_msg 'ERROR_DELETION')${LH_COLOR_RESET}"
+                    backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_DELETE_ORPHANED_ERROR' "$marker")"
                     ((error_count++))
                 fi
             done
@@ -1340,35 +1614,136 @@ cleanup_orphaned_temp_snapshots() {
     fi
 }
 
-# Improved cleanup function with error handling
-safe_cleanup_temp_snapshot() {
-    local snapshot_path="$1"
-    local snapshot_name="$(basename "$snapshot_path")"
+# Enhanced source parent snapshot preservation
+# Source snapshots must be preserved for incremental backup chains to work properly
+preserve_source_parent_snapshots() {
+    local temp_snapshot_dir="$1"
+    local current_snapshot_name="$2"
     
-    if [ -d "$snapshot_path" ]; then
-        backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_TEMP' "$snapshot_path")"
+    backup_log_msg "INFO" "Preserving source parent snapshots for incremental chain integrity"
+    
+    # Find all snapshots in the temporary directory
+    local all_temp_snapshots=()
+    if [ -d "$temp_snapshot_dir" ]; then
+        while IFS= read -r -d '' snap_path; do
+            all_temp_snapshots+=("$snap_path")
+        done < <(find "$temp_snapshot_dir" -maxdepth 1 -type d -name "*-*" -print0 2>/dev/null)
+    fi
+    
+    # Sort by modification time (newest first)
+    if [ ${#all_temp_snapshots[@]} -gt 0 ]; then
+        local sorted_snapshots
+        sorted_snapshots=($(printf '%s\n' "${all_temp_snapshots[@]}" | while read -r path; do
+            if [ -d "$path" ]; then
+                printf '%s %s\n' "$(stat -c '%Y' "$path" 2>/dev/null || echo 0)" "$path"
+            fi
+        done | sort -nr | cut -d' ' -f2-))
         
-        # Multiple attempts for robust deletion
-        local max_attempts=3
-        local attempt=1
+        # Keep the most recent snapshots (at least 2 for each subvolume)
+        local preserved_count=0
+        # Use backup retention setting but ensure minimum of 2 for chain integrity
+        local max_preserve=$((LH_RETENTION_BACKUP > 2 ? LH_RETENTION_BACKUP : 2))
         
-        while [ $attempt -le $max_attempts ]; do
-            if btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1; then
-                backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_TEMP_DELETED' "$snapshot_name")"
-                return 0
+        backup_log_msg "DEBUG" "Source snapshot preservation: using max_preserve=$max_preserve (from LH_RETENTION_BACKUP=$LH_RETENTION_BACKUP, minimum=2 for chain integrity)"
+        
+        for snapshot in "${sorted_snapshots[@]}"; do
+            if [ $preserved_count -ge $max_preserve ]; then
+                break
+            fi
+            
+            local snapshot_basename=$(basename "$snapshot")
+            
+            # Don't preserve the current snapshot (it will be cleaned up normally)
+            if [ "$snapshot_basename" = "$current_snapshot_name" ]; then
+                continue
+            fi
+            
+            # Create preservation marker
+            local preservation_marker="${snapshot}.chain_parent"
+            if touch "$preservation_marker" 2>/dev/null; then
+                backup_log_msg "DEBUG" "Preserved source parent snapshot: $snapshot_basename"
+                ((preserved_count++))
             else
-                backup_log_msg "WARN" "$(lh_msg 'BTRFS_LOG_TEMP_DELETE_ATTEMPT' "$attempt" "$max_attempts" "$snapshot_name")"
-                if [ $attempt -lt $max_attempts ]; then
-                    sleep 2  # Short wait before retry
-                fi
-                ((attempt++))
+                backup_log_msg "WARN" "Could not create preservation marker for: $snapshot_basename"
             fi
         done
         
-        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_TEMP_DELETE_ERROR' "$snapshot_path")"
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_WARNING_TEMP_SNAPSHOT_DELETE' "$snapshot_name")${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_MANUAL_DELETE_HINT' "$snapshot_path")${LH_COLOR_RESET}"
-        return 1
+        backup_log_msg "INFO" "Preserved $preserved_count source parent snapshots for incremental chains"
+    fi
+}
+
+# Enhanced cleanup that respects chain parent markers
+safe_cleanup_temp_snapshot() {
+    local snapshot_path="$1"
+    
+    if [ -z "$snapshot_path" ] || [ ! -d "$snapshot_path" ]; then
+        return 0
+    fi
+    
+    # Check if this snapshot has a chain parent marker
+    local chain_marker="${snapshot_path}.chain_parent"
+    if [ -f "$chain_marker" ]; then
+        backup_log_msg "INFO" "Skipping cleanup of chain parent snapshot: $(basename "$snapshot_path")"
+        return 0
+    fi
+    
+    backup_log_msg "DEBUG" "Cleaning up temporary snapshot: $(basename "$snapshot_path")"
+    
+    # Remove read-only flag if present
+    local ro_status=$(btrfs property get "$snapshot_path" ro 2>/dev/null | cut -d'=' -f2)
+    if [ "$ro_status" = "true" ]; then
+        if ! btrfs property set "$snapshot_path" ro false 2>/dev/null; then
+            backup_log_msg "WARN" "Could not remove read-only flag from temporary snapshot: $(basename "$snapshot_path")"
+        fi
+    fi
+    
+    # Delete the snapshot
+    if btrfs subvolume delete "$snapshot_path" 2>/dev/null; then
+        backup_log_msg "DEBUG" "Successfully cleaned up temporary snapshot: $(basename "$snapshot_path")"
+    else
+        backup_log_msg "WARN" "Failed to clean up temporary snapshot: $(basename "$snapshot_path")"
+    fi
+}
+
+# Clean up old chain parent markers that are no longer needed
+cleanup_old_chain_markers() {
+    local temp_snapshot_dir="$1"
+    # Use configurable retention: either provided parameter or calculate from backup retention
+    # Chain markers should be kept longer than regular snapshots to ensure chain integrity
+    local retention_days="${2:-$((LH_RETENTION_BACKUP * 2 > 7 ? LH_RETENTION_BACKUP * 2 : 7))}"
+    
+    backup_log_msg "DEBUG" "Cleaning up old chain parent markers older than $retention_days days (calculated from LH_RETENTION_BACKUP=$LH_RETENTION_BACKUP)"
+    
+    if [ ! -d "$temp_snapshot_dir" ]; then
+        return 0
+    fi
+    
+    # Find and remove old chain parent markers
+    local markers_removed=0
+    while IFS= read -r -d '' marker_file; do
+        local marker_age_days=$(( ($(date +%s) - $(stat -c %Y "$marker_file" 2>/dev/null || echo 0)) / 86400 ))
+        
+        if [ $marker_age_days -gt $retention_days ]; then
+            local snapshot_path="${marker_file%.chain_parent}"
+            
+            # If the associated snapshot no longer exists, remove the marker
+            if [ ! -d "$snapshot_path" ]; then
+                if rm -f "$marker_file" 2>/dev/null; then
+                    backup_log_msg "DEBUG" "Removed orphaned chain marker: $(basename "$marker_file")"
+                    ((markers_removed++))
+                fi
+            # If the marker is very old, remove it even if snapshot exists
+            elif [ $marker_age_days -gt $((retention_days * 2)) ]; then
+                if rm -f "$marker_file" 2>/dev/null; then
+                    backup_log_msg "DEBUG" "Removed old chain marker: $(basename "$marker_file")"
+                    ((markers_removed++))
+                fi
+            fi
+        fi
+    done < <(find "$temp_snapshot_dir" -name "*.chain_parent" -type f -print0 2>/dev/null)
+    
+    if [ $markers_removed -gt 0 ]; then
+        backup_log_msg "INFO" "Removed $markers_removed old chain parent markers"
     fi
 }
 
@@ -1642,6 +2017,191 @@ delete_btrfs_backups() {
     return 0
 }
 
+# Function to find existing snapshots from BTRFS Assistant or other snapshot tools
+find_existing_snapshots() {
+    local subvol="$1"
+    local mount_point=""
+    
+    # Determine mount point for the subvolume
+    if [ "$subvol" == "@" ]; then
+        mount_point="/"
+    elif [ "$subvol" == "@home" ]; then
+        mount_point="/home"
+    else
+        mount_point="/$subvol"
+    fi
+    
+    backup_log_msg "DEBUG" "Looking for existing snapshots of $subvol (mount: $mount_point)"
+    
+    # Search for snapshots in common locations used by snapshot tools
+    local snapshot_locations=(
+        "/.snapshots"           # BTRFS Assistant, Snapper
+        "/timeshift/snapshots"  # Timeshift
+        "/.timeshift"           # Timeshift alternate location
+        "/snapshots"            # Custom locations
+        "/backup/snapshots"     # Custom locations
+    )
+    
+    local found_snapshots=()
+    
+    for location in "${snapshot_locations[@]}"; do
+        if [[ ! -d "$location" ]]; then
+            continue
+        fi
+        
+        backup_log_msg "DEBUG" "Searching for snapshots in: $location"
+        
+        # For numbered directories (BTRFS Assistant style)
+        while IFS= read -r -d '' numbered_dir; do
+            local snapshot_path="$numbered_dir/snapshot"
+            if [[ -d "$snapshot_path" ]]; then
+                # Verify it's a BTRFS subvolume and check if it matches our target subvolume
+                if btrfs subvolume show "$snapshot_path" >/dev/null 2>&1; then
+                    # Check if this snapshot is of the target subvolume by comparing parent UUID
+                    local parent_uuid
+                    parent_uuid=$(btrfs subvolume show "$snapshot_path" | grep "Parent UUID:" | awk '{print $3}')
+                    
+                    # Get the UUID of our target subvolume
+                    local target_uuid
+                    target_uuid=$(btrfs subvolume show "$mount_point" | grep "UUID:" | head -n1 | awk '{print $2}')
+                    
+                    if [[ "$parent_uuid" == "$target_uuid" ]]; then
+                        backup_log_msg "DEBUG" "Found matching snapshot: $snapshot_path (parent UUID matches)"
+                        found_snapshots+=("$snapshot_path")
+                    fi
+                fi
+            fi
+        done < <(find "$location" -maxdepth 1 -type d -name "[0-9]*" -print0 2>/dev/null)
+        
+        # Also search for direct subvolume snapshots with timestamp names
+        while IFS= read -r -d '' snapshot_path; do
+            if btrfs subvolume show "$snapshot_path" >/dev/null 2>&1; then
+                backup_log_msg "DEBUG" "Found potential snapshot: $snapshot_path"
+                found_snapshots+=("$snapshot_path")
+            fi
+        done < <(find "$location" -maxdepth 1 -type d -name "${subvol}-*" -print0 2>/dev/null)
+    done
+    
+    if [[ ${#found_snapshots[@]} -gt 0 ]]; then
+        # Sort by modification time (newest first)
+        local sorted_snapshots
+        sorted_snapshots=($(printf '%s\n' "${found_snapshots[@]}" | while read -r path; do
+            if [[ -d "$path" ]]; then
+                printf '%s %s\n' "$(stat -c '%Y' "$path" 2>/dev/null || echo 0)" "$path"
+            fi
+        done | sort -nr | cut -d' ' -f2-))
+        
+        backup_log_msg "INFO" "Found ${#sorted_snapshots[@]} existing snapshots for $subvol"
+        for snapshot in "${sorted_snapshots[@]:0:3}"; do  # Show first 3
+            local snapshot_time
+            snapshot_time=$(stat -c '%y' "$snapshot" 2>/dev/null | cut -d'.' -f1)
+            backup_log_msg "DEBUG" "  Available snapshot: $snapshot (created: $snapshot_time)"
+        done
+        
+        # Return the newest snapshot that's read-only, or make it read-only
+        for snapshot in "${sorted_snapshots[@]}"; do
+            local ro_status
+            ro_status=$(btrfs property get "$snapshot" ro 2>/dev/null | cut -d'=' -f2)
+            if [[ "$ro_status" == "true" ]]; then
+                backup_log_msg "INFO" "Using existing read-only snapshot: $snapshot"
+                echo "$snapshot"
+                return 0
+            fi
+        done
+        
+        # If no read-only snapshot found, use the newest one and make it read-only
+        local newest_snapshot="${sorted_snapshots[0]}"
+        backup_log_msg "INFO" "Making existing snapshot read-only: $newest_snapshot"
+        if btrfs property set "$newest_snapshot" ro true 2>/dev/null; then
+            backup_log_msg "INFO" "Using existing snapshot (now read-only): $newest_snapshot"
+            echo "$newest_snapshot"
+            return 0
+        fi
+    fi
+    
+    backup_log_msg "DEBUG" "No suitable existing snapshots found for $subvol"
+    return 1
+}
+
+
+# Function to check BTRFS availability and find existing snapshots
+check_btrfs_and_find_snapshots() {
+    local subvol="$1"
+    
+    # Check if BTRFS tools are installed
+    if ! command -v btrfs >/dev/null 2>&1; then
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_TOOLS_MISSING')${LH_COLOR_RESET}"
+        return 1
+    fi
+    
+    # Check if root partition uses BTRFS
+    if ! grep -q "btrfs" /proc/mounts || ! grep -q " / " /proc/mounts; then
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_NOT_SUPPORTED')${LH_COLOR_RESET}"
+        return 1
+    fi
+    
+    # If BTRFS is available, try to find existing snapshots
+    find_existing_snapshots "$subvol"
+}
+
+# Debug function to diagnose incremental backup issues
+debug_incremental_backup_chain() {
+    local subvol="$1"
+    local backup_subvol_dir="$2"
+    local temp_snapshot_dir="$3"
+    
+    backup_log_msg "DEBUG" "=== INCREMENTAL BACKUP CHAIN DIAGNOSIS ==="
+    backup_log_msg "DEBUG" "Subvolume: $subvol"
+    backup_log_msg "DEBUG" "Backup directory: $backup_subvol_dir"
+    backup_log_msg "DEBUG" "Temp snapshot directory: $temp_snapshot_dir"
+    
+    # List all existing backups
+    if [ -d "$backup_subvol_dir" ]; then
+        backup_log_msg "DEBUG" "Existing backups in $backup_subvol_dir:"
+        local backup_count=0
+        while IFS= read -r -d '' backup_path; do
+            local backup_name=$(basename "$backup_path")
+            local backup_uuid=$(btrfs subvolume show "$backup_path" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}' || echo "unknown")
+            local received_uuid=$(btrfs subvolume show "$backup_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "none")
+            local generation=$(btrfs subvolume show "$backup_path" 2>/dev/null | grep "Generation:" | awk '{print $2}' || echo "unknown")
+            local ro_status=$(btrfs property get "$backup_path" ro 2>/dev/null | cut -d'=' -f2)
+            
+            backup_log_msg "DEBUG" "  $backup_name: UUID=$backup_uuid, Received=$received_uuid, Gen=$generation, RO=$ro_status"
+            ((backup_count++))
+        done < <(find "$backup_subvol_dir" -maxdepth 1 -type d -name "${subvol}-*" -print0 2>/dev/null)
+        
+        backup_log_msg "DEBUG" "Total existing backups: $backup_count"
+    else
+        backup_log_msg "DEBUG" "Backup directory does not exist: $backup_subvol_dir"
+    fi
+    
+    # List all temp snapshots
+    if [ -d "$temp_snapshot_dir" ]; then
+        backup_log_msg "DEBUG" "Source snapshots in $temp_snapshot_dir:"
+        local temp_count=0
+        while IFS= read -r -d '' temp_path; do
+            local temp_name=$(basename "$temp_path")
+            local temp_uuid=$(btrfs subvolume show "$temp_path" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}' || echo "unknown")
+            local generation=$(btrfs subvolume show "$temp_path" 2>/dev/null | grep "Generation:" | awk '{print $2}' || echo "unknown")
+            local ro_status=$(btrfs property get "$temp_path" ro 2>/dev/null | cut -d'=' -f2)
+            local has_marker=""
+            if [ -f "${temp_path}.chain_parent" ]; then
+                has_marker=" [CHAIN_PARENT]"
+            fi
+            
+            backup_log_msg "DEBUG" "  $temp_name: UUID=$temp_uuid, Gen=$generation, RO=$ro_status$has_marker"
+            ((temp_count++))
+        done < <(find "$temp_snapshot_dir" -maxdepth 1 -type d -name "${subvol}-*" -print0 2>/dev/null)
+        
+        backup_log_msg "DEBUG" "Total source snapshots: $temp_count"
+    else
+        backup_log_msg "DEBUG" "Temp snapshot directory does not exist: $temp_snapshot_dir"
+    fi
+    
+    backup_log_msg "DEBUG" "=== END INCREMENTAL BACKUP CHAIN DIAGNOSIS ==="
+}
+
+
 # Enhanced error handling based on BTRFS documentation error table
 handle_btrfs_error() {
     local error_output="$1"
@@ -1833,7 +2393,6 @@ check_backup_integrity() {
     echo "$status|${issues[*]}"
 }
 
-# Create marker file (must be called at the end of successful backup transfer)
 # Create marker file (must be called at the end of successful backup transfer)
 create_backup_marker() {
     local snapshot_path="$1"
@@ -2141,14 +2700,10 @@ cleanup_problematic_backups() {
             
             if btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1; then
                 # Also delete marker file
-                if [ -f "$marker_file_to_delete" ]; then
-                    rm -f "$marker_file_to_delete"
-                    backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_MARKER_DELETE_PROBLEMATIC' "$marker_file_to_delete")"
-                fi
-
-                echo -e "  ${LH_COLOR_SUCCESS}$(lh_msg 'SUCCESS_DELETED')${LH_COLOR_RESET}"
+                rm -f "${snapshot_path}.backup_complete" 2>/dev/null
+                echo -e "  ${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_CLEANUP_DELETED')${LH_COLOR_RESET}"
                 backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_PROBLEMATIC_SUCCESS' "$snapshot_path")"
-                ((cleaned_count++))
+                ((deleted_count++))
             else
                 echo -e "  ${LH_COLOR_ERROR}$(lh_msg 'ERROR_DELETION')${LH_COLOR_RESET}"
                 backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_CLEANUP_PROBLEMATIC_ERROR' "$snapshot_path")"
@@ -2284,7 +2839,7 @@ main_menu() {
     done
 }
 
-# If the script is run directly, show menu
+# If the script is run directly, show menu by default
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     while true; do
         main_menu

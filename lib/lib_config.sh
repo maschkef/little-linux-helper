@@ -26,6 +26,7 @@ LH_TEMP_SNAPSHOT_DIR_DEFAULT="/.snapshots_backup" # Absolute path
 LH_RETENTION_BACKUP_DEFAULT=10
 LH_BACKUP_LOG_BASENAME_DEFAULT="backup.log" # Base name for the backup log file
 LH_TAR_EXCLUDES_DEFAULT="" # Default TAR exclusions
+LH_DEBUG_LOG_LIMIT_DEFAULT=10 # Maximum number of backup candidates to show in debug logs (0 = unlimited, only affects verbose backup listing)
 
 # Default Docker configuration values
 LH_DOCKER_COMPOSE_ROOT_DEFAULT="/opt/containers"
@@ -45,6 +46,7 @@ LH_RETENTION_BACKUP=""
 LH_BACKUP_LOG_BASENAME="" # The configured base name for the backup log file
 LH_BACKUP_LOG="${LH_BACKUP_LOG:-}"          # Full path to the backup log file (with timestamp)
 LH_TAR_EXCLUDES="" # Active TAR exclusions
+LH_DEBUG_LOG_LIMIT="" # Maximum number of backup candidates to show in debug logs per backup session
 
 # Active Docker configuration variables
 LH_DOCKER_COMPOSE_ROOT_EFFECTIVE=""
@@ -75,6 +77,7 @@ function lh_load_backup_config() {
     LH_RETENTION_BACKUP="$LH_RETENTION_BACKUP_DEFAULT"
     LH_BACKUP_LOG_BASENAME="$LH_BACKUP_LOG_BASENAME_DEFAULT"
     LH_TAR_EXCLUDES="$LH_TAR_EXCLUDES_DEFAULT"
+    LH_DEBUG_LOG_LIMIT="$LH_DEBUG_LOG_LIMIT_DEFAULT"
 
     if [ -f "$LH_BACKUP_CONFIG_FILE" ]; then
         # Use English fallback before translation system is loaded
@@ -102,6 +105,9 @@ function lh_load_backup_config() {
         
         LH_TAR_EXCLUDES="${CFG_LH_TAR_EXCLUDES:-$LH_TAR_EXCLUDES_DEFAULT}"
         [ -z "$LH_TAR_EXCLUDES" ] && LH_TAR_EXCLUDES="$LH_TAR_EXCLUDES_DEFAULT"
+        
+        LH_DEBUG_LOG_LIMIT="${CFG_LH_DEBUG_LOG_LIMIT:-$LH_DEBUG_LOG_LIMIT_DEFAULT}"
+        [ -z "$LH_DEBUG_LOG_LIMIT" ] && LH_DEBUG_LOG_LIMIT="$LH_DEBUG_LOG_LIMIT_DEFAULT"
     else
         # Use English fallback before translation system is loaded
         local msg="${MSG[LIB_BACKUP_CONFIG_NOT_FOUND]:-No backup configuration file (%s) found. Using internal default values.}"
@@ -145,6 +151,10 @@ function lh_save_backup_config() {
     
     if [ -n "$LH_TAR_EXCLUDES" ]; then
         echo "CFG_LH_TAR_EXCLUDES=\"$LH_TAR_EXCLUDES\"" >> "$LH_BACKUP_CONFIG_FILE"
+    fi
+    
+    if [ -n "$LH_DEBUG_LOG_LIMIT" ]; then
+        echo "CFG_LH_DEBUG_LOG_LIMIT=\"$LH_DEBUG_LOG_LIMIT\"" >> "$LH_BACKUP_CONFIG_FILE"
     fi
     
     # Use English fallback before translation system is loaded

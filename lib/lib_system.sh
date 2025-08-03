@@ -199,6 +199,32 @@ function lh_run_command_as_target_user() {
 LH_POWER_INHIBIT_PID=""
 LH_POWER_INHIBIT_METHOD=""
 
+# Function to check if energy module has active sleep inhibits
+function lh_check_energy_module_inhibits() {
+    local energy_temp_file="/tmp/lh_energy_temp_settings"
+    
+    if [[ -f "$energy_temp_file" ]]; then
+        local energy_pid
+        energy_pid=$(cat "$energy_temp_file" 2>/dev/null)
+        if [[ -n "$energy_pid" && -d "/proc/$energy_pid" ]]; then
+            return 0  # Energy module inhibit is active
+        fi
+    fi
+    return 1  # No active energy module inhibit
+}
+
+# Function to list all Little Linux Helper inhibits
+function lh_list_all_lh_inhibits() {
+    lh_log_msg "DEBUG" "Listing all Little Linux Helper sleep inhibits"
+    
+    if command -v systemd-inhibit >/dev/null 2>&1; then
+        echo "Current Little Linux Helper sleep inhibits:"
+        systemd-inhibit --list 2>/dev/null | grep -i "little.*linux.*helper" || echo "  No Little Linux Helper inhibits found"
+    else
+        echo "systemd-inhibit not available"
+    fi
+}
+
 # Prevent system from entering standby/suspend/sleep during long-running operations
 # Compatible with systemd, X11, and fallback methods across Linux distributions
 function lh_prevent_standby() {
@@ -207,6 +233,11 @@ function lh_prevent_standby() {
     
     lh_log_msg "INFO" "$(lh_msg 'LIB_POWER_PREVENTING_STANDBY' "$operation_name")"
     
+    # Check if energy module has active inhibits and log this information
+    if lh_check_energy_module_inhibits; then
+        lh_log_msg "INFO" "Energy module sleep inhibit detected - both will run independently"
+    fi
+    
     # Method 1: systemd-inhibit (most modern Linux distributions)
     if command -v systemd-inhibit >/dev/null 2>&1; then
         lh_log_msg "DEBUG" "Using systemd-inhibit for power management"
@@ -214,7 +245,7 @@ function lh_prevent_standby() {
         # Start systemd-inhibit in background and capture its PID
         systemd-inhibit \
             --what="$inhibit_what" \
-            --who="little-linux-helper" \
+            --who="little-linux-helper-backup" \
             --why="Preventing system suspend during $operation_name" \
             --mode=block \
             sleep infinity &
@@ -297,6 +328,11 @@ function lh_allow_standby() {
     fi
     
     lh_log_msg "INFO" "$(lh_msg 'LIB_POWER_ALLOWING_STANDBY' "$operation_name")"
+    
+    # Check if energy module has active inhibits before restoring
+    if lh_check_energy_module_inhibits; then
+        lh_log_msg "INFO" "Energy module sleep inhibit still active - only removing backup inhibit"
+    fi
     
     case "$LH_POWER_INHIBIT_METHOD" in
         "systemd-inhibit")

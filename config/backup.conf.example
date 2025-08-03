@@ -30,3 +30,15 @@ CFG_LH_RETENTION_BACKUP="10"
 # The base name for backup log files. A timestamp (YYMMDD-HHMM_) will be prepended to this name.
 # Example: "backup.log" becomes "240730-1015_backup.log".
 CFG_LH_BACKUP_LOG_BASENAME="backup.log"
+
+# CFG_LH_TAR_EXCLUDES:
+# Exclusion patterns for TAR-based backups (space-separated list).
+# Example: "*.tmp *.log /var/cache"
+CFG_LH_TAR_EXCLUDES=""
+
+# CFG_LH_DEBUG_LOG_LIMIT:
+# Maximum number of backup candidates to show in debug logs when listing existing backups.
+# Set to 0 for unlimited (shows all existing backups in debug output).
+# This only affects log verbosity, not backup functionality.
+# Recommended: 10-20 for normal use, 0 for debugging issues.
+CFG_LH_DEBUG_LOG_LIMIT="10"

@@ -207,9 +207,10 @@ while true; do
     lh_print_menu_item 6 "$(lh_msg "MENU_SECURITY")"
     lh_print_menu_item 7 "$(lh_msg "MENU_BACKUP")"
     lh_print_menu_item 8 "$(lh_msg "MENU_DOCKER")"
+    lh_print_menu_item 9 "$(lh_msg "MENU_ENERGY")"
 
     echo -e "${LH_COLOR_BOLD_MAGENTA}$(lh_msg "CATEGORY_SPECIAL")${LH_COLOR_RESET}"
-    lh_print_menu_item 9 "$(lh_msg "MENU_DEBUG_BUNDLE")"
+    lh_print_menu_item 10 "$(lh_msg "MENU_DEBUG_BUNDLE")"
 
     echo ""
     lh_print_menu_item 0 "$(lh_msg "EXIT")"
@@ -245,6 +246,9 @@ while true; do
             bash "$LH_ROOT_DIR/modules/mod_docker.sh"
             ;;
         9)
+            bash "$LH_ROOT_DIR/modules/mod_energy.sh"
+            ;;
+        10)
             create_debug_bundle
             ;;
         0)

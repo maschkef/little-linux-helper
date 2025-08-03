@@ -29,6 +29,7 @@ MSG_EN[MENU_PACKAGE_MGMT]="Package Management & Updates"
 MSG_EN[MENU_SECURITY]="Security Checks"
 MSG_EN[MENU_BACKUP]="Backup & Recovery"
 MSG_EN[MENU_DOCKER]="Docker Functions"
+MSG_EN[MENU_ENERGY]="Energy Management"
 MSG_EN[MENU_DEBUG_BUNDLE]="Collect Important Debug Info to File"
 
 # Debug bundle messages
