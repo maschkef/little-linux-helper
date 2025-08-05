@@ -1,8 +1,9 @@
 # Little Linux Helper
 
 > **⚠️ Dokumentationsstatus-Hinweis:**
-> 1. **Dokumentation muss aktualisiert werden**: Die Dokumentation (einschließlich dieser README_DE.md) muss aktualisiert werden, um aktuelle Änderungen und Verbesserungen zu reflektieren.
-> 2. **BTRFS Module benötigen Tests**: Die BTRFS Backup- und Restore-Module müssen noch umfassend getestet werden. Das Backup-Modul wurde erweitert und verbessert, während das Restore-Modul komplett neu erstellt wurde. Bitte mit Vorsicht verwenden und vorher gründlich testen.
+> - **Dokumentation muss aktualisiert werden**: Die Dokumentation (einschließlich dieser README_DE.md) muss aktualisiert werden, um die jüngsten Änderungen und Verbesserungen zu berücksichtigen.
+> - **BTRFS-Module müssen getestet werden**: Die BTRFS-Module für Backup und Wiederherstellung müssen umfassend getestet werden. Das Backup wurde erweitert und verbessert, während das Wiederherstellungsmodul komplett neu erstellt wurde. Bitte verwende es mit Vorsicht und teste es zuvor gründlich.
+> - Aktualisierung: Die inkrementelle Sicherung funktioniert jetzt. Das Wiederherstellungsmodul ist noch nicht getestet, aber die Sicherung eignet sich hervorragend zum Speichern des aktuellen Zustands und zum Wiederherstellen von Dateien/Ordnern.
 
 ## Beschreibung
 
@@ -59,10 +60,12 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
 <summary>💾 Backup & Wiederherstellung</summary>
 
 * **BTRFS Snapshot Backup & Restore** (`modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`):
-    * Erstellung und Verwaltung von Snapshots der Subvolumes `@` und `@home`.
-    * Übertragung der Snapshots zum Backup-Ziel mittels `btrfs send/receive`.
+    * Erstellung und Verwaltung von Snapshots der Subvolumes `@` und `@home` mit inkrementeller Backup-Unterstützung.
+    * Übertragung der Snapshots zum Backup-Ziel mittels `btrfs send/receive` mit automatischer Erkennung inkrementeller Ketten.
+    * Erhaltung von Quell-Snapshots erforderlich für inkrementelle Backups - Parent-Snapshots müssen auf dem Quellsystem verbleiben, damit inkrementelle Ketten funktionieren.
+    * Keine Integration mit Snapper oder Timeshift - erstellt eigene unabhängige Snapshots für Backup-Zwecke.
     * Integrierte Integritätsprüfung, Marker-Dateien, automatische Bereinigung, manuelles und automatisches Löschen, Statusanzeige und Desktop-Benachrichtigungen.
-    * Wiederherstellung kompletter Systeme, einzelner Subvolumes oder einzelner Ordner aus Snapshots – mit Dry-Run-Unterstützung.
+    * **⚠️ Restore-Modul ist komplett neu und ungetestet** - Wiederherstellung kompletter Systeme, einzelner Subvolumes oder einzelner Ordner aus Snapshots mit Dry-Run-Unterstützung.
     * Ausführliche technische Beschreibung: siehe `docs/mod_btrfs_backup.md` und `docs/mod_btrfs_restore.md`.
 * **TAR Archiv Backup & Restore** (`modules/backup/mod_backup.sh`):
     * Erstellung komprimierter TAR-Archive (`.tar.gz`) von ausgewählten Verzeichnissen.
@@ -153,6 +156,17 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
             * Direkte Einbettung sensitiver Daten (z.B. API-Keys, Tokens) anstelle von Umgebungsvariablen. (funktioniert aktuell nicht wirklich)
         * Optional kann eine Liste der aktuell laufenden Docker-Container angezeigt werden. (In der `config/docker.conf.example` im standard deaktiviert.)
         * Stellt eine Zusammenfassung der gefundenen potenziellen Probleme mit Empfehlungen bereit.
+
+</details>
+
+<details>
+<summary>🔋 Energieverwaltung & Systemsteuerung</summary>
+
+* **Energieverwaltung (`mod_energy.sh`)**:
+    * Energieprofilverwaltung (Performance, Balanced, Power-Saver).
+    * Standby/Suspend-Kontrolle mit zeitgesteuerter Inhibit-Funktionalität.
+    * Bildschirmhelligkeitssteuerung.
+    * Schnellaktionen zur Wiederherstellung der Standby-Funktionalität.
 
 </details>
 
@@ -286,6 +300,7 @@ Das Projekt ist in Module unterteilt, um die Funktionalität zu organisieren:
 * **`modules/mod_logs.sh`**: Analyse von System- und Anwendungsprotokollen.
 * **`modules/mod_packages.sh`**: Paketverwaltung, Systemaktualisierung, Bereinigung.
 * **`modules/mod_security.sh`**: Sicherheitsüberprüfungen, Docker-Security, Netzwerk, Rootkit-Check.
+* **`modules/mod_energy.sh`**: Energieverwaltung und Stromverwaltungsfunktionen (Energieprofile, Standby-Kontrolle, Helligkeit).
 
 </details>
 

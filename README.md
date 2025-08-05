@@ -3,6 +3,7 @@
 > **⚠️ Documentation Status Notice:**
 > - **Documentation Update Needed**: The documentation (including this README.md) needs to be updated to reflect recent changes and improvements.
 > - **BTRFS Modules Need Testing**: The BTRFS backup and restore modules require comprehensive testing. The backup module has been enhanced and improved, while the restore module has been completely recreated. Please use with caution and test thoroughly beforehand.
+> - Update: The incremental backup now works. The restore module is still untested, but the backup works great for saving the current state to just restore files/folders from it.
 
 ## Description
 
@@ -58,10 +59,12 @@ The main script `help_master.sh` serves as the central entry point and provides 
 <summary>💾 Backup & Restore</summary>
 
 * **BTRFS Snapshot Backup & Restore** (`modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`):
-    * Creation and management of snapshots for subvolumes `@` and `@home`.
-    * Transfer of snapshots to backup destination using `btrfs send/receive`.
+    * Creation and management of snapshots for subvolumes `@` and `@home` with incremental backup support.
+    * Transfer of snapshots to backup destination using `btrfs send/receive` with automatic incremental chain detection.
+    * Source snapshot preservation required for incremental backups - parent snapshots must remain on source system for incremental chains to work.
+    * Does not integrate with Snapper or Timeshift - creates its own independent snapshots for backup purposes.
     * Integrated integrity checking, marker files, automatic cleanup, manual and automatic deletion, status display, and desktop notifications.
-    * Restoration of complete systems, individual subvolumes, or individual folders from snapshots – with dry-run support.
+    * **⚠️ Restore module is completely untested!** - restoration of complete systems, individual subvolumes, or individual folders from snapshots with dry-run support.
     * Detailed technical description: see `docs/mod_btrfs_backup.md` and `docs/mod_btrfs_restore.md`.
 * **TAR Archive Backup & Restore** (`modules/backup/mod_backup.sh`):
     * Creation of compressed TAR archives (`.tar.gz`) from selected directories.
@@ -152,6 +155,17 @@ The main script `help_master.sh` serves as the central entry point and provides 
             * Direct embedding of sensitive data (e.g., API keys, tokens) instead of environment variables. (currently not working properly)
         * Optionally displays a list of currently running Docker containers. (Disabled by default in `config/docker.conf.example`.)
         * Provides a summary of found potential issues with recommendations.
+
+</details>
+
+<details>
+<summary>🔋 Energy Management & System Control</summary>
+
+* **Energy Management (`mod_energy.sh`)**:
+    * Power profile management (performance, balanced, power-saver).
+    * Sleep/suspend control with timed inhibit functionality.
+    * Screen brightness control.
+    * Quick actions for restoring sleep functionality.
 
 </details>
 
@@ -285,6 +299,7 @@ The project is divided into modules to organize functionality:
 * **`modules/mod_logs.sh`**: Analysis of system and application logs.
 * **`modules/mod_packages.sh`**: Package management, system updates, cleanup.
 * **`modules/mod_security.sh`**: Security checks, Docker security, network, rootkit checking.
+* **`modules/mod_energy.sh`**: Energy and power management features (power profiles, sleep control, brightness).
 
 </details>
 
