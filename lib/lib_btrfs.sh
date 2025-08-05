@@ -279,9 +279,12 @@ atomic_receive_with_validation() {
         fi
         
         lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 1 - Receiving into temporary directory: $temp_receive_dir"
-        if btrfs send "$source_snapshot" | btrfs receive "$temp_receive_dir"; then
+        # Create temporary file to capture error output
+        local error_log=$(mktemp)
+        if btrfs send "$source_snapshot" 2>"$error_log" | btrfs receive "$temp_receive_dir" 2>>"$error_log"; then
             # Step 2: Validate operation success (exit code check)
             lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 2 - Receive successful, verifying result"
+            rm -f "$error_log"
             
             # The snapshot is created with its original name in temp_receive_dir
             local temp_received_snapshot="$temp_receive_dir/$source_snapshot_name"
@@ -312,6 +315,12 @@ atomic_receive_with_validation() {
             local expected_name=$(basename "$source_snapshot")
             local expected_received_path="$final_parent_dir/$expected_name"
             
+            # Ensure final destination parent directory exists
+            if ! mkdir -p "$final_parent_dir"; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot create final parent directory: $final_parent_dir"
+                return 1
+            fi
+            
             lh_log_msg "DEBUG" "atomic_receive_with_validation: Receiving full backup to parent directory: $final_parent_dir"
             lh_log_msg "DEBUG" "atomic_receive_with_validation: Expected received path: $expected_received_path"
             
@@ -332,11 +341,18 @@ atomic_receive_with_validation() {
         else
             send_result=$?
             lh_log_msg "ERROR" "atomic_receive_with_validation: Full send/receive failed with exit code: $send_result"
+            if [ -s "$error_log" ]; then
+                lh_log_msg "ERROR" "BTRFS send/receive error output:"
+                while IFS= read -r line; do
+                    lh_log_msg "ERROR" "  $line"
+                done < "$error_log"
+            fi
             
             # Step 4: Clean up temporary files on failure
             local partial_snapshot="$temp_receive_dir/$source_snapshot_name"
             [[ -d "$partial_snapshot" ]] && btrfs subvolume delete "$partial_snapshot" 2>/dev/null || true
             rmdir "$temp_receive_dir" 2>/dev/null || true
+            rm -f "$error_log"
             return 1
         fi
     fi
@@ -841,38 +857,39 @@ get_btrfs_available_space() {
     
     # Input validation
     if [[ -z "$filesystem_path" ]]; then
-        lh_log_msg "ERROR" "get_btrfs_available_space: Missing filesystem path parameter"
+        lh_log_msg "ERROR" "get_btrfs_available_space: Missing filesystem path parameter" >&2
         return 1
     fi
     
     if [[ ! -d "$filesystem_path" ]]; then
-        lh_log_msg "ERROR" "get_btrfs_available_space: Filesystem path does not exist: $filesystem_path"
+        lh_log_msg "ERROR" "get_btrfs_available_space: Filesystem path does not exist: $filesystem_path" >&2
         return 1
     fi
     
     # Get BTRFS filesystem usage
     local usage_output
     if ! usage_output=$(btrfs filesystem usage "$filesystem_path" 2>/dev/null); then
-        lh_log_msg "ERROR" "get_btrfs_available_space: Failed to get BTRFS filesystem usage"
+        lh_log_msg "ERROR" "get_btrfs_available_space: Failed to get BTRFS filesystem usage" >&2
         return 1
     fi
     
     # Extract unallocated space as the most conservative estimate
     local unallocated
-    unallocated=$(echo "$usage_output" | grep "Device unallocated:" | awk '{print $3}' | sed 's/[^0-9.]//g')
+    unallocated=$(echo "$usage_output" | grep "Device unallocated:" | awk '{print $3}')
     
     # Convert to bytes
     local unallocated_bytes=0
     if [[ -n "$unallocated" ]]; then
-        if [[ "$unallocated" =~ ([0-9.]+)([KMGTPE]?)(i?B?)$ ]]; then
-            local number="${BASH_REMATCH[1]}"
-            local unit="${BASH_REMATCH[2]}"
-            
+        # Use sed to extract number and unit parts
+        local number=$(echo "$unallocated" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\1/p')
+        local unit=$(echo "$unallocated" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\2/p')
+        
+        if [[ -n "$number" && -n "$unit" ]]; then
             case "$unit" in
-                K|Ki) unallocated_bytes=$(echo "$number * 1024" | bc -l 2>/dev/null | cut -d. -f1) ;;
-                M|Mi) unallocated_bytes=$(echo "$number * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1) ;;
-                G|Gi) unallocated_bytes=$(echo "$number * 1024 * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1) ;;
-                T|Ti) unallocated_bytes=$(echo "$number * 1024 * 1024 * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1) ;;
+                K|KB|Ki|KiB) unallocated_bytes=$(echo "$number * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1024" | awk '{print int($1 * $2)}') ;;
+                M|MB|Mi|MiB) unallocated_bytes=$(echo "$number * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1048576" | awk '{print int($1 * $2)}') ;;
+                G|GB|Gi|GiB) unallocated_bytes=$(echo "$number * 1024 * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1073741824" | awk '{print int($1 * $2)}') ;;
+                T|TB|Ti|TiB) unallocated_bytes=$(echo "$number * 1024 * 1024 * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1099511627776" | awk '{print int($1 * $2)}') ;;
                 *) unallocated_bytes=$(echo "$number" | cut -d. -f1) ;;
             esac
         fi
@@ -881,18 +898,19 @@ get_btrfs_available_space() {
     # Fallback to data free space if unallocated calculation failed
     if [[ "$unallocated_bytes" -eq 0 ]]; then
         local data_free
-        data_free=$(echo "$usage_output" | grep -A1 "Data," | grep "Free" | awk '{print $2}' | sed 's/[^0-9.]//g')
+        data_free=$(echo "$usage_output" | grep -A1 "Data," | grep "Free" | awk '{print $2}')
         
         if [[ -n "$data_free" ]]; then
-            if [[ "$data_free" =~ ([0-9.]+)([KMGTPE]?)(i?B?)$ ]]; then
-                local number="${BASH_REMATCH[1]}"
-                local unit="${BASH_REMATCH[2]}"
-                
+            # Use sed to extract number and unit parts
+            local number=$(echo "$data_free" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\1/p')
+            local unit=$(echo "$data_free" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\2/p')
+            
+            if [[ -n "$number" && -n "$unit" ]]; then
                 case "$unit" in
-                    K|Ki) unallocated_bytes=$(echo "$number * 1024" | bc -l 2>/dev/null | cut -d. -f1) ;;
-                    M|Mi) unallocated_bytes=$(echo "$number * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1) ;;
-                    G|Gi) unallocated_bytes=$(echo "$number * 1024 * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1) ;;
-                    T|Ti) unallocated_bytes=$(echo "$number * 1024 * 1024 * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1) ;;
+                    K|KB|Ki|KiB) unallocated_bytes=$(echo "$number * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1024" | awk '{print int($1 * $2)}') ;;
+                    M|MB|Mi|MiB) unallocated_bytes=$(echo "$number * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1048576" | awk '{print int($1 * $2)}') ;;
+                    G|GB|Gi|GiB) unallocated_bytes=$(echo "$number * 1024 * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1073741824" | awk '{print int($1 * $2)}') ;;
+                    T|TB|Ti|TiB) unallocated_bytes=$(echo "$number * 1024 * 1024 * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1099511627776" | awk '{print int($1 * $2)}') ;;
                     *) unallocated_bytes=$(echo "$number" | cut -d. -f1) ;;
                 esac
             fi

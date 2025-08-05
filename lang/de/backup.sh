@@ -760,26 +760,7 @@ MSG_DE[BTRFS_MENU_STATUS]="Backup-Status anzeigen"
 MSG_DE[BTRFS_MENU_DELETE]="BTRFS-Backups löschen"
 MSG_DE[BTRFS_MENU_CLEANUP]="Problematische Backups bereinigen"
 MSG_DE[BTRFS_MENU_RESTORE]="BTRFS-Backup wiederherstellen"
-MSG_DE[BTRFS_MENU_SNAPSHOTS_CHECK]="Snapshot-Umgebung prüfen"
 MSG_DE[BTRFS_MENU_BACK]="Zurück zum Hauptmenü"
-
-# BTRFS snapshots environment check
-MSG_DE[BTRFS_SNAPSHOTS_CHECK_HEADER]="BTRFS Snapshot-Umgebungsprüfung"
-MSG_DE[BTRFS_SNAPSHOTS_CHECK_DESCRIPTION]="Diese Funktion prüft Ihre BTRFS-Snapshot-Umgebung."
-MSG_DE[BTRFS_SNAPSHOTS_CHECK_AFTER_RESTORE]="Besonders nützlich nach Systemwiederherstellung um sicherzustellen, dass alles funktioniert."
-MSG_DE[BTRFS_SNAPSHOTS_CHECK_COMPLETED]="Snapshot-Umgebungsprüfung abgeschlossen."
-MSG_DE[BTRFS_SNAPSHOTS_NONE_INSTALLED]="Weder Snapper noch Timeshift sind installiert."
-MSG_DE[BTRFS_SNAPSHOTS_SUBVOL_VALID]="/.snapshots Subvolume existiert und ist gültig"
-MSG_DE[BTRFS_SNAPSHOTS_EXISTS_INVALID]="/.snapshots existiert, ist aber kein gültiges BTRFS-Subvolume"
-MSG_DE[BTRFS_SNAPSHOTS_RECREATE_CONFIRM]="/.snapshots als BTRFS-Subvolume neu erstellen?"
-MSG_DE[BTRFS_SNAPSHOTS_RECREATED]="/.snapshots Subvolume erfolgreich neu erstellt"
-MSG_DE[BTRFS_SNAPSHOTS_MISSING]="/.snapshots Subvolume fehlt"
-MSG_DE[BTRFS_SNAPSHOTS_CREATE_CONFIRM]="/.snapshots Subvolume erstellen?"
-MSG_DE[BTRFS_SNAPSHOTS_CREATED]="/.snapshots Subvolume erfolgreich erstellt"
-MSG_DE[BTRFS_SNAPSHOTS_SNAPPER_CONFIG_FOUND]="Snapper-Konfiguration für Root gefunden"
-MSG_DE[BTRFS_SNAPSHOTS_SNAPPER_CONFIG_MISSING]="Snapper ist installiert, aber keine Konfiguration für Root gefunden"
-MSG_DE[BTRFS_SNAPSHOTS_TIMESHIFT_CONFIG_FOUND]="Timeshift-Konfiguration gefunden"
-MSG_DE[BTRFS_SNAPSHOTS_TIMESHIFT_CONFIG_MISSING]="Timeshift ist installiert, aber keine Konfiguration gefunden"
 
 # BTRFS log messages - problematic cleanup
 MSG_DE[BTRFS_LOG_CLEANUP_PROBLEMATIC_COMPLETE]="Problematische Bereinigung abgeschlossen: %d erfolgreich, %d Fehler"
@@ -1020,3 +1001,12 @@ MSG_DE[CONFIG_NEW_DEBUG_LIMIT]="Neues Debug-Protokoll-Limit gesetzt auf"
 MSG_DE[CONFIG_VALIDATION_DEBUG_LIMIT]="Bitte geben Sie eine gültige Zahl ein (0 oder größer)"
 MSG_DE[BTRFS_DEBUG_LOG_LIMITED]="Debug-Protokollierung begrenzt auf %d Einträge (gefunden %d Kandidaten)"
 MSG_DE[BTRFS_DEBUG_LOG_REMAINING]="... und %d weitere (begrenzt durch Debug-Protokoll-Einstellungen)"
+
+# Source snapshot preservation
+MSG_DE[BACKUP_SOURCE_SNAPSHOT_PRESERVATION_PROMPT]="Quell-Snapshot-Aufbewahrung"
+MSG_DE[BACKUP_SOURCE_SNAPSHOT_EXPLANATION]="Quell-Snapshots können nach dem Backup für manuelle Inspektion oder Wiederherstellung aufbewahrt werden."
+MSG_DE[BACKUP_SOURCE_SNAPSHOT_LOCATION]="Permanenter Speicherort"
+MSG_DE[BACKUP_KEEP_SOURCE_SNAPSHOTS]="Quell-Snapshots nach dem Backup behalten?"
+
+# Missing BTRFS cleanup key
+MSG_DE[BTRFS_CLEANUP_DELETED]="Snapshots erfolgreich gelöscht"

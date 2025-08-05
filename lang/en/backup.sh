@@ -10,10 +10,6 @@
 [[ ! -v MSG_EN ]] && declare -A MSG_EN
 
 # Backup module main menu
-MSG_EN[BACKUP_TITLE]="Backup & Recovery"
-MSG_EN[BACKUP_MENU_TAR]="TAR Backup"
-MSG_EN[BACKUP_MENU_RSYNC]="RSYNC Backup"
-MSG_EN[BACKUP_MENU_RESTORE]="Restore Data"
 
 # TAR Backup section
 MSG_EN[BACKUP_TAR_HEADER]="TAR Backup"
@@ -41,7 +37,6 @@ MSG_EN[CHOOSE_OPTION_1_N]="Choose an option (1-%d):"
 MSG_EN[INVALID_SELECTION]="Invalid selection"
 MSG_EN[PRESS_KEY_CONTINUE]="Press any key to continue..."
 MSG_EN[OPERATION_CANCELLED]="Operation cancelled"
-MSG_EN[OPERATION_ABORTED]="Operation aborted"
 
 # === COMMON SPACE CHECK MESSAGES ===
 MSG_EN[SPACE_CHECK_WARNING]="Could not reliably determine available space on %s."
@@ -174,7 +169,6 @@ MSG_EN[BACKUP_RSYNC_HEADER]="RSYNC Backup"
 MSG_EN[BACKUP_RSYNC_NOT_INSTALLED]="Rsync is not installed and could not be installed."
 MSG_EN[BACKUP_RSYNC_DRY_RUN]="Would you like to perform a dry run?"
 MSG_EN[BACKUP_RSYNC_DRY_RUN_INFO]="RSYNC will run in dry-run mode. NO files will be copied or deleted."
-MSG_EN[BACKUP_RSYNC_SELECT_TYPE]="Which backup type should be created?"
 MSG_EN[BACKUP_RSYNC_FULL]="Full backup (copy everything)"
 MSG_EN[BACKUP_RSYNC_INCREMENTAL]="Incremental backup (changes only)"
 MSG_EN[BACKUP_RSYNC_STARTING]="Starting RSYNC backup..."
@@ -248,15 +242,12 @@ MSG_EN[BACKUP_NOTIFICATION_FAILED_DETAILS]="Exit code: %s\nTimestamp: %s\nSee lo
 
 # Error handling
 MSG_EN[BACKUP_ERROR_CREATE_DIR]="Could not create backup directory"
-MSG_EN[BACKUP_ERROR_NO_PKG_MANAGER]="No supported package manager found."
-MSG_EN[BACKUP_ERROR_OPERATION_CANCELLED]="Operation cancelled."
 
 # RSYNC Backup additional messages
 MSG_EN[BACKUP_RSYNC_SELECT_TYPE_PROMPT]="Which backup type should be created?"
 MSG_EN[BACKUP_RSYNC_FULL_OPTION]="Full backup (copy everything)"
 MSG_EN[BACKUP_RSYNC_INCREMENTAL_OPTION]="Incremental backup (changes only)"
 MSG_EN[BACKUP_RSYNC_ERROR_FAILED]="Error creating RSYNC backup."
-MSG_EN[BACKUP_RSYNC_ERROR_DRY_RUN_FAILED]="RSYNC dry run failed."
 
 # Restore menu and operations
 MSG_EN[RESTORE_MENU_TITLE]="Select Restore Option"
@@ -365,7 +356,6 @@ MSG_EN[MENU_BACKUP_CONFIG]="Show/Change Backup Configuration"
 # BTRFS specific translations
 MSG_EN[BTRFS_TOOLS_MISSING]="BTRFS tools are not available. This module requires btrfs-progs."
 MSG_EN[BTRFS_NOT_SUPPORTED]="BTRFS snapshots are not supported on this system."
-MSG_EN[BTRFS_BACKUP_NEEDS_ROOT]="BTRFS backup requires root permissions."
 MSG_EN[BTRFS_RUN_WITH_SUDO]="Run BTRFS backup with sudo?"
 MSG_EN[BTRFS_INSTALL_TOOLS_PROMPT]="Would you like to install BTRFS tools?"
 MSG_EN[BTRFS_PROCESSING_SUBVOLUME]="Processing subvolume: %s"
@@ -402,7 +392,6 @@ MSG_EN[BACKUP_SPECIFY_EXISTING_PATH]="Please specify an existing path or allow c
 MSG_EN[BACKUP_TARGET_SET]="Backup target set to '%s' for this session."
 
 # BTRFS Space Check Messages
-MSG_EN[BACKUP_SPACE_WARNING]="Possibly insufficient space on backup target (%s)."
 
 # BTRFS Error Messages
 MSG_EN[BTRFS_ERROR_CREATE_BACKUP_DIR]="Could not create backup directory. Please check permissions."
@@ -458,7 +447,6 @@ MSG_EN[BTRFS_DELETE_DELETING_SNAPSHOT]="Deleting snapshot: %s"
 MSG_EN[BTRFS_DELETE_RESULT_HEADER]="Deletion results for subvolume %s:"
 MSG_EN[BTRFS_DELETE_SUCCESS_COUNT]="Successfully deleted: %d snapshots"
 MSG_EN[BTRFS_DELETE_ERROR_COUNT]="Errors: %d snapshots"
-MSG_EN[BTRFS_DELETE_ABORTED_FOR_SUBVOLUME]="Deletion aborted for subvolume: %s"
 MSG_EN[BTRFS_DELETE_OPERATION_COMPLETED]="Delete operation completed."
 
 # BTRFS Orphaned Snapshots Messages
@@ -475,7 +463,6 @@ MSG_EN[BTRFS_ORPHANED_SNAPSHOTS_NONE]="No orphaned snapshots found."
 MSG_EN[BTRFS_BACKUP_INTERRUPTED]="Backup interrupted. Cleaning up temporary snapshot..."
 MSG_EN[BTRFS_TEMP_SNAPSHOT_CLEANED]="Temporary snapshot cleaned up successfully."
 MSG_EN[BTRFS_ERROR_CLEANUP_TEMP]="Error cleaning up temporary snapshot."
-MSG_EN[BTRFS_WARNING_TEMP_SNAPSHOT_DELETE]="Warning: Could not delete temporary snapshot: %s"
 MSG_EN[BTRFS_MANUAL_DELETE_HINT]="Manual deletion required: sudo btrfs subvolume delete %s"
 
 # BTRFS Integrity Check Messages
@@ -510,17 +497,14 @@ MSG_EN[BTRFS_LOG_BACKUP_WITH_SUDO]="Starting BTRFS backup with sudo privileges"
 MSG_EN[BTRFS_LOG_TARGET_NOT_FOUND]="Configured backup target not found: %s"
 MSG_EN[BTRFS_LOG_CHECK_SPACE]="Checking available space on %s"
 MSG_EN[BTRFS_LOG_SPACE_CHECK_ERROR]="Could not determine available space on %s"
-MSG_EN[BTRFS_LOG_BACKUP_CANCELLED_SPACE]="Backup cancelled - space check failed"
 MSG_EN[BTRFS_LOG_SIZE_ROOT_CALC]="Calculating size of root (/) subvolume"
 MSG_EN[BTRFS_LOG_SIZE_ROOT_ERROR]="Could not determine size of root subvolume"
 MSG_EN[BTRFS_LOG_SIZE_HOME_CALC]="Calculating size of home (/home) subvolume"
 MSG_EN[BTRFS_LOG_SIZE_HOME_ERROR]="Could not determine size of home subvolume"
 MSG_EN[BTRFS_LOG_SPACE_INFO]="Space check: Available: %s, Required (estimated): %s"
-MSG_EN[BTRFS_LOG_BACKUP_CANCELLED_LOW_SPACE]="Backup cancelled due to insufficient space"
 MSG_EN[BTRFS_LOG_BACKUP_DIR_ERROR]="Could not create backup directory"
 MSG_EN[BTRFS_LOG_TEMP_DIR_ERROR]="Could not create temporary snapshot directory"
 MSG_EN[BTRFS_LOG_USING_DIRECT_SNAPSHOTS]="Using direct snapshots (subvolumes: @, @home)"
-MSG_EN[BTRFS_LOG_PREVIOUS_BACKUP_FOUND]="Previous backup found: %s"
 MSG_EN[BTRFS_LOG_SEND_FULL_SNAPSHOT_PREV]="Sending full snapshot (incremental for future use)"
 MSG_EN[BTRFS_LOG_SEND_FULL_SNAPSHOT_NEW]="Sending full snapshot (first backup)"
 MSG_EN[BTRFS_LOG_TRANSFER_ERROR]="Failed to transfer snapshot for subvolume: %s"
@@ -528,17 +512,11 @@ MSG_EN[BTRFS_LOG_TRANSFER_SUCCESS]="Snapshot successfully transferred: %s"
 MSG_EN[BTRFS_LOG_MARKER_ERROR]="Failed to create backup completion marker for: %s"
 MSG_EN[BTRFS_LOG_MARKER_SUCCESS]="Backup completion marker created for: %s"
 MSG_EN[BTRFS_LOG_CLEANUP_OLD_BACKUPS]="Cleaning up old backups for subvolume: %s"
-MSG_EN[BTRFS_LOG_DELETE_OLD_BACKUP]="Deleting old backup: %s (marker: %s)"
-MSG_EN[BTRFS_LOG_DELETE_ERROR]="Error deleting backup: %s"
 MSG_EN[BTRFS_LOG_SESSION_COMPLETE]="BTRFS backup session completed"
 MSG_EN[BTRFS_LOG_CREATE_DIR_ERROR]="Could not create directory: %s"
 MSG_EN[BTRFS_LOG_CHECK_ORPHANED]="Checking for orphaned temporary snapshots"
 MSG_EN[BTRFS_LOG_CLEANUP_ORPHANED]="Cleaning up orphaned snapshot: %s"
 MSG_EN[BTRFS_LOG_DELETE_ORPHANED_ERROR]="Error deleting orphaned snapshot: %s"
-MSG_EN[BTRFS_LOG_CLEANUP_TEMP]="Cleaning up temporary snapshot: %s"
-MSG_EN[BTRFS_LOG_TEMP_DELETED]="Temporary snapshot deleted: %s"
-MSG_EN[BTRFS_LOG_TEMP_DELETE_ATTEMPT]="Attempt %s/%s to delete temporary snapshot: %s"
-MSG_EN[BTRFS_LOG_TEMP_DELETE_ERROR]="Could not delete temporary snapshot: %s"
 MSG_EN[BTRFS_LOG_CLEANUP_INTERRUPTED]="Backup interrupted, cleaning up temporary snapshot: %s"
 MSG_EN[BTRFS_LOG_CLEANUP_INTERRUPTED_SUCCESS]="Temporary snapshot cleaned up after interruption"
 MSG_EN[BTRFS_LOG_CLEANUP_INTERRUPTED_ERROR]="Error cleaning up temporary snapshot after interruption: %s"
@@ -574,189 +552,39 @@ MSG_EN[BTRFS_STATUS_ACTIVE_EN]="CREATING"
 MSG_EN[BTRFS_STATUS_OK_EN]="OK"
 
 # Menu and UI Messages
-MSG_EN[MAIN_MENU_CONTINUE]="Press any key to continue..."
 
 # BTRFS Restore module translations
-MSG_EN[BTRFS_RESTORE_LOG_WARN_CREATE]="WARN (modules/backup/mod_btrfs_restore): Could not create/touch restore log file %s."
 
 
 # Read-only subvolume handling
-MSG_EN[BTRFS_RESTORE_LOG_CHECKING_READONLY]="Checking read-only status of subvolume: %s"
-MSG_EN[BTRFS_RESTORE_LOG_SUBVOL_READONLY]="Subvolume %s is read-only"
-MSG_EN[BTRFS_RESTORE_TRY_SET_READWRITE]="Attempting to set subvolume to read-write..."
-MSG_EN[BTRFS_RESTORE_LOG_SET_READWRITE_SUCCESS]="Successfully set subvolume %s to read-write"
-MSG_EN[BTRFS_RESTORE_SET_READWRITE_SUCCESS]="Successfully set subvolume to read-write"
-MSG_EN[BTRFS_RESTORE_LOG_SET_READWRITE_ERROR]="Failed to set subvolume %s to read-write"
-MSG_EN[BTRFS_RESTORE_SET_READWRITE_ERROR]="Failed to set subvolume to read-write"
-MSG_EN[BTRFS_RESTORE_DRY_RUN_WOULD_SET]="DRY RUN: Would set %s to read-write"
-MSG_EN[BTRFS_RESTORE_LOG_SUBVOL_READWRITE]="Subvolume %s is already read-write"
 
 # Manual checkpoints
-MSG_EN[BTRFS_RESTORE_MANUAL_CHECKPOINT]="=== MANUAL CHECKPOINT ==="
-MSG_EN[BTRFS_RESTORE_CHECK_SITUATION]="Please check the current situation carefully before proceeding."
-MSG_EN[BTRFS_RESTORE_PRESS_KEY]="Press any key to continue..."
 
 # Child snapshot handling
-MSG_EN[BTRFS_RESTORE_CHILD_CHECKPOINT_MSG]="Child snapshots of subvolume '%s' will be processed"
-MSG_EN[BTRFS_RESTORE_CHILD_SNAPSHOTS_FOUND]="Found %d child snapshots in subvolume '%s':"
-MSG_EN[BTRFS_RESTORE_HOW_TO_PROCEED]="How do you want to proceed?"
-MSG_EN[BTRFS_RESTORE_BACKUP_ALL_SNAPSHOTS]="Backup all child snapshots before proceeding"
-MSG_EN[BTRFS_RESTORE_DELETE_ALL_SNAPSHOTS]="Delete all child snapshots"
-MSG_EN[BTRFS_RESTORE_ABORT]="Abort operation"
-MSG_EN[BTRFS_RESTORE_OPTION_SELECT]="Select option (0-2):"
-MSG_EN[BTRFS_RESTORE_BACKING_UP_SNAPSHOTS]="Backing up child snapshots to: %s"
-MSG_EN[BTRFS_RESTORE_DRY_RUN_WOULD_BACKUP]="DRY RUN: Would backup %s to %s as %s.img"
-MSG_EN[BTRFS_RESTORE_ALL_SNAPSHOTS_BACKED_UP]="All child snapshots have been backed up successfully"
-MSG_EN[BTRFS_RESTORE_DRY_RUN_WOULD_DELETE]="DRY RUN: Would delete snapshot %s"
-MSG_EN[BTRFS_RESTORE_ALL_SNAPSHOTS_DELETED]="All child snapshots have been deleted successfully"
-MSG_EN[BTRFS_RESTORE_OPERATION_ABORTED]="Operation aborted by user"
 
 # Subvolume replacement
-MSG_EN[BTRFS_RESTORE_LOG_PREPARING_REPLACEMENT]="Preparing replacement of subvolume: %s"
-MSG_EN[BTRFS_RESTORE_LOG_EXISTING_SUBVOL_FOUND]="Existing subvolume found at: %s"
-MSG_EN[BTRFS_RESTORE_EXISTING_SUBVOL_FOUND]="An existing subvolume '%s' was found at %s"
-MSG_EN[BTRFS_RESTORE_CHILD_CHECKPOINT_REPLACEMENT]="Existing subvolume '%s' at %s will be replaced"
-MSG_EN[BTRFS_RESTORE_LOG_CHILD_HANDLING_ABORTED]="Child snapshot handling was aborted"
-MSG_EN[BTRFS_RESTORE_RENAME_EXISTING]="Renaming existing subvolume to:"
-MSG_EN[BTRFS_RESTORE_CONFIRM_RENAME]="Proceed with renaming the existing subvolume '%s'?"
-MSG_EN[BTRFS_RESTORE_LOG_RENAME_ERROR]="Failed to rename existing subvolume"
-MSG_EN[BTRFS_RESTORE_RENAME_ERROR]="Error renaming existing subvolume"
-MSG_EN[BTRFS_RESTORE_LOG_RENAME_SUCCESS]="Successfully renamed existing subvolume to: %s"
-MSG_EN[BTRFS_RESTORE_BACKUP_CREATED]="Backup created: %s"
-MSG_EN[BTRFS_RESTORE_DRY_RUN_WOULD_RENAME]="DRY RUN: Would rename %s to %s"
-MSG_EN[BTRFS_RESTORE_LOG_USER_ABORTED_RENAME]="User aborted the rename operation"
-MSG_EN[BTRFS_RESTORE_RESTORE_ABORTED_UNTOUCHED]="Restore aborted. Existing data remains untouched."
-MSG_EN[BTRFS_RESTORE_LOG_NO_EXISTING_SUBVOL]="No existing subvolume found for: %s"
 
 # Core restore operations
-MSG_EN[BTRFS_RESTORE_LOG_SNAPSHOT_NOT_FOUND]="Source snapshot not found: %s"
-MSG_EN[BTRFS_RESTORE_SNAPSHOT_NOT_EXISTS]="Snapshot does not exist"
-MSG_EN[BTRFS_RESTORE_RESTORE_CHECKPOINT]="About to restore subvolume '%s' from snapshot '%s' to target '%s'"
-MSG_EN[BTRFS_RESTORE_LOG_RECEIVING_SNAPSHOT]="Receiving snapshot %s (Size: %s)"
-MSG_EN[BTRFS_RESTORE_RECEIVING_SNAPSHOT]="Receiving snapshot (Size: %s)..."
-MSG_EN[BTRFS_RESTORE_LOG_RECEIVE_ERROR]="Failed to receive snapshot"
-MSG_EN[BTRFS_RESTORE_RECEIVE_ERROR]="Error receiving snapshot"
-MSG_EN[BTRFS_RESTORE_DRY_RUN_WOULD_RECEIVE]="DRY RUN: Would receive snapshot from %s"
-MSG_EN[BTRFS_RESTORE_LOG_MOVING_SNAPSHOT]="Moving received snapshot to target location: %s"
-MSG_EN[BTRFS_RESTORE_MOVING_SNAPSHOT]="Moving snapshot to target location..."
-MSG_EN[BTRFS_RESTORE_LOG_MOVE_ERROR]="Failed to move snapshot to: %s"
-MSG_EN[BTRFS_RESTORE_MOVE_ERROR]="Error moving snapshot to target location"
-MSG_EN[BTRFS_RESTORE_DRY_RUN_WOULD_MOVE]="DRY RUN: Would move %s to %s"
-MSG_EN[BTRFS_RESTORE_READONLY_FIX_WARNING]="Warning: Could not fix read-only flag. You may need to do this manually."
-MSG_EN[BTRFS_RESTORE_LOG_RESTORE_SUCCESS]="Successfully restored subvolume %s to %s"
-MSG_EN[BTRFS_RESTORE_RESTORE_SUCCESS]="Successfully restored subvolume: %s"
-MSG_EN[BTRFS_RESTORE_SNAPSHOTS_HINT]="Note: Child snapshots may need to be restored separately if needed."
 
 # Restore type selection menu
-MSG_EN[BTRFS_RESTORE_SELECT_TYPE_HEADER]="BTRFS Restore - Select Restore Type"
-MSG_EN[BTRFS_RESTORE_NO_SUBVOLS_FOUND]="No BTRFS subvolumes found in backup"
-MSG_EN[BTRFS_RESTORE_WHAT_TO_RESTORE]="What do you want to restore?"
-MSG_EN[BTRFS_RESTORE_COMPLETE_SYSTEM]="Complete system (root + home)"
-MSG_EN[BTRFS_RESTORE_SYSTEM_ONLY]="System only (root)"
-MSG_EN[BTRFS_RESTORE_HOME_ONLY]="Home only"
-MSG_EN[BTRFS_RESTORE_SELECT_OPTION]="Select option (1-3):"
-MSG_EN[BTRFS_RESTORE_NO_SNAPSHOTS_FOUND]="No snapshots found for subvolume: %s"
 
 # Snapshot selection table
-MSG_EN[BTRFS_RESTORE_SELECT_SNAPSHOT_HEADER]="Select Snapshot for Subvolume: %s"
-MSG_EN[BTRFS_RESTORE_TABLE_NR]="No."
-MSG_EN[BTRFS_RESTORE_TABLE_SNAPSHOT_NAME]="Snapshot Name"
-MSG_EN[BTRFS_RESTORE_TABLE_CREATED_AT]="Created At"
-MSG_EN[BTRFS_RESTORE_TABLE_SIZE]="Size"
-MSG_EN[BTRFS_RESTORE_SELECT_SNAPSHOT_NR]="Select snapshot number:"
 
 # Final confirmation
-MSG_EN[BTRFS_RESTORE_FINAL_CONFIRMATION]="=== FINAL CONFIRMATION ==="
-MSG_EN[BTRFS_RESTORE_IRREVERSIBLE_WARNING]="WARNING: This operation is irreversible and will overwrite existing data!"
-MSG_EN[BTRFS_RESTORE_SOURCE_LABEL]="Source: "
-MSG_EN[BTRFS_RESTORE_TARGET_LABEL]="Target: "
 
 # Restore actions
-MSG_EN[BTRFS_RESTORE_ACTION_COMPLETE_SYSTEM]="Action: "
-MSG_EN[BTRFS_RESTORE_RESTORE_COMPLETE_SYSTEM]="Complete system restore"
-MSG_EN[BTRFS_RESTORE_WITH_ROOT_SNAPSHOT]="Root snapshot: "
-MSG_EN[BTRFS_RESTORE_AND_HOME_SNAPSHOT]="Home snapshot: "
-MSG_EN[BTRFS_RESTORE_CONFIRM_COMPLETE_RESTORE]="Proceed with complete system restore?"
-MSG_EN[BTRFS_RESTORE_ACTION_SYSTEM_ONLY]="System-only restore"
-MSG_EN[BTRFS_RESTORE_WITH_SNAPSHOT]="Snapshot: "
-MSG_EN[BTRFS_RESTORE_CONFIRM_SYSTEM_RESTORE]="Proceed with system restore?"
-MSG_EN[BTRFS_RESTORE_ACTION_HOME_ONLY]="Home-only restore"
-MSG_EN[BTRFS_RESTORE_CONFIRM_HOME_RESTORE]="Proceed with home restore?"
 
 # Folder restore
-MSG_EN[BTRFS_RESTORE_FOLDER_HEADER]="BTRFS Restore - Single Folder"
-MSG_EN[BTRFS_RESTORE_SELECT_SOURCE_SUBVOL]="Select source subvolume:"
-MSG_EN[BTRFS_RESTORE_SYSTEM_LABEL]="System (@)"
-MSG_EN[BTRFS_RESTORE_HOME_LABEL]="Home (@home)"
-MSG_EN[BTRFS_RESTORE_SELECT_NUMBER]="Select number (1-2):"
 
 # Folder restore specific translations
-MSG_EN[BTRFS_RESTORE_FOLDER_PATH_PROMPT]="Enter the path to the folder to restore (e.g., /home/user/Documents):"
-MSG_EN[BTRFS_RESTORE_NO_PATH_GIVEN]="No path specified"
-MSG_EN[BTRFS_RESTORE_FOLDER_NOT_IN_SNAPSHOT]="Folder '%s' not found in snapshot"
-MSG_EN[BTRFS_RESTORE_TARGET_EXISTS_BACKUP]="Target already exists. Create backup at '%s'?"
-MSG_EN[BTRFS_RESTORE_DRY_RUN_WOULD_MOVE_FOLDER]="DRY RUN: Would move %s to %s"
-MSG_EN[BTRFS_RESTORE_FOLDER_RESTORED_SUCCESS]="Folder '%s' restored successfully"
-MSG_EN[BTRFS_RESTORE_LOG_FOLDER_RESTORED]="Folder %s restored from snapshot %s"
-MSG_EN[BTRFS_RESTORE_DRY_RUN_WOULD_COPY]="DRY RUN: Would copy %s to %s"
 
 # Live environment check
-MSG_EN[BTRFS_RESTORE_LIVE_ENV_DETECTED]="Live environment detected - this is recommended for BTRFS restore operations"
-MSG_EN[BTRFS_RESTORE_LOG_LIVE_ENV]="Live environment detected"
-MSG_EN[BTRFS_RESTORE_NOT_LIVE_WARNING]="WARNING: You are not running in a live environment!"
-MSG_EN[BTRFS_RESTORE_LIVE_SAFER_WARNING]="Running BTRFS restore from a live environment is much safer."
-MSG_EN[BTRFS_RESTORE_CONTINUE_NOT_RECOMMENDED]="Continue anyway? (Not recommended)"
-MSG_EN[BTRFS_RESTORE_LOG_USER_ABORTED_NO_LIVE]="User aborted due to non-live environment"
 
 # Drive detection and setup
-MSG_EN[BTRFS_RESTORE_SETUP_HEADER]="BTRFS Restore Setup"
-MSG_EN[BTRFS_RESTORE_SEARCHING_BACKUP_DRIVES]="Searching for backup drives..."
-MSG_EN[BTRFS_RESTORE_SELECT_BACKUP_DRIVE]="Select backup drive:"
-MSG_EN[BTRFS_RESTORE_MANUAL_INPUT]="Manual input"
-MSG_EN[BTRFS_RESTORE_BACKUP_MOUNT_PROMPT]="Enter backup mount point (e.g., /mnt/backup):"
-MSG_EN[BTRFS_RESTORE_BACKUP_DIR_NOT_FOUND]="Backup directory not found at %s%s"
-MSG_EN[BTRFS_RESTORE_LOG_BACKUP_SOURCE_SET]="Backup source set to: %s"
-MSG_EN[BTRFS_RESTORE_BACKUP_SOURCE_SUCCESS]="Backup source configured successfully"
-MSG_EN[BTRFS_RESTORE_SEARCHING_TARGET_DRIVES]="Searching for target drives with BTRFS subvolumes..."
-MSG_EN[BTRFS_RESTORE_SELECT_TARGET_DRIVE]="Select target drive:"
-MSG_EN[BTRFS_RESTORE_TARGET_MOUNT_PROMPT]="Enter target mount point (e.g., /mnt/target):"
-MSG_EN[BTRFS_RESTORE_TARGET_NOT_EXISTS_CREATE]="Target directory '%s' does not exist. Create it?"
-MSG_EN[BTRFS_RESTORE_COULD_NOT_CREATE_TARGET]="Could not create target directory"
-MSG_EN[BTRFS_RESTORE_LOG_TARGET_SET]="Target set to: %s"
-MSG_EN[BTRFS_RESTORE_TARGET_SUCCESS]="Target configured successfully"
-MSG_EN[BTRFS_RESTORE_DRY_RUN_PROMPT]="Enable dry run mode? (Recommended for first test)"
-MSG_EN[BTRFS_RESTORE_DRY_RUN_ACTIVATED]="Dry run mode activated - no actual changes will be made"
-MSG_EN[BTRFS_RESTORE_DRY_RUN_DEACTIVATED]="Dry run mode deactivated - REAL changes will be made!"
 
 # Main menu
-MSG_EN[BTRFS_RESTORE_MAIN_HEADER]="BTRFS Restore - Main Menu"
-MSG_EN[BTRFS_RESTORE_MENU_START_RESTORE]="Start System/Subvolume Restore"
-MSG_EN[BTRFS_RESTORE_MENU_FOLDER_RESTORE]="Restore Single Folder"
-MSG_EN[BTRFS_RESTORE_MENU_DISK_INFO]="Show Disk Information"
-MSG_EN[BTRFS_RESTORE_MENU_SETUP_AGAIN]="Setup Environment Again"
-MSG_EN[BTRFS_RESTORE_MENU_BACK]="Back to Main Menu"
-MSG_EN[BTRFS_RESTORE_DISK_INFO_HEADER]="Disk and BTRFS Information"
-MSG_EN[BTRFS_RESTORE_BLOCK_DEVICES]="Block devices:"
-MSG_EN[BTRFS_RESTORE_BTRFS_USAGE]="BTRFS filesystem usage:"
-MSG_EN[BTRFS_RESTORE_SETUP_FAILED]="Setup failed"
 
 # Main execution messages
-MSG_EN[BTRFS_RESTORE_HEADER]="BTRFS SNAPSHOT RESTORE MODULE"
-MSG_EN[BTRFS_RESTORE_DESTRUCTIVE_WARNING]="WARNING: This module performs DESTRUCTIVE operations!"
-MSG_EN[BTRFS_RESTORE_OVERWRITE_WARNING]="Existing data WILL BE OVERWRITTEN without further confirmation!"
-MSG_EN[BTRFS_RESTORE_LIVE_RECOMMEND_1]="STRONGLY RECOMMENDED: Use this module only from a live environment"
-MSG_EN[BTRFS_RESTORE_LIVE_RECOMMEND_2]="(e.g., Arch Linux ISO, Ubuntu Live USB, etc.)"
-MSG_EN[BTRFS_RESTORE_LIVE_RECOMMEND_3]="This ensures your running system is not affected during restore!"
-MSG_EN[BTRFS_RESTORE_ROOT_REQUIRED]="Root privileges required for BTRFS operations"
-MSG_EN[BTRFS_RESTORE_RESTART_WITH_SUDO]="Restart with sudo?"
-MSG_EN[BTRFS_RESTORE_LOG_START_WITH_SUDO]="Restarting with sudo privileges"
-MSG_EN[BTRFS_RESTORE_LOG_USER_DENIED_SUDO]="User denied sudo privileges"
-MSG_EN[BTRFS_RESTORE_LOG_BTRFS_TOOLS_MISSING]="BTRFS tools not available"
-MSG_EN[BTRFS_RESTORE_UNDERSTAND_WARNING]="Do you understand the risks and want to continue?"
-MSG_EN[BTRFS_RESTORE_LOG_USER_ABORTED]="User aborted operation"
-MSG_EN[BTRFS_RESTORE_LOG_SETUP_FAILED]="Setup failed"
-MSG_EN[BTRFS_RESTORE_LOG_MODULE_FINISHED]="BTRFS restore module finished"
-MSG_EN[BTRFS_RESTORE_MODULE_FINISHED]="BTRFS restore module completed"
 
 # Additional missing keys for BTRFS module
 MSG_EN[BACKUP_MENU_TITLE]="Backup & Recovery"
@@ -793,32 +621,12 @@ MSG_EN[BTRFS_MENU_STATUS]="Show Backup Status"
 MSG_EN[BTRFS_MENU_DELETE]="Delete BTRFS Backups"
 MSG_EN[BTRFS_MENU_CLEANUP]="Cleanup Problematic Backups"
 MSG_EN[BTRFS_MENU_RESTORE]="Restore BTRFS Backup"
-MSG_EN[BTRFS_MENU_SNAPSHOTS_CHECK]="Check Snapshot Environment"
-
-# BTRFS snapshots environment check
-MSG_EN[BTRFS_SNAPSHOTS_CHECK_HEADER]="BTRFS Snapshot Environment Check"
-MSG_EN[BTRFS_SNAPSHOTS_CHECK_DESCRIPTION]="This function checks your BTRFS snapshot environment."
-MSG_EN[BTRFS_SNAPSHOTS_CHECK_AFTER_RESTORE]="Especially useful after system restore to ensure everything is working."
-MSG_EN[BTRFS_SNAPSHOTS_CHECK_COMPLETED]="Snapshot environment check completed."
-MSG_EN[BTRFS_SNAPSHOTS_NONE_INSTALLED]="Neither Snapper nor Timeshift are installed."
-MSG_EN[BTRFS_SNAPSHOTS_SUBVOL_VALID]="/.snapshots subvolume exists and is valid"
-MSG_EN[BTRFS_SNAPSHOTS_EXISTS_INVALID]="/.snapshots exists but is not a valid BTRFS subvolume"
-MSG_EN[BTRFS_SNAPSHOTS_RECREATE_CONFIRM]="Recreate /.snapshots as BTRFS subvolume?"
-MSG_EN[BTRFS_SNAPSHOTS_RECREATED]="/.snapshots subvolume recreated successfully"
-MSG_EN[BTRFS_SNAPSHOTS_MISSING]="/.snapshots subvolume is missing"
-MSG_EN[BTRFS_SNAPSHOTS_CREATE_CONFIRM]="Create /.snapshots subvolume?"
-MSG_EN[BTRFS_SNAPSHOTS_CREATED]="/.snapshots subvolume created successfully"
-MSG_EN[BTRFS_SNAPSHOTS_SNAPPER_CONFIG_FOUND]="Snapper configuration found for root"
-MSG_EN[BTRFS_SNAPSHOTS_SNAPPER_CONFIG_MISSING]="Snapper is installed but no configuration found for root"
-MSG_EN[BTRFS_SNAPSHOTS_TIMESHIFT_CONFIG_FOUND]="Timeshift configuration found"
-MSG_EN[BTRFS_SNAPSHOTS_TIMESHIFT_CONFIG_MISSING]="Timeshift is installed but no configuration found"
 
 # BTRFS log messages - problematic cleanup
 MSG_EN[BTRFS_LOG_CLEANUP_PROBLEMATIC_COMPLETE]="Problematic cleanup complete: %d successful, %d errors"
 MSG_EN[BTRFS_LOG_CLEANUP_PROBLEMATIC_ERROR]="Error cleaning up problematic snapshot: %s"
 MSG_EN[BTRFS_LOG_CLEANUP_PROBLEMATIC_SNAPSHOT]="Cleaning up problematic snapshot: %s"
 MSG_EN[BTRFS_LOG_CLEANUP_PROBLEMATIC_SUCCESS]="Successfully cleaned up problematic snapshot: %s"
-MSG_EN[BTRFS_LOG_MARKER_DELETE_PROBLEMATIC]="Deleting problematic completion marker: %s"
 
 # Final missing BTRFS log messages
 MSG_EN[BTRFS_LOG_BACKUP_SUBVOL_DIR_ERROR]="Could not create backup subvolume directory for: %s"
@@ -829,7 +637,6 @@ MSG_EN[BACKUP_TAR_MODULE_INFO]="Starting TAR backup operations..."
 MSG_EN[BACKUP_RSYNC_MODULE_INFO]="Starting RSYNC backup operations..."
 MSG_EN[RESTORE_TAR_MODULE_INFO]="Starting TAR restore operations..."
 MSG_EN[RESTORE_RSYNC_MODULE_INFO]="Starting RSYNC restore operations..."
-MSG_EN[BTRFS_SNAPSHOTS_CHECK_COMPLETED]="BTRFS snapshot environment check completed."
 
 # ===== NEW BTRFS RESTORE MODULE TRANSLATIONS =====
 
@@ -1025,3 +832,12 @@ MSG_EN[CONFIG_NEW_DEBUG_LIMIT]="New debug log limit set to"
 MSG_EN[CONFIG_VALIDATION_DEBUG_LIMIT]="Please enter a valid number (0 or greater)"
 MSG_EN[BTRFS_DEBUG_LOG_LIMITED]="Debug logging limited to %d entries (found %d candidates)"
 MSG_EN[BTRFS_DEBUG_LOG_REMAINING]="... and %d more (limited by debug log settings)"
+
+# Source snapshot preservation
+MSG_EN[BACKUP_SOURCE_SNAPSHOT_PRESERVATION_PROMPT]="Source Snapshot Preservation"
+MSG_EN[BACKUP_SOURCE_SNAPSHOT_EXPLANATION]="Source snapshots can be preserved after backup for manual inspection or restore."
+MSG_EN[BACKUP_SOURCE_SNAPSHOT_LOCATION]="Permanent storage location"
+MSG_EN[BACKUP_KEEP_SOURCE_SNAPSHOTS]="Keep source snapshots after backup?"
+
+# Missing BTRFS cleanup key
+MSG_EN[BTRFS_CLEANUP_DELETED]="Snapshots successfully deleted"

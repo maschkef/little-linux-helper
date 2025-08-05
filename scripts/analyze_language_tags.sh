@@ -160,80 +160,56 @@ load_language_file_keys() {
     done < "$lang_file"
 }
 
+# Global associative arrays to store all language keys and their sources
+declare -gA all_language_keys=()
+declare -gA key_sources=()
+
 # Load all available keys from all language files for a language
 load_all_language_keys() {
     local lang="$1"
     local lang_dir="$PROJECT_ROOT/lang/$lang"
     
-    # Declare associative arrays for each language file
-    declare -gA common_keys=()
-    declare -gA lib_keys=()
-    declare -gA backup_keys=()
-    declare -gA disk_keys=()
-    declare -gA docker_keys=()
-    declare -gA logs_keys=()
-    declare -gA packages_keys=()
-    declare -gA restarts_keys=()
-    declare -gA security_keys=()
-    declare -gA system_info_keys=()
-    declare -gA main_menu_keys=()
-    declare -gA docker_setup_keys=()
+    # Clear the global arrays
+    all_language_keys=()
+    key_sources=()
     
-    # Load keys from each language file if it exists
-    [[ -f "$lang_dir/common.sh" ]] && load_language_file_keys "$lang_dir/common.sh" common_keys
-    [[ -f "$lang_dir/lib.sh" ]] && load_language_file_keys "$lang_dir/lib.sh" lib_keys
-    [[ -f "$lang_dir/backup.sh" ]] && load_language_file_keys "$lang_dir/backup.sh" backup_keys
-    [[ -f "$lang_dir/disk.sh" ]] && load_language_file_keys "$lang_dir/disk.sh" disk_keys
-    [[ -f "$lang_dir/docker.sh" ]] && load_language_file_keys "$lang_dir/docker.sh" docker_keys
-    [[ -f "$lang_dir/logs.sh" ]] && load_language_file_keys "$lang_dir/logs.sh" logs_keys
-    [[ -f "$lang_dir/packages.sh" ]] && load_language_file_keys "$lang_dir/packages.sh" packages_keys
-    [[ -f "$lang_dir/restarts.sh" ]] && load_language_file_keys "$lang_dir/restarts.sh" restarts_keys
-    [[ -f "$lang_dir/security.sh" ]] && load_language_file_keys "$lang_dir/security.sh" security_keys
-    [[ -f "$lang_dir/system_info.sh" ]] && load_language_file_keys "$lang_dir/system_info.sh" system_info_keys
-    [[ -f "$lang_dir/main_menu.sh" ]] && load_language_file_keys "$lang_dir/main_menu.sh" main_menu_keys
-    [[ -f "$lang_dir/docker_setup.sh" ]] && load_language_file_keys "$lang_dir/docker_setup.sh" docker_setup_keys
+    # Dynamically discover and load all .sh files in the language directory
+    for lang_file in "$lang_dir"/*.sh; do
+        [[ -f "$lang_file" ]] || continue
+        
+        local filename="$(basename "$lang_file")"
+        echo -e "${COLOR_INFO}Loading language keys from $filename...${COLOR_RESET}"
+        
+        # Create a temporary array for this file's keys
+        declare -A temp_keys=()
+        load_language_file_keys "$lang_file" temp_keys
+        
+        # Add keys to global array and track their source
+        for key in "${!temp_keys[@]}"; do
+            all_language_keys["$key"]=1
+            key_sources["$key"]="$filename"
+        done
+    done
 }
 
-# Check if a key exists in any of the language file arrays
+# Check if a key exists in the global language keys array
 key_exists_in_language() {
     local key="$1"
     
-    # Check each array for the key
-    [[ ${common_keys["$key"]+_} ]] && return 0
-    [[ ${lib_keys["$key"]+_} ]] && return 0
-    [[ ${backup_keys["$key"]+_} ]] && return 0
-    [[ ${disk_keys["$key"]+_} ]] && return 0
-    [[ ${docker_keys["$key"]+_} ]] && return 0
-    [[ ${logs_keys["$key"]+_} ]] && return 0
-    [[ ${packages_keys["$key"]+_} ]] && return 0
-    [[ ${restarts_keys["$key"]+_} ]] && return 0
-    [[ ${security_keys["$key"]+_} ]] && return 0
-    [[ ${system_info_keys["$key"]+_} ]] && return 0
-    [[ ${main_menu_keys["$key"]+_} ]] && return 0
-    [[ ${docker_setup_keys["$key"]+_} ]] && return 0
+    # Check the global array for the key
+    [[ ${all_language_keys["$key"]+_} ]] && return 0
     
     return 1
 }
 
 # Find which language file(s) contain a specific key
+# Find which language file contains a specific key
 find_key_location() {
     local key="$1"
-    local locations=()
     
-    [[ ${common_keys["$key"]+_} ]] && locations+=("common.sh")
-    [[ ${lib_keys["$key"]+_} ]] && locations+=("lib.sh")
-    [[ ${backup_keys["$key"]+_} ]] && locations+=("backup.sh")
-    [[ ${disk_keys["$key"]+_} ]] && locations+=("disk.sh")
-    [[ ${docker_keys["$key"]+_} ]] && locations+=("docker.sh")
-    [[ ${logs_keys["$key"]+_} ]] && locations+=("logs.sh")
-    [[ ${packages_keys["$key"]+_} ]] && locations+=("packages.sh")
-    [[ ${restarts_keys["$key"]+_} ]] && locations+=("restarts.sh")
-    [[ ${security_keys["$key"]+_} ]] && locations+=("security.sh")
-    [[ ${system_info_keys["$key"]+_} ]] && locations+=("system_info.sh")
-    [[ ${main_menu_keys["$key"]+_} ]] && locations+=("main_menu.sh")
-    [[ ${docker_setup_keys["$key"]+_} ]] && locations+=("docker_setup.sh")
-    
-    printf "%s\n" "${locations[@]}"
+    if [[ ${key_sources["$key"]+_} ]]; then
+        echo "${key_sources["$key"]}"
+    fi
 }
 
 # Analyze a single module file

@@ -20,7 +20,8 @@ CFG_LH_BACKUP_DIR="/backups"
 # CFG_LH_TEMP_SNAPSHOT_DIR:
 # An absolute path to a temporary directory used for BTRFS snapshots during the backup process.
 # This directory should be on a BTRFS volume, ideally on the system itself if possible.
-CFG_LH_TEMP_SNAPSHOT_DIR="/.snapshots_backup"
+# IMPORTANT: Do NOT use Snapper (.snapshots) or Timeshift directories to avoid conflicts.
+CFG_LH_TEMP_SNAPSHOT_DIR="/.snapshots_lh_temp"
 
 # CFG_LH_RETENTION_BACKUP:
 # The number of backup versions to keep (e.g., 10 means the 10 newest backups will be retained).
@@ -42,3 +43,15 @@ CFG_LH_TAR_EXCLUDES=""
 # This only affects log verbosity, not backup functionality.
 # Recommended: 10-20 for normal use, 0 for debugging issues.
 CFG_LH_DEBUG_LOG_LIMIT="10"
+
+# CFG_LH_KEEP_SOURCE_SNAPSHOTS:
+# Controls whether source snapshots created by this script should be preserved after backup.
+# Values: "prompt" (ask user during backup), "true" (always keep), "false" (always delete)
+# When kept, snapshots are stored in CFG_LH_SOURCE_SNAPSHOT_DIR to avoid conflicts with other tools.
+CFG_LH_KEEP_SOURCE_SNAPSHOTS="prompt"
+
+# CFG_LH_SOURCE_SNAPSHOT_DIR:
+# Directory for permanent source snapshots when CFG_LH_KEEP_SOURCE_SNAPSHOTS is enabled.
+# This avoids conflicts with Snapper (/.snapshots) and Timeshift directories.
+# Script-created snapshots are marked with metadata for identification and cleanup.
+CFG_LH_SOURCE_SNAPSHOT_DIR="/.snapshots_lh"

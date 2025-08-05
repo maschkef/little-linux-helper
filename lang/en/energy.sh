@@ -162,3 +162,10 @@ MSG_EN[ENERGY_QUICK_ACTIONS_TITLE]="Quick Actions:"
 MSG_EN[ENERGY_QUICK_ACTION_RESTORE]="Restore sleep functionality (stop energy inhibit)"
 MSG_EN[ENERGY_QUICK_ACTION_RETURN]="Return to energy menu"
 MSG_EN[ENERGY_QUICK_CHOOSE_ACTION]="Choose action (r/Enter):"
+
+# Additional missing keys from analysis
+MSG_EN[ENERGY_LOG_SLEEP_DISABLED]="Sleep disabled successfully"
+MSG_EN[ENERGY_LOG_SLEEP_DISABLED_TIME]="Sleep disabled for %s minutes"
+MSG_EN[ENERGY_LOG_SLEEP_DISABLED_PID]="Sleep disabled with inhibit process PID: %s"
+MSG_EN[ENERGY_LOG_SLEEP_DISABLED_TIME_PID]="Sleep disabled for %s with inhibit process PID: %s"
+MSG_EN[ENERGY_STATUS_OUR_INHIBIT_NONE]="No Little Linux Helper sleep inhibit found."

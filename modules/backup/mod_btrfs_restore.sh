@@ -413,7 +413,7 @@ setup_restore_environment() {
     restore_log_msg "INFO" "Target system configured: $TARGET_ROOT"
     
     # Step 3: Set up temporary snapshot directory
-    TEMP_SNAPSHOT_DIR="${TARGET_ROOT}/.snapshots_recovery"
+    TEMP_SNAPSHOT_DIR="${TARGET_ROOT}${LH_TEMP_SNAPSHOT_DIR}_recovery"
     restore_log_msg "INFO" "Temporary snapshot directory: $TEMP_SNAPSHOT_DIR"
     
     # Step 4: Configure operation mode
@@ -481,19 +481,20 @@ create_manual_checkpoint() {
     restore_log_msg "INFO" "Manual checkpoint: $context_msg"
 }
 
-# Handle child snapshots (like Snapper, Timeshift) before subvolume operations
+# Handle child snapshots (legacy external snapshot tools) before subvolume operations
 handle_child_snapshots() {
     local parent_path="$1"
     local parent_name="$2"
     
     restore_log_msg "DEBUG" "Checking for child snapshots in: $parent_path"
     
-    # Search for common snapshot directories within the subvolume
+    # Search for script-created snapshot directories within the subvolume
     local -a child_snapshot_dirs=()
+    
+    # Look for script-created snapshots from little-linux-helper backup system
     local search_patterns=(
-        "${parent_path}/.snapshots"
-        "${parent_path}/.timeshift"
-        "${parent_path}/snapshots"
+        "${parent_path}${LH_SOURCE_SNAPSHOT_DIR}"
+        "${parent_path}${LH_TEMP_SNAPSHOT_DIR}"
     )
     
     for pattern in "${search_patterns[@]}"; do
@@ -502,10 +503,10 @@ handle_child_snapshots() {
         fi
     done
     
-    # Also search for snapshot subdirectories up to 3 levels deep
+    # Also search for any remaining legacy snapshot directories (limited search)
     while IFS= read -r -d '' snapshot_dir; do
         child_snapshot_dirs+=("$snapshot_dir")
-    done < <(find "$parent_path" -maxdepth 3 -type d -name ".snapshots" -print0 2>/dev/null)
+    done < <(find "$parent_path" -maxdepth 2 -type d \( -name ".snapshots" -o -name "snapshots" \) -print0 2>/dev/null)
     
     if [[ ${#child_snapshot_dirs[@]} -eq 0 ]]; then
         restore_log_msg "DEBUG" "No child snapshots found in $parent_name"
@@ -898,7 +899,7 @@ perform_subvolume_restore() {
 # List available snapshots for a given subvolume
 list_available_snapshots() {
     local subvolume="$1"  # e.g., "@" or "@home"
-    local backup_path="${BACKUP_ROOT}/${LH_BACKUP_DIR}/snapshots"
+    local backup_path="${BACKUP_ROOT}${LH_BACKUP_DIR}/${subvolume}"
     
     restore_log_msg "DEBUG" "Listing snapshots for $subvolume in $backup_path"
     
@@ -907,21 +908,9 @@ list_available_snapshots() {
         return 1
     fi
     
-    # Find snapshots matching the subvolume pattern
+    # Find snapshots matching the script-created pattern: subvolume-YYYY-MM-DD_HH-MM-SS
     local -a snapshots=()
-    local pattern
-    
-    case "$subvolume" in
-        "@")
-            pattern="*root*"
-            ;;
-        "@home")
-            pattern="*home*"
-            ;;
-        *)
-            pattern="*${subvolume}*"
-            ;;
-    esac
+    local pattern="${subvolume}-20*"  # Matches @-2025-08-05_21-13-12 format
     
     while IFS= read -r -d '' snapshot; do
         snapshots+=("$snapshot")

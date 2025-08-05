@@ -22,11 +22,13 @@ LH_DOCKER_CONFIG_FILE="$LH_CONFIG_DIR/docker.conf"
 # Default backup configuration (overridden by lh_load_backup_config if configuration file exists)
 LH_BACKUP_ROOT_DEFAULT="/run/media/tux/hdd_3tb/"
 LH_BACKUP_DIR_DEFAULT="/backups" # Relative to LH_BACKUP_ROOT
-LH_TEMP_SNAPSHOT_DIR_DEFAULT="/.snapshots_backup" # Absolute path
+LH_TEMP_SNAPSHOT_DIR_DEFAULT="/.snapshots_lh_temp" # Absolute path - script-controlled, not Snapper
 LH_RETENTION_BACKUP_DEFAULT=10
 LH_BACKUP_LOG_BASENAME_DEFAULT="backup.log" # Base name for the backup log file
 LH_TAR_EXCLUDES_DEFAULT="" # Default TAR exclusions
 LH_DEBUG_LOG_LIMIT_DEFAULT=10 # Maximum number of backup candidates to show in debug logs (0 = unlimited, only affects verbose backup listing)
+LH_KEEP_SOURCE_SNAPSHOTS_DEFAULT="prompt" # Source snapshot preservation: "prompt", "true", "false"
+LH_SOURCE_SNAPSHOT_DIR_DEFAULT="/.snapshots_lh" # Directory for permanent source snapshots
 
 # Default Docker configuration values
 LH_DOCKER_COMPOSE_ROOT_DEFAULT="/opt/containers"
@@ -47,6 +49,8 @@ LH_BACKUP_LOG_BASENAME="" # The configured base name for the backup log file
 LH_BACKUP_LOG="${LH_BACKUP_LOG:-}"          # Full path to the backup log file (with timestamp)
 LH_TAR_EXCLUDES="" # Active TAR exclusions
 LH_DEBUG_LOG_LIMIT="" # Maximum number of backup candidates to show in debug logs per backup session
+LH_KEEP_SOURCE_SNAPSHOTS="" # Source snapshot preservation setting
+LH_SOURCE_SNAPSHOT_DIR="" # Directory for permanent source snapshots
 
 # Active Docker configuration variables
 LH_DOCKER_COMPOSE_ROOT_EFFECTIVE=""
@@ -78,6 +82,8 @@ function lh_load_backup_config() {
     LH_BACKUP_LOG_BASENAME="$LH_BACKUP_LOG_BASENAME_DEFAULT"
     LH_TAR_EXCLUDES="$LH_TAR_EXCLUDES_DEFAULT"
     LH_DEBUG_LOG_LIMIT="$LH_DEBUG_LOG_LIMIT_DEFAULT"
+    LH_KEEP_SOURCE_SNAPSHOTS="$LH_KEEP_SOURCE_SNAPSHOTS_DEFAULT"
+    LH_SOURCE_SNAPSHOT_DIR="$LH_SOURCE_SNAPSHOT_DIR_DEFAULT"
 
     if [ -f "$LH_BACKUP_CONFIG_FILE" ]; then
         # Use English fallback before translation system is loaded
@@ -108,6 +114,12 @@ function lh_load_backup_config() {
         
         LH_DEBUG_LOG_LIMIT="${CFG_LH_DEBUG_LOG_LIMIT:-$LH_DEBUG_LOG_LIMIT_DEFAULT}"
         [ -z "$LH_DEBUG_LOG_LIMIT" ] && LH_DEBUG_LOG_LIMIT="$LH_DEBUG_LOG_LIMIT_DEFAULT"
+        
+        LH_KEEP_SOURCE_SNAPSHOTS="${CFG_LH_KEEP_SOURCE_SNAPSHOTS:-$LH_KEEP_SOURCE_SNAPSHOTS_DEFAULT}"
+        [ -z "$LH_KEEP_SOURCE_SNAPSHOTS" ] && LH_KEEP_SOURCE_SNAPSHOTS="$LH_KEEP_SOURCE_SNAPSHOTS_DEFAULT"
+        
+        LH_SOURCE_SNAPSHOT_DIR="${CFG_LH_SOURCE_SNAPSHOT_DIR:-$LH_SOURCE_SNAPSHOT_DIR_DEFAULT}"
+        [ -z "$LH_SOURCE_SNAPSHOT_DIR" ] && LH_SOURCE_SNAPSHOT_DIR="$LH_SOURCE_SNAPSHOT_DIR_DEFAULT"
     else
         # Use English fallback before translation system is loaded
         local msg="${MSG[LIB_BACKUP_CONFIG_NOT_FOUND]:-No backup configuration file (%s) found. Using internal default values.}"
@@ -155,6 +167,14 @@ function lh_save_backup_config() {
     
     if [ -n "$LH_DEBUG_LOG_LIMIT" ]; then
         echo "CFG_LH_DEBUG_LOG_LIMIT=\"$LH_DEBUG_LOG_LIMIT\"" >> "$LH_BACKUP_CONFIG_FILE"
+    fi
+    
+    if [ -n "$LH_KEEP_SOURCE_SNAPSHOTS" ]; then
+        echo "CFG_LH_KEEP_SOURCE_SNAPSHOTS=\"$LH_KEEP_SOURCE_SNAPSHOTS\"" >> "$LH_BACKUP_CONFIG_FILE"
+    fi
+    
+    if [ -n "$LH_SOURCE_SNAPSHOT_DIR" ]; then
+        echo "CFG_LH_SOURCE_SNAPSHOT_DIR=\"$LH_SOURCE_SNAPSHOT_DIR\"" >> "$LH_BACKUP_CONFIG_FILE"
     fi
     
     # Use English fallback before translation system is loaded

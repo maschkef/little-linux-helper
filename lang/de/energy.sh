@@ -156,3 +156,16 @@ MSG_DE[ENERGY_LOG_SETTING_BRIGHTNESS]="Setze Bildschirmhelligkeit auf %s%%"
 MSG_DE[ENERGY_LOG_BRIGHTNESS_SET_SUCCESS]="Bildschirmhelligkeit erfolgreich auf %s%% gesetzt"
 MSG_DE[ENERGY_LOG_BRIGHTNESS_SET_FAILED]="Fehler beim Setzen der Bildschirmhelligkeit auf %s%%"
 MSG_DE[ENERGY_LOG_MODULE_EXIT]="Verlasse Energieverwaltungsmodul"
+
+# Quick Actions
+MSG_DE[ENERGY_QUICK_ACTIONS_TITLE]="Schnellaktionen:"
+MSG_DE[ENERGY_QUICK_ACTION_RESTORE]="Standby-Funktionalität wiederherstellen (Energie-Inhibit stoppen)"
+MSG_DE[ENERGY_QUICK_ACTION_RETURN]="Zurück zum Energiemenü"
+MSG_DE[ENERGY_QUICK_CHOOSE_ACTION]="Aktion wählen (r/Enter):"
+
+# Additional missing keys from analysis
+MSG_DE[ENERGY_LOG_SLEEP_DISABLED]="Standby erfolgreich deaktiviert"
+MSG_DE[ENERGY_LOG_SLEEP_DISABLED_TIME]="Standby für %s Minuten deaktiviert"
+MSG_DE[ENERGY_LOG_SLEEP_DISABLED_PID]="Standby deaktiviert mit Inhibit-Prozess PID: %s"
+MSG_DE[ENERGY_LOG_SLEEP_DISABLED_TIME_PID]="Standby für %s deaktiviert mit Inhibit-Prozess PID: %s"
+MSG_DE[ENERGY_STATUS_OUR_INHIBIT_NONE]="Keine Little Linux Helper Standby-Sperre gefunden."
