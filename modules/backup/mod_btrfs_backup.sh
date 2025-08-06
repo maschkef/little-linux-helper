@@ -1517,24 +1517,34 @@ btrfs_backup() {
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_TARGET_DIR')${LH_COLOR_RESET} $LH_BACKUP_ROOT$LH_BACKUP_DIR"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_BACKED_DIRS')${LH_COLOR_RESET} ${subvolumes[*]}"
 
-    # Estimated total size of created snapshots (can vary with BTRFS)
-    # Use timeout to prevent long delays on large backup directories
-    backup_log_msg "DEBUG" "Calculating backup directory size with timeout"
-    local total_btrfs_size
-    if command -v timeout >/dev/null 2>&1; then
-        total_btrfs_size=$(timeout 10s du -sh "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | cut -f1 || echo "calculating...")
-        if [ "$total_btrfs_size" = "calculating..." ]; then
-            backup_log_msg "DEBUG" "Size calculation timed out after 10 seconds, using filesystem stats"
-            # Fallback: Use df to get used space on the backup device (much faster)
-            total_btrfs_size=$(df -h "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | tail -1 | awk '{print $3}' || echo "?")
-            total_btrfs_size="${total_btrfs_size} (used on device)"
+    # Calculate size of snapshots created in this backup session from marker files
+    backup_log_msg "DEBUG" "Reading backup sizes from marker files created during this session"
+    local total_session_size=0
+    local total_session_size_human=""
+    
+    for subvol in "${subvolumes[@]}"; do
+        local snapshot_path="$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol/$subvol-$timestamp"
+        local marker_file="${snapshot_path}.backup_complete"
+        
+        if [ -f "$marker_file" ]; then
+            # Get size from marker file (already calculated during backup)
+            local size_bytes=$(grep "^BACKUP_SIZE=" "$marker_file" 2>/dev/null | cut -d'=' -f2)
+            if [[ "$size_bytes" =~ ^[0-9]+$ ]]; then
+                total_session_size=$((total_session_size + size_bytes))
+                backup_log_msg "DEBUG" "Snapshot $subvol-$timestamp: $size_bytes bytes (from marker)"
+            fi
+        else
+            backup_log_msg "DEBUG" "Marker file not found: $marker_file"
         fi
+    done
+    
+    # Convert to human readable format using the existing function
+    if [ "$total_session_size" -gt 0 ]; then
+        total_session_size_human=$(bytes_to_human_readable "$total_session_size")
     else
-        backup_log_msg "DEBUG" "timeout command not available, using quick df fallback"
-        total_btrfs_size=$(df -h "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | tail -1 | awk '{print $3}' || echo "?")
-        total_btrfs_size="${total_btrfs_size} (used on device)"
+        total_session_size_human="0B"
     fi
-    echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_SIZE')${LH_COLOR_RESET} $total_btrfs_size"
+    echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_SIZE')${LH_COLOR_RESET} $total_session_size_human"
 
     # Calculate duration
     local duration=$((end_time - BACKUP_START_TIME))
@@ -2013,16 +2023,8 @@ delete_btrfs_backups() {
         local snapshots_to_delete=()
         
         while [ "$show_menu" = true ]; do
-            if [ -z "$delete_choice" ] || [ "$delete_choice" = "s" ] || [ "$delete_choice" = "S" ]; then
-                if [ "$delete_choice" = "s" ] || [ "$delete_choice" = "S" ]; then
-                    echo ""
-                    echo -e "${LH_COLOR_INFO}Reading sizes from backup metadata...${LH_COLOR_RESET}"
-                    list_snapshots_with_integrity "$subvol" "true"
-                else
-                    list_snapshots_with_integrity "$subvol"
-                    echo ""
-                    echo -e "${LH_COLOR_INFO}Note: Sizes hidden for faster listing. Use option 's' to show sizes (fast, from backup metadata).${LH_COLOR_RESET}"
-                fi
+            if [ -z "$delete_choice" ]; then
+                list_snapshots_with_integrity "$subvol"
                 
                 echo ""
                 echo -e "${LH_COLOR_PROMPT}$(lh_msg 'BTRFS_DELETE_OPTIONS' "$subvol")${LH_COLOR_RESET}"
@@ -2030,17 +2032,12 @@ delete_btrfs_backups() {
                 echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BTRFS_DELETE_OPTION_AUTO')${LH_COLOR_RESET}"
                 echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BTRFS_DELETE_OPTION_OLDER')${LH_COLOR_RESET}"
                 echo -e "  ${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BTRFS_DELETE_OPTION_ALL')${LH_COLOR_RESET}"
-                echo -e "  ${LH_COLOR_MENU_NUMBER}s.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}Show sizes (from metadata)${LH_COLOR_RESET}"
                 echo -e "  ${LH_COLOR_MENU_NUMBER}0.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BTRFS_DELETE_OPTION_SKIP')${LH_COLOR_RESET}"
                 
                 read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" delete_choice
             fi
             
             case $delete_choice in
-                s|S)
-                    # Continue loop to show sizes
-                    continue
-                    ;;
                 0)
                     show_menu=false
                     continue
@@ -2775,7 +2772,7 @@ get_snapshot_size_from_marker() {
 # Enhanced snapshot listing with integrity checking
 list_snapshots_with_integrity() {
     local subvol="$1"
-    local show_sizes="${2:-false}"  # Optional: true to calculate sizes, false for fast mode
+    local show_sizes="${2:-true}" # Default to true if not specified since it uses the marker files now
     local snapshot_dir="$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol"
     
     if [ ! -d "$snapshot_dir" ]; then
@@ -2952,12 +2949,46 @@ show_backup_status() {
             echo -e "${LH_COLOR_INFO}$(lh_msg 'STATUS_RSYNC_NEWEST')${LH_COLOR_RESET} $(basename "$newest_rsync")"
         fi
         
-        # Total backup size
+        # Total backup size from marker files
         echo ""
         echo -e "${LH_COLOR_HEADER}$(lh_msg 'BACKUP_STATUS_BACKUP_SIZES')${LH_COLOR_RESET}"
         if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
-            local total_size=$(du -sh "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | cut -f1)
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_STATUS_TOTAL_SIZE')${LH_COLOR_RESET} $total_size"
+            backup_log_msg "DEBUG" "Calculating backup sizes from marker files"
+            local total_size_bytes=0
+            local backup_count=0
+            
+            # Calculate size from BTRFS backup marker files
+            for subvol in @ @home; do
+                if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" ]; then
+                    local subvol_size_bytes=0
+                    local subvol_count=0
+                    
+                    # Find all marker files for this subvolume
+                    while IFS= read -r -d '' marker_file; do
+                        local size_bytes=$(grep "^BACKUP_SIZE=" "$marker_file" 2>/dev/null | cut -d'=' -f2)
+                        if [[ "$size_bytes" =~ ^[0-9]+$ ]]; then
+                            subvol_size_bytes=$((subvol_size_bytes + size_bytes))
+                            subvol_count=$((subvol_count + 1))
+                        fi
+                    done < <(find "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" -name "*.backup_complete" -print0 2>/dev/null)
+                    
+                    total_size_bytes=$((total_size_bytes + subvol_size_bytes))
+                    backup_count=$((backup_count + subvol_count))
+                    
+                    if [ $subvol_count -gt 0 ]; then
+                        local subvol_size_human=$(bytes_to_human_readable "$subvol_size_bytes")
+                        echo -e "  ${LH_COLOR_INFO}$subvol:${LH_COLOR_RESET} $subvol_size_human ($subvol_count backups)"
+                    fi
+                fi
+            done
+            
+            # Show total
+            if [ $backup_count -gt 0 ]; then
+                local total_size_human=$(bytes_to_human_readable "$total_size_bytes")
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_STATUS_TOTAL_SIZE')${LH_COLOR_RESET} $total_size_human ($backup_count total backups)"
+            else
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_STATUS_TOTAL_SIZE')${LH_COLOR_RESET} No backup sizes available (missing marker files)"
+            fi
         fi
     else
         echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_STATUS_NO_BACKUPS')${LH_COLOR_RESET}"
