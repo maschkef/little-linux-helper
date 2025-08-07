@@ -104,6 +104,253 @@ init_restore_log() {
     fi
 }
 
+# Enhanced BTRFS-specific error handling for restore operations
+handle_restore_btrfs_error() {
+    local exit_code="$1"
+    local operation_context="$2"
+    local additional_info="${3:-}"
+    local stderr_output="${4:-}"
+    
+    restore_log_msg "ERROR" "BTRFS error in $operation_context: exit code $exit_code"
+    
+    # Pattern-based error analysis for better debugging
+    local error_pattern_found="false"
+    
+    # Pattern 1: "cannot find parent subvolume" - Most critical for restore operations
+    if echo "$additional_info$stderr_output" | grep -qi "cannot find parent subvolume"; then
+        error_pattern_found="true"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_PARENT_SNAPSHOT_MISSING')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_PARENT_MISSING_CAUSE')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_ERROR_PARENT_MISSING_SOLUTION')${LH_COLOR_RESET}"
+        
+        restore_log_msg "ERROR" "Pattern: cannot find parent subvolume"
+        restore_log_msg "INFO" "Recommended action: Fallback to full send (without -p option)"
+        
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_RECOVERY_STEPS'):${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}1. $(lh_msg 'RESTORE_ERROR_LIST_SNAPSHOTS' "${TARGET_ROOT:-/mnt/target}")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}2. $(lh_msg 'RESTORE_ERROR_RETRY_FULL_TRANSFER')${LH_COLOR_RESET}"
+        return 0
+    fi
+    
+    # Pattern 2: "No space left on device" - BTRFS metadata exhaustion detection
+    if echo "$additional_info$stderr_output" | grep -qi "no space left on device"; then
+        error_pattern_found="true"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_SPACE_EXHAUSTION')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_SPACE_EXHAUSTION_CAUSE')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_ERROR_SPACE_EXHAUSTION_CRITICAL')${LH_COLOR_RESET}"
+        
+        restore_log_msg "ERROR" "Pattern: No space left on device"
+        restore_log_msg "INFO" "Recommended action: Manual btrfs balance operation"
+        
+        # Enhanced diagnosis
+        if [[ -n "$TARGET_ROOT" ]] && command -v btrfs >/dev/null 2>&1; then
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_FILESYSTEM_ANALYSIS'):${LH_COLOR_RESET}"
+            local fs_usage
+            fs_usage=$(btrfs filesystem usage "$TARGET_ROOT" 2>/dev/null || echo "Cannot analyze filesystem")
+            echo "$fs_usage"
+            restore_log_msg "INFO" "BTRFS filesystem usage: $fs_usage"
+            
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_ERROR_MANUAL_STEPS_REQUIRED'):${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}1. btrfs filesystem usage ${TARGET_ROOT}${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}2. btrfs balance start -m ${TARGET_ROOT}${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}3. $(lh_msg 'RESTORE_ERROR_RETRY_OPERATION')${LH_COLOR_RESET}"
+        fi
+        return 0
+    fi
+    
+    # Pattern 3: "Read-only file system" - Critical mount state detection
+    if echo "$additional_info$stderr_output" | grep -qi "read-only file system"; then
+        error_pattern_found="true"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_READONLY_FILESYSTEM')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_READONLY_CAUSE')${LH_COLOR_RESET}"
+        
+        restore_log_msg "ERROR" "Pattern: Read-only file system"
+        restore_log_msg "INFO" "Performing mount analysis for read-only cause"
+        
+        # Proactive diagnosis
+        if [[ -n "$TARGET_ROOT" ]]; then
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_MOUNT_ANALYSIS'):${LH_COLOR_RESET}"
+            local mount_info
+            mount_info=$(grep "$TARGET_ROOT" /proc/mounts 2>/dev/null | head -n1)
+            if [[ -n "$mount_info" ]]; then
+                echo "$mount_info"
+                restore_log_msg "INFO" "Mount info: $mount_info"
+                
+                if echo "$mount_info" | grep -q "ro"; then
+                    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_ERROR_REMOUNT_SOLUTION'):${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_REMOUNT_COMMAND' "${TARGET_ROOT}")${LH_COLOR_RESET}"
+                else
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_EMERGENCY_READONLY')${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_ERROR_CHECK_DMESG')${LH_COLOR_RESET}"
+                fi
+            fi
+        fi
+        return 0
+    fi
+    
+    # Pattern 4: "parent transid verify failed" - Critical corruption indicator
+    if echo "$additional_info$stderr_output" | grep -qi "parent transid verify failed"; then
+        error_pattern_found="true"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_METADATA_CORRUPTION')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_ERROR_CORRUPTION_CAUSE')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_ABORT_REQUIRED')${LH_COLOR_RESET}"
+        
+        restore_log_msg "ERROR" "Pattern: parent transid verify failed"
+        restore_log_msg "ERROR" "CRITICAL: Metadata corruption - manual intervention required"
+        
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_ERROR_MANUAL_RECOVERY_OPTIONS'):${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}1. $(lh_msg 'RESTORE_ERROR_CHECK_DMESG')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}2. $(lh_msg 'RESTORE_ERROR_TRY_USEBACKUPROOT')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}3. $(lh_msg 'RESTORE_ERROR_CONSIDER_BTRFS_CHECK')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}4. $(lh_msg 'RESTORE_ERROR_PROFESSIONAL_RECOVERY')${LH_COLOR_RESET}"
+        return 1  # Force abort
+    fi
+    
+    # Pattern 5: Destination not a mountpoint
+    if echo "$additional_info$stderr_output" | grep -qi "not a mountpoint\|destination.*not.*mount"; then
+        error_pattern_found="true"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_TARGET_NOT_MOUNTED')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_MOUNTPOINT_CAUSE')${LH_COLOR_RESET}"
+        
+        restore_log_msg "ERROR" "Pattern: destination not a mountpoint"
+        restore_log_msg "INFO" "Performing mountpoint verification"
+        
+        # Proactive verification
+        if [[ -n "$TARGET_ROOT" ]]; then
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_MOUNTPOINT_VERIFICATION'):${LH_COLOR_RESET}"
+            if mountpoint -q "$TARGET_ROOT" 2>/dev/null; then
+                echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_ERROR_MOUNTPOINT_VALID' "${TARGET_ROOT}")${LH_COLOR_RESET}"
+            else
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_MOUNTPOINT_INVALID' "${TARGET_ROOT}")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_MOUNT_FILESYSTEM_SOLUTION' "${TARGET_ROOT}")${LH_COLOR_RESET}"
+            fi
+        fi
+        return 0
+    fi
+    
+    # Pattern 6: Permission denied
+    if echo "$additional_info$stderr_output" | grep -qi "permission denied\|operation not permitted"; then
+        error_pattern_found="true"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_INSUFFICIENT_PERMISSIONS')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_PERMISSIONS_CAUSE')${LH_COLOR_RESET}"
+        
+        restore_log_msg "ERROR" "Pattern: permission denied"
+        restore_log_msg "INFO" "Verifying effective user permissions"
+        
+        # Permission verification
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_PERMISSION_CHECK'):${LH_COLOR_RESET}"
+        local current_user
+        current_user=$(whoami 2>/dev/null || echo "unknown")
+        local effective_uid
+        effective_uid=$(id -u 2>/dev/null || echo "unknown")
+        
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_CURRENT_USER' "$current_user" "$effective_uid")${LH_COLOR_RESET}"
+        
+        if [[ "$effective_uid" != "0" ]]; then
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_RUN_AS_ROOT')${LH_COLOR_RESET}"
+        else
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_ERROR_ROOT_STILL_DENIED')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_CHECK_FILESYSTEM_SUPPORT')${LH_COLOR_RESET}"
+        fi
+        return 0
+    fi
+    
+    # Use library function for standard BTRFS error handling if no pattern matched
+    if [[ "$error_pattern_found" == "false" ]]; then
+        if handle_btrfs_error "$exit_code" "$operation_context"; then
+            restore_log_msg "DEBUG" "Standard BTRFS error handler provided solution"
+            return 0
+        fi
+    fi
+    
+    # Enhanced restore-specific error handling
+    case $exit_code in
+        1)
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_GENERAL' "$operation_context")${LH_COLOR_RESET}"
+            restore_log_msg "ERROR" "General BTRFS operation failed: $operation_context"
+            
+            if [[ "$operation_context" =~ "send/receive" ]]; then
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_SEND_RECEIVE_SUGGESTIONS')${LH_COLOR_RESET}"
+                restore_log_msg "INFO" "Possible causes: network interruption, permission issues, or corrupted snapshot"
+                
+                # Check for common send/receive issues
+                if [[ -n "$additional_info" ]]; then
+                    if echo "$additional_info" | grep -q "No such file or directory"; then
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_SNAPSHOT_MISSING')${LH_COLOR_RESET}"
+                    elif echo "$additional_info" | grep -q "Permission denied"; then
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_PERMISSION_DENIED')${LH_COLOR_RESET}"
+                    elif echo "$additional_info" | grep -q "cannot find parent subvolume"; then
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_PARENT_MISSING')${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_PARENT_MISSING_SOLUTION')${LH_COLOR_RESET}"
+                    fi
+                fi
+            fi
+            ;;
+        2)
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_PARENT_VALIDATION')${LH_COLOR_RESET}"
+            restore_log_msg "ERROR" "Parent snapshot validation failed in $operation_context"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_PARENT_SUGGESTIONS')${LH_COLOR_RESET}"
+            ;;
+        3)
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_SPACE_EXHAUSTED')${LH_COLOR_RESET}"
+            restore_log_msg "ERROR" "Space exhaustion during $operation_context"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_SPACE_SOLUTIONS')${LH_COLOR_RESET}"
+            
+            # Provide specific space-related guidance
+            echo -e "${LH_COLOR_INFO}• $(lh_msg 'RESTORE_ERROR_SPACE_CLEANUP')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}• $(lh_msg 'RESTORE_ERROR_SPACE_BALANCE')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}• $(lh_msg 'RESTORE_ERROR_SPACE_EXTEND')${LH_COLOR_RESET}"
+            ;;
+        4)
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_CORRUPTION_DETECTED')${LH_COLOR_RESET}"
+            restore_log_msg "ERROR" "Filesystem corruption detected during $operation_context"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_ERROR_CORRUPTION_WARNING')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_CORRUPTION_RECOMMENDATIONS')${LH_COLOR_RESET}"
+            
+            # Check for specific corruption indicators
+            if [[ -n "$additional_info" ]]; then
+                if echo "$additional_info" | grep -q "parent transid verify failed"; then
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_TRANSID_FAILURE')${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_TRANSID_SOLUTION')${LH_COLOR_RESET}"
+                fi
+            fi
+            ;;
+        5)
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_READONLY_FILESYSTEM')${LH_COLOR_RESET}"
+            restore_log_msg "ERROR" "Read-only filesystem error during $operation_context"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_READONLY_SOLUTIONS')${LH_COLOR_RESET}"
+            ;;
+        28)  # ENOSPC - No space left on device
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_NO_SPACE_DEVICE')${LH_COLOR_RESET}"
+            restore_log_msg "ERROR" "No space left on device during $operation_context"
+            
+            # Enhanced space diagnosis
+            if command -v btrfs >/dev/null 2>&1 && [[ -n "$TARGET_ROOT" ]]; then
+                local filesystem_usage
+                filesystem_usage=$(btrfs filesystem usage "$TARGET_ROOT" 2>/dev/null || echo "Cannot get filesystem usage")
+                restore_log_msg "INFO" "BTRFS filesystem usage: $filesystem_usage"
+            fi
+            ;;
+        *)
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR_UNKNOWN' "$exit_code" "$operation_context")${LH_COLOR_RESET}"
+            restore_log_msg "ERROR" "Unknown error code $exit_code in $operation_context"
+            
+            # Log additional context if available
+            if [[ -n "$additional_info" ]]; then
+                restore_log_msg "ERROR" "Additional error info: $additional_info"
+            fi
+            ;;
+    esac
+    
+    # Provide general recovery suggestions
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ERROR_GENERAL_RECOVERY_STEPS')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}1. $(lh_msg 'RESTORE_ERROR_CHECK_LOGS')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}2. $(lh_msg 'RESTORE_ERROR_VERIFY_BACKUP_INTEGRITY')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}3. $(lh_msg 'RESTORE_ERROR_CHECK_TARGET_HEALTH')${LH_COLOR_RESET}"
+    
+    return 1
+}
+
 # Enhanced logging function for restore operations
 restore_log_msg() {
     local level="$1"
@@ -200,10 +447,11 @@ validate_filesystem_health() {
     esac
 }
 
-# Check space availability using BTRFS library function
+# Enhanced space availability check for atomic restore workflow
 check_restore_space() {
     local target_filesystem="$1"
     local operation_name="$2"
+    local estimated_snapshot_size="$3"  # Optional: estimated size of snapshot being restored
     
     restore_log_msg "DEBUG" "Checking BTRFS space for $operation_name: $target_filesystem"
     
@@ -216,13 +464,29 @@ check_restore_space() {
         0)
             restore_log_msg "DEBUG" "BTRFS space check passed for: $target_filesystem"
             
-            # Get available space for informational purposes using library function
+            # Get available space for atomic workflow validation
             local available_bytes
             available_bytes=$(get_btrfs_available_space "$target_filesystem" 2>/dev/null)
             if [[ -n "$available_bytes" && "$available_bytes" =~ ^[0-9]+$ ]]; then
                 local available_gb=$((available_bytes / 1024 / 1024 / 1024))
                 restore_log_msg "INFO" "Available space: ${available_gb}GB"
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_AVAILABLE_SPACE' "${available_gb}GB")${LH_COLOR_RESET}"
+                
+                # Enhanced: Check if we have enough space for atomic workflow
+                # Atomic workflow needs space for: temporary receiving + final destination + overhead
+                if [[ -n "$estimated_snapshot_size" && "$estimated_snapshot_size" =~ ^[0-9]+$ ]]; then
+                    local required_bytes=$((estimated_snapshot_size * 3))  # 3x for safety: temp + final + overhead
+                    if [[ $available_bytes -lt $required_bytes ]]; then
+                        local required_gb=$((required_bytes / 1024 / 1024 / 1024))
+                        restore_log_msg "WARN" "Insufficient space for atomic workflow: need ~${required_gb}GB, have ${available_gb}GB"
+                        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_INSUFFICIENT_ATOMIC_SPACE' "${required_gb}GB" "${available_gb}GB")${LH_COLOR_RESET}"
+                        
+                        if ! lh_confirm_action "$(lh_msg 'RESTORE_CONTINUE_DESPITE_SPACE_CONCERNS')" "n"; then
+                            restore_log_msg "INFO" "User aborted due to insufficient space for atomic workflow"
+                            return 1
+                        fi
+                    fi
+                fi
             fi
             return 0
             ;;
@@ -481,138 +745,8 @@ create_manual_checkpoint() {
     restore_log_msg "INFO" "Manual checkpoint: $context_msg"
 }
 
-# Handle child snapshots (legacy external snapshot tools) before subvolume operations
-handle_child_snapshots() {
-    local parent_path="$1"
-    local parent_name="$2"
-    
-    restore_log_msg "DEBUG" "Checking for child snapshots in: $parent_path"
-    
-    # Search for script-created snapshot directories within the subvolume
-    local -a child_snapshot_dirs=()
-    
-    # Look for script-created snapshots from little-linux-helper backup system
-    local search_patterns=(
-        "${parent_path}${LH_SOURCE_SNAPSHOT_DIR}"
-        "${parent_path}${LH_TEMP_SNAPSHOT_DIR}"
-    )
-    
-    for pattern in "${search_patterns[@]}"; do
-        if [[ -d "$pattern" ]]; then
-            child_snapshot_dirs+=("$pattern")
-        fi
-    done
-    
-    # Also search for any remaining legacy snapshot directories (limited search)
-    while IFS= read -r -d '' snapshot_dir; do
-        child_snapshot_dirs+=("$snapshot_dir")
-    done < <(find "$parent_path" -maxdepth 2 -type d \( -name ".snapshots" -o -name "snapshots" \) -print0 2>/dev/null)
-    
-    if [[ ${#child_snapshot_dirs[@]} -eq 0 ]]; then
-        restore_log_msg "DEBUG" "No child snapshots found in $parent_name"
-        return 0
-    fi
-    
-    echo ""
-    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_CHILD_SNAPSHOTS_FOUND' "$parent_name"):${LH_COLOR_RESET}"
-    for dir in "${child_snapshot_dirs[@]}"; do
-        echo -e "  • $dir"
-    done
-    echo ""
-    
-    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_CHILD_SNAPSHOTS_OPTIONS'):${LH_COLOR_RESET}"
-    echo -e "1. $(lh_msg 'RESTORE_BACKUP_CHILD_SNAPSHOTS')"
-    echo -e "2. $(lh_msg 'RESTORE_DELETE_CHILD_SNAPSHOTS')"
-    echo -e "3. $(lh_msg 'RESTORE_SKIP_OPERATION')"
-    
-    local choice
-    choice=$(lh_ask_for_input "$(lh_msg 'CHOOSE_OPTION')")
-    
-    case "$choice" in
-        1)
-            backup_child_snapshots "$parent_path" "$parent_name" "${child_snapshot_dirs[@]}"
-            ;;
-        2)
-            delete_child_snapshots "${child_snapshot_dirs[@]}"
-            ;;
-        3)
-            restore_log_msg "INFO" "User chose to skip operation due to child snapshots"
-            return 1
-            ;;
-        *)
-            echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
-            return 1
-            ;;
-    esac
-    
-    create_manual_checkpoint "$(lh_msg 'RESTORE_CHECKPOINT_CHILD_SNAPSHOTS')"
-    return 0
-}
 
-# Backup child snapshots using btrfs send
-backup_child_snapshots() {
-    local parent_path="$1"
-    local parent_name="$2"
-    shift 2
-    local child_dirs=("$@")
-    
-    local backup_timestamp=$(date '+%Y%m%d_%H%M%S')
-    local child_backup_dir="${TEMP_SNAPSHOT_DIR}/child_snapshots_backup_${backup_timestamp}"
-    
-    restore_log_msg "INFO" "Creating backup of child snapshots to: $child_backup_dir"
-    
-    if [[ "$DRY_RUN" == "false" ]]; then
-        mkdir -p "$child_backup_dir" || {
-            restore_log_msg "ERROR" "Failed to create child snapshot backup directory"
-            return 1
-        }
-    fi
-    
-    for child_dir in "${child_dirs[@]}"; do
-        local child_name=$(basename "$child_dir")
-        local backup_file="${child_backup_dir}/${parent_name}_${child_name}_${backup_timestamp}.btrfs"
-        
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_BACKING_UP_CHILD' "$child_dir")${LH_COLOR_RESET}"
-        
-        if [[ "$DRY_RUN" == "false" ]]; then
-            if btrfs send "$child_dir" > "$backup_file" 2>/dev/null; then
-                restore_log_msg "INFO" "Successfully backed up child snapshot: $child_dir"
-            else
-                restore_log_msg "WARN" "Failed to backup child snapshot: $child_dir"
-            fi
-        else
-            restore_log_msg "INFO" "DRY-RUN: Would backup $child_dir to $backup_file"
-        fi
-    done
-    
-    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_CHILD_BACKUP_COMPLETED' "$child_backup_dir")${LH_COLOR_RESET}"
-}
 
-# Delete child snapshots
-delete_child_snapshots() {
-    local child_dirs=("$@")
-    
-    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_DELETING_CHILD_SNAPSHOTS')${LH_COLOR_RESET}"
-    
-    for child_dir in "${child_dirs[@]}"; do
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_DELETING_CHILD' "$child_dir")${LH_COLOR_RESET}"
-        
-        if [[ "$DRY_RUN" == "false" ]]; then
-            if btrfs subvolume delete "$child_dir" >/dev/null 2>&1; then
-                restore_log_msg "INFO" "Successfully deleted child snapshot: $child_dir"
-            else
-                # Try deleting as regular directory if not a subvolume
-                if rm -rf "$child_dir"; then
-                    restore_log_msg "INFO" "Successfully deleted child directory: $child_dir"
-                else
-                    restore_log_msg "WARN" "Failed to delete child snapshot/directory: $child_dir"
-                fi
-            fi
-        else
-            restore_log_msg "INFO" "DRY-RUN: Would delete $child_dir"
-        fi
-    done
-}
 
 # Remove read-only flag from restored subvolume using library verification
 remove_readonly_flag() {
@@ -705,11 +839,6 @@ safely_replace_subvolume() {
         return 0
     fi
     
-    # Handle child snapshots first
-    if ! handle_child_snapshots "$existing_subvol" "$subvol_name"; then
-        restore_log_msg "WARN" "Child snapshot handling failed or was skipped"
-        return 1
-    fi
     
     # Create backup name for existing subvolume
     local backup_name="${existing_subvol}.broken_${timestamp}"
@@ -766,10 +895,11 @@ safely_replace_subvolume() {
     return 0
 }
 
-# Perform the actual subvolume restore using library's atomic operations
+# Perform the actual subvolume restore using atomic receive from BTRFS library
+# CRITICAL FIX: Use atomic_receive_with_validation instead of manual atomic implementation
 perform_subvolume_restore() {
     local subvol_to_restore="$1"    # e.g., "@" or "@home"
-    local snapshot_to_use="$2"      # Full path to the snapshot
+    local snapshot_to_use="$2"      # Full path to the backup snapshot
     local target_subvol_name="$3"   # Final name for the restored subvolume
     
     restore_log_msg "INFO" "Starting restore of $subvol_to_restore from $snapshot_to_use"
@@ -803,13 +933,23 @@ perform_subvolume_restore() {
         return 1
     fi
     
-    # Create temporary directory for receive operation
-    if [[ "$DRY_RUN" == "false" ]]; then
-        mkdir -p "$TEMP_SNAPSHOT_DIR"
-    fi
-    
     # Validate target filesystem health before operation
     if ! validate_filesystem_health "$TARGET_ROOT" "restore target"; then
+        lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
+        return 1
+    fi
+    
+    # Enhanced space check with estimated size for atomic workflow
+    local estimated_size_bytes=0
+    if command -v du >/dev/null 2>&1; then
+        estimated_size_bytes=$(du -sb "$snapshot_to_use" 2>/dev/null | cut -f1 || echo "0")
+        local estimated_size_human=$(du -sh "$snapshot_to_use" 2>/dev/null | cut -f1)
+        if [[ -n "$estimated_size_human" ]]; then
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ESTIMATED_SIZE' "$estimated_size_human")${LH_COLOR_RESET}"
+        fi
+    fi
+    
+    if ! check_restore_space "$TARGET_ROOT" "atomic restore operation" "$estimated_size_bytes"; then
         lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
         return 1
     fi
@@ -818,17 +958,8 @@ perform_subvolume_restore() {
     
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_STARTING_SEND_RECEIVE' "$snapshot_to_use")${LH_COLOR_RESET}"
     
-    # Display estimated size
-    if command -v du >/dev/null 2>&1; then
-        local estimated_size
-        estimated_size=$(du -sh "$snapshot_to_use" 2>/dev/null | cut -f1)
-        if [[ -n "$estimated_size" ]]; then
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ESTIMATED_SIZE' "$estimated_size")${LH_COLOR_RESET}"
-        fi
-    fi
-    
     if [[ "$DRY_RUN" == "false" ]]; then
-        # Check if source snapshot is read-only (required for btrfs send)
+        # CRITICAL FIX: Ensure source snapshot is read-only (required for btrfs send)
         local source_ro
         source_ro=$(btrfs property get "$snapshot_to_use" ro 2>/dev/null | cut -d'=' -f2)
         if [[ "$source_ro" != "true" ]]; then
@@ -837,54 +968,92 @@ perform_subvolume_restore() {
             
             if ! btrfs property set "$snapshot_to_use" ro true; then
                 restore_log_msg "ERROR" "Failed to make source snapshot read-only"
+                lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
                 return 1
             fi
         fi
         
-        # Use library's atomic receive function for safe operations
+        # CRITICAL FIX: Use atomic_receive_with_validation from BTRFS library
+        # This handles received_uuid correctly and implements proper atomic pattern
         local final_destination="${TARGET_ROOT}/${target_subvol_name}"
+        local expected_received_path="${TARGET_ROOT}/$(basename "$snapshot_to_use")"
         
-        restore_log_msg "INFO" "Using atomic receive pattern for safe restore operation"
+        restore_log_msg "INFO" "Using atomic receive pattern from BTRFS library"
+        restore_log_msg "DEBUG" "Final destination: $final_destination"
+        restore_log_msg "DEBUG" "Expected received path: $expected_received_path"
         
-        # Call the atomic receive function from the library
-        if atomic_receive_with_validation "$snapshot_to_use" "$final_destination"; then
+        # Use library's atomic receive function (no parent for restore operations)
+        local receive_result=0
+        local receive_stderr
+        receive_stderr=$(mktemp)
+        
+        if atomic_receive_with_validation "$snapshot_to_use" "$expected_received_path" 2>"$receive_stderr"; then
             restore_log_msg "INFO" "Atomic restore operation completed successfully"
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_SEND_RECEIVE_SUCCESS')${LH_COLOR_RESET}"
-        else
-            local atomic_exit_code=$?
-            restore_log_msg "ERROR" "Atomic restore operation failed with exit code: $atomic_exit_code"
             
-            # Enhanced error handling using library function
-            case $atomic_exit_code in
-                1)
-                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ATOMIC_OPERATION_FAILED')${LH_COLOR_RESET}"
-                    ;;
-                2)
-                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_PARENT_VALIDATION_FAILED')${LH_COLOR_RESET}"
-                    ;;
-                3)
-                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_SPACE_EXHAUSTION')${LH_COLOR_RESET}"
-                    ;;
-                4)
-                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_FILESYSTEM_CORRUPTION')${LH_COLOR_RESET}"
-                    ;;
-                *)
-                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_UNKNOWN_ERROR')${LH_COLOR_RESET}"
-                    ;;
-            esac
+            # If the received path differs from desired final path, rename it
+            if [[ "$expected_received_path" != "$final_destination" ]]; then
+                restore_log_msg "DEBUG" "Renaming received snapshot to final destination"
+                if [[ -d "$expected_received_path" ]]; then
+                    # Check if received snapshot has received_uuid before moving
+                    local received_uuid
+                    received_uuid=$(btrfs subvolume show "$expected_received_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+                    
+                    if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
+                        # Use snapshot instead of mv to preserve received_uuid
+                        restore_log_msg "DEBUG" "Creating snapshot to preserve received_uuid: $received_uuid"
+                        if btrfs subvolume snapshot "$expected_received_path" "$final_destination"; then
+                            # Remove original received snapshot after successful copy
+                            btrfs subvolume delete "$expected_received_path" 2>/dev/null || true
+                        else
+                            restore_log_msg "ERROR" "Failed to create final snapshot from received snapshot"
+                            btrfs subvolume delete "$expected_received_path" 2>/dev/null || true
+                            lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
+                            return 1
+                        fi
+                    else
+                        # Safe to use mv for non-received snapshots
+                        if ! mv "$expected_received_path" "$final_destination"; then
+                            restore_log_msg "ERROR" "Failed to rename snapshot to final destination"
+                            btrfs subvolume delete "$expected_received_path" 2>/dev/null || true
+                            lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
+                            return 1
+                        fi
+                    fi
+                fi
+            fi
+        else
+            receive_result=$?
+            local error_output=""
+            if [[ -f "$receive_stderr" ]]; then
+                error_output=$(cat "$receive_stderr" 2>/dev/null || echo "")
+                restore_log_msg "ERROR" "BTRFS stderr: $error_output"
+            fi
+            
+            restore_log_msg "ERROR" "Atomic receive failed with exit code: $receive_result"
+            
+            # Use enhanced pattern-based error handling
+            handle_restore_btrfs_error "$receive_result" "atomic restore send/receive" "" "$error_output"
+            
             lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
+            [[ -f "$receive_stderr" ]] && rm -f "$receive_stderr"
             return 1
         fi
+        
+        # Clean up stderr capture file
+        [[ -f "$receive_stderr" ]] && rm -f "$receive_stderr"
     else
         restore_log_msg "INFO" "DRY-RUN: Would perform atomic btrfs send/receive operation"
         restore_log_msg "INFO" "DRY-RUN: Source: $snapshot_to_use"
         restore_log_msg "INFO" "DRY-RUN: Destination: ${TARGET_ROOT}/${target_subvol_name}"
     fi
     
-    # Remove read-only flag from restored subvolume (with safety checks)
+    # Remove read-only flag from restored subvolume
+    # After btrfs receive, the subvolume will be read-only and needs to be made writable
     local final_path="${TARGET_ROOT}/${target_subvol_name}"
     if ! remove_readonly_flag "$final_path" "$target_subvol_name"; then
         restore_log_msg "WARN" "Failed to remove read-only flag, but restore was successful"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_READONLY_WARNING')${LH_COLOR_RESET}"
     fi
     
     restore_log_msg "INFO" "Subvolume restore completed: $subvol_to_restore"
@@ -896,7 +1065,86 @@ perform_subvolume_restore() {
     return 0
 }
 
-# List available snapshots for a given subvolume
+# Validate snapshot integrity and parent chain
+validate_restore_snapshot() {
+    local snapshot_path="$1"
+    local context="$2"  # Description for logging
+    
+    restore_log_msg "DEBUG" "Validating snapshot for restore: $snapshot_path ($context)"
+    
+    # Basic BTRFS subvolume validation
+    if ! btrfs subvolume show "$snapshot_path" >/dev/null 2>&1; then
+        restore_log_msg "ERROR" "Invalid BTRFS subvolume: $snapshot_path"
+        return 1
+    fi
+    
+    # Check if snapshot has received_uuid (indicates it's from incremental backup)
+    local received_uuid
+    received_uuid=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+    
+    if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
+        restore_log_msg "DEBUG" "Snapshot has received_uuid: $received_uuid (part of incremental chain)"
+        
+        # Use library function to verify received_uuid integrity
+        if ! verify_received_uuid_integrity "$snapshot_path"; then
+            local integrity_result=$?
+            case $integrity_result in
+                1)
+                    restore_log_msg "WARN" "Snapshot has broken incremental chain"
+                    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_BROKEN_INCREMENTAL_CHAIN' "$(basename "$snapshot_path")")${LH_COLOR_RESET}"
+                    
+                    if ! lh_confirm_action "$(lh_msg 'RESTORE_CONTINUE_BROKEN_CHAIN')" "y"; then
+                        return 1
+                    fi
+                    ;;
+                *)
+                    restore_log_msg "ERROR" "Cannot verify snapshot integrity: $snapshot_path"
+                    return 1
+                    ;;
+            esac
+        else
+            restore_log_msg "DEBUG" "Snapshot integrity verified: received_uuid intact"
+        fi
+        
+        # For received snapshots, verify they are read-only
+        local ro_status
+        ro_status=$(btrfs property get "$snapshot_path" ro 2>/dev/null | cut -d'=' -f2)
+        if [[ "$ro_status" != "true" ]]; then
+            restore_log_msg "WARN" "Received snapshot is not read-only - integrity may be compromised"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_RECEIVED_NOT_READONLY' "$(basename "$snapshot_path")")${LH_COLOR_RESET}"
+            
+            if ! lh_confirm_action "$(lh_msg 'RESTORE_CONTINUE_NOT_READONLY')" "n"; then
+                return 1
+            fi
+        fi
+    else
+        restore_log_msg "DEBUG" "Snapshot is not from incremental backup (no received_uuid)"
+    fi
+    
+    # Validate filesystem health of the snapshot's parent filesystem
+    local snapshot_mount
+    snapshot_mount=$(findmnt -n -o TARGET "$snapshot_path" 2>/dev/null || dirname "$snapshot_path")
+    
+    # Use library function for health check
+    if ! check_filesystem_health "$snapshot_mount" >/dev/null 2>&1; then
+        local health_exit_code=$?
+        case $health_exit_code in
+            1)
+                restore_log_msg "WARN" "Snapshot filesystem has health issues but may be usable"
+                ;;
+            2|4)
+                restore_log_msg "ERROR" "Snapshot filesystem is corrupted or read-only"
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_SNAPSHOT_FILESYSTEM_CORRUPT' "$(basename "$snapshot_path")")${LH_COLOR_RESET}"
+                return 1
+                ;;
+        esac
+    fi
+    
+    restore_log_msg "DEBUG" "Snapshot validation passed: $snapshot_path"
+    return 0
+}
+
+# List available snapshots for a given subvolume with validation
 list_available_snapshots() {
     local subvolume="$1"  # e.g., "@" or "@home"
     local backup_path="${BACKUP_ROOT}${LH_BACKUP_DIR}/${subvolume}"
@@ -908,26 +1156,73 @@ list_available_snapshots() {
         return 1
     fi
     
-    # Find snapshots matching the script-created pattern: subvolume-YYYY-MM-DD_HH-MM-SS
+    # Find snapshots with flexible patterns to support different naming conventions
     local -a snapshots=()
-    local pattern="${subvolume}-20*"  # Matches @-2025-08-05_21-13-12 format
+    local -a valid_snapshots=()
     
-    while IFS= read -r -d '' snapshot; do
-        snapshots+=("$snapshot")
-    done < <(find "$backup_path" -maxdepth 1 -type d -name "$pattern" -print0 2>/dev/null | sort -z)
+    # Multiple patterns to support different backup naming schemes:
+    # 1. Standard: @-2025-08-05_21-13-12
+    # 2. Underscore: @_2025-08-05_21-13-12  
+    # 3. Prefix variations: backup_@_2025-08-05, home_backup-2025-08-05, etc.
+    local -a patterns=(
+        "${subvolume}-20*"           # Standard: @-2025-*
+        "${subvolume}_20*"           # Underscore: @_2025-*
+        "*${subvolume}*20*"          # Contains subvolume name and year
+        "${subvolume}[-_]*"          # Any separator after subvolume name
+        "*[-_]${subvolume}[-_]*20*"  # Subvolume name in middle with separators
+    )
+    
+    restore_log_msg "DEBUG" "Searching with flexible patterns for different backup naming schemes"
+    for pattern in "${patterns[@]}"; do
+        while IFS= read -r -d '' snapshot; do
+            # Avoid duplicates by checking if already in array
+            local already_found=false
+            for existing in "${snapshots[@]}"; do
+                if [[ "$existing" == "$snapshot" ]]; then
+                    already_found=true
+                    break
+                fi
+            done
+            
+            if [[ "$already_found" == false ]]; then
+                snapshots+=("$snapshot")
+            fi
+        done < <(find "$backup_path" -maxdepth 1 -type d -name "$pattern" -print0 2>/dev/null)
+    done
+    
+    # Sort snapshots by modification time (newest first)
+    if [[ ${#snapshots[@]} -gt 0 ]]; then
+        readarray -t snapshots < <(printf '%s\n' "${snapshots[@]}" | xargs -I {} stat -c '%Y %s' {} | sort -rn | cut -d' ' -f2-)
+    fi
     
     if [[ ${#snapshots[@]} -eq 0 ]]; then
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_NO_SNAPSHOTS_FOUND' "$subvolume")${LH_COLOR_RESET}"
         return 1
     fi
     
+    # Validate each snapshot and filter out invalid ones
+    restore_log_msg "DEBUG" "Validating ${#snapshots[@]} found snapshots"
+    for snapshot in "${snapshots[@]}"; do
+        if validate_restore_snapshot "$snapshot" "listing validation"; then
+            valid_snapshots+=("$snapshot")
+        else
+            restore_log_msg "WARN" "Skipping invalid snapshot: $(basename "$snapshot")"
+        fi
+    done
+    
+    if [[ ${#valid_snapshots[@]} -eq 0 ]]; then
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_NO_VALID_SNAPSHOTS_FOUND' "$subvolume")${LH_COLOR_RESET}"
+        return 1
+    fi
+    
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_AVAILABLE_SNAPSHOTS' "$subvolume"):${LH_COLOR_RESET}"
     
-    for i in "${!snapshots[@]}"; do
-        local snapshot="${snapshots[i]}"
+    for i in "${!valid_snapshots[@]}"; do
+        local snapshot="${valid_snapshots[i]}"
         local snapshot_name=$(basename "$snapshot")
         local size_info=""
         local date_info=""
+        local status_info=""
         
         # Get size information if possible
         if command -v du >/dev/null 2>&1; then
@@ -939,13 +1234,23 @@ list_available_snapshots() {
             date_info="${BASH_REMATCH[1]}"
         fi
         
+        # Check if it's an incremental snapshot
+        local received_uuid
+        received_uuid=$(btrfs subvolume show "$snapshot" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+        if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
+            status_info="[incremental]"
+        else
+            status_info="[full]"
+        fi
+        
         printf "  %2d. %-40s" "$((i+1))" "$snapshot_name"
         [[ -n "$date_info" ]] && printf " [%s]" "$date_info"
+        [[ -n "$status_info" ]] && printf " %s" "$status_info"
         [[ -n "$size_info" ]] && printf " (%s)" "$size_info"
         printf "\n"
     done
     
-    printf '%s\n' "${snapshots[@]}"
+    printf '%s\n' "${valid_snapshots[@]}"
 }
 
 # Select restore type and specific snapshot
@@ -1019,6 +1324,60 @@ select_restore_type_and_snapshot() {
             
             IFS='|' read -r selected_root selected_home <<< "${matching_pairs[$((pair_choice-1))]}"
             
+            # Enhanced validation of both snapshots before restore
+            echo ""
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_VALIDATING_SNAPSHOT_PAIR')${LH_COLOR_RESET}"
+            
+            if ! validate_restore_snapshot "$selected_root" "root snapshot validation"; then
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ROOT_SNAPSHOT_VALIDATION_FAILED' "$(basename "$selected_root")")${LH_COLOR_RESET}"
+                return 1
+            fi
+            
+            if ! validate_restore_snapshot "$selected_home" "home snapshot validation"; then
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_HOME_SNAPSHOT_VALIDATION_FAILED' "$(basename "$selected_home")")${LH_COLOR_RESET}"
+                return 1
+            fi
+            
+            # Validate parent chains for both snapshots if they are incremental
+            for snapshot_info in "$selected_root:@:root" "$selected_home:@home:home"; do
+                IFS=':' read -r snapshot_path subvol_name display_name <<< "$snapshot_info"
+                
+                local received_uuid
+                received_uuid=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+                
+                if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
+                    restore_log_msg "DEBUG" "Validating $display_name incremental snapshot parent chain"
+                    
+                    local backup_base="${BACKUP_ROOT}${LH_BACKUP_DIR}/${subvol_name}"
+                    local found_parent=false
+                    
+                    while IFS= read -r -d '' potential_parent; do
+                        if [[ -d "$potential_parent" ]]; then
+                            local parent_uuid
+                            parent_uuid=$(btrfs subvolume show "$potential_parent" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
+                            
+                            if [[ "$parent_uuid" == "$received_uuid" ]]; then
+                                if validate_parent_snapshot_chain "$potential_parent" "$snapshot_path" "$snapshot_path"; then
+                                    restore_log_msg "DEBUG" "$display_name parent chain validation passed"
+                                    found_parent=true
+                                    break
+                                fi
+                            fi
+                        fi
+                    done < <(find "$backup_base" -maxdepth 1 -type d \( -name "${subvol_name}-20*" -o -name "${subvol_name}_20*" -o -name "*${subvol_name}*20*" \) -print0 2>/dev/null)
+                    
+                    if [[ "$found_parent" == "false" ]]; then
+                        restore_log_msg "WARN" "Cannot validate parent chain for $display_name snapshot"
+                        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_PARENT_CHAIN_INCOMPLETE_FOR' "$display_name")${LH_COLOR_RESET}"
+                        
+                        if ! lh_confirm_action "$(lh_msg 'RESTORE_CONTINUE_COMPLETE_WITHOUT_VALIDATION')" "n"; then
+                            restore_log_msg "INFO" "User aborted complete system restore due to parent chain issues"
+                            return 1
+                        fi
+                    fi
+                fi
+            done
+            
             # Final confirmation with warnings
             echo ""
             echo -e "${LH_COLOR_WARNING}╔════════════════════════════════════════╗"
@@ -1035,18 +1394,68 @@ select_restore_type_and_snapshot() {
                 return 1
             fi
             
-            # Perform root restore first, then home
+            # Perform atomic complete system restore with rollback capability
+            restore_log_msg "INFO" "Starting atomic complete system restore"
+            local restore_timestamp=$(date '+%Y%m%d_%H%M%S')
+            local root_backup_created="false"
+            local home_backup_created="false"
+            local bootloader_modified="false"
+            
+            # Store original state information for potential rollback
+            local original_root_backup="${TARGET_ROOT}/@.backup_before_restore_${restore_timestamp}"
+            local original_home_backup="${TARGET_ROOT}/@home.backup_before_restore_${restore_timestamp}"
+            
+            # Perform root restore with rollback tracking
+            restore_log_msg "INFO" "Phase 1/3: Root subvolume restore"
             if perform_subvolume_restore "@" "$selected_root" "@"; then
+                root_backup_created="true"
+                restore_log_msg "INFO" "Root restore successful, proceeding to home restore"
+                
+                # Perform home restore with rollback capability
+                restore_log_msg "INFO" "Phase 2/3: Home subvolume restore"
                 if perform_subvolume_restore "@home" "$selected_home" "@home"; then
-                    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_COMPLETE_SYSTEM_SUCCESS')${LH_COLOR_RESET}"
+                    home_backup_created="true"
+                    restore_log_msg "INFO" "Both subvolume restores successful, configuring bootloader"
                     
                     # Handle bootloader configuration for root subvolume
-                    handle_bootloader_configuration
+                    restore_log_msg "INFO" "Phase 3/3: Bootloader configuration"
+                    if handle_bootloader_configuration; then
+                        bootloader_modified="true"
+                        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_COMPLETE_SYSTEM_SUCCESS')${LH_COLOR_RESET}"
+                        restore_log_msg "INFO" "Complete system restore successful"
+                        return 0
+                    else
+                        restore_log_msg "ERROR" "Bootloader configuration failed"
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_BOOTLOADER_FAILED')${LH_COLOR_RESET}"
+                        
+                        # Bootloader failure - offer rollback but system might still be usable
+                        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_BOOTLOADER_ROLLBACK_OPTION')${LH_COLOR_RESET}"
+                        if lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_COMPLETE_ROLLBACK_BOOTLOADER')" "n"; then
+                            perform_complete_system_rollback "$restore_timestamp" "$root_backup_created" "$home_backup_created" "$bootloader_modified"
+                            return 1
+                        else
+                            restore_log_msg "WARN" "User chose to keep partially restored system with bootloader issues"
+                            echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_MANUAL_BOOTLOADER_REQUIRED')${LH_COLOR_RESET}"
+                            return 0
+                        fi
+                    fi
                 else
+                    restore_log_msg "ERROR" "Home restore failed after successful root restore"
                     echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_HOME_FAILED')${LH_COLOR_RESET}"
-                    return 1
+                    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_PARTIAL_SUCCESS_ROLLBACK')${LH_COLOR_RESET}"
+                    
+                    # Home restore failed - automatic rollback recommended
+                    if lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_ROLLBACK_ROOT')" "y"; then
+                        perform_complete_system_rollback "$restore_timestamp" "$root_backup_created" "false" "false"
+                        return 1
+                    else
+                        restore_log_msg "WARN" "User chose to keep partially restored system (root only)"
+                        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_PARTIAL_SYSTEM_WARNING')${LH_COLOR_RESET}"
+                        return 0
+                    fi
                 fi
             else
+                restore_log_msg "ERROR" "Root restore failed - no rollback needed"
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ROOT_FAILED')${LH_COLOR_RESET}"
                 return 1
             fi
@@ -1083,6 +1492,59 @@ select_restore_type_and_snapshot() {
             
             local selected_snapshot="${snapshots[$((snapshot_choice-1))]}"
             
+            # Enhanced validation of selected snapshot before restore
+            echo ""
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_VALIDATING_SELECTED_SNAPSHOT')${LH_COLOR_RESET}"
+            
+            if ! validate_restore_snapshot "$selected_snapshot" "pre-restore validation"; then
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_SNAPSHOT_VALIDATION_FAILED' "$(basename "$selected_snapshot")")${LH_COLOR_RESET}"
+                return 1
+            fi
+            
+            # Check parent chain integrity if this is an incremental snapshot
+            local received_uuid
+            received_uuid=$(btrfs subvolume show "$selected_snapshot" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+            
+            if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
+                restore_log_msg "DEBUG" "Validating incremental snapshot parent chain"
+                
+                # Look for source parent snapshot that matches this received_uuid
+                local backup_base="${BACKUP_ROOT}${LH_BACKUP_DIR}/${subvolume}"
+                local found_parent=false
+                
+                # Search for potential parent snapshots
+                while IFS= read -r -d '' potential_parent; do
+                    if [[ -d "$potential_parent" ]]; then
+                        local parent_uuid
+                        parent_uuid=$(btrfs subvolume show "$potential_parent" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
+                        
+                        if [[ "$parent_uuid" == "$received_uuid" ]]; then
+                            restore_log_msg "DEBUG" "Found matching parent snapshot: $(basename "$potential_parent")"
+                            
+                            # Use library function to validate the complete chain
+                            if validate_parent_snapshot_chain "$potential_parent" "$selected_snapshot" "$selected_snapshot"; then
+                                restore_log_msg "DEBUG" "Parent chain validation passed"
+                                found_parent=true
+                                break
+                            else
+                                restore_log_msg "WARN" "Parent chain validation failed for: $(basename "$potential_parent")"
+                            fi
+                        fi
+                    fi
+                done < <(find "$backup_base" -maxdepth 1 -type d -name "${subvolume}-20*" -print0 2>/dev/null)
+                
+                if [[ "$found_parent" == "false" ]]; then
+                    restore_log_msg "WARN" "Cannot find valid parent snapshot for incremental restore"
+                    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_PARENT_CHAIN_INCOMPLETE')${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_INCREMENTAL_RESTORE_EXPLANATION')${LH_COLOR_RESET}"
+                    
+                    if ! lh_confirm_action "$(lh_msg 'RESTORE_CONTINUE_WITHOUT_PARENT_VALIDATION')" "n"; then
+                        restore_log_msg "INFO" "User aborted due to incomplete parent chain"
+                        return 1
+                    fi
+                fi
+            fi
+            
             # Final confirmation
             echo ""
             echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_CONFIRM_SINGLE_RESTORE' "$restore_name")${LH_COLOR_RESET}"
@@ -1117,7 +1579,535 @@ select_restore_type_and_snapshot() {
     return 0
 }
 
-# Handle bootloader configuration after root subvolume restore
+# Detect current boot configuration to determine safe update strategy
+detect_boot_configuration() {
+    local target_root="$1"
+    
+    restore_log_msg "INFO" "Analyzing current boot configuration for safe bootloader updates"
+    
+    # Initialize detection results
+    local boot_config_result=""
+    local fstab_uses_subvol="false"
+    local grub_uses_subvol="false"
+    local systemd_uses_subvol="false"
+    local current_default_subvol=""
+    local boot_strategy="unknown"
+    
+    # Check current default subvolume
+    current_default_subvol=$(btrfs subvolume get-default "$target_root" 2>/dev/null | awk '{print $9}' || echo "")
+    restore_log_msg "DEBUG" "Current default subvolume: $current_default_subvol"
+    
+    # Analysis 1: Check /etc/fstab for explicit subvol= options
+    local fstab_path="${target_root}/@/etc/fstab"
+    if [[ -f "$fstab_path" ]]; then
+        restore_log_msg "DEBUG" "Analyzing fstab: $fstab_path"
+        
+        # Look for root filesystem mount with subvol= option
+        local fstab_root_line
+        fstab_root_line=$(grep -E '^[^#]*\s+/\s+btrfs' "$fstab_path" 2>/dev/null | head -n1)
+        
+        if [[ -n "$fstab_root_line" ]]; then
+            restore_log_msg "DEBUG" "Found fstab root entry: $fstab_root_line"
+            
+            if echo "$fstab_root_line" | grep -q "subvol="; then
+                fstab_uses_subvol="true"
+                local subvol_option
+                subvol_option=$(echo "$fstab_root_line" | sed -n 's/.*subvol=\([^,[:space:]]\+\).*/\1/p')
+                restore_log_msg "DEBUG" "fstab uses explicit subvol option: $subvol_option"
+                boot_config_result+="FSTAB: explicit subvol=$subvol_option\n"
+            else
+                boot_config_result+="FSTAB: uses default subvolume (no explicit subvol=)\n"
+            fi
+        else
+            boot_config_result+="FSTAB: no BTRFS root entry found\n"
+        fi
+    else
+        restore_log_msg "WARN" "Cannot access fstab: $fstab_path"
+        boot_config_result+="FSTAB: not accessible\n"
+    fi
+    
+    # Analysis 2: Check GRUB configuration for rootflags=subvol=
+    local grub_cfg_paths=(
+        "${target_root}/@/boot/grub/grub.cfg"
+        "${target_root}/@/boot/grub2/grub.cfg"
+        "${target_root}/@/boot/efi/EFI/*/grub.cfg"
+        "${target_root}/@/efi/EFI/*/grub.cfg"
+        "/boot/grub/grub.cfg"
+        "/boot/grub2/grub.cfg"
+        "/boot/efi/EFI/*/grub.cfg"
+        "/efi/EFI/*/grub.cfg"
+    )
+    
+    # Enhanced GRUB detection with wildcard expansion and multiple patterns
+    local grub_found="false"
+    for grub_pattern in "${grub_cfg_paths[@]}"; do
+        # Handle wildcard patterns (EFI directories)
+        if [[ "$grub_pattern" == *"*"* ]]; then
+            for grub_cfg in $grub_pattern; do
+                [[ -f "$grub_cfg" ]] || continue
+                grub_found="true"
+                restore_log_msg "DEBUG" "Analyzing GRUB config: $grub_cfg"
+                
+                # Look for multiple GRUB subvolume patterns
+                if grep -qE "(rootflags=.*subvol=|root=.*subvol=)" "$grub_cfg" 2>/dev/null; then
+                    grub_uses_subvol="true"
+                    local grub_subvol
+                    grub_subvol=$(grep -oE "(rootflags=.*subvol=[^[:space:],]+|root=.*subvol=[^[:space:],]+)" "$grub_cfg" 2>/dev/null | head -n1 | sed 's/.*subvol=//')
+                    restore_log_msg "DEBUG" "GRUB uses explicit subvol: $grub_subvol"
+                    boot_config_result+="GRUB: explicit subvol=$grub_subvol (from $grub_cfg)\n"
+                    break 2
+                fi
+            done
+        else
+            # Handle exact paths
+            if [[ -f "$grub_pattern" ]]; then
+                grub_found="true"
+                restore_log_msg "DEBUG" "Analyzing GRUB config: $grub_pattern"
+                
+                # Look for multiple GRUB subvolume patterns
+                if grep -qE "(rootflags=.*subvol=|root=.*subvol=)" "$grub_pattern" 2>/dev/null; then
+                    grub_uses_subvol="true"
+                    local grub_subvol
+                    grub_subvol=$(grep -oE "(rootflags=.*subvol=[^[:space:],]+|root=.*subvol=[^[:space:],]+)" "$grub_pattern" 2>/dev/null | head -n1 | sed 's/.*subvol=//')
+                    restore_log_msg "DEBUG" "GRUB uses explicit subvol: $grub_subvol"
+                    boot_config_result+="GRUB: explicit subvol=$grub_subvol (from $grub_pattern)\n"
+                    break
+                fi
+            fi
+        fi
+    done
+    
+    if [[ "$grub_found" == "true" ]] && [[ "$grub_uses_subvol" == "false" ]]; then
+        boot_config_result+="GRUB: uses default subvolume (no explicit subvol=)\n"
+    elif [[ "$grub_found" == "false" ]]; then
+        boot_config_result+="GRUB: configuration not accessible\n"
+    fi
+    
+    
+    # Analysis 3: Check systemd mount units (if present)
+    local systemd_mount_path="${target_root}/@/etc/systemd/system"
+    if [[ -d "$systemd_mount_path" ]]; then
+        if find "$systemd_mount_path" -name "*.mount" -exec grep -l "What=.*subvol=" {} \; 2>/dev/null | head -n1 | grep -q .; then
+            systemd_uses_subvol="true"
+            boot_config_result+="SYSTEMD: explicit subvol mount units found\n"
+        fi
+    fi
+    
+    # Determine boot strategy based on analysis
+    if [[ "$fstab_uses_subvol" == "true" ]] || [[ "$grub_uses_subvol" == "true" ]] || [[ "$systemd_uses_subvol" == "true" ]]; then
+        boot_strategy="explicit_subvol"
+    elif [[ "$fstab_uses_subvol" == "false" ]] && [[ -f "$fstab_path" ]]; then
+        boot_strategy="default_subvol"
+    else
+        # CRITICAL: For unknown configs, assume default_subvol for safety
+        # This ensures set-default gets called rather than leaving system unbootable
+        boot_strategy="default_subvol"
+        boot_config_result+="SAFETY: Defaulting to 'default_subvol' strategy due to unclear configuration\n"
+        restore_log_msg "WARN" "Boot configuration unclear - defaulting to set-default strategy for safety"
+    fi
+    
+    # Store results in global variables for use by other functions
+    DETECTED_BOOT_STRATEGY="$boot_strategy"
+    DETECTED_FSTAB_USES_SUBVOL="$fstab_uses_subvol"
+    DETECTED_GRUB_USES_SUBVOL="$grub_uses_subvol"
+    DETECTED_CURRENT_DEFAULT="$current_default_subvol"
+    
+    restore_log_msg "INFO" "Boot configuration analysis completed"
+    restore_log_msg "DEBUG" "Detected strategy: $boot_strategy"
+    
+    # Return the analysis results
+    echo -e "$boot_config_result"
+    return 0
+}
+
+# Create backup of critical bootloader files before modification
+backup_bootloader_files() {
+    local target_root="$1"
+    local backup_suffix="_pre_restore_$(date '+%Y%m%d_%H%M%S')"
+    
+    restore_log_msg "INFO" "Creating bootloader configuration backups"
+    
+    local backup_created="false"
+    local backup_files=()
+    
+    # Backup fstab
+    local fstab_path="${target_root}/@/etc/fstab"
+    if [[ -f "$fstab_path" ]]; then
+        if [[ "$DRY_RUN" == "false" ]]; then
+            if cp "$fstab_path" "${fstab_path}${backup_suffix}"; then
+                restore_log_msg "INFO" "Backed up fstab: ${fstab_path}${backup_suffix}"
+                backup_files+=("${fstab_path}${backup_suffix}")
+                backup_created="true"
+            else
+                restore_log_msg "WARN" "Failed to backup fstab: $fstab_path"
+            fi
+        else
+            restore_log_msg "INFO" "DRY-RUN: Would backup fstab to ${fstab_path}${backup_suffix}"
+            backup_created="true"
+        fi
+    fi
+    
+    # Backup GRUB configuration (if accessible and not in /boot)
+    local grub_cfg_path="${target_root}/@/boot/grub/grub.cfg"
+    if [[ -f "$grub_cfg_path" ]]; then
+        if [[ "$DRY_RUN" == "false" ]]; then
+            if cp "$grub_cfg_path" "${grub_cfg_path}${backup_suffix}"; then
+                restore_log_msg "INFO" "Backed up GRUB config: ${grub_cfg_path}${backup_suffix}"
+                backup_files+=("${grub_cfg_path}${backup_suffix}")
+                backup_created="true"
+            else
+                restore_log_msg "WARN" "Failed to backup GRUB config: $grub_cfg_path"
+            fi
+        else
+            restore_log_msg "INFO" "DRY-RUN: Would backup GRUB config to ${grub_cfg_path}${backup_suffix}"
+        fi
+    fi
+    
+    # Store backup file list for potential rollback
+    if [[ "$backup_created" == "true" ]]; then
+        BOOTLOADER_BACKUP_FILES=("${backup_files[@]}")
+        restore_log_msg "INFO" "Bootloader backup completed: ${#backup_files[@]} files backed up"
+        return 0
+    else
+        restore_log_msg "WARN" "No bootloader files were backed up"
+        return 1
+    fi
+}
+
+# Choose and execute the appropriate boot configuration strategy
+choose_boot_strategy() {
+    local target_root="$1"
+    local restored_subvol_name="$2"  # e.g., "@"
+    
+    restore_log_msg "INFO" "Selecting boot configuration strategy based on detected configuration"
+    
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_BOOT_STRATEGY_ANALYSIS'):${LH_COLOR_RESET}"
+    
+    # Display the detection results
+    local analysis_result
+    analysis_result=$(detect_boot_configuration "$target_root")
+    echo -e "$analysis_result"
+    
+    echo ""
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_DETECTED_STRATEGY' "$DETECTED_BOOT_STRATEGY"):${LH_COLOR_RESET}"
+    
+    case "$DETECTED_BOOT_STRATEGY" in
+        "explicit_subvol")
+            echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_STRATEGY_EXPLICIT_SAFE')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_STRATEGY_EXPLICIT_EXPLANATION')${LH_COLOR_RESET}"
+            echo ""
+            
+            if lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_KEEP_EXPLICIT_CONFIG')" "y"; then
+                execute_explicit_subvol_strategy "$target_root" "$restored_subvol_name"
+                return $?
+            else
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_OFFER_ALTERNATIVE_STRATEGY')${LH_COLOR_RESET}"
+                if lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_SWITCH_TO_DEFAULT_STRATEGY')" "n"; then
+                    execute_default_subvol_strategy "$target_root" "$restored_subvol_name"
+                    return $?
+                else
+                    restore_log_msg "INFO" "User chose to skip automatic bootloader configuration"
+                    return 0
+                fi
+            fi
+            ;;
+        "default_subvol")
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_STRATEGY_DEFAULT_DETECTED')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_STRATEGY_DEFAULT_EXPLANATION')${LH_COLOR_RESET}"
+            echo ""
+            
+            if lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_UPDATE_DEFAULT_SUBVOL')" "y"; then
+                execute_default_subvol_strategy "$target_root" "$restored_subvol_name"
+                return $?
+            else
+                restore_log_msg "INFO" "User chose to skip default subvolume update"
+                return 0
+            fi
+            ;;
+        "default_subvol")
+            # This now includes the safety case where config was unclear
+            if [[ "$DETECTED_BOOT_STRATEGY" == "default_subvol" ]] && echo "$analysis_result" | grep -q "SAFETY:"; then
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_STRATEGY_SAFETY_DEFAULT')${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_STRATEGY_SAFETY_EXPLANATION')${LH_COLOR_RESET}"
+            else
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_STRATEGY_DEFAULT_DETECTED')${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_STRATEGY_DEFAULT_EXPLANATION')${LH_COLOR_RESET}"
+            fi
+            echo ""
+            
+            if lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_UPDATE_DEFAULT_SUBVOL')" "y"; then
+                execute_default_subvol_strategy "$target_root" "$restored_subvol_name"
+                return $?
+            else
+                restore_log_msg "INFO" "User chose to skip default subvolume update"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_MANUAL_DEFAULT_REQUIRED')${LH_COLOR_RESET}"
+                return 0
+            fi
+            ;;
+        *)
+            restore_log_msg "ERROR" "Unknown boot strategy detected: $DETECTED_BOOT_STRATEGY"
+            return 1
+            ;;
+    esac
+}
+
+# Execute strategy: Keep existing explicit subvol= references (safest)
+execute_explicit_subvol_strategy() {
+    local target_root="$1"
+    local restored_subvol_name="$2"
+    
+    restore_log_msg "INFO" "Executing explicit subvolume strategy (safest)"
+    
+    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_EXPLICIT_STRATEGY_INFO')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_EXPLICIT_STRATEGY_DETAILS')${LH_COLOR_RESET}"
+    
+    # For explicit subvol strategy, we typically don't need to change anything
+    # because the bootloader already knows to look for the specific subvolume name
+    # The restore process has already placed the restored data in the correct subvolume location
+    
+    restore_log_msg "INFO" "Explicit subvolume strategy: No changes needed to boot configuration"
+    restore_log_msg "INFO" "Bootloader will continue using explicit subvol=$restored_subvol_name references"
+    
+    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_EXPLICIT_STRATEGY_COMPLETE')${LH_COLOR_RESET}"
+    return 0
+}
+
+# Execute strategy: Update default subvolume (traditional approach)
+execute_default_subvol_strategy() {
+    local target_root="$1"
+    local restored_subvol_name="$2"
+    
+    restore_log_msg "INFO" "Executing default subvolume strategy"
+    
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_DEFAULT_STRATEGY_INFO')${LH_COLOR_RESET}"
+    
+    # Create backups before making changes
+    if ! backup_bootloader_files "$target_root"; then
+        restore_log_msg "WARN" "Failed to create backups, but continuing with user consent"
+        if ! lh_confirm_action "$(lh_msg 'RESTORE_CONTINUE_WITHOUT_BACKUP')" "n"; then
+            return 1
+        fi
+    fi
+    
+    # Get the subvolume ID of the restored root
+    local subvol_id
+    subvol_id=$(btrfs subvolume list "$target_root" | grep -E "\s${restored_subvol_name}$" | awk '{print $2}')
+    
+    if [[ -z "$subvol_id" ]]; then
+        restore_log_msg "ERROR" "Cannot determine subvolume ID for restored $restored_subvol_name"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_SUBVOLUME_ID_FAILED')${LH_COLOR_RESET}"
+        return 1
+    fi
+    
+    restore_log_msg "INFO" "Found restored subvolume ID: $subvol_id for $restored_subvol_name"
+    
+    # Show what will be changed
+    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_DEFAULT_STRATEGY_CHANGES'):${LH_COLOR_RESET}"
+    echo -e "• $(lh_msg 'RESTORE_WILL_SET_DEFAULT_SUBVOL' "$subvol_id" "$restored_subvol_name")"
+    if [[ -n "$DETECTED_CURRENT_DEFAULT" ]]; then
+        echo -e "• $(lh_msg 'RESTORE_CURRENT_DEFAULT_WILL_CHANGE' "$DETECTED_CURRENT_DEFAULT")"
+    fi
+    echo ""
+    
+    if ! lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_DEFAULT_STRATEGY_CHANGES')" "y"; then
+        restore_log_msg "INFO" "User aborted default subvolume strategy"
+        return 1
+    fi
+    
+    # Execute the default subvolume change
+    if [[ "$DRY_RUN" == "false" ]]; then
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_SETTING_DEFAULT_SUBVOLUME')${LH_COLOR_RESET}"
+        
+        if btrfs subvolume set-default "$subvol_id" "$target_root"; then
+            restore_log_msg "INFO" "Successfully set default subvolume ID: $subvol_id ($restored_subvol_name)"
+            echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_DEFAULT_SUBVOLUME_SET')${LH_COLOR_RESET}"
+            
+            # Verify the change
+            local new_default
+            new_default=$(btrfs subvolume get-default "$target_root" 2>/dev/null | awk '{print $9}' || echo "")
+            if [[ "$new_default" == "$restored_subvol_name" ]] || [[ "$new_default" =~ $restored_subvol_name$ ]]; then
+                restore_log_msg "INFO" "Verified: Default subvolume is now $new_default"
+                echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_DEFAULT_SUBVOLUME_VERIFIED')${LH_COLOR_RESET}"
+            else
+                restore_log_msg "WARN" "Default subvolume verification inconclusive: $new_default"
+            fi
+        else
+            restore_log_msg "ERROR" "Failed to set default subvolume ID: $subvol_id"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_DEFAULT_SUBVOLUME_FAILED')${LH_COLOR_RESET}"
+            
+            # Offer rollback if backups exist
+            if [[ ${#BOOTLOADER_BACKUP_FILES[@]} -gt 0 ]]; then
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ROLLBACK_AVAILABLE')${LH_COLOR_RESET}"
+                if lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_ROLLBACK')" "n"; then
+                    rollback_bootloader_changes
+                fi
+            fi
+            return 1
+        fi
+    else
+        restore_log_msg "INFO" "DRY-RUN: Would set default subvolume ID $subvol_id for $restored_subvol_name"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_DRY_RUN_DEFAULT_SUBVOL' "$subvol_id" "$restored_subvol_name")${LH_COLOR_RESET}"
+    fi
+    
+    return 0
+}
+
+# Perform complete system rollback after partial restore failure
+perform_complete_system_rollback() {
+    local restore_timestamp="$1"
+    local root_backup_created="$2"
+    local home_backup_created="$3"
+    local bootloader_modified="$4"
+    
+    restore_log_msg "INFO" "Starting complete system rollback for timestamp: $restore_timestamp"
+    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_STARTING_ROLLBACK')${LH_COLOR_RESET}"
+    
+    local rollback_success="true"
+    
+    # Phase 1: Rollback bootloader changes
+    if [[ "$bootloader_modified" == "true" ]]; then
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ROLLBACK_BOOTLOADER')${LH_COLOR_RESET}"
+        restore_log_msg "INFO" "Rolling back bootloader changes"
+        
+        if ! rollback_bootloader_changes; then
+            restore_log_msg "ERROR" "Failed to rollback bootloader changes"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ROLLBACK_BOOTLOADER_FAILED')${LH_COLOR_RESET}"
+            rollback_success="false"
+        else
+            restore_log_msg "INFO" "Bootloader rollback successful"
+        fi
+    fi
+    
+    # Phase 2: Rollback home subvolume
+    if [[ "$home_backup_created" == "true" ]]; then
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ROLLBACK_HOME')${LH_COLOR_RESET}"
+        restore_log_msg "INFO" "Rolling back home subvolume"
+        
+        local home_backup_path="${TARGET_ROOT}/@home.broken_${restore_timestamp}"
+        if [[ -d "$home_backup_path" ]]; then
+            # Remove the failed restored @home and restore the backup
+            if [[ -d "${TARGET_ROOT}/@home" ]]; then
+                if [[ "$DRY_RUN" == "false" ]]; then
+                    if btrfs subvolume delete "${TARGET_ROOT}/@home" 2>/dev/null; then
+                        restore_log_msg "INFO" "Deleted failed home restore"
+                    else
+                        restore_log_msg "WARN" "Could not delete failed home restore"
+                    fi
+                    
+                    # Restore original home from backup
+                    if mv "$home_backup_path" "${TARGET_ROOT}/@home"; then
+                        restore_log_msg "INFO" "Home subvolume rollback successful"
+                        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_ROLLBACK_HOME_SUCCESS')${LH_COLOR_RESET}"
+                    else
+                        restore_log_msg "ERROR" "Failed to restore original home subvolume"
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ROLLBACK_HOME_FAILED')${LH_COLOR_RESET}"
+                        rollback_success="false"
+                    fi
+                else
+                    restore_log_msg "INFO" "DRY-RUN: Would rollback home subvolume"
+                fi
+            fi
+        else
+            restore_log_msg "WARN" "Home backup not found for rollback: $home_backup_path"
+        fi
+    fi
+    
+    # Phase 3: Rollback root subvolume (most critical)
+    if [[ "$root_backup_created" == "true" ]]; then
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ROLLBACK_ROOT')${LH_COLOR_RESET}"
+        restore_log_msg "INFO" "Rolling back root subvolume"
+        
+        local root_backup_path="${TARGET_ROOT}/@.broken_${restore_timestamp}"
+        if [[ -d "$root_backup_path" ]]; then
+            # Remove the failed restored @ and restore the backup
+            if [[ -d "${TARGET_ROOT}/@" ]]; then
+                if [[ "$DRY_RUN" == "false" ]]; then
+                    if btrfs subvolume delete "${TARGET_ROOT}/@" 2>/dev/null; then
+                        restore_log_msg "INFO" "Deleted failed root restore"
+                    else
+                        restore_log_msg "WARN" "Could not delete failed root restore"
+                    fi
+                    
+                    # Restore original root from backup
+                    if mv "$root_backup_path" "${TARGET_ROOT}/@"; then
+                        restore_log_msg "INFO" "Root subvolume rollback successful"
+                        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_ROLLBACK_ROOT_SUCCESS')${LH_COLOR_RESET}"
+                        
+                        # Restore original default subvolume if needed
+                        local original_subvol_id
+                        original_subvol_id=$(btrfs subvolume list "$TARGET_ROOT" | grep -E "\s@$" | awk '{print $2}')
+                        if [[ -n "$original_subvol_id" ]]; then
+                            if btrfs subvolume set-default "$original_subvol_id" "$TARGET_ROOT"; then
+                                restore_log_msg "INFO" "Restored original default subvolume: $original_subvol_id"
+                            else
+                                restore_log_msg "WARN" "Could not restore original default subvolume"
+                            fi
+                        fi
+                    else
+                        restore_log_msg "ERROR" "CRITICAL: Failed to restore original root subvolume"
+                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ROLLBACK_ROOT_CRITICAL_FAILED')${LH_COLOR_RESET}"
+                        rollback_success="false"
+                    fi
+                else
+                    restore_log_msg "INFO" "DRY-RUN: Would rollback root subvolume"
+                fi
+            fi
+        else
+            restore_log_msg "ERROR" "CRITICAL: Root backup not found for rollback: $root_backup_path"
+            rollback_success="false"
+        fi
+    fi
+    
+    # Report rollback results
+    if [[ "$rollback_success" == "true" ]]; then
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_ROLLBACK_COMPLETE_SUCCESS')${LH_COLOR_RESET}"
+        restore_log_msg "INFO" "Complete system rollback successful"
+        return 0
+    else
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ROLLBACK_PARTIAL_FAILURE')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_ROLLBACK_MANUAL_INTERVENTION')${LH_COLOR_RESET}"
+        restore_log_msg "ERROR" "Rollback completed with some failures - manual intervention may be required"
+        return 1
+    fi
+}
+
+# Rollback bootloader changes using created backups
+rollback_bootloader_changes() {
+    restore_log_msg "INFO" "Rolling back bootloader configuration changes"
+    
+    local rollback_success="true"
+    
+    for backup_file in "${BOOTLOADER_BACKUP_FILES[@]}"; do
+        local original_file="${backup_file%_pre_restore_*}"
+        
+        if [[ -f "$backup_file" ]] && [[ -f "$original_file" ]]; then
+            restore_log_msg "INFO" "Rolling back: $original_file"
+            
+            if [[ "$DRY_RUN" == "false" ]]; then
+                if cp "$backup_file" "$original_file"; then
+                    restore_log_msg "INFO" "Successfully rolled back: $original_file"
+                else
+                    restore_log_msg "ERROR" "Failed to rollback: $original_file"
+                    rollback_success="false"
+                fi
+            else
+                restore_log_msg "INFO" "DRY-RUN: Would rollback $original_file from $backup_file"
+            fi
+        else
+            restore_log_msg "WARN" "Cannot rollback $original_file: backup or original missing"
+        fi
+    done
+    
+    if [[ "$rollback_success" == "true" ]]; then
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_ROLLBACK_SUCCESSFUL')${LH_COLOR_RESET}"
+        return 0
+    else
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ROLLBACK_PARTIAL')${LH_COLOR_RESET}"
+        return 1
+    fi
+}
+
+# Enhanced bootloader configuration with safety features
 handle_bootloader_configuration() {
     echo ""
     echo -e "${LH_COLOR_WARNING}╔════════════════════════════════════════╗"
@@ -1125,34 +2115,24 @@ handle_bootloader_configuration() {
     echo -e "╚════════════════════════════════════════╝${LH_COLOR_RESET}"
     echo ""
     
-    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_BOOTLOADER_INFO')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_BOOTLOADER_ENHANCED_INFO')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_BOOTLOADER_CRITICAL')${LH_COLOR_RESET}"
     echo ""
     
-    # Set default subvolume
+    # Initialize global variables for detection results
+    DETECTED_BOOT_STRATEGY=""
+    DETECTED_FSTAB_USES_SUBVOL=""
+    DETECTED_GRUB_USES_SUBVOL=""
+    DETECTED_CURRENT_DEFAULT=""
+    BOOTLOADER_BACKUP_FILES=()
+    
     local restored_root="${TARGET_ROOT}/@"
     
-    if [[ "$DRY_RUN" == "false" ]]; then
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_SETTING_DEFAULT_SUBVOLUME')${LH_COLOR_RESET}"
-        
-        # Get the subvolume ID of the restored root
-        local subvol_id
-        subvol_id=$(btrfs subvolume list "$TARGET_ROOT" | grep -E '\s@$' | awk '{print $2}')
-        
-        if [[ -n "$subvol_id" ]]; then
-            if btrfs subvolume set-default "$subvol_id" "$TARGET_ROOT"; then
-                restore_log_msg "INFO" "Successfully set default subvolume ID: $subvol_id"
-                echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_DEFAULT_SUBVOLUME_SET')${LH_COLOR_RESET}"
-            else
-                restore_log_msg "ERROR" "Failed to set default subvolume"
-                echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_DEFAULT_SUBVOLUME_FAILED')${LH_COLOR_RESET}"
-            fi
-        else
-            restore_log_msg "ERROR" "Could not determine subvolume ID for restored root"
-            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_SUBVOLUME_ID_FAILED')${LH_COLOR_RESET}"
-        fi
+    # Execute the enhanced boot strategy selection
+    if choose_boot_strategy "$TARGET_ROOT" "@"; then
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_BOOTLOADER_CONFIGURATION_COMPLETE')${LH_COLOR_RESET}"
     else
-        restore_log_msg "INFO" "DRY-RUN: Would set default subvolume for restored @"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_BOOTLOADER_CONFIGURATION_INCOMPLETE')${LH_COLOR_RESET}"
     fi
     
     echo ""
@@ -1160,6 +2140,7 @@ handle_bootloader_configuration() {
     echo -e "• $(lh_msg 'RESTORE_BOOTLOADER_CHROOT')"
     echo -e "• $(lh_msg 'RESTORE_BOOTLOADER_UPDATE_GRUB')"
     echo -e "• $(lh_msg 'RESTORE_BOOTLOADER_VERIFY_FSTAB')"
+    echo -e "• $(lh_msg 'RESTORE_BOOTLOADER_TEST_BOOT')"
     echo ""
     
     create_manual_checkpoint "$(lh_msg 'RESTORE_CHECKPOINT_BOOTLOADER')"
