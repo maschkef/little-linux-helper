@@ -841,3 +841,198 @@ MSG_EN[BACKUP_KEEP_SOURCE_SNAPSHOTS]="Keep source snapshots after backup?"
 
 # Missing BTRFS cleanup key
 MSG_EN[BTRFS_CLEANUP_DELETED]="Snapshots successfully deleted"
+
+# ===== BTRFS RESTORE MODULE - MISSING TRANSLATIONS =====
+
+# Bootloader configuration
+MSG_EN[RESTORE_BOOTLOADER_CONFIGURATION_COMPLETE]="Bootloader configuration completed successfully"
+MSG_EN[RESTORE_BOOTLOADER_CONFIGURATION_INCOMPLETE]="Bootloader configuration incomplete"
+MSG_EN[RESTORE_BOOTLOADER_ENHANCED_INFO]="Enhanced bootloader configuration details"
+MSG_EN[RESTORE_BOOTLOADER_FAILED]="Bootloader configuration failed"
+MSG_EN[RESTORE_BOOTLOADER_ROLLBACK_OPTION]="Bootloader modification failed - rollback available"
+MSG_EN[RESTORE_BOOTLOADER_TEST_BOOT]="Test boot after configuration changes"
+
+# Boot strategy analysis
+MSG_EN[RESTORE_BOOT_STRATEGY_ANALYSIS]="Boot Configuration Strategy Analysis"
+MSG_EN[RESTORE_BROKEN_INCREMENTAL_CHAIN]="Incremental backup chain is broken"
+
+# Confirmation dialogs
+MSG_EN[RESTORE_CONFIRM_COMPLETE_ROLLBACK_BOOTLOADER]="Rollback complete system due to bootloader failure?"
+MSG_EN[RESTORE_CONFIRM_DEFAULT_STRATEGY_CHANGES]="Proceed with default subvolume strategy changes?"
+MSG_EN[RESTORE_CONFIRM_KEEP_EXPLICIT_CONFIG]="Keep current explicit bootloader configuration?"
+MSG_EN[RESTORE_CONFIRM_ROLLBACK]="Confirm rollback of changes?"
+MSG_EN[RESTORE_CONFIRM_ROLLBACK_ROOT]="Rollback root subvolume changes?"
+MSG_EN[RESTORE_CONFIRM_SWITCH_TO_DEFAULT_STRATEGY]="Switch to default subvolume strategy instead?"
+MSG_EN[RESTORE_CONFIRM_UPDATE_DEFAULT_SUBVOL]="Update default BTRFS subvolume?"
+
+# Continue operations
+MSG_EN[RESTORE_CONTINUE_BROKEN_CHAIN]="Continue despite broken backup chain?"
+MSG_EN[RESTORE_CONTINUE_COMPLETE_WITHOUT_VALIDATION]="Continue complete system restore without full validation?"
+MSG_EN[RESTORE_CONTINUE_DESPITE_SPACE_CONCERNS]="Continue despite space concerns?"
+MSG_EN[RESTORE_CONTINUE_NOT_READONLY]="Continue without making source read-only?"
+MSG_EN[RESTORE_CONTINUE_WITHOUT_BACKUP]="Continue without creating backups?"
+MSG_EN[RESTORE_CONTINUE_WITHOUT_PARENT_VALIDATION]="Continue without parent validation?"
+
+# Default strategy information
+MSG_EN[RESTORE_CURRENT_DEFAULT_WILL_CHANGE]="Current default subvolume '%s' will be changed"
+MSG_EN[RESTORE_DEFAULT_STRATEGY_CHANGES]="Changes that will be made to default subvolume"
+MSG_EN[RESTORE_DEFAULT_STRATEGY_INFO]="Using default subvolume strategy for bootloader"
+MSG_EN[RESTORE_DEFAULT_SUBVOLUME_VERIFIED]="Default subvolume change verified successfully"
+MSG_EN[RESTORE_DETECTED_STRATEGY]="Detected boot strategy: %s"
+MSG_EN[RESTORE_DRY_RUN_DEFAULT_SUBVOL]="Dry-run: Would set default subvolume ID %s for %s"
+
+# Error messages - General
+MSG_EN[RESTORE_ERROR_ABORT_REQUIRED]="ABORT REQUIRED: This cannot be automatically fixed"
+MSG_EN[RESTORE_ERROR_CHECK_DMESG]="Check dmesg for additional errors"
+MSG_EN[RESTORE_ERROR_CHECK_FILESYSTEM_SUPPORT]="Check if target filesystem supports the operation"
+MSG_EN[RESTORE_ERROR_CHECK_LOGS]="Check logs for detailed information"
+MSG_EN[RESTORE_ERROR_CHECK_TARGET_HEALTH]="Check target filesystem health"
+MSG_EN[RESTORE_ERROR_CONSIDER_BTRFS_CHECK]="Consider btrfs check (READ-ONLY first!)"
+MSG_EN[RESTORE_ERROR_CORRUPTION_CAUSE]="Filesystem tree inconsistency (often after crash)"
+MSG_EN[RESTORE_ERROR_CORRUPTION_DETECTED]="Filesystem corruption detected during restore"
+MSG_EN[RESTORE_ERROR_CORRUPTION_RECOMMENDATIONS]="Manual filesystem repair required"
+MSG_EN[RESTORE_ERROR_CORRUPTION_WARNING]="WARNING: This indicates serious filesystem problems"
+MSG_EN[RESTORE_ERROR_CURRENT_USER]="Current user: %s (EUID: %s)"
+MSG_EN[RESTORE_ERROR_EMERGENCY_READONLY]="CRITICAL: BTRFS emergency read-only mode detected"
+
+# Error messages - Filesystem analysis
+MSG_EN[RESTORE_ERROR_FILESYSTEM_ANALYSIS]="Performing BTRFS filesystem analysis"
+MSG_EN[RESTORE_ERROR_GENERAL]="General BTRFS operation failed: %s"
+MSG_EN[RESTORE_ERROR_GENERAL_RECOVERY_STEPS]="General recovery steps"
+MSG_EN[RESTORE_ERROR_INSUFFICIENT_PERMISSIONS]="BTRFS ERROR: Insufficient permissions"
+MSG_EN[RESTORE_ERROR_LIST_SNAPSHOTS]="List available snapshots: btrfs subvolume list %s"
+MSG_EN[RESTORE_ERROR_MANUAL_RECOVERY_OPTIONS]="Manual recovery options"
+MSG_EN[RESTORE_ERROR_MANUAL_STEPS_REQUIRED]="Required manual steps"
+MSG_EN[RESTORE_ERROR_METADATA_CORRUPTION]="BTRFS CRITICAL ERROR: Metadata corruption detected"
+
+# Error messages - Mount analysis
+MSG_EN[RESTORE_ERROR_MOUNT_ANALYSIS]="Mount analysis"
+MSG_EN[RESTORE_ERROR_MOUNT_FILESYSTEM_SOLUTION]="Solution: Mount BTRFS filesystem at %s"
+MSG_EN[RESTORE_ERROR_MOUNTPOINT_CAUSE]="Backup target is not a valid BTRFS mount point"
+MSG_EN[RESTORE_ERROR_MOUNTPOINT_INVALID]="✗ %s is NOT a mountpoint"
+MSG_EN[RESTORE_ERROR_MOUNTPOINT_VALID]="✓ %s is a valid mountpoint"
+MSG_EN[RESTORE_ERROR_MOUNTPOINT_VERIFICATION]="Mountpoint verification"
+MSG_EN[RESTORE_ERROR_NO_SPACE_DEVICE]="No space left on device during restore"
+
+# Error messages - Parent operations
+MSG_EN[RESTORE_ERROR_PARENT_MISSING]="Parent snapshot missing for incremental restore"
+MSG_EN[RESTORE_ERROR_PARENT_MISSING_CAUSE]="Parent snapshot for incremental restore not found on target system"
+MSG_EN[RESTORE_ERROR_PARENT_MISSING_SOLUTION]="Solution: Performing full snapshot transfer instead of incremental"
+MSG_EN[RESTORE_ERROR_PARENT_SNAPSHOT_MISSING]="BTRFS ERROR: Parent snapshot missing"
+MSG_EN[RESTORE_ERROR_PARENT_SUGGESTIONS]="Suggestions for resolving parent snapshot issues"
+MSG_EN[RESTORE_ERROR_PARENT_VALIDATION]="Parent snapshot validation failed"
+
+# Error messages - Permissions
+MSG_EN[RESTORE_ERROR_PERMISSION_CHECK]="Permission check"
+MSG_EN[RESTORE_ERROR_PERMISSION_DENIED]="BTRFS operation permission denied"
+MSG_EN[RESTORE_ERROR_PERMISSIONS_CAUSE]="Script not running with required privileges (root)"
+MSG_EN[RESTORE_ERROR_PROFESSIONAL_RECOVERY]="May require professional data recovery"
+
+# Error messages - Read-only filesystem
+MSG_EN[RESTORE_ERROR_READONLY_CAUSE]="Target filesystem mounted read-only or emergency read-only mode"
+MSG_EN[RESTORE_ERROR_READONLY_FILESYSTEM]="BTRFS ERROR: Filesystem is read-only"
+MSG_EN[RESTORE_ERROR_READONLY_SOLUTIONS]="Read-only filesystem solutions"
+MSG_EN[RESTORE_ERROR_RECOVERY_STEPS]="Recovery steps"
+MSG_EN[RESTORE_ERROR_REMOUNT_COMMAND]="Command: mount -o remount,rw %s"
+MSG_EN[RESTORE_ERROR_REMOUNT_SOLUTION]="Solution: Remount filesystem read-write"
+MSG_EN[RESTORE_ERROR_RETRY_FULL_TRANSFER]="Retry with full transfer (script will handle automatically)"
+MSG_EN[RESTORE_ERROR_RETRY_OPERATION]="Retry restore operation"
+MSG_EN[RESTORE_ERROR_ROOT_STILL_DENIED]="Running as root but still getting permission errors"
+MSG_EN[RESTORE_ERROR_RUN_AS_ROOT]="Solution: Run script as root or with sudo"
+
+# Error messages - Send/Receive
+MSG_EN[RESTORE_ERROR_SEND_RECEIVE_SUGGESTIONS]="Send/receive operation suggestions"
+MSG_EN[RESTORE_ERROR_SNAPSHOT_MISSING]="Required snapshot is missing"
+
+# Error messages - Space
+MSG_EN[RESTORE_ERROR_SPACE_BALANCE]="Run btrfs balance operation"
+MSG_EN[RESTORE_ERROR_SPACE_CLEANUP]="Clean up unnecessary files"
+MSG_EN[RESTORE_ERROR_SPACE_EXHAUSTED]="Space exhaustion during restore operation"
+MSG_EN[RESTORE_ERROR_SPACE_EXHAUSTION]="BTRFS ERROR: Space exhaustion (likely metadata chunks)"
+MSG_EN[RESTORE_ERROR_SPACE_EXHAUSTION_CAUSE]="BTRFS metadata chunks exhausted, not actual disk space"
+MSG_EN[RESTORE_ERROR_SPACE_EXHAUSTION_CRITICAL]="Critical: This requires manual intervention"
+MSG_EN[RESTORE_ERROR_SPACE_EXTEND]="Extend filesystem space"
+MSG_EN[RESTORE_ERROR_SPACE_SOLUTIONS]="Space-related solutions"
+
+# Error messages - Target and corruption
+MSG_EN[RESTORE_ERROR_TARGET_NOT_MOUNTED]="BTRFS ERROR: Target not properly mounted"
+MSG_EN[RESTORE_ERROR_TRANSID_FAILURE]="Transaction ID validation failed"
+MSG_EN[RESTORE_ERROR_TRANSID_SOLUTION]="Transaction ID failure resolution"
+MSG_EN[RESTORE_ERROR_TRY_USEBACKUPROOT]="Try mount with -o usebackuproot"
+MSG_EN[RESTORE_ERROR_UNKNOWN]="Unknown BTRFS error occurred during restore"
+MSG_EN[RESTORE_ERROR_VERIFY_BACKUP_INTEGRITY]="Verify backup integrity before restore"
+
+# Explicit strategy
+MSG_EN[RESTORE_EXPLICIT_STRATEGY_COMPLETE]="Explicit subvolume strategy completed"
+MSG_EN[RESTORE_EXPLICIT_STRATEGY_DETAILS]="Bootloader already configured with explicit subvolume references"
+MSG_EN[RESTORE_EXPLICIT_STRATEGY_INFO]="Using explicit subvolume references (safest approach)"
+
+# Home snapshot validation
+MSG_EN[RESTORE_HOME_SNAPSHOT_VALIDATION_FAILED]="Home snapshot validation failed: %s"
+
+# Incremental restore
+MSG_EN[RESTORE_INCREMENTAL_RESTORE_EXPLANATION]="Incremental restore operation explanation"
+
+# Insufficient space
+MSG_EN[RESTORE_INSUFFICIENT_ATOMIC_SPACE]="Insufficient space for atomic restore workflow"
+
+# Manual requirements
+MSG_EN[RESTORE_MANUAL_BOOTLOADER_REQUIRED]="Manual bootloader configuration required"
+MSG_EN[RESTORE_MANUAL_DEFAULT_REQUIRED]="Manual default subvolume configuration required"
+
+# Snapshot validation
+MSG_EN[RESTORE_NO_VALID_SNAPSHOTS_FOUND]="No valid snapshots found for subvolume: %s"
+
+# Strategy options
+MSG_EN[RESTORE_OFFER_ALTERNATIVE_STRATEGY]="Alternative bootloader strategy available"
+
+# Parent chain validation
+MSG_EN[RESTORE_PARENT_CHAIN_INCOMPLETE]="Incomplete parent chain detected"
+MSG_EN[RESTORE_PARENT_CHAIN_INCOMPLETE_FOR]="Cannot validate parent chain for %s snapshot"
+
+# Partial operations
+MSG_EN[RESTORE_PARTIAL_SUCCESS_ROLLBACK]="Partial success detected - rollback recommended"
+MSG_EN[RESTORE_PARTIAL_SYSTEM_WARNING]="WARNING: System partially restored - manual attention required"
+
+# Read-only warnings
+MSG_EN[RESTORE_READONLY_WARNING]="Warning: Target filesystem is read-only"
+MSG_EN[RESTORE_RECEIVED_NOT_READONLY]="Received snapshot is not read-only - this is unusual"
+
+# Rollback operations
+MSG_EN[RESTORE_ROLLBACK_AVAILABLE]="Rollback option available for failed operation"
+MSG_EN[RESTORE_ROLLBACK_BOOTLOADER]="Rolling back bootloader changes"
+MSG_EN[RESTORE_ROLLBACK_BOOTLOADER_FAILED]="Failed to rollback bootloader changes"
+MSG_EN[RESTORE_ROLLBACK_COMPLETE_SUCCESS]="Complete system rollback successful"
+MSG_EN[RESTORE_ROLLBACK_HOME]="Rolling back home subvolume"
+MSG_EN[RESTORE_ROLLBACK_HOME_FAILED]="Failed to restore original home subvolume"
+MSG_EN[RESTORE_ROLLBACK_HOME_SUCCESS]="Home subvolume rollback successful"
+MSG_EN[RESTORE_ROLLBACK_MANUAL_INTERVENTION]="Manual intervention may be required"
+MSG_EN[RESTORE_ROLLBACK_PARTIAL]="Partial rollback completed"
+MSG_EN[RESTORE_ROLLBACK_PARTIAL_FAILURE]="Rollback completed with some failures"
+MSG_EN[RESTORE_ROLLBACK_ROOT]="Rolling back root subvolume"
+MSG_EN[RESTORE_ROLLBACK_ROOT_CRITICAL_FAILED]="CRITICAL: Failed to restore original root subvolume"
+MSG_EN[RESTORE_ROLLBACK_ROOT_SUCCESS]="Root subvolume rollback successful"
+MSG_EN[RESTORE_ROLLBACK_SUCCESSFUL]="Rollback operation completed successfully"
+
+# Root snapshot validation
+MSG_EN[RESTORE_ROOT_SNAPSHOT_VALIDATION_FAILED]="Root snapshot validation failed: %s"
+
+# Snapshot corruption and validation
+MSG_EN[RESTORE_SNAPSHOT_FILESYSTEM_CORRUPT]="Snapshot filesystem corruption detected"
+MSG_EN[RESTORE_SNAPSHOT_VALIDATION_FAILED]="Snapshot validation failed"
+
+# Starting operations
+MSG_EN[RESTORE_STARTING_ROLLBACK]="Starting complete system rollback"
+
+# Strategy detection and explanation
+MSG_EN[RESTORE_STRATEGY_DEFAULT_DETECTED]="Default subvolume strategy detected"
+MSG_EN[RESTORE_STRATEGY_DEFAULT_EXPLANATION]="System uses default subvolume for boot"
+MSG_EN[RESTORE_STRATEGY_EXPLICIT_EXPLANATION]="System uses explicit subvolume references"
+MSG_EN[RESTORE_STRATEGY_EXPLICIT_SAFE]="Explicit subvolume strategy (safest)"
+MSG_EN[RESTORE_STRATEGY_SAFETY_DEFAULT]="Safety fallback: Using default subvolume strategy"
+MSG_EN[RESTORE_STRATEGY_SAFETY_EXPLANATION]="Boot configuration unclear - using safest option"
+
+# Validation operations
+MSG_EN[RESTORE_VALIDATING_SELECTED_SNAPSHOT]="Validating selected snapshot"
+MSG_EN[RESTORE_VALIDATING_SNAPSHOT_PAIR]="Validating snapshot pair for complete system restore"
+MSG_EN[RESTORE_WILL_SET_DEFAULT_SUBVOL]="Will set default subvolume ID %s for %s"

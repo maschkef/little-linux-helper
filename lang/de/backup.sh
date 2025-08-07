@@ -1010,3 +1010,198 @@ MSG_DE[BACKUP_KEEP_SOURCE_SNAPSHOTS]="Quell-Snapshots nach dem Backup behalten?"
 
 # Missing BTRFS cleanup key
 MSG_DE[BTRFS_CLEANUP_DELETED]="Snapshots erfolgreich gelöscht"
+
+# ===== BTRFS RESTORE MODULE - DEUTSCHE ÜBERSETZUNGEN =====
+
+# Bootloader-Konfiguration
+MSG_DE[RESTORE_BOOTLOADER_CONFIGURATION_COMPLETE]="Bootloader-Konfiguration erfolgreich abgeschlossen"
+MSG_DE[RESTORE_BOOTLOADER_CONFIGURATION_INCOMPLETE]="Bootloader-Konfiguration unvollständig"
+MSG_DE[RESTORE_BOOTLOADER_ENHANCED_INFO]="Erweiterte Bootloader-Konfigurationsdetails"
+MSG_DE[RESTORE_BOOTLOADER_FAILED]="Bootloader-Konfiguration fehlgeschlagen"
+MSG_DE[RESTORE_BOOTLOADER_ROLLBACK_OPTION]="Bootloader-Änderung fehlgeschlagen - Rollback verfügbar"
+MSG_DE[RESTORE_BOOTLOADER_TEST_BOOT]="Boot nach Konfigurationsänderungen testen"
+
+# Boot-Strategie-Analyse
+MSG_DE[RESTORE_BOOT_STRATEGY_ANALYSIS]="Boot-Konfigurations-Strategie-Analyse"
+MSG_DE[RESTORE_BROKEN_INCREMENTAL_CHAIN]="Inkrementelle Backup-Kette ist unterbrochen"
+
+# Bestätigungsdialoge
+MSG_DE[RESTORE_CONFIRM_COMPLETE_ROLLBACK_BOOTLOADER]="Vollständiges System wegen Bootloader-Fehler zurücksetzen?"
+MSG_DE[RESTORE_CONFIRM_DEFAULT_STRATEGY_CHANGES]="Mit Standard-Subvolume-Strategie-Änderungen fortfahren?"
+MSG_DE[RESTORE_CONFIRM_KEEP_EXPLICIT_CONFIG]="Aktuelle explizite Bootloader-Konfiguration beibehalten?"
+MSG_DE[RESTORE_CONFIRM_ROLLBACK]="Rückgängigmachen der Änderungen bestätigen?"
+MSG_DE[RESTORE_CONFIRM_ROLLBACK_ROOT]="Root-Subvolume-Änderungen zurücksetzen?"
+MSG_DE[RESTORE_CONFIRM_SWITCH_TO_DEFAULT_STRATEGY]="Stattdessen zur Standard-Subvolume-Strategie wechseln?"
+MSG_DE[RESTORE_CONFIRM_UPDATE_DEFAULT_SUBVOL]="Standard-BTRFS-Subvolume aktualisieren?"
+
+# Fortsetzungsoptionen
+MSG_DE[RESTORE_CONTINUE_BROKEN_CHAIN]="Trotz unterbrochener Backup-Kette fortfahren?"
+MSG_DE[RESTORE_CONTINUE_COMPLETE_WITHOUT_VALIDATION]="Vollständige Systemwiederherstellung ohne vollständige Validierung fortsetzen?"
+MSG_DE[RESTORE_CONTINUE_DESPITE_SPACE_CONCERNS]="Trotz Speicherplatz-Bedenken fortfahren?"
+MSG_DE[RESTORE_CONTINUE_NOT_READONLY]="Ohne Quelle schreibgeschützt zu machen fortfahren?"
+MSG_DE[RESTORE_CONTINUE_WITHOUT_BACKUP]="Ohne Erstellung von Backups fortfahren?"
+MSG_DE[RESTORE_CONTINUE_WITHOUT_PARENT_VALIDATION]="Ohne Eltern-Validierung fortfahren?"
+
+# Standard-Strategie-Informationen
+MSG_DE[RESTORE_CURRENT_DEFAULT_WILL_CHANGE]="Aktuelles Standard-Subvolume '%s' wird geändert"
+MSG_DE[RESTORE_DEFAULT_STRATEGY_CHANGES]="Änderungen, die am Standard-Subvolume vorgenommen werden"
+MSG_DE[RESTORE_DEFAULT_STRATEGY_INFO]="Verwendung der Standard-Subvolume-Strategie für Bootloader"
+MSG_DE[RESTORE_DEFAULT_SUBVOLUME_VERIFIED]="Standard-Subvolume-Änderung erfolgreich verifiziert"
+MSG_DE[RESTORE_DETECTED_STRATEGY]="Erkannte Boot-Strategie: %s"
+MSG_DE[RESTORE_DRY_RUN_DEFAULT_SUBVOL]="Testlauf: Würde Standard-Subvolume-ID %s für %s setzen"
+
+# Fehlermeldungen - Allgemein
+MSG_DE[RESTORE_ERROR_ABORT_REQUIRED]="ABBRUCH ERFORDERLICH: Dies kann nicht automatisch behoben werden"
+MSG_DE[RESTORE_ERROR_CHECK_DMESG]="dmesg auf zusätzliche Fehler prüfen"
+MSG_DE[RESTORE_ERROR_CHECK_FILESYSTEM_SUPPORT]="Prüfen, ob Ziel-Dateisystem die Operation unterstützt"
+MSG_DE[RESTORE_ERROR_CHECK_LOGS]="Protokolle für detaillierte Informationen prüfen"
+MSG_DE[RESTORE_ERROR_CHECK_TARGET_HEALTH]="Ziel-Dateisystem-Gesundheit prüfen"
+MSG_DE[RESTORE_ERROR_CONSIDER_BTRFS_CHECK]="btrfs check erwägen (zuerst NUR-LESEN!)"
+MSG_DE[RESTORE_ERROR_CORRUPTION_CAUSE]="Dateisystem-Baum-Inkonsistenz (oft nach Absturz)"
+MSG_DE[RESTORE_ERROR_CORRUPTION_DETECTED]="Dateisystem-Korruption während Wiederherstellung erkannt"
+MSG_DE[RESTORE_ERROR_CORRUPTION_RECOMMENDATIONS]="Manuelle Dateisystem-Reparatur erforderlich"
+MSG_DE[RESTORE_ERROR_CORRUPTION_WARNING]="WARNUNG: Dies deutet auf ernsthafte Dateisystem-Probleme hin"
+MSG_DE[RESTORE_ERROR_CURRENT_USER]="Aktueller Benutzer: %s (EUID: %s)"
+MSG_DE[RESTORE_ERROR_EMERGENCY_READONLY]="KRITISCH: BTRFS Notfall-Nur-Lesen-Modus erkannt"
+
+# Fehlermeldungen - Dateisystem-Analyse
+MSG_DE[RESTORE_ERROR_FILESYSTEM_ANALYSIS]="BTRFS-Dateisystem-Analyse wird durchgeführt"
+MSG_DE[RESTORE_ERROR_GENERAL]="Allgemeiner BTRFS-Vorgang fehlgeschlagen: %s"
+MSG_DE[RESTORE_ERROR_GENERAL_RECOVERY_STEPS]="Allgemeine Wiederherstellungsschritte"
+MSG_DE[RESTORE_ERROR_INSUFFICIENT_PERMISSIONS]="BTRFS FEHLER: Unzureichende Berechtigungen"
+MSG_DE[RESTORE_ERROR_LIST_SNAPSHOTS]="Verfügbare Snapshots auflisten: btrfs subvolume list %s"
+MSG_DE[RESTORE_ERROR_MANUAL_RECOVERY_OPTIONS]="Manuelle Wiederherstellungsoptionen"
+MSG_DE[RESTORE_ERROR_MANUAL_STEPS_REQUIRED]="Erforderliche manuelle Schritte"
+MSG_DE[RESTORE_ERROR_METADATA_CORRUPTION]="BTRFS KRITISCHER FEHLER: Metadaten-Korruption erkannt"
+
+# Fehlermeldungen - Mount-Analyse
+MSG_DE[RESTORE_ERROR_MOUNT_ANALYSIS]="Mount-Analyse"
+MSG_DE[RESTORE_ERROR_MOUNT_FILESYSTEM_SOLUTION]="Lösung: BTRFS-Dateisystem bei %s mounten"
+MSG_DE[RESTORE_ERROR_MOUNTPOINT_CAUSE]="Backup-Ziel ist kein gültiger BTRFS-Mount-Punkt"
+MSG_DE[RESTORE_ERROR_MOUNTPOINT_INVALID]="✗ %s ist KEIN Mountpoint"
+MSG_DE[RESTORE_ERROR_MOUNTPOINT_VALID]="✓ %s ist ein gültiger Mountpoint"
+MSG_DE[RESTORE_ERROR_MOUNTPOINT_VERIFICATION]="Mountpoint-Verifikation"
+MSG_DE[RESTORE_ERROR_NO_SPACE_DEVICE]="Kein Speicherplatz auf Gerät während Wiederherstellung"
+
+# Fehlermeldungen - Eltern-Operationen
+MSG_DE[RESTORE_ERROR_PARENT_MISSING]="Eltern-Snapshot für inkrementelle Wiederherstellung fehlt"
+MSG_DE[RESTORE_ERROR_PARENT_MISSING_CAUSE]="Eltern-Snapshot für inkrementelle Wiederherstellung nicht auf Zielsystem gefunden"
+MSG_DE[RESTORE_ERROR_PARENT_MISSING_SOLUTION]="Lösung: Vollständige Snapshot-Übertragung statt inkrementelle wird durchgeführt"
+MSG_DE[RESTORE_ERROR_PARENT_SNAPSHOT_MISSING]="BTRFS FEHLER: Eltern-Snapshot fehlt"
+MSG_DE[RESTORE_ERROR_PARENT_SUGGESTIONS]="Vorschläge zur Lösung von Eltern-Snapshot-Problemen"
+MSG_DE[RESTORE_ERROR_PARENT_VALIDATION]="Eltern-Snapshot-Validierung fehlgeschlagen"
+
+# Fehlermeldungen - Berechtigungen
+MSG_DE[RESTORE_ERROR_PERMISSION_CHECK]="Berechtigungsprüfung"
+MSG_DE[RESTORE_ERROR_PERMISSION_DENIED]="BTRFS-Operation Berechtigung verweigert"
+MSG_DE[RESTORE_ERROR_PERMISSIONS_CAUSE]="Skript läuft nicht mit erforderlichen Berechtigungen (root)"
+MSG_DE[RESTORE_ERROR_PROFESSIONAL_RECOVERY]="Möglicherweise professionelle Datenrettung erforderlich"
+
+# Fehlermeldungen - Nur-Lesen-Dateisystem
+MSG_DE[RESTORE_ERROR_READONLY_CAUSE]="Ziel-Dateisystem als schreibgeschützt gemountet oder Notfall-Nur-Lesen-Modus"
+MSG_DE[RESTORE_ERROR_READONLY_FILESYSTEM]="BTRFS FEHLER: Dateisystem ist schreibgeschützt"
+MSG_DE[RESTORE_ERROR_READONLY_SOLUTIONS]="Nur-Lesen-Dateisystem-Lösungen"
+MSG_DE[RESTORE_ERROR_RECOVERY_STEPS]="Wiederherstellungsschritte"
+MSG_DE[RESTORE_ERROR_REMOUNT_COMMAND]="Befehl: mount -o remount,rw %s"
+MSG_DE[RESTORE_ERROR_REMOUNT_SOLUTION]="Lösung: Dateisystem mit Schreibzugriff neu mounten"
+MSG_DE[RESTORE_ERROR_RETRY_FULL_TRANSFER]="Mit vollständiger Übertragung wiederholen (Skript übernimmt automatisch)"
+MSG_DE[RESTORE_ERROR_RETRY_OPERATION]="Wiederherstellungsoperation wiederholen"
+MSG_DE[RESTORE_ERROR_ROOT_STILL_DENIED]="Als root ausgeführt, aber immer noch Berechtigungsfehler"
+MSG_DE[RESTORE_ERROR_RUN_AS_ROOT]="Lösung: Skript als root oder mit sudo ausführen"
+
+# Fehlermeldungen - Send/Receive
+MSG_DE[RESTORE_ERROR_SEND_RECEIVE_SUGGESTIONS]="Send/Receive-Operation-Vorschläge"
+MSG_DE[RESTORE_ERROR_SNAPSHOT_MISSING]="Erforderlicher Snapshot fehlt"
+
+# Fehlermeldungen - Speicherplatz
+MSG_DE[RESTORE_ERROR_SPACE_BALANCE]="btrfs balance-Operation ausführen"
+MSG_DE[RESTORE_ERROR_SPACE_CLEANUP]="Unnötige Dateien bereinigen"
+MSG_DE[RESTORE_ERROR_SPACE_EXHAUSTED]="Speicherplatz-Erschöpfung während Wiederherstellungsoperation"
+MSG_DE[RESTORE_ERROR_SPACE_EXHAUSTION]="BTRFS FEHLER: Speicherplatz-Erschöpfung (wahrscheinlich Metadaten-Chunks)"
+MSG_DE[RESTORE_ERROR_SPACE_EXHAUSTION_CAUSE]="BTRFS-Metadaten-Chunks erschöpft, nicht tatsächlich Festplattenspeicher"
+MSG_DE[RESTORE_ERROR_SPACE_EXHAUSTION_CRITICAL]="Kritisch: Dies erfordert manuelle Intervention"
+MSG_DE[RESTORE_ERROR_SPACE_EXTEND]="Dateisystem-Speicherplatz erweitern"
+MSG_DE[RESTORE_ERROR_SPACE_SOLUTIONS]="Speicherplatz-bezogene Lösungen"
+
+# Fehlermeldungen - Ziel und Korruption
+MSG_DE[RESTORE_ERROR_TARGET_NOT_MOUNTED]="BTRFS FEHLER: Ziel nicht ordnungsgemäß gemountet"
+MSG_DE[RESTORE_ERROR_TRANSID_FAILURE]="Transaktions-ID-Validierung fehlgeschlagen"
+MSG_DE[RESTORE_ERROR_TRANSID_SOLUTION]="Transaktions-ID-Fehler-Lösung"
+MSG_DE[RESTORE_ERROR_TRY_USEBACKUPROOT]="Mount mit -o usebackuproot versuchen"
+MSG_DE[RESTORE_ERROR_UNKNOWN]="Unbekannter BTRFS-Fehler während Wiederherstellung aufgetreten"
+MSG_DE[RESTORE_ERROR_VERIFY_BACKUP_INTEGRITY]="Backup-Integrität vor Wiederherstellung verifizieren"
+
+# Explizite Strategie
+MSG_DE[RESTORE_EXPLICIT_STRATEGY_COMPLETE]="Explizite Subvolume-Strategie abgeschlossen"
+MSG_DE[RESTORE_EXPLICIT_STRATEGY_DETAILS]="Bootloader bereits mit expliziten Subvolume-Referenzen konfiguriert"
+MSG_DE[RESTORE_EXPLICIT_STRATEGY_INFO]="Verwendung expliziter Subvolume-Referenzen (sicherster Ansatz)"
+
+# Home-Snapshot-Validierung
+MSG_DE[RESTORE_HOME_SNAPSHOT_VALIDATION_FAILED]="Home-Snapshot-Validierung fehlgeschlagen: %s"
+
+# Inkrementelle Wiederherstellung
+MSG_DE[RESTORE_INCREMENTAL_RESTORE_EXPLANATION]="Erklärung der inkrementellen Wiederherstellungsoperation"
+
+# Unzureichender Speicherplatz
+MSG_DE[RESTORE_INSUFFICIENT_ATOMIC_SPACE]="Unzureichender Speicherplatz für atomaren Wiederherstellungs-Workflow"
+
+# Manuelle Anforderungen
+MSG_DE[RESTORE_MANUAL_BOOTLOADER_REQUIRED]="Manuelle Bootloader-Konfiguration erforderlich"
+MSG_DE[RESTORE_MANUAL_DEFAULT_REQUIRED]="Manuelle Standard-Subvolume-Konfiguration erforderlich"
+
+# Snapshot-Validierung
+MSG_DE[RESTORE_NO_VALID_SNAPSHOTS_FOUND]="Keine gültigen Snapshots für Subvolume gefunden: %s"
+
+# Strategieoptionen
+MSG_DE[RESTORE_OFFER_ALTERNATIVE_STRATEGY]="Alternative Bootloader-Strategie verfügbar"
+
+# Eltern-Ketten-Validierung
+MSG_DE[RESTORE_PARENT_CHAIN_INCOMPLETE]="Unvollständige Eltern-Kette erkannt"
+MSG_DE[RESTORE_PARENT_CHAIN_INCOMPLETE_FOR]="Kann Eltern-Kette für %s Snapshot nicht validieren"
+
+# Teilweise Operationen
+MSG_DE[RESTORE_PARTIAL_SUCCESS_ROLLBACK]="Teilweise Erfolg erkannt - Rollback empfohlen"
+MSG_DE[RESTORE_PARTIAL_SYSTEM_WARNING]="WARNUNG: System teilweise wiederhergestellt - manuelle Aufmerksamkeit erforderlich"
+
+# Nur-Lesen-Warnungen
+MSG_DE[RESTORE_READONLY_WARNING]="Warnung: Ziel-Dateisystem ist schreibgeschützt"
+MSG_DE[RESTORE_RECEIVED_NOT_READONLY]="Empfangener Snapshot ist nicht schreibgeschützt - das ist ungewöhnlich"
+
+# Rollback-Operationen
+MSG_DE[RESTORE_ROLLBACK_AVAILABLE]="Rollback-Option für fehlgeschlagene Operation verfügbar"
+MSG_DE[RESTORE_ROLLBACK_BOOTLOADER]="Bootloader-Änderungen werden zurückgesetzt"
+MSG_DE[RESTORE_ROLLBACK_BOOTLOADER_FAILED]="Rollback der Bootloader-Änderungen fehlgeschlagen"
+MSG_DE[RESTORE_ROLLBACK_COMPLETE_SUCCESS]="Vollständiges System-Rollback erfolgreich"
+MSG_DE[RESTORE_ROLLBACK_HOME]="Home-Subvolume wird zurückgesetzt"
+MSG_DE[RESTORE_ROLLBACK_HOME_FAILED]="Wiederherstellung des ursprünglichen Home-Subvolumes fehlgeschlagen"
+MSG_DE[RESTORE_ROLLBACK_HOME_SUCCESS]="Home-Subvolume-Rollback erfolgreich"
+MSG_DE[RESTORE_ROLLBACK_MANUAL_INTERVENTION]="Manuelle Intervention möglicherweise erforderlich"
+MSG_DE[RESTORE_ROLLBACK_PARTIAL]="Teilweises Rollback abgeschlossen"
+MSG_DE[RESTORE_ROLLBACK_PARTIAL_FAILURE]="Rollback mit einigen Fehlern abgeschlossen"
+MSG_DE[RESTORE_ROLLBACK_ROOT]="Root-Subvolume wird zurückgesetzt"
+MSG_DE[RESTORE_ROLLBACK_ROOT_CRITICAL_FAILED]="KRITISCH: Wiederherstellung des ursprünglichen Root-Subvolumes fehlgeschlagen"
+MSG_DE[RESTORE_ROLLBACK_ROOT_SUCCESS]="Root-Subvolume-Rollback erfolgreich"
+MSG_DE[RESTORE_ROLLBACK_SUCCESSFUL]="Rollback-Operation erfolgreich abgeschlossen"
+
+# Root-Snapshot-Validierung
+MSG_DE[RESTORE_ROOT_SNAPSHOT_VALIDATION_FAILED]="Root-Snapshot-Validierung fehlgeschlagen: %s"
+
+# Snapshot-Korruption und Validierung
+MSG_DE[RESTORE_SNAPSHOT_FILESYSTEM_CORRUPT]="Snapshot-Dateisystem-Korruption erkannt"
+MSG_DE[RESTORE_SNAPSHOT_VALIDATION_FAILED]="Snapshot-Validierung fehlgeschlagen"
+
+# Startende Operationen
+MSG_DE[RESTORE_STARTING_ROLLBACK]="Vollständiges System-Rollback wird gestartet"
+
+# Strategieerkennung und -erklärung
+MSG_DE[RESTORE_STRATEGY_DEFAULT_DETECTED]="Standard-Subvolume-Strategie erkannt"
+MSG_DE[RESTORE_STRATEGY_DEFAULT_EXPLANATION]="System verwendet Standard-Subvolume für Boot"
+MSG_DE[RESTORE_STRATEGY_EXPLICIT_EXPLANATION]="System verwendet explizite Subvolume-Referenzen"
+MSG_DE[RESTORE_STRATEGY_EXPLICIT_SAFE]="Explizite Subvolume-Strategie (sicherste)"
+MSG_DE[RESTORE_STRATEGY_SAFETY_DEFAULT]="Sicherheits-Fallback: Standard-Subvolume-Strategie wird verwendet"
+MSG_DE[RESTORE_STRATEGY_SAFETY_EXPLANATION]="Boot-Konfiguration unklar - sicherste Option wird verwendet"
+
+# Validierungsoperationen
+MSG_DE[RESTORE_VALIDATING_SELECTED_SNAPSHOT]="Ausgewählten Snapshot validieren"
+MSG_DE[RESTORE_VALIDATING_SNAPSHOT_PAIR]="Snapshot-Paar für vollständige Systemwiederherstellung validieren"
+MSG_DE[RESTORE_WILL_SET_DEFAULT_SUBVOL]="Wird Standard-Subvolume-ID %s für %s setzen"
