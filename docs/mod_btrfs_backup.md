@@ -13,9 +13,17 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 This module provides comprehensive BTRFS snapshot-based backup functionality. It creates read-only snapshots of BTRFS subvolumes (`@` and `@home`) and transfers them to a backup destination using `btrfs send/receive`. The module includes integrity checking, cleanup mechanisms, and management tools for BTRFS backups. It is designed to work with standard BTRFS subvolume layouts commonly used by distributions like openSUSE, Arch Linux, and others.
 
 **2. Initialization & Dependencies:**
-*   **Library Source:** The module begins by sourcing the common library: `source "$(dirname "$0")/../lib/lib_common.sh"`.
+*   **Library Source:** The module sources two critical libraries:
+    *   `lib_common.sh`: For general helper functions and system utilities
+    *   `lib_btrfs.sh`: For BTRFS-specific atomic operations and safety functions
+*   **BTRFS Library Integration:** The module now heavily integrates with `lib_btrfs.sh` which provides atomic backup patterns, comprehensive error handling, and advanced BTRFS safety mechanisms.
+*   **BTRFS Implementation Validation:** The module performs comprehensive validation of all required BTRFS library functions at startup using `validate_btrfs_implementation()`, ensuring critical atomic functions are available before proceeding.
 *   **Package Manager Detection:** It calls `lh_detect_package_manager()` to set up `LH_PKG_MANAGER` for potential package installations (e.g., `btrfs-progs`).
-*   **Backup Configuration:** It loads backup-specific configurations by calling `lh_load_backup_config`. This function populates variables like `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_RETENTION_BACKUP`, and `LH_BACKUP_LOG`.
+*   **Backup Configuration:** It loads backup-specific configurations by calling `lh_load_backup_config`. This function populates variables like `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_SOURCE_SNAPSHOT_DIR`, `LH_RETENTION_BACKUP`, `LH_BACKUP_LOG`, `LH_KEEP_SOURCE_SNAPSHOTS`, and `LH_DEBUG_LOG_LIMIT`.
+*   **Critical Safety Features:**
+    *   `set -o pipefail`: Enables pipeline failure detection for critical backup operations
+    *   Atomic backup patterns that prevent corrupted or incomplete backups
+    *   Comprehensive UUID protection for incremental backup chains
 *   **Core Library Functions Used:**
     *   `lh_log_msg`: For general logging to the main log file.
     *   `lh_print_header`: For displaying section titles.
@@ -27,10 +35,29 @@ This module provides comprehensive BTRFS snapshot-based backup functionality. It
     *   `lh_save_backup_config`: To persist backup configuration changes.
     *   Color variables (e.g., `LH_COLOR_INFO`, `LH_COLOR_ERROR`, `LH_COLOR_PROMPT`).
     *   Global variables: `LH_PKG_MANAGER`, `LH_SUDO_CMD`, `EUID`.
+*   **BTRFS Library Functions Used:**
+    *   `atomic_receive_with_validation`: Atomic backup operations with comprehensive validation
+    *   `validate_parent_snapshot_chain`: Incremental backup chain validation
+    *   `intelligent_cleanup`: Safe cleanup respecting backup chains
+    *   `check_btrfs_space`: Space checking with metadata exhaustion detection
+    *   `get_btrfs_available_space`: Available space calculation
+    *   `check_filesystem_health`: Comprehensive BTRFS health checking
+    *   `handle_btrfs_error`: Specialized BTRFS error management
+    *   `verify_received_uuid_integrity`: UUID protection for backup chains
+    *   `protect_received_snapshots`: Prevents accidental modification of received snapshots
+    *   `validate_btrfs_implementation`: Comprehensive self-validation framework
 *   **Key System Commands:** `btrfs`, `mount`, `grep`, `awk`, `sort`, `head`, `tail`, `mkdir`, `rm`, `mv`, `date`, `stat`, `df`, `du`, `find`, `basename`, `dirname`, `touch`, `numfmt`, `sed`, `cat`, `hostname`.
 
 **3. Main Menu Function: `main_menu()`**
-This is the entry point and main interactive loop for the BTRFS backup module. It presents a menu with options for creating backups, configuration, status display, backup management, and Snapper/Timeshift support.
+This is the entry point and main interactive loop for the BTRFS backup module. It presents a menu with options for:
+1. **Create BTRFS Backup:** Execute the main backup operation
+2. **Configure Backup Settings:** Modify backup parameters and preferences
+3. **Show Backup Status:** Display comprehensive backup status and information
+4. **Delete BTRFS Backups:** Interactive backup deletion with multiple options
+5. **Clean up Problematic Backups:** Automated cleanup of corrupted or incomplete backups
+6. **Clean up Script-Created Source Snapshots:** Manage preserved source snapshots
+7. **Enhanced Restore (with set-default):** Access to the advanced restore module with bootloader integration
+8. **Exit:** Return to main system menu
 
 **4. Module Functions:**
 
@@ -84,13 +111,14 @@ This is the entry point and main interactive loop for the BTRFS backup module. I
     *   **Interaction:** Logs attempts and outcome. If deletion fails, it prints a warning and instructions for manual deletion.
 
 *   **`btrfs_backup()`**
-    *   **Purpose:** Main function to perform BTRFS snapshot-based backups.
+    *   **Purpose:** Main function to perform BTRFS snapshot-based backups using advanced atomic patterns from lib_btrfs.sh.
     *   **Interaction:**
         *   Sets trap for `cleanup_on_exit`.
+        *   Validates BTRFS implementation using `validate_btrfs_implementation()` from lib_btrfs.sh.
         *   Checks BTRFS support using `check_btrfs_support()`.
         *   Checks for root privileges (`$EUID`); if not root, prompts to re-run with `sudo`.
         *   Verifies `$LH_BACKUP_ROOT`. If invalid or user desires, prompts for a new backup root for the session using `lh_ask_for_input`, with options to create the directory.
-        *   Performs space checking using `df` and `du` to estimate required space for backing up `/` and `/home`, excluding standard system paths, cache directories, and the backup destination itself.
+        *   Performs comprehensive space checking using `check_btrfs_space()` and `get_btrfs_available_space()` from lib_btrfs.sh, which includes metadata exhaustion detection.
         *   Ensures backup target (`$LH_BACKUP_ROOT$LH_BACKUP_DIR`) and temporary snapshot (`$LH_TEMP_SNAPSHOT_DIR`) directories exist, creating them if necessary.
         *   Calls `cleanup_orphaned_temp_snapshots()`.
         *   Iterates through a predefined list of subvolumes (`@`, `@home`).
@@ -98,11 +126,12 @@ This is the entry point and main interactive loop for the BTRFS backup module. I
             *   Sets `CURRENT_TEMP_SNAPSHOT`.
             *   Calls `create_direct_snapshot()` to create a read-only snapshot.
             *   Creates the target directory for the subvolume in the backup location.
-            *   **Atomic Transfer**: Uses the atomic `btrfs send/receive` pattern with temporary naming and atomic rename to prevent corrupted backups.
-            *   **Incremental Logic**: Automatically detects suitable parent snapshots and performs incremental transfers when possible, falling back to full transfers when necessary.
-            *   **received_uuid Protection**: Validates parent snapshots have proper `received_uuid` before attempting incremental operations.
+            *   **Atomic Transfer**: Uses `atomic_receive_with_validation()` from lib_btrfs.sh which implements true atomic backup patterns with comprehensive validation.
+            *   **Incremental Logic**: Automatically detects suitable parent snapshots using `validate_parent_snapshot_chain()` and performs incremental transfers when possible, falling back to full transfers when necessary.
+            *   **received_uuid Protection**: Uses `verify_received_uuid_integrity()` and `protect_received_snapshots()` to validate parent snapshots have proper `received_uuid` before attempting incremental operations.
+            *   **Advanced Error Handling**: Uses `handle_btrfs_error()` for intelligent error classification and automatic fallback strategies.
             *   Calls `create_backup_marker()` upon successful transfer.
-            *   Calls `safe_cleanup_temp_snapshot()` for the temporary snapshot.
+            *   Uses `intelligent_cleanup()` from lib_btrfs.sh for safe cleanup respecting backup chains.
             *   Cleans old backups for the subvolume based on `$LH_RETENTION_BACKUP` using `ls`, `sort`, `head`, and `btrfs subvolume delete`. Also removes corresponding `.backup_complete` marker files.
         *   Resets trap.
         *   Prints a summary (timestamp, source, destination, processed subvolumes, status, duration).
@@ -172,49 +201,206 @@ This is the entry point and main interactive loop for the BTRFS backup module. I
         *   If yes, individually prompts for new values for `LH_BACKUP_ROOT`, `LH_BACKUP_DIR` (ensuring leading `/`), `LH_TEMP_SNAPSHOT_DIR`, and `LH_RETENTION_BACKUP`.
         *   If changes were made, displays updated configuration and asks if user wants to save them permanently using `lh_save_backup_config` (which should write to `$LH_BACKUP_CONFIG_FILE`).
 
-*   **`check_and_fix_snapshots()`**
-    *   **Purpose:** Checks and repairs the `.snapshots` subvolume used by Snapper and Timeshift.
-    *   **Interaction:**
-        *   Checks if Snapper or Timeshift are installed using `command -v`.
-        *   Verifies if `/.snapshots` exists and is a valid BTRFS subvolume using `btrfs subvolume show`.
-        *   If `.snapshots` is missing or invalid, offers to create/recreate it as a BTRFS subvolume.
-        *   Checks for Snapper configuration files in `/etc/snapper/configs/root`.
-        *   Checks for Timeshift configuration in `/etc/timeshift`.
-        *   Displays basic status information for both tools if available.
-    *   **Mechanism:** Uses `btrfs subvolume create`, `btrfs subvolume show`, and checks configuration files.
+*   **`determine_snapshot_preservation()`**
+    *   **Purpose:** Determines whether source snapshots should be preserved based on the `LH_KEEP_SOURCE_SNAPSHOTS` configuration setting.
+    *   **Returns:** True if preservation is enabled, false otherwise.
+    *   **Usage:** Called at the beginning of backup operations to set global preservation behavior.
+
+*   **`preserve_source_parent_snapshots(temp_snapshot_dir, current_snapshot_name)`**
+    *   **Purpose:** Preserves source parent snapshots needed for incremental backup chain integrity by creating chain markers.
+    *   **Mechanism:**
+        *   Scans the temporary snapshot directory for existing snapshots
+        *   Creates `.chain_parent` marker files to prevent deletion of parent snapshots
+        *   Logs preservation actions for audit trail
+    *   **Usage:** Called after successful backup operations to maintain incremental chain integrity.
+
+*   **`mark_script_created_snapshot(snapshot_path, timestamp)`**
+    *   **Purpose:** Marks snapshots as script-created with timestamps for tracking and management.
+    *   **Mechanism:**
+        *   Creates marker files to identify snapshots created by this script
+        *   Stores timestamp information for snapshot lifecycle management
+        *   Validates snapshot existence before marking
+    *   **Usage:** Called when creating permanent snapshots for source preservation tracking.
+
+*   **`handle_snapshot_preservation(temp_snapshot_path, subvol, timestamp, keep_snapshots)`**
+    *   **Purpose:** Handles the preservation logic for source snapshots used in incremental backup chains.
+    *   **Mechanism:**
+        *   Creates permanent snapshot locations when preservation is enabled
+        *   Moves temporary snapshots to permanent preservation directory
+        *   Updates tracking variables for cleanup operations
+        *   Marks preserved snapshots with appropriate metadata
+    *   **Parameters:** `temp_snapshot_path`, `subvol` (e.g., "@"), `timestamp`, `keep_snapshots` boolean
+    *   **Usage:** Called during backup operations when source snapshot preservation is configured.
+
+*   **`list_script_created_snapshots()`**
+    *   **Purpose:** Lists all snapshots created and tracked by this backup script.
+    *   **Mechanism:**
+        *   Scans the source snapshot preservation directory
+        *   Identifies script-created snapshots using marker files
+        *   Displays snapshot information including dates and sizes
+    *   **Usage:** Interactive menu option to review preserved source snapshots.
+
+*   **`cleanup_script_created_snapshots()`**
+    *   **Purpose:** Provides interactive cleanup of script-created and preserved source snapshots.
+    *   **Mechanism:**
+        *   Lists script-created snapshots with detailed information
+        *   Allows selective deletion of preserved snapshots
+        *   Respects incremental backup chain integrity during cleanup
+        *   Provides confirmation prompts for destructive operations
+    *   **Usage:** Menu option for managing preserved source snapshot storage usage.
+
+*   **`cleanup_old_chain_markers(temp_snapshot_dir, retention_days)`**
+    *   **Purpose:** Cleans up old chain marker files that are no longer needed for backup integrity.
+    *   **Mechanism:**
+        *   Scans for `.chain_parent` marker files older than retention period
+        *   Respects backup chain integrity requirements during cleanup
+        *   Uses configurable retention period (defaults to 2x backup retention or minimum 7 days)
+    *   **Parameters:** `temp_snapshot_dir`, `retention_days` (optional, calculated from backup retention)
+    *   **Usage:** Called during regular maintenance to prevent marker file accumulation.
+
+*   **`debug_incremental_backup_chain(subvol, backup_subvol_dir, temp_snapshot_dir)`**
+    *   **Purpose:** Provides comprehensive diagnostic information for incremental backup chain debugging.
+    *   **Mechanism:**
+        *   Analyzes incremental backup chain state and relationships
+        *   Reports parent-child relationships between snapshots
+        *   Validates received_uuid integrity across the chain
+        *   Logs detailed chain information for troubleshooting
+    *   **Parameters:** `subvol`, `backup_subvol_dir`, `temp_snapshot_dir`
+    *   **Usage:** Called when detailed logging is enabled to assist with backup chain troubleshooting.
+
+*   **`display_debug_log_limit()`**
+    *   **Purpose:** Formats and displays the current debug log limit configuration.
+    *   **Mechanism:**
+        *   Shows current `LH_DEBUG_LOG_LIMIT` value
+        *   Displays "unlimited" message when limit is 0
+        *   Provides user-friendly configuration display
+    *   **Usage:** Called during configuration display and modification workflows.
+
+*   **`format_bytes_for_display(bytes)`**
+    *   **Purpose:** Formats byte values into human-readable format with appropriate units.
+    *   **Mechanism:**
+        *   Uses `numfmt --to=iec-i` when available for IEC binary units (KiB, MiB, GiB)
+        *   Falls back to simple byte display when numfmt is unavailable
+        *   Provides consistent formatting across backup size reports
+    *   **Parameters:** `bytes` (numeric value)
+    *   **Usage:** Called throughout the backup process for space calculations and reporting.
+
+*   **`bytes_to_human_readable(bytes)`**
+    *   **Purpose:** Converts numeric byte values to human-readable format with appropriate scale.
+    *   **Mechanism:**
+        *   Handles invalid input gracefully
+        *   Converts bytes to appropriate units (B, K, M, G, T, P)
+        *   Provides consistent formatting for backup size reporting
+    *   **Parameters:** `bytes` (numeric value)
+    *   **Returns:** Human-readable string with appropriate unit suffix
+    *   **Usage:** Used extensively for displaying backup sizes and space usage information.
+
+*   **`get_snapshot_size_from_marker(snapshot_path)`**
+    *   **Purpose:** Retrieves snapshot size information from backup completion marker files.
+    *   **Mechanism:**
+        *   Reads size information from `.backup_complete` marker files
+        *   Extracts `BACKUP_SIZE` field from marker metadata
+        *   Converts stored byte values to human-readable format
+    *   **Parameters:** `snapshot_path` (path to snapshot directory)
+    *   **Returns:** Human-readable size string or "?" if marker is missing/invalid
+    *   **Usage:** Used by backup status and listing functions for efficient size reporting.
+
 
 **5. Special Considerations:**
 *   **Root Privileges:** Most BTRFS operations, especially creating/deleting snapshots and subvolumes, require root privileges. The script often checks `$EUID` and prompts for `sudo` if necessary.
-*   **Configuration Persistence:** Backup settings are loaded via `lh_load_backup_config` and can be saved via `lh_save_backup_config`. The exact location of the configuration file (`$LH_BACKUP_CONFIG_FILE`) is managed by `lib_common.sh`.
-*   **Error Handling:** The script uses `backup_log_msg` for logging errors. Return codes from critical commands are checked. Some functions like `safe_cleanup_temp_snapshot` implement retries. User-facing error messages are printed with `LH_COLOR_ERROR`.
-*   **Temporary Snapshots:** BTRFS backups utilize a temporary snapshot directory (`$LH_TEMP_SNAPSHOT_DIR`). Cleanup mechanisms (`cleanup_on_exit`, `cleanup_orphaned_temp_snapshots`, `safe_cleanup_temp_snapshot`) are in place to manage these.
+*   **Configuration Persistence:** Backup settings are loaded via `lh_load_backup_config` and can be saved via `lh_save_backup_config`. The exact location of the configuration file (`$LH_BACKUP_CONFIG_FILE`) is managed by `lib_common.sh`. New configuration options include source snapshot preservation (`LH_KEEP_SOURCE_SNAPSHOTS`), preservation directory (`LH_SOURCE_SNAPSHOT_DIR`), and debug logging limits (`LH_DEBUG_LOG_LIMIT`).
+*   **Advanced Error Handling:** The module now uses `handle_btrfs_error()` from lib_btrfs.sh for intelligent error classification, providing automatic fallback strategies and detailed error analysis. Traditional error handling is supplemented with specialized BTRFS error management.
+*   **Temporary Snapshots:** BTRFS backups utilize a temporary snapshot directory (`$LH_TEMP_SNAPSHOT_DIR`). Advanced cleanup mechanisms (`intelligent_cleanup`, `cleanup_on_exit`, `cleanup_orphaned_temp_snapshots`) are in place to manage these while respecting backup chains.
 *   **Backup Markers:** BTRFS backups use `.backup_complete` marker files to indicate a successful transfer and store metadata. These are used by `check_backup_integrity` to verify backup completeness.
-*   **Space Estimation:** Before backup, the module estimates required space by calculating the size of `/` (excluding `/home`, cache directories, pseudo-filesystems, and the backup destination) and `/home` separately. It intelligently adjusts estimates for incremental vs. full backups and adds appropriate BTRFS overhead margins.
-*   **Incremental Backups:** The implementation now supports both full and incremental backups using `btrfs send/receive`. Incremental backups are automatically used when a valid parent snapshot with `received_uuid` is available, significantly reducing transfer size and time.
-*   **Atomic Operations:** All backup transfers use the atomic pattern recommended by BTRFS documentation, ensuring no corrupted or incomplete backups remain on the destination.
-*   **received_uuid Protection:** The module includes comprehensive protection against accidentally modifying received snapshots, which would destroy the `received_uuid` and break incremental backup chains.
+*   **Advanced Space Management:** The module now uses `check_btrfs_space()` and `get_btrfs_available_space()` from lib_btrfs.sh for comprehensive space checking, including metadata exhaustion detection, intelligent estimates for incremental vs. full backups, and appropriate BTRFS overhead margins.
+*   **Enterprise-Grade Incremental Backups:** The implementation uses `validate_parent_snapshot_chain()` to ensure incremental backup chain integrity. Incremental backups are automatically used when a valid parent snapshot with `received_uuid` is available, significantly reducing transfer size and time.
+*   **True Atomic Operations:** All backup transfers now use `atomic_receive_with_validation()` which implements the true atomic pattern for BTRFS operations. This solves the critical issue that standard `btrfs receive` is NOT atomic by default, preventing corrupted or incomplete backups from appearing valid.
+*   **Comprehensive UUID Protection:** The module uses `verify_received_uuid_integrity()` and `protect_received_snapshots()` for comprehensive protection against accidentally modifying received snapshots, which would destroy the `received_uuid` and break incremental backup chains.
 *   **Signal Handling:** The module uses robust trap handlers with proper cleanup to ensure temporary snapshots are cleaned up if the backup process is interrupted. Traps are properly reset to prevent recursive calls.
+*   **Pipeline Safety:** The module uses `set -o pipefail` to ensure pipeline failures are properly detected, critical for reliable BTRFS operations.
+*   **Implementation Validation:** The module validates all required BTRFS library functions at startup using `validate_btrfs_implementation()`, ensuring critical atomic functions are available before proceeding.
+*   **Filesystem Health Monitoring:** The module integrates `check_filesystem_health()` for comprehensive BTRFS health checking throughout backup operations.
+*   **Self-Managed Snapshots:** The module creates and manages its own snapshots exclusively for reliable incremental backup chains. External snapshot tools like Snapper/Timeshift are completely bypassed to avoid sibling snapshot issues that would break incremental backup chain integrity.
+*   **Source Snapshot Preservation:** The module can optionally preserve source snapshots used for incremental backup chains. This is controlled by the `LH_KEEP_SOURCE_SNAPSHOTS` configuration setting and ensures that parent snapshots remain available for future incremental backups.
+*   **Incremental Chain Integrity:** Source parent snapshots are automatically preserved with chain markers (`.chain_parent` files) to maintain incremental backup chain integrity. The module tracks and manages these preservation markers to prevent accidental deletion of snapshots needed for incremental operations.
 *   **Hardcoded Subvolumes:** The BTRFS backup logic primarily targets `@` and `@home` subvolumes. Other BTRFS configurations might require script modification.
-*   **Integration with Snapper/Timeshift:** The module includes functionality to check and repair the `.snapshots` subvolume used by these snapshot management tools.
 
 **6. Globals:**
 *   `CURRENT_TEMP_SNAPSHOT`: Stores the path to the BTRFS snapshot currently being processed by `btrfs_backup()` for cleanup purposes in `cleanup_on_exit()`.
 *   `BACKUP_START_TIME`: Stores the start time of the backup operation for duration calculation.
 
-**7. Supported BTRFS Layout:**
+**7. New Configuration Variables:**
+*   `LH_KEEP_SOURCE_SNAPSHOTS`: Controls whether source snapshots are preserved for incremental backup chain integrity (true/false/ask).
+*   `LH_SOURCE_SNAPSHOT_DIR`: Directory path for preserving source snapshots when preservation is enabled.
+*   `LH_DEBUG_LOG_LIMIT`: Limits the number of debug log entries displayed (0 for unlimited, positive integer for limit).
+
+**8. Supported BTRFS Layout:**
 The module is designed to work with the common BTRFS subvolume layout used by many Linux distributions:
 *   `@` subvolume mounted at `/` (root filesystem)
 *   `@home` subvolume mounted at `/home` (user data)
-*   Optional `.snapshots` subvolume for Snapper/Timeshift integration
 
-**8. Backup Process Flow:**
-1. **Pre-flight checks:** Verify BTRFS support, root privileges, backup destination
-2. **Space estimation:** Calculate required space with safety margin, intelligently adjusting for incremental vs. full backups
-3. **Cleanup:** Remove any orphaned temporary snapshots from previous runs
-4. **Snapshot creation:** Create read-only snapshots of target subvolumes
-5. **Transfer:** Use atomic `btrfs send/receive` operations with incremental transfer support when suitable parent snapshots are available
-6. **Verification:** Create completion markers and verify successful transfer
-7. **Cleanup:** Remove temporary snapshots and old backups beyond retention limit
-8. **Reporting:** Log results and send desktop notifications
+The module creates its own snapshots in the designated temporary snapshot directory and manages them independently for optimal incremental backup chain integrity.
 
-This module provides a robust, enterprise-grade BTRFS backup solution with comprehensive error handling, integrity checking, and user-friendly management features.
+**9. Backup Process Flow:**
+1. **Implementation validation:** Use `validate_btrfs_implementation()` to ensure all required lib_btrfs.sh functions are available
+2. **Pre-flight checks:** Verify BTRFS support, root privileges, backup destination, filesystem health using `check_filesystem_health()`
+3. **Preservation settings:** Use `determine_snapshot_preservation()` to configure source snapshot preservation behavior
+4. **Advanced space checking:** Use `check_btrfs_space()` and `get_btrfs_available_space()` for comprehensive space analysis including metadata exhaustion detection
+5. **Cleanup:** Remove any orphaned temporary snapshots from previous runs using `intelligent_cleanup()`
+6. **Snapshot creation:** Create read-only snapshots of target subvolumes with comprehensive validation, optionally in permanent locations for preservation
+7. **Chain validation:** Use `validate_parent_snapshot_chain()` to verify incremental backup chain integrity from both temporary and preserved source snapshots
+8. **Atomic transfer:** Use `atomic_receive_with_validation()` for true atomic operations with comprehensive validation:
+   - Incremental transfers when suitable parent snapshots with valid `received_uuid` are available
+   - Automatic fallback to full backup when incremental chains are broken
+   - Intelligent error handling with `handle_btrfs_error()` for automatic recovery strategies
+9. **UUID protection:** Use `verify_received_uuid_integrity()` and `protect_received_snapshots()` to maintain backup chain integrity
+10. **Verification:** Create completion markers and verify successful transfer with comprehensive integrity checking
+11. **Chain preservation:** Use `preserve_source_parent_snapshots()` to create chain markers and preserve parent snapshots needed for future incremental backups
+12. **Safe cleanup:** Use `intelligent_cleanup()` to remove temporary snapshots and old backups while respecting backup chains and preservation markers
+13. **Health monitoring:** Final filesystem health check using `check_filesystem_health()`
+14. **Reporting:** Log results and send desktop notifications with detailed status information
+
+This module now provides a cutting-edge, enterprise-grade BTRFS backup solution with true atomic operations, comprehensive error handling, intelligent fallback strategies, advanced space management, and robust integrity checking that surpasses standard BTRFS backup implementations.
+
+**10. lib_btrfs.sh Integration Details:**
+
+The module's integration with `lib_btrfs.sh` represents a significant architectural advancement, providing enterprise-grade atomic backup operations:
+
+*   **`atomic_receive_with_validation()` - True Atomic Backups:**
+    *   Solves the critical issue that standard `btrfs receive` is NOT atomic by default
+    *   Implements four-step atomic workflow: temporary receive → validation → atomic rename → cleanup
+    *   Handles both full and incremental backups with comprehensive validation
+    *   Returns specific exit codes for intelligent error handling (general failure, parent validation failed, space exhaustion, corruption detected)
+    *   Ensures only complete, valid backups are marked as official
+
+*   **`validate_parent_snapshot_chain()` - Chain Integrity:**
+    *   Validates incremental backup chain integrity before attempting operations
+    *   Checks for proper `received_uuid` presence and validity
+    *   Prevents broken incremental chains that could lead to backup failures
+    *   Enables intelligent decision-making for incremental vs. full backup strategies
+
+*   **`intelligent_cleanup()` - Safe Cleanup:**
+    *   Respects incremental backup chains when cleaning up old snapshots
+    *   Prevents accidental deletion of parent snapshots needed for future incrementals
+    *   Implements safe cleanup algorithms that maintain backup chain integrity
+
+*   **`check_btrfs_space()` and `get_btrfs_available_space()` - Advanced Space Management:**
+    *   Detects BTRFS metadata exhaustion conditions that can cause backup failures
+    *   Provides accurate space calculations considering BTRFS-specific overhead
+    *   Intelligently estimates space requirements for incremental vs. full backups
+
+*   **`handle_btrfs_error()` - Intelligent Error Management:**
+    *   Classifies BTRFS-specific errors and provides automated recovery strategies
+    *   Enables automatic fallback from incremental to full backups when appropriate
+    *   Provides detailed error analysis for troubleshooting
+
+*   **UUID Protection Functions:**
+    *   `verify_received_uuid_integrity()`: Validates UUID integrity across backup chains
+    *   `protect_received_snapshots()`: Prevents accidental modification of received snapshots
+
+*   **`check_filesystem_health()` - Health Monitoring:**
+    *   Performs comprehensive BTRFS filesystem health checks
+    *   Integrates health monitoring throughout the backup process
+    *   Enables proactive detection of filesystem issues that could affect backups
+
+This integration transforms the module from a standard BTRFS backup script into a professional-grade backup solution that addresses the fundamental limitations of native BTRFS tools while providing enterprise-level reliability and safety features.

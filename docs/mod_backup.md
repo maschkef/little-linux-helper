@@ -7,10 +7,10 @@ This project is part of the 'little-linux-helper' collection.
 Licensed under the MIT License. See the LICENSE file in the project root for more information.
 -->
 
-## Module: `modules/backup/mod_backup.sh` – TAR & RSYNC Backup/Restore Operations
+## Module: `modules/backup/mod_backup.sh` – Backup Operations Dispatcher
 
 **1. Purpose:**
-This module provides comprehensive backup and restore functionalities for TAR archives and RSYNC-based backups. It offers a user-friendly interface for creating, managing, and restoring data, with built-in safety checks and configuration options. BTRFS operations are no longer part of this module but can be reached from the Menu.
+This module serves as a central dispatcher and coordinator for all backup and restore operations in the Little Linux Helper system. It provides a unified menu interface that launches specialized backup modules for different backup types (BTRFS, TAR, RSYNC) while maintaining shared configuration and status reporting functionality. The module acts as the main entry point for backup operations while delegating actual backup tasks to specialized sub-modules.
 
 **2. Initialization & Dependencies:**
 *   **Library Source:** The module begins by sourcing the common library: `source "$(dirname "$0")/../lib/lib_common.sh"`.
@@ -30,88 +30,76 @@ This module provides comprehensive backup and restore functionalities for TAR ar
 *   **Key System Commands:** `tar`, `rsync`, `df`, `du`, `mkdir`, `rm`, `mv`, `cp`, `date`, `stat`, `find`, `basename`, `dirname`, `touch`, `numfmt`, `sed`, `cat`.
 
 **3. Main Menu Function: `backup_menu()`**
-This is the entry point and main interactive loop for the backup module. It presents a menu with options for TAR and RSYNC backups, restoration, configuration, status, and launching the BTRFS backup/restore modules.
+This is the entry point and main interactive loop for the backup dispatcher. It presents a unified menu interface with the following options:
 
-**4. Module Functions:**
+1. **BTRFS Operations:** Launches the comprehensive BTRFS backup module (`mod_btrfs_backup.sh`) for snapshot-based backups
+2. **TAR Backup:** Launches the TAR backup module (`mod_backup_tar.sh`) for archive-based backups
+3. **RSYNC Backup:** Launches the RSYNC backup module (`mod_backup_rsync.sh`) for incremental file-based backups
+4. **Restore Operations:** Presents the restore menu with TAR and RSYNC restore options
+5. **Backup Status:** Displays comprehensive status information for all backup types
+6. **Configure Backup:** Manages shared backup configuration settings
+7. **Exit:** Returns to main system menu
+
+The menu provides a centralized access point while maintaining clean separation between different backup methodologies.
+
+**4. Core Functions:**
 
 *   **`backup_log_msg(level, message)`**
-    *   **Purpose:** Custom logging function for backup operations. It logs messages to both the standard log (via `lh_log_msg`) and a backup-specific log file (`$LH_BACKUP_LOG`).
-    *   **Mechanism:** Appends a timestamped message to `$LH_BACKUP_LOG`. Attempts to create the log file if it doesn't exist.
-
-*   **`tar_backup()`**
-    *   **Purpose:** Creates compressed TAR archives of specified directories.
-    *   **Interaction:**
-        *   Verifies `$LH_BACKUP_ROOT` and prompts for a session-specific path if needed.
-        *   Ensures backup target directory exists.
-        *   Prompts user to select directories to back up: `/home` only, `/etc` only, `/home` and `/etc`, entire system (with standard exclusions), or custom.
-        *   If not a simple `/home` or `/etc` backup, asks if user wants to specify additional exclusions.
-        *   Creates a timestamped `.tar.gz` file in `$LH_BACKUP_ROOT$LH_BACKUP_DIR`.
-    *   **Mechanism:**
-        *   Uses `tar czf` with `--exclude-from` (populating a temporary exclude file) and `--exclude` for the archive itself.
-        *   Standard exclusions for system backup: `/proc`, `/sys`, `/tmp`, `/dev`, `/mnt`, `/media`, `/run`, `/var/cache`, `/var/tmp`, and any user-configured excludes.
-        *   Cleans old TAR backups based on `$LH_RETENTION_BACKUP`.
-        *   Sends desktop notification.
-
-*   **`rsync_backup()`**
-    *   **Purpose:** Performs backups using `rsync`.
-    *   **Interaction:**
-        *   Checks if `rsync` is installed using `lh_check_command`; prompts to install if missing.
-        *   Verifies `$LH_BACKUP_ROOT` and prompts for a session-specific path if needed.
-        *   Ensures backup target directory exists.
-        *   Prompts for backup type: full or incremental.
-        *   Prompts for source directories: `/home` only, entire system (with exclusions), or custom.
-        *   Asks for additional exclusions.
-    *   **Mechanism:**
-        *   Creates a timestamped destination directory `rsync_backup_YYYY-MM-DD_HH-MM-SS`.
-        *   Uses `rsync -avxHS --numeric-ids --no-whole-file` along with specified exclusions.
-        *   For incremental backups, if a previous `rsync_backup_*` directory exists, it uses the latest one as `--link-dest`.
-        *   Cleans old RSYNC backup directories based on `$LH_RETENTION_BACKUP`.
-        *   Sends desktop notification.
+    *   **Purpose:** Centralized logging function for all backup operations. Provides consistent logging across all backup modules.
+    *   **Mechanism:** Logs messages to both the standard system log (via `lh_log_msg`) and a backup-specific log file (`$LH_BACKUP_LOG`).
+    *   **Usage:** Used by the dispatcher and can be used by launched sub-modules for consistent logging.
 
 *   **`restore_menu()`**
-    *   **Purpose:** Sub-menu for selecting the type of backup to restore.
-    *   **Interaction:** Presents options for TAR and RSYNC restore, and for launching the BTRFS restore module.
-
-*   **`restore_tar()`**
-    *   **Purpose:** Restores files from a TAR archive.
-    *   **Interaction:**
-        *   Lists available `tar_backup_*.tar.gz` archives with timestamps and sizes.
-        *   User selects an archive.
-        *   Prompts for restore location: original location (with overwrite warning), temporary directory (`/tmp/restore_tar`), or custom path.
-    *   **Mechanism:** Uses `tar xzf` with `-C` to extract to the chosen path.
-
-*   **`restore_rsync()`**
-    *   **Purpose:** Restores files from an RSYNC backup.
-    *   **Interaction:**
-        *   Lists available `rsync_backup_*` directories with timestamps and sizes.
-        *   User selects a backup.
-        *   Prompts for restore location: original location (with overwrite warning), temporary directory (`/tmp/restore_rsync`), or custom path.
-    *   **Mechanism:** Uses `rsync -avxHS --progress` to copy files from the backup to the target.
+    *   **Purpose:** Sub-menu dispatcher for restore operations, providing access to different restore methodologies.
+    *   **Interaction:** 
+        *   Presents a focused menu for restore operations
+        *   Option 1: TAR Restore - Launches `mod_restore_tar.sh` for archive-based restoration
+        *   Option 2: RSYNC Restore - Launches `mod_restore_rsync.sh` for file-based restoration
+        *   Option 0: Return to main backup menu
+    *   **Architecture:** Follows the same dispatcher pattern as the main menu, delegating to specialized restore modules.
 
 *   **`configure_backup()`**
-    *   **Purpose:** Allows viewing and modifying backup configuration settings.
+    *   **Purpose:** Centralized configuration management for shared backup settings used across all backup modules.
     *   **Interaction:**
-        *   Displays current values of `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_RETENTION_BACKUP`, `LH_BACKUP_LOG`.
-        *   Prompts if user wants to change configuration.
-        *   If yes, individually prompts for new values for `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, and `LH_RETENTION_BACKUP`.
-        *   If changes were made, displays updated configuration and asks if user wants to save them permanently using `lh_save_backup_config` (which should write to `$LH_BACKUP_CONFIG_FILE`).
+        *   Displays current values of `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_RETENTION_BACKUP`, `LH_BACKUP_LOG`
+        *   Prompts if user wants to change configuration
+        *   Individually prompts for new values for core backup parameters
+        *   Displays updated configuration and asks for permanent save confirmation
+        *   Uses `lh_save_backup_config` to persist changes to `$LH_BACKUP_CONFIG_FILE`
+    *   **Scope:** Manages shared configuration that affects all backup modules (BTRFS, TAR, RSYNC)
 
 *   **`show_backup_status()`**
-    *   **Purpose:** Displays an overview of the current backup situation.
-    *   **Interaction:**
-        *   Shows backup destination (`$LH_BACKUP_ROOT`) and its online/offline status.
-        *   Displays free/total space on the backup destination using `df -h`.
-        *   Lists counts of TAR archives and RSYNC backups.
-        *   Shows the newest TAR and RSYNC backup found.
-        *   Displays total size of all backups in `$LH_BACKUP_ROOT$LH_BACKUP_DIR` using `du -sh`.
-        *   Shows the last 5 lines from `$LH_BACKUP_LOG` containing "backup".
+    *   **Purpose:** Provides comprehensive status overview for all backup types managed by the system.
+    *   **Features:**
+        *   **System Status:** Shows backup destination (`$LH_BACKUP_ROOT`) availability and online/offline status
+        *   **Space Analysis:** Displays free/total disk space using `df -h`
+        *   **BTRFS Backup Summary:** Counts snapshots for `@` and `@home` subvolumes, shows total BTRFS snapshots
+        *   **TAR Backup Summary:** Lists count of `tar_backup_*.tar.gz` archives and newest TAR backup
+        *   **RSYNC Backup Summary:** Lists count of `rsync_backup_*` directories and newest RSYNC backup  
+        *   **Storage Usage:** Shows total size of all backups in `$LH_BACKUP_ROOT$LH_BACKUP_DIR`
+        *   **Recent Activity:** Displays last 5 log entries containing "backup" from `$LH_BACKUP_LOG`
+    *   **Architecture:** Provides unified view across all backup methodologies managed by the system
 
-**5. Special Considerations:**
-*   **Root Privileges:** Some operations, especially those writing to system locations during restore, may require root privileges. The script often checks `$EUID` and prompts for `sudo` if necessary.
-*   **Configuration Persistence:** Backup settings are loaded via `lh_load_backup_config` and can be saved via `lh_save_backup_config`. The exact location of the configuration file (`$LH_BACKUP_CONFIG_FILE`) is managed by `lib_common.sh`.
-*   **Error Handling:** The script uses `backup_log_msg` for logging errors. Return codes from critical commands are checked. User-facing error messages are printed with `LH_COLOR_ERROR`.
-*   **Restore Risks:** Restore operations, especially to original locations, are inherently risky and involve overwriting data. The script provides warnings.
-*   **User Prompts for Paths:** When the configured `$LH_BACKUP_ROOT` is unavailable or the user wishes to change it for the session, the script uses `lh_ask_for_input` and includes logic to validate paths and offer to create directories.
+**5. Dispatcher Architecture:**
 
-**6. Integration with BTRFS Modules:**
-*   The main menu of `mod_backup.sh` provides an entry point to launch the BTRFS backup and restore modules (`modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`). For all BTRFS snapshot-based backup and restore operations, refer to the documentation of those modules.
+*   **Module Delegation:** The dispatcher launches specialized modules using `bash "$LH_ROOT_DIR/modules/backup/[module_name].sh"`, providing clean separation between backup methodologies
+*   **Shared Configuration:** All launched modules inherit the same configuration context, ensuring consistency across backup types
+*   **Centralized Logging:** Uses `backup_log_msg` for consistent logging across all operations, with detailed debug logging for menu navigation
+*   **State Management:** Maintains session state and user context while delegating operations to specialized modules
+
+**6. Launched Sub-Modules:**
+
+*   **BTRFS Operations:** `mod_btrfs_backup.sh` - Complete BTRFS snapshot ecosystem with backup, restore, and management operations
+*   **TAR Backup:** `mod_backup_tar.sh` - Archive-based backup creation and management
+*   **RSYNC Backup:** `mod_backup_rsync.sh` - Incremental file-based backup operations  
+*   **TAR Restore:** `mod_restore_tar.sh` - TAR archive restoration operations
+*   **RSYNC Restore:** `mod_restore_rsync.sh` - RSYNC backup restoration operations
+
+**7. Special Considerations:**
+
+*   **Unified Interface:** Provides a single entry point for all backup operations while maintaining specialized functionality
+*   **Configuration Persistence:** Manages shared backup settings via `lh_load_backup_config` and `lh_save_backup_config`
+*   **Cross-Module Compatibility:** Ensures consistent configuration and logging across all launched modules
+*   **Error Handling:** Uses centralized `backup_log_msg` for error logging with detailed debug information
+*   **Status Reporting:** Provides comprehensive status overview covering all backup methodologies in the system
+*   **Module Independence:** Each launched module operates independently while sharing core configuration and logging infrastructure
