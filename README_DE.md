@@ -2,9 +2,9 @@
 
 > **🎯 Projekt-Status:**
 > - **Dokumentation**: Umfassende technische Dokumentation ist im `docs/` Verzeichnis für alle Module und Kernkomponenten verfügbar
-> - **BTRFS-Module**: Enterprise-Grade BTRFS-Backup- und -Restore-Module mit atomaren Operationen, inkrementellen Backup-Ketten und umfassenden Sicherheitsfeatures
+> - **BTRFS-Module**: Erweiterte BTRFS-Backup- und -Restore-Module mit atomaren Operationen, inkrementellen Backup-Ketten und umfassenden Sicherheitsfeatures
 > - **Modulare Architektur**: Klare Trennung der Backup-Typen in spezialisierte Module (BTRFS, TAR, RSYNC) mit einheitlicher Dispatcher-Schnittstelle
-> - **Produktionsbereit**: Alle Module enthalten umfassende Fehlerbehandlung, Protokollierung und Sicherheitsmechanismen
+> - **Test-Status**: Backup-Funktionen sind gut getestet und stabil; Restore-Funktionen sind implementiert, benötigen aber umfassende Tests vor Produktionseinsatz
 
 ## Beschreibung
 
@@ -77,11 +77,11 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
     * Umfassende Status-Übersicht für BTRFS-, TAR- und RSYNC-Backups
 
 * **BTRFS Snapshot Backup & Restore** (`modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`):
-    * **Enterprise-Grade Features**: Atomare Backup-Operationen, received_uuid-Schutz, inkrementelle Kettenvalidierung
+    * **Erweiterte Features**: Atomare Backup-Operationen, received_uuid-Schutz, inkrementelle Kettenvalidierung
     * **Erweiterte BTRFS-Bibliothek** (`lib/lib_btrfs.sh`): Spezialisierte Bibliothek, die kritische BTRFS-Limitationen mit echten atomaren Mustern löst
     * **Snapshot-Verwaltung**: Erstellt unabhängige Snapshots für `@` und `@home` Subvolumes mit optionaler Quellbewahrung
     * **Inkrementelle Backups**: Intelligente Parent-Erkennung, automatisches Fallback und umfassende Ketten-Integritätsvalidierung
-    * **Restore-Funktionen**: Vollständige Systemwiederherstellung, individuelle Subvolume-Wiederherstellung, Ordner-Level-Wiederherstellung und Bootloader-Integration
+    * **Restore-Funktionen**: Vollständige Systemwiederherstellung, individuelle Subvolume-Wiederherstellung, Ordner-Level-Wiederherstellung und Bootloader-Integration *(Hinweis: Restore-Funktionen sind implementiert, benötigen aber umfassende Tests)*
     * **Sicherheitsfeatures**: Live-Umgebungs-Erkennung, Dateisystem-Gesundheitsprüfung, Rollback-Funktionen und Dry-Run-Unterstützung
     * **Detaillierte Dokumentation**: Siehe `docs/mod_btrfs_backup.md`, `docs/mod_btrfs_restore.md` und `docs/lib_btrfs.md`
 

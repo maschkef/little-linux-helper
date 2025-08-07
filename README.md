@@ -2,9 +2,9 @@
 
 > **🎯 Project Status:**
 > - **Documentation**: Comprehensive technical documentation is available in the `docs/` directory for all modules and core components
-> - **BTRFS Modules**: Enterprise-grade BTRFS backup and restore modules with atomic operations, incremental backup chains, and comprehensive safety features
+> - **BTRFS Modules**: Advanced BTRFS backup and restore modules with atomic operations, incremental backup chains, and comprehensive safety features
 > - **Modular Architecture**: Clean separation of backup types into specialized modules (BTRFS, TAR, RSYNC) with unified dispatcher interface
-> - **Production Ready**: All modules include comprehensive error handling, logging, and safety mechanisms
+> - **Testing Status**: Backup functions are well-tested and stable; restore functions are implemented but require comprehensive testing before production use
 
 ## Description
 
@@ -76,11 +76,11 @@ The main script `help_master.sh` serves as the central entry point and provides 
     * Comprehensive status overview covering BTRFS, TAR, and RSYNC backups
 
 * **BTRFS Snapshot Backup & Restore** (`modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`):
-    * **Enterprise-Grade Features**: Atomic backup operations, received_uuid protection, incremental chain validation
+    * **Advanced Features**: Atomic backup operations, received_uuid protection, incremental chain validation
     * **Advanced BTRFS Library** (`lib/lib_btrfs.sh`): Specialized library solving critical BTRFS limitations with true atomic patterns
     * **Snapshot Management**: Creates independent snapshots for `@` and `@home` subvolumes with optional source preservation
     * **Incremental Backups**: Intelligent parent detection, automatic fallback, and comprehensive chain integrity validation
-    * **Restore Capabilities**: Complete system restore, individual subvolume restore, folder-level restoration, and bootloader integration
+    * **Restore Capabilities**: Complete system restore, individual subvolume restore, folder-level restoration, and bootloader integration *(Note: Restore functions are implemented but require comprehensive testing)*
     * **Safety Features**: Live environment detection, filesystem health checking, rollback capabilities, and dry-run support
     * **Detailed Documentation**: See `docs/mod_btrfs_backup.md`, `docs/mod_btrfs_restore.md`, and `docs/lib_btrfs.md`
 
