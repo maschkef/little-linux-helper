@@ -431,7 +431,46 @@ else
 fi
 ```
 
-**11. Function Export System:**
+**11. Internal Utility Functions:**
+
+### `ensure_pipefail()`
+
+**Purpose:** Ensures that pipeline failure detection (`set -o pipefail`) is enabled for safe pipe operations.
+
+**Critical Importance:** BTRFS operations often involve complex pipelines, and pipeline failures must be detected to ensure backup integrity.
+
+**Mechanism:**
+- Checks current `pipefail` status using `set -o | grep pipefail`
+- Enables `set -o pipefail` if not already active
+- Called automatically when library is loaded
+
+**Safety Impact:** Ensures that failures in any part of a pipeline are properly detected and handled.
+
+**Usage:** Internal function - called automatically during library initialization.
+
+### `convert_to_bytes()` (Internal Helper)
+
+**Purpose:** Converts human-readable size units to bytes for precise space calculations.
+
+**Supported Units:**
+- **Binary Units:** K/Ki, M/Mi, G/Gi, T/Ti (1024-based)
+- **Decimal Units:** Basic numeric values
+- **Flexible Input:** Handles both IEC (Ki, Mi, Gi) and SI (K, M, G) notation
+
+**Implementation Details:**
+- Uses regex pattern matching for unit detection
+- Employs `bc` for precise arithmetic calculations
+- Handles decimal values and rounds to integer bytes
+- Provides fallback to "0" for invalid input
+
+**Parameters:**
+- `$1`: Size value with unit (e.g., "1.5G", "500Mi", "128K")
+
+**Returns:** Size in bytes as integer, or "0" for invalid input
+
+**Usage:** Internal function used by space checking functions for consistent unit conversion.
+
+**12. Function Export System:**
 
 All major functions are exported for use by other modules:
 ```bash
@@ -447,7 +486,7 @@ export -f protect_received_snapshots
 export -f validate_btrfs_implementation
 ```
 
-**12. Integration with Main System:**
+**13. Integration with Main System:**
 
 *   **Module Dependencies**: Used exclusively by BTRFS-specific modules (`mod_btrfs_backup.sh`, `mod_btrfs_restore.sh`)
 *   **Library Architecture**: Specialized library separate from the core library system - not loaded by `lib_common.sh`
@@ -457,7 +496,7 @@ export -f validate_btrfs_implementation
 *   **Error Propagation**: Provides detailed error codes for intelligent handling by calling BTRFS modules
 *   **Safety Integration**: Coordinates with main system safety mechanisms through common patterns
 
-**13. Critical Safety Features:**
+**14. Critical Safety Features:**
 
 *   **Pipeline Failure Detection**: `set -o pipefail` ensures pipe operation failures are caught
 *   **Atomic Operations**: True atomic patterns prevent partial states
@@ -466,14 +505,14 @@ export -f validate_btrfs_implementation
 *   **Error Recovery**: Cleanup mechanisms for failed operations
 *   **Chain Integrity**: Preserves backup chain dependencies in all operations
 
-**14. Performance Considerations:**
+**15. Performance Considerations:**
 
 *   **Space Efficiency**: Uses BTRFS-specific space calculation for accuracy
 *   **Chain Optimization**: Intelligent cleanup preserves necessary dependencies
 *   **Error Efficiency**: Quick error pattern recognition for fast failure handling
 *   **Validation Optimization**: Efficient validation checks without excessive overhead
 
-**15. Advanced BTRFS Concepts Handled:**
+**16. Advanced BTRFS Concepts Handled:**
 
 *   **Incremental Backup Chains**: Complete understanding and protection of BTRFS incremental mechanisms
 *   **received_uuid Semantics**: Deep understanding of received snapshot metadata

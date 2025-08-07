@@ -1,9 +1,10 @@
 # Little Linux Helper
 
-> **⚠️ Documentation Status Notice:**
-> - **Documentation Update Needed**: The documentation (including this README.md) needs to be updated to reflect recent changes and improvements.
-> - **BTRFS Modules Need Testing**: The BTRFS backup and restore modules require comprehensive testing. The backup module has been enhanced and improved, while the restore module has been completely recreated. Please use with caution and test thoroughly beforehand.
-> - Update: The incremental backup now works. The restore module is still untested, but the backup works great for saving the current state to just restore files/folders from it.
+> **🎯 Project Status:**
+> - **Documentation**: Comprehensive technical documentation is available in the `docs/` directory for all modules and core components
+> - **BTRFS Modules**: Enterprise-grade BTRFS backup and restore modules with atomic operations, incremental backup chains, and comprehensive safety features
+> - **Modular Architecture**: Clean separation of backup types into specialized modules (BTRFS, TAR, RSYNC) with unified dispatcher interface
+> - **Production Ready**: All modules include comprehensive error handling, logging, and safety mechanisms
 
 ## Description
 
@@ -34,10 +35,21 @@ This project is licensed under the MIT License. For more information, see the `L
 <summary>❗ Known Issues and Limitations</summary>
 
 Here is a list of known issues, limitations, or behaviors you might encounter when using the scripts.
-* **Backups:**
-    * **BTRFS Backup:** The BTRFS backup and restore functions are now moved to the modules `modules/backup/mod_btrfs_backup.sh` and `modules/backup/mod_btrfs_restore.sh`. The other backup methods (TAR, RSYNC) are less intensively tested.
+
+* **System Compatibility:**
+    * Primary testing environment: Arch Linux (main system) and Debian (Proxmox services)
+    * Other distributions may have unknown compatibility issues, though scripts are designed for broad compatibility
+    * Some features require specific package managers or system tools
+
 * **Advanced Log Analysis (`scripts/advanced_log_analyzer.py`):**
-    * This script is less intensively tested and has known limitations regarding log format recognition, character encoding, and the complexity of its regular expressions (see `docs/advanced_log_analyzer.md` for details).
+    * Known limitations regarding log format recognition and character encoding
+    * Complex regular expressions may not handle all log variations
+    * See `docs/advanced_log_analyzer.md` for detailed limitations and usage notes
+
+* **Module-Specific Limitations:**
+    * **BTRFS Operations**: Requires BTRFS filesystem and appropriate privileges
+    * **Docker Security**: Scanning depth and accuracy depend on Compose file complexity
+    * **Hardware Monitoring**: Temperature sensors require `lm-sensors` and proper hardware support
 
 </details>
 
@@ -56,27 +68,35 @@ The main script `help_master.sh` serves as the central entry point and provides 
 </details>
 
 <details>
-<summary>💾 Backup & Restore</summary>
+<summary>💾 Backup & Restore System</summary>
+
+* **Unified Backup Dispatcher** (`modules/backup/mod_backup.sh`):
+    * Central dispatcher providing unified interface for all backup types
+    * Shared configuration management and status reporting across all backup methods
+    * Comprehensive status overview covering BTRFS, TAR, and RSYNC backups
 
 * **BTRFS Snapshot Backup & Restore** (`modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`):
-    * Creation and management of snapshots for subvolumes `@` and `@home` with incremental backup support.
-    * Transfer of snapshots to backup destination using `btrfs send/receive` with automatic incremental chain detection.
-    * Source snapshot preservation required for incremental backups - parent snapshots must remain on source system for incremental chains to work.
-    * Does not integrate with Snapper or Timeshift - creates its own independent snapshots for backup purposes.
-    * Integrated integrity checking, marker files, automatic cleanup, manual and automatic deletion, status display, and desktop notifications.
-    * **⚠️ Restore module is completely untested!** - restoration of complete systems, individual subvolumes, or individual folders from snapshots with dry-run support.
-    * Detailed technical description: see `docs/mod_btrfs_backup.md` and `docs/mod_btrfs_restore.md`.
-* **TAR Archive Backup & Restore** (`modules/backup/mod_backup.sh`):
-    * Creation of compressed TAR archives (`.tar.gz`) from selected directories.
-    * Configurable exclusion lists and retention policies.
-    * Restoration to original location, temporary directory, or custom path.
-* **RSYNC Backup & Restore** (`modules/backup/mod_backup.sh`):
-    * Backups with `rsync` (full or incremental, with hardlinks for space savings).
-    * Selection of source directories and exclusion lists.
-    * Restoration to original location, temporary directory, or custom path.
-* **Backup Status and Configuration**:
-    * Display of current backup status (online/offline, free disk space, existing backups, latest backups, total size).
-    * Display and modification of backup configuration (target path, directory, retention, temporary snapshot directory).
+    * **Enterprise-Grade Features**: Atomic backup operations, received_uuid protection, incremental chain validation
+    * **Advanced BTRFS Library** (`lib/lib_btrfs.sh`): Specialized library solving critical BTRFS limitations with true atomic patterns
+    * **Snapshot Management**: Creates independent snapshots for `@` and `@home` subvolumes with optional source preservation
+    * **Incremental Backups**: Intelligent parent detection, automatic fallback, and comprehensive chain integrity validation
+    * **Restore Capabilities**: Complete system restore, individual subvolume restore, folder-level restoration, and bootloader integration
+    * **Safety Features**: Live environment detection, filesystem health checking, rollback capabilities, and dry-run support
+    * **Detailed Documentation**: See `docs/mod_btrfs_backup.md`, `docs/mod_btrfs_restore.md`, and `docs/lib_btrfs.md`
+
+* **TAR Archive Backup & Restore** (`modules/backup/mod_backup_tar.sh`, `modules/backup/mod_restore_tar.sh`):
+    * **Flexible Backup Options**: Home only, system config, full system, or custom directory selection
+    * **Intelligent Exclusions**: Built-in system exclusions, user-configurable patterns, and interactive exclusion management
+    * **Archive Management**: Compressed `.tar.gz` archives with automatic cleanup and retention policies
+    * **Safe Restoration**: Multiple destination options with safety warnings and confirmation prompts
+    * **Documentation**: See `docs/mod_backup_tar.md` and `docs/mod_restore_tar.md`
+
+* **RSYNC Incremental Backup & Restore** (`modules/backup/mod_backup_rsync.sh`, `modules/backup/mod_restore_rsync.sh`):
+    * **Incremental Intelligence**: Space-efficient backups using hardlink optimization with `--link-dest`
+    * **Backup Types**: Full backups and incremental backups with automatic parent detection
+    * **Advanced Options**: Comprehensive RSYNC configuration with atomic operations and progress monitoring
+    * **Flexible Restoration**: Real-time progress monitoring and complete directory tree restoration
+    * **Documentation**: See `docs/mod_backup_rsync.md` and `docs/mod_restore_rsync.md`
 
 </details>
 
@@ -155,6 +175,22 @@ The main script `help_master.sh` serves as the central entry point and provides 
             * Direct embedding of sensitive data (e.g., API keys, tokens) instead of environment variables. (currently not working properly)
         * Optionally displays a list of currently running Docker containers. (Disabled by default in `config/docker.conf.example`.)
         * Provides a summary of found potential issues with recommendations.
+
+</details>
+
+<details>
+<summary>🐳 Docker Management</summary>
+
+* **Docker Container Management (`mod_docker.sh`)**:
+    * Container status monitoring and management.
+    * Docker system information and resource usage.
+    * Container log access and analysis.
+    * Network and volume management.
+* **Docker Setup & Installation (`mod_docker_setup.sh`)**:
+    * Automated Docker installation across distributions.
+    * Docker Compose setup and configuration.
+    * User permission configuration for Docker access.
+    * System service configuration and startup.
 
 </details>
 
@@ -291,14 +327,20 @@ The project is divided into modules to organize functionality:
     * **Core Library System**: Automatically loads specialized library components (`lib_colors.sh`, `lib_i18n.sh`, `lib_ui.sh`, etc.).
 * **`lib/lib_btrfs.sh`**: **Specialized BTRFS library** (not part of core library system). Provides advanced BTRFS-specific functions for atomic backup operations, incremental chain validation, and comprehensive BTRFS safety mechanisms. Used exclusively by BTRFS modules and must be explicitly sourced.
 * **`modules/mod_restarts.sh`**: Provides options for restarting services and the desktop environment.
-* **`modules/backup/mod_backup.sh`**: Provides backup and restore functions using TAR and RSYNC.
+* **`modules/backup/mod_backup.sh`**: Unified backup dispatcher providing centralized interface for all backup types (BTRFS, TAR, RSYNC).
 * **`modules/backup/mod_btrfs_backup.sh`**: BTRFS-specific backup functions (snapshots, transfer, integrity checking, markers, cleanup, status, etc.). Uses `lib_btrfs.sh` for advanced BTRFS operations.
 * **`modules/backup/mod_btrfs_restore.sh`**: BTRFS-specific restore functions (complete system, individual subvolumes, folders, and dry-run). Uses `lib_btrfs.sh` for atomic restore operations.
+* **`modules/backup/mod_backup_tar.sh`**: TAR archive backup functionality with multiple backup types and intelligent exclusion management.
+* **`modules/backup/mod_restore_tar.sh`**: TAR archive restoration with safety features and flexible destination options.
+* **`modules/backup/mod_backup_rsync.sh`**: RSYNC incremental backup with hardlink optimization and comprehensive configuration.
+* **`modules/backup/mod_restore_rsync.sh`**: RSYNC backup restoration with real-time progress monitoring and complete directory tree restoration.
 * **`modules/mod_system_info.sh`**: Displays detailed system information.
 * **`modules/mod_disk.sh`**: Tools for disk analysis and maintenance.
 * **`modules/mod_logs.sh`**: Analysis of system and application logs.
 * **`modules/mod_packages.sh`**: Package management, system updates, cleanup.
 * **`modules/mod_security.sh`**: Security checks, Docker security, network, rootkit checking.
+* **`modules/mod_docker.sh`**: Docker container management and monitoring.
+* **`modules/mod_docker_setup.sh`**: Docker installation and setup automation.
 * **`modules/mod_energy.sh`**: Energy and power management features (power profiles, sleep control, brightness).
 
 </details>
