@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # lang/en/main_menu.sh
-# Copyright (c) 2025 wuldorf
+# Copyright (c) 2025 maschkef
 # SPDX-License-Identifier: MIT
 #
 # English main menu language strings

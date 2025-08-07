@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # lib/lib_ui.sh
-# Copyright (c) 2025 wuldorf
+# Copyright (c) 2025 maschkef
 # SPDX-License-Identifier: MIT
 #
 # User interface functions for formatted output and input handling

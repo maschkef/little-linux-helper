@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # lib/lib_colors.sh
-# Copyright (c) 2025 wuldorf
+# Copyright (c) 2025 maschkef
 # SPDX-License-Identifier: MIT
 #
 # Color definitions for console output

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # little-linux-helper/scripts/advanced_log_analyzer.py
-# Copyright (c) 2025 wuldorf
+# Copyright (c) 2025 maschkef
 # SPDX-License-Identifier: MIT
 #
 # This script is part of the 'little-linux-helper' collection.

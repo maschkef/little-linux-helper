@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # little-linux-helper/lang/es/common.sh
-# Copyright (c) 2025 wuldorf
+# Copyright (c) 2025 maschkef
 # SPDX-License-Identifier: MIT
 #
 # Spanish common language strings

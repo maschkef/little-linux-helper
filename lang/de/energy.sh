@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # little-linux-helper/lang/de/energy.sh
-# Copyright (c) 2025 wuldorf
+# Copyright (c) 2025 maschkef
 # SPDX-License-Identifier: MIT
 #
 # Deutsche Übersetzungen für das Energieverwaltungsmodul

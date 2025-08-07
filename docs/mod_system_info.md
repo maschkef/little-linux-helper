@@ -1,6 +1,6 @@
 <!--
 File: docs/mod_system_info.md
-Copyright (c) 2025 wuldorf
+Copyright (c) 2025 maschkef
 SPDX-License-Identifier: MIT
 
 This project is part of the 'little-linux-helper' collection.

@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # lang/en/security.sh
-# Copyright (c) 2025 wuldorf
+# Copyright (c) 2025 maschkef
 # SPDX-License-Identifier: MIT
 #
 # English security module language strings
@@ -122,6 +122,5 @@ MSG_EN[SECURITY_PASSWORD_INFO_UNAVAILABLE]="Information could not be retrieved."
 
 # Common options
 MSG_EN[SECURITY_OPTION_1_TO_4]="Option (1-4): "
-MSG_EN[SECURITY_OPTION_1_TO_7]="Choose an option (1-7): "
 MSG_EN[SECURITY_CHOOSE_OPTION]="Choose an option: "
 MSG_EN[SECURITY_INVALID_OPTION]="Invalid option. Operation cancelled."

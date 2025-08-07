@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # lang/en/logs.sh
-# Copyright (c) 2025 wuldorf
+# Copyright (c) 2025 maschkef
 # SPDX-License-Identifier: MIT
 #
 # English language strings for logs module

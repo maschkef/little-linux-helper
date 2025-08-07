@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # lang/de/backup.sh
-# Copyright (c) 2025 wuldorf
+# Copyright (c) 2025 maschkef
 # SPDX-License-Identifier: MIT
 #
 # German backup module language strings

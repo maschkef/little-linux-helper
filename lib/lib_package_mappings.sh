@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # lib/lib_package_mappings.sh
-# Copyright (c) 2025 wuldorf
+# Copyright (c) 2025 maschkef
 # SPDX-License-Identifier: MIT
 #
 # Package name mappings for different package managers

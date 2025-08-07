@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # little-linux-helper/lang/en/packages.sh
-# Copyright (c) 2025 wuldorf
+# Copyright (c) 2025 maschkef
 # SPDX-License-Identifier: MIT
 #
 # English translations for package management module
@@ -189,7 +189,6 @@ MSG_EN[PKG_INFO_APPIMAGE_CHECK_LOGS]="Check individual application logs in:"
 # Error messages
 MSG_EN[PKG_ERROR_NO_PACKAGE_MANAGER]="No supported package manager found."
 MSG_EN[PKG_ERROR_UNKNOWN_PACKAGE_MANAGER]="Error: Unknown package manager: %s"
-MSG_EN[PKG_ERROR_UNKNOWN_ALT_MANAGER]="Unknown alternative package manager: %s"
 MSG_EN[PKG_WARN_UNKNOWN_ALT_MANAGER]="Warning: Unknown alternative package manager: %s"
 MSG_EN[PKG_ERROR_INVALID_SELECTION]="Invalid selection. Please try again."
 
