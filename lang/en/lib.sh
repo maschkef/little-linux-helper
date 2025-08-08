@@ -49,11 +49,24 @@ MSG_EN[LIB_INSTALL_SUCCESS]="Successfully installed %s"
 MSG_EN[LIB_INSTALL_FAILED]="Could not install %s"
 
 # User info messages
-MSG_EN[LIB_USER_INFO_CACHED]="Using cached user info for %s"
-MSG_EN[LIB_USER_INFO_SUCCESS]="User info for %s successfully determined."
-MSG_EN[LIB_USER_INFO_ERROR]="Could not determine user info. Command cannot be executed."
-MSG_EN[LIB_XDG_RUNTIME_ERROR]="XDG_RUNTIME_DIR for user %s could not be determined or is invalid."
-MSG_EN[LIB_COMMAND_EXECUTION]="Executing as user %s: %s"
+MSG_EN[LIB_USER_INFO_CACHED]="User info already cached for user: %s"
+MSG_EN[LIB_USER_INFO_SESSION_FOUND]="Active graphical session found: User=%s, Session=%s"
+MSG_EN[LIB_USER_INFO_SESSION_DETAILS]="Session details - Display: %s, Runtime: %s"
+MSG_EN[LIB_USER_INFO_NO_SESSION]="No active graphical session found via loginctl"
+MSG_EN[LIB_USER_INFO_FALLBACK_USER]="Using fallback user detection"
+MSG_EN[LIB_USER_INFO_FALLBACK_ENV]="Using fallback environment variables"
+MSG_EN[LIB_USER_INFO_SUCCESS]="Successfully determined target user: %s"
+MSG_EN[LIB_USER_INFO_ERROR]="Could not determine target user information"
+
+# Sudo elevation messages
+MSG_EN[LIB_SUDO_GUI_MODE_DETECTED]="GUI mode detected - cannot re-execute with sudo"
+MSG_EN[LIB_SUDO_GUI_INDIVIDUAL_COMMANDS]="In GUI mode, commands will be executed with sudo prompts."
+MSG_EN[LIB_SUDO_GUI_PASSWORD_PROMPTS]="Password prompts will appear in the GUI interface."
+MSG_EN[LIB_SUDO_CONTINUE_QUESTION]="Do you want to continue with elevated privileges?"
+MSG_EN[LIB_SUDO_CONFIRMED]="User confirmed to continue with sudo for individual commands"
+MSG_EN[LIB_SUDO_DENIED]="User denied continuing with sudo"
+MSG_EN[LIB_SUDO_REEXECUTE]="Re-executing script with sudo privileges"
+MSG_EN[LIB_SUDO_DENIED_ELEVATION]="User denied sudo elevation"
 
 # General warnings
 MSG_EN[LIB_WARNING_INITIAL_LOG_DIR]="WARNING: Could not create initial log directory: %s"

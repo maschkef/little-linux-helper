@@ -30,8 +30,8 @@ MSG_DE[LIB_BACKUP_LOG_CREATE_ERROR]="Konnte Backup-Logdatei %s nicht erstellen/b
 MSG_DE[LIB_CLEANUP_OLD_BACKUP]="Entferne altes Backup: %s"
 
 # Root privileges messages
-MSG_DE[LIB_ROOT_PRIVILEGES_NEEDED]="Einige Funktionen dieses Skripts erfordern Root-Rechte. Bitte führen Sie das Skript mit 'sudo' aus."
-MSG_DE[LIB_ROOT_PRIVILEGES_DETECTED]="Skript läuft mit Root-Rechten."
+MSG_DE[LIB_ROOT_PRIVILEGES_NEEDED]="Einige Funktionen dieses Skripts erfordern Root-Berechtigung. Bitte führen Sie das Skript mit 'sudo' aus."
+MSG_DE[LIB_ROOT_PRIVILEGES_DETECTED]="Skript läuft mit Root-Berechtigung."
 
 # Package manager messages
 MSG_DE[LIB_PKG_MANAGER_NOT_FOUND]="Kein unterstützter Paketmanager gefunden."
@@ -49,11 +49,24 @@ MSG_DE[LIB_INSTALL_SUCCESS]="Erfolgreich installiert: %s"
 MSG_DE[LIB_INSTALL_FAILED]="Konnte %s nicht installieren"
 
 # User info messages
-MSG_DE[LIB_USER_INFO_CACHED]="Benutze gecachte Benutzerinfos für %s"
-MSG_DE[LIB_USER_INFO_SUCCESS]="Benutzerinfos für %s erfolgreich ermittelt."
-MSG_DE[LIB_USER_INFO_ERROR]="Konnte keine Benutzerinfos ermitteln. Befehl kann nicht ausgeführt werden."
-MSG_DE[LIB_XDG_RUNTIME_ERROR]="XDG_RUNTIME_DIR für Benutzer %s konnte nicht ermittelt oder ist ungültig."
-MSG_DE[LIB_COMMAND_EXECUTION]="Führe als Benutzer %s aus: %s"
+MSG_DE[LIB_USER_INFO_CACHED]="Benutzerinformationen bereits zwischengespeichert für Benutzer: %s"
+MSG_DE[LIB_USER_INFO_SESSION_FOUND]="Aktive grafische Sitzung gefunden: Benutzer=%s, Sitzung=%s"
+MSG_DE[LIB_USER_INFO_SESSION_DETAILS]="Sitzungsdetails - Display: %s, Runtime: %s"
+MSG_DE[LIB_USER_INFO_NO_SESSION]="Keine aktive grafische Sitzung über loginctl gefunden"
+MSG_DE[LIB_USER_INFO_FALLBACK_USER]="Verwende Fallback-Benutzererkennung"
+MSG_DE[LIB_USER_INFO_FALLBACK_ENV]="Verwende Fallback-Umgebungsvariablen"
+MSG_DE[LIB_USER_INFO_SUCCESS]="Zielbenutzer erfolgreich bestimmt: %s"
+MSG_DE[LIB_USER_INFO_ERROR]="Konnte Zielbenutzerinformationen nicht bestimmen"
+
+# Sudo elevation messages
+MSG_DE[LIB_SUDO_GUI_MODE_DETECTED]="GUI-Modus erkannt - kann nicht mit sudo neu ausführen"
+MSG_DE[LIB_SUDO_GUI_INDIVIDUAL_COMMANDS]="Im GUI-Modus werden Befehle mit sudo-Abfragen ausgeführt."
+MSG_DE[LIB_SUDO_GUI_PASSWORD_PROMPTS]="Passwort-Abfragen erscheinen in der GUI-Oberfläche."
+MSG_DE[LIB_SUDO_CONTINUE_QUESTION]="Möchten Sie mit erhöhten Berechtigungen fortfahren?"
+MSG_DE[LIB_SUDO_CONFIRMED]="Benutzer bestätigte Fortsetzung mit sudo für einzelne Befehle"
+MSG_DE[LIB_SUDO_DENIED]="Benutzer verweigerte Fortsetzung mit sudo"
+MSG_DE[LIB_SUDO_REEXECUTE]="Führe Skript mit sudo-Berechtigungen neu aus"
+MSG_DE[LIB_SUDO_DENIED_ELEVATION]="Benutzer verweigerte sudo-Erhöhung"
 
 # General warnings
 MSG_DE[LIB_WARNING_INITIAL_LOG_DIR]="WARNUNG: Konnte initiales Log-Verzeichnis nicht erstellen: %s"

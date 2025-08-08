@@ -15,12 +15,55 @@ function lh_check_root_privileges() {
         # Use English fallback before translation system is loaded
         local msg="${MSG[LIB_ROOT_PRIVILEGES_NEEDED]:-Some functions of this script require root privileges. Please run the script with 'sudo'.}"
         lh_log_msg "INFO" "$msg"
-        LH_SUDO_CMD='sudo'
+        
+        # In GUI mode, use a wrapper that forces OS-level sudo prompts
+        if [ "${LH_GUI_MODE:-false}" = "true" ]; then
+            LH_SUDO_CMD='lh_sudo_cmd'
+        else
+            LH_SUDO_CMD='sudo'
+        fi
     else
         # Use English fallback before translation system is loaded  
         local msg="${MSG[LIB_ROOT_PRIVILEGES_DETECTED]:-Script is running with root privileges.}"
         lh_log_msg "INFO" "$msg"
         LH_SUDO_CMD=''
+    fi
+}
+
+# Standardized sudo elevation function that works with both CLI and GUI
+# This function handles privilege elevation with proper password masking in GUI mode
+# $1: Error message to display
+# $2: Question to ask user (optional)
+# Returns: 0 if running as root or user confirmed sudo, 1 if user denied
+function lh_elevate_privileges() {
+    local error_message="${1:-Root privileges are required for this operation.}"
+    local sudo_question="${2:-Do you want to continue with elevated privileges?}"
+    
+    # Check if already running as root
+    if [ "$(id -u)" -eq 0 ]; then
+        lh_log_msg "DEBUG" "Already running with root privileges"
+        return 0
+    fi
+
+    # Display error message
+    echo -e "${LH_COLOR_ERROR}${error_message}${LH_COLOR_RESET}" >&2
+    lh_log_msg "ERROR" "$error_message"
+    
+    # Ask user if they want to continue with elevated privileges
+    if lh_confirm_action "$sudo_question" "y"; then
+        lh_log_msg "INFO" "$(lh_msg 'LIB_SUDO_REEXECUTE')"
+        
+        # In GUI mode, we want to use OS-level sudo prompts for proper password masking
+        # In CLI mode, we also use re-execution for consistency
+        # Clear any existing traps before re-execution
+        trap - INT TERM EXIT
+        exec sudo "$0" "$@"
+        # This line should never be reached
+        return $?
+    else
+        lh_log_msg "INFO" "$(lh_msg 'LIB_SUDO_DENIED_ELEVATION')"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
+        return 1
     fi
 }
 
@@ -192,6 +235,61 @@ function lh_run_command_as_target_user() {
        PATH="/usr/bin:/bin:$PATH" \
        sh -c "$command_to_run"
 
+    return $?
+}
+
+# Execute a command with sudo, using OS-level prompts in GUI mode for proper password masking
+# This function ensures that password prompts are properly masked in GUI environments
+# $@: Command and arguments to execute with sudo
+# Returns: Exit code of the executed command
+function lh_sudo_execute() {
+    # If already running as root, execute directly
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+        return $?
+    fi
+    
+    # In GUI mode, we want to force OS-level sudo prompts for security
+    if [ "${LH_GUI_MODE:-false}" = "true" ]; then
+        # Use sudo with -A flag to force the askpass program (OS-level prompt)
+        # This ensures password masking in GUI environments
+        sudo -A "$@"
+        return $?
+    fi
+    
+    # In CLI mode, use regular sudo
+    sudo "$@"
+    return $?
+}
+
+# Enhanced version of sudo that respects GUI mode requirements
+# This function should be used instead of direct sudo calls for better GUI compatibility
+function lh_sudo_cmd() {
+    # If already running as root, execute directly
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+        return $?
+    fi
+    
+    # In GUI mode, try to use OS-level sudo prompts for proper password masking
+    if [ "${LH_GUI_MODE:-false}" = "true" ]; then
+        # First try with -A (askpass) for GUI environments
+        # If that fails, fall back to regular sudo
+        if command -v pkexec >/dev/null 2>&1; then
+            # Prefer pkexec for GUI environments as it provides proper password dialogs
+            pkexec "$@"
+        elif sudo -A "$@" 2>/dev/null; then
+            # Success with askpass
+            return $?
+        else
+            # Fall back to regular sudo (this will use PTY but at least it works)
+            sudo "$@"
+        fi
+        return $?
+    fi
+    
+    # In CLI mode, use regular sudo
+    sudo "$@"
     return $?
 }
 

@@ -65,6 +65,7 @@ function lh_finalize_initialization() {
     lh_load_backup_config     # Load backup configuration
     lh_initialize_i18n        # Initialize internationalization
     lh_load_language_module "lib" # Load library-specific translations
+    lh_check_root_privileges  # Check and set up sudo handling
     export LH_LOG_DIR
     export LH_LOG_FILE
     export LH_SUDO_CMD
@@ -98,6 +99,20 @@ function lh_finalize_initialization() {
     # Export log functions
     export -f lh_should_log
     export -f lh_initialize_logging
+    export -f lh_log_msg
+    # Export system functions
+    export -f lh_check_root_privileges
+    export -f lh_elevate_privileges
+    export -f lh_sudo_execute
+    export -f lh_sudo_cmd
+    export -f lh_get_target_user_info
+    export -f lh_run_command_as_target_user
+    export -f lh_log_msg
+    # Export system functions
+    export -f lh_check_root_privileges
+    export -f lh_elevate_privileges
+    export -f lh_get_target_user_info
+    export -f lh_run_command_as_target_user
     export -f lh_log_msg
     export -f lh_backup_log
     # Export package management functions  

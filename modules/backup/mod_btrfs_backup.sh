@@ -819,19 +819,9 @@ btrfs_backup() {
     
     # 1. Root-Rechte prüfen
     backup_log_msg "DEBUG" "Checking root privileges (EUID=$EUID)..."
-    if [ "$(id -u)" -ne 0 ]; then
-        backup_log_msg "ERROR" "$(lh_msg 'BTRFS_ERROR_NEED_ROOT')"
-        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_NEED_ROOT')${LH_COLOR_RESET}" >&2
-        if lh_confirm_action "$(lh_msg 'BTRFS_RUN_WITH_SUDO')" "y"; then
-            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_BACKUP_WITH_SUDO')"
-            trap - INT TERM EXIT
-            sudo "$0" "$@"
-            return $?
-        else
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
-            trap - INT TERM EXIT
-            return 1
-        fi
+    if ! lh_elevate_privileges "$(lh_msg 'BTRFS_ERROR_NEED_ROOT')" "$(lh_msg 'BTRFS_RUN_WITH_SUDO')"; then
+        trap - INT TERM EXIT
+        return 1
     fi
     
     backup_log_msg "DEBUG" "✓ Root privileges confirmed"
@@ -2217,16 +2207,8 @@ delete_btrfs_backups() {
     lh_print_header "$(lh_msg 'BTRFS_DELETE_HEADER')"
     
     # Check root privileges
-    if [ "$EUID" -ne 0 ]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_DELETE_NEEDS_ROOT')${LH_COLOR_RESET}"
-        if lh_confirm_action "$(lh_msg 'BTRFS_RUN_WITH_SUDO')" "y"; then
-            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_DELETE_WITH_SUDO')"
-            sudo "$0" delete-btrfs-backups
-            return $?
-        else
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'DELETION_ABORTED')${LH_COLOR_RESET}"
-            return 1
-        fi
+    if ! lh_elevate_privileges "$(lh_msg 'BTRFS_DELETE_NEEDS_ROOT')" "$(lh_msg 'BTRFS_RUN_WITH_SUDO')"; then
+        return 1
     fi
     
     # Check backup directory
@@ -3417,16 +3399,8 @@ cleanup_problematic_backups() {
     lh_print_header "$(lh_msg 'BTRFS_CLEANUP_PROBLEMATIC_HEADER')"
     
     # Check root permissions
-    if [ "$EUID" -ne 0 ]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_CLEANUP_NEEDS_ROOT')${LH_COLOR_RESET}"
-        if lh_confirm_action "$(lh_msg 'BTRFS_CLEANUP_WITH_SUDO')" "y"; then
-            backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_START_SUDO')"
-            sudo "$0" cleanup-problematic-backups
-            return $?
-        else
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_CLEANUP_CANCELLED')${LH_COLOR_RESET}"
-            return 1
-        fi
+    if ! lh_elevate_privileges "$(lh_msg 'BTRFS_CLEANUP_NEEDS_ROOT')" "$(lh_msg 'BTRFS_CLEANUP_WITH_SUDO')"; then
+        return 1
     fi
     
     # Check available subvolumes
