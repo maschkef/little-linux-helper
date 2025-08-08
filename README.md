@@ -1,7 +1,5 @@
 # Little Linux Helper
 
-
-
 ## Description
 
 <img src="gui/web/public/favicon.svg" alt="Little Linux Helper" width="350" height="350" align="right" style="margin-left: 20px; margin-top: 20px;">
@@ -420,3 +418,9 @@ All actions are logged to help with tracking and troubleshooting.
 * **Filenames:** General log files receive a timestamp indicating when the script was started. Backup and restore-specific logs are also timestamped to capture each session separately.
 
 </details>
+
+## Contact
+
+If you have questions, suggestions, or encounter issues with this project, feel free to reach out:
+
+📧 **Email:** [maschkef-git@pm.me](mailto:maschkef-git@pm.me)

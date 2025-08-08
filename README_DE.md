@@ -1,6 +1,5 @@
 # Little Linux Helper
 
-
 ## Beschreibung
 
 <img src="gui/web/public/favicon.svg" alt="Little Linux Helper" width="350" height="350" align="right" style="margin-left: 20px; margin-top: 10px;">
@@ -420,3 +419,9 @@ Alle Aktionen werden in Log-Dateien protokolliert, um die Nachverfolgung und Feh
 * **Dateinamen:** Allgemeine Logdateien erhalten einen Zeitstempel, wann das Skript gestartet wurde. Backup- und Restore-spezifische Protokolle werden ebenfalls mit einem Zeitstempel versehen, um jede Sitzung separat zu erfassen.
 
 </details>
+
+## Kontakt
+
+Bei Fragen, Anregungen oder Problemen mit diesem Projekt können Sie mich gerne kontaktieren:
+
+📧 **E-Mail:** [maschkef-git@pm.me](mailto:maschkef-git@pm.me)
