@@ -1,16 +1,9 @@
 # Little Linux Helper
 
-<div align="center">
-  <img src="gui/web/public/favicon.svg" alt="Little Linux Helper" width="128" height="128">
-</div>
-
-> **🎯 Projekt-Status:**
-> - **Dokumentation**: Umfassende technische Dokumentation ist im `docs/` Verzeichnis für alle Module und Kernkomponenten verfügbar
-> - **BTRFS-Module**: Erweiterte BTRFS-Backup- und -Restore-Module mit atomaren Operationen, inkrementellen Backup-Ketten und umfassenden Sicherheitsfeatures
-> - **Modulare Architektur**: Klare Trennung der Backup-Typen in spezialisierte Module (BTRFS, TAR, RSYNC) mit einheitlicher Dispatcher-Schnittstelle
-> - **Test-Status**: Backup-Funktionen sind gut getestet und stabil; Restore-Funktionen sind implementiert, benötigen aber umfassende Tests vor Produktionseinsatz
 
 ## Beschreibung
+
+<img src="gui/web/public/favicon.svg" alt="Little Linux Helper" width="350" height="350" align="right" style="margin-left: 20px; margin-top: 10px;">
 
 Little Linux Helper ist eine umfassende Sammlung von Bash-Skripten, die entwickelt wurden, um verschiedene Systemadministrations-, Diagnose- und Wartungsaufgaben unter Linux zu vereinfachen. Es bietet sowohl ein traditionelles kommandozeilen-basiertes menügeführtes Interface als auch eine moderne webbasierte GUI für einfachen Zugriff auf eine Vielzahl von Werkzeugen und Funktionen.
 
@@ -20,6 +13,15 @@ Die `docs/DEVELOPER_GUIDE.md` enthält alle Informationen zu `lib/lib_common.sh`
 Hinweis: Die ursprüngliche `lib_common.sh` wurde zur besseren Organisation in mehrere spezialisierte Bibliotheken aufgeteilt (z.B. `lib_colors.sh`, `lib_i18n.sh`, `lib_notifications.sh`, etc.), aber `lib_common.sh` bleibt der Haupteinstiegspunkt und lädt alle anderen Kern-Bibliotheken automatisch. Zusätzlich ist `lib_btrfs.sh` eine spezialisierte Bibliothek, die ausschließlich von BTRFS-Modulen verwendet wird und nicht Teil des Kern-Bibliothekssystems ist.
 
 Meine Umgebung ist i.d.R. Arch (hauptsystem) oder Debian (diverse Dienste auf meinem Proxmox - daher auch die docker-Anteile), entsprechend kann es unter anderen Distributionen noch unbekannte Probleme geben, auch wenn ich versuche, alles kompatibel zu halten.
+
+<br clear="right">
+
+> **🎯 Projekt-Status:**
+> - **Dokumentation**: Umfassende technische Dokumentation ist im `docs/` Verzeichnis für alle Module und Kernkomponenten verfügbar
+> - **BTRFS-Module**: Erweiterte BTRFS-Backup- und -Restore-Module mit atomaren Operationen, inkrementellen Backup-Ketten und umfassenden Sicherheitsfeatures
+> - **Modulare Architektur**: Klare Trennung der Backup-Typen in spezialisierte Module (BTRFS, TAR, RSYNC) mit einheitlicher Dispatcher-Schnittstelle
+> - **Test-Status**: Backup-Funktionen sind gut getestet und stabil; Restore-Funktionen sind implementiert, benötigen aber umfassende Tests vor Produktionseinsatz
+> - **Update**: das btrfs backup module muss (erneut) getestet werden
 
 <details>
 <summary>⚠️ Wichtige Hinweise zur Nutzung</summary>

@@ -1,24 +1,27 @@
 # Little Linux Helper
 
-<div align="center">
-  <img src="gui/web/public/favicon.svg" alt="Little Linux Helper" width="128" height="128">
-</div>
+
+
+## Description
+
+<img src="gui/web/public/favicon.svg" alt="Little Linux Helper" width="350" height="350" align="right" style="margin-left: 20px; margin-top: 20px;">
+
+Little Linux Helper is a comprehensive collection of Bash scripts designed to simplify various system administration, diagnostic, and maintenance tasks on Linux. It provides both a traditional command-line menu-driven interface and a modern web-based GUI for easy access to a variety of tools and functions.
+
+More detailed technical English documentation for individual modules and core components can be found in the `docs` directory.
+The `docs/DEVELOPER_GUIDE.md` contains all the information about `lib/lib_common.sh` and `help_master.sh` needed to create a new module.
+Note: The original `lib_common.sh` has been split into multiple specialized libraries for better organization (e.g., `lib_colors.sh`, `lib_i18n.sh`, `lib_notifications.sh`, etc.), but `lib_common.sh` remains the main entry point and automatically loads all other core libraries. Additionally, `lib_btrfs.sh` is a specialized library used exclusively by BTRFS modules and is not part of the core library system.
+
+My environment is typically Arch (main system) or Debian (various services on my Proxmox - hence the Docker components), so there may be unknown issues on other distributions, although I try to keep everything compatible.
+
+<br clear="right">
 
 > **🎯 Project Status:**
 > - **Documentation**: Comprehensive technical documentation is available in the `docs/` directory for all modules and core components
 > - **BTRFS Modules**: Advanced BTRFS backup and restore modules with atomic operations, incremental backup chains, and comprehensive safety features
 > - **Modular Architecture**: Clean separation of backup types into specialized modules (BTRFS, TAR, RSYNC) with unified dispatcher interface
 > - **Testing Status**: Backup functions are well-tested and stable; restore functions are implemented but require comprehensive testing before production use
-
-## Description
-
-Little Linux Helper is a comprehensive collection of Bash scripts designed to simplify various system administration, diagnostic, and maintenance tasks on Linux. It provides both a traditional command-line menu-driven interface and a modern web-based GUI for easy access to a variety of tools and functions.
-
-More detailed technical English documentation for individual modules and core components can be found in the `docs` directory. This documentation was created in part to provide AI with the context of a module or file without having to read it completely and to save context.
-The `docs/DEVELOPER_GUIDE.md` contains all the information about `lib/lib_common.sh` and `help_master.sh` needed to create a new module.
-Note: The original `lib_common.sh` has been split into multiple specialized libraries for better organization (e.g., `lib_colors.sh`, `lib_i18n.sh`, `lib_notifications.sh`, etc.), but `lib_common.sh` remains the main entry point and automatically loads all other core libraries. Additionally, `lib_btrfs.sh` is a specialized library used exclusively by BTRFS modules and is not part of the core library system.
-
-My environment is typically Arch (main system) or Debian (various services on my Proxmox - hence the Docker components), so there may be unknown issues on other distributions, although I try to keep everything compatible.
+> - **Update**: the btrfs backup module needs testing (again)
 
 <details>
 <summary>⚠️ Important Usage Notes</summary>
