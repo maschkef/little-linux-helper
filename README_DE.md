@@ -1,5 +1,9 @@
 # Little Linux Helper
 
+<div align="center">
+  <img src="gui/web/public/favicon.svg" alt="Little Linux Helper" width="128" height="128">
+</div>
+
 > **🎯 Projekt-Status:**
 > - **Dokumentation**: Umfassende technische Dokumentation ist im `docs/` Verzeichnis für alle Module und Kernkomponenten verfügbar
 > - **BTRFS-Module**: Erweiterte BTRFS-Backup- und -Restore-Module mit atomaren Operationen, inkrementellen Backup-Ketten und umfassenden Sicherheitsfeatures
@@ -8,7 +12,7 @@
 
 ## Beschreibung
 
-Little Linux Helper ist eine Sammlung von Bash-Skripten, die entwickelt wurden, um verschiedene Systemadministrations-, Diagnose- und Wartungsaufgaben unter Linux zu vereinfachen. Es bietet ein menügeführtes Interface für einfachen Zugriff auf eine Vielzahl von Werkzeugen und Funktionen.
+Little Linux Helper ist eine umfassende Sammlung von Bash-Skripten, die entwickelt wurden, um verschiedene Systemadministrations-, Diagnose- und Wartungsaufgaben unter Linux zu vereinfachen. Es bietet sowohl ein traditionelles kommandozeilen-basiertes menügeführtes Interface als auch eine moderne webbasierte GUI für einfachen Zugriff auf eine Vielzahl von Werkzeugen und Funktionen.
 
 Eine detailliertere technische englische Dokumentation der einzelnen Module und Kernkomponenten befindet sich im `docs`-Verzeichnis, 
 diese wurde mitunter erstellt um einer KI den kontext eines modules bzw einer Datei zu geben ohne dieses selbst komplett lesen zu müssen und kontext zusparen.
@@ -56,7 +60,26 @@ Hier ist eine Liste von bekannten Problemen, Einschränkungen oder Verhaltenswei
 
 ## Funktionen
 
-Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Zugriff auf folgende Module:
+Das Projekt bietet zwei Schnittstellen für den Zugriff auf seine Funktionalität:
+
+### 🖥️ **Kommandozeilen-Interface (CLI)**
+Das Hauptskript `help_master.sh` dient als zentraler CLI-Einstiegspunkt und bietet Zugriff auf alle Module über ein traditionelles menügeführtes Interface.
+
+### 🌐 **Graphische Benutzeroberfläche (GUI)**
+Eine moderne webbasierte GUI ist über `gui_launcher.sh` verfügbar und bietet:
+- **Webbasierte Oberfläche**: Moderne React-Frontend mit responsivem Design, zugänglich über Webbrowser
+- **Echtzeit-Terminal**: Integrierte Terminal-Anzeige mit ANSI-Farbunterstützung und interaktiver Eingabebehandlung
+- **Modul-Navigation**: Kategorisierte Seitenleiste mit intuitiver Modul-Organisation und Suchfunktionen
+- **Dokumentations-Integration**: Eingebauter Markdown-Viewer für Modul-Dokumentation aus dem `docs/` Verzeichnis
+- **Multi-Panel-Layout**: Größenveränderbare Panels für optimale Arbeitsbereich-Organisation
+- **Sitzungs-Management**: Mehrere gleichzeitige Modul-Ausführungen mit unabhängigen Sitzungen
+- **Erweiterte Funktionen**: PTY-Integration für authentische Terminal-Erfahrung, WebSocket-Kommunikation für Echtzeit-Updates
+
+Die GUI behält vollständige Kompatibilität mit allen CLI-Funktionen bei und bietet gleichzeitig eine verbesserte Benutzererfahrung.
+
+---
+
+Beide Schnittstellen bieten Zugriff auf folgende Module:
 
 <details>
 <summary>🔄 Wiederherstellung & Neustarts (<code>mod_restarts.sh</code>)</summary>
@@ -79,7 +102,7 @@ Das Hauptskript `help_master.sh` dient als zentraler Einstiegspunkt und bietet Z
 * **BTRFS Snapshot Backup & Restore** (`modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`):
     * **Erweiterte Features**: Atomare Backup-Operationen, received_uuid-Schutz, inkrementelle Kettenvalidierung
     * **Erweiterte BTRFS-Bibliothek** (`lib/lib_btrfs.sh`): Spezialisierte Bibliothek, die kritische BTRFS-Limitationen mit echten atomaren Mustern löst
-    * **Snapshot-Verwaltung**: Erstellt unabhängige Snapshots für `@` und `@home` Subvolumes mit optionaler Quellbewahrung
+    * **Dynamische Subvolume-Unterstützung**: Erkennt automatisch BTRFS-Subvolumes aus der Systemkonfiguration (`/etc/fstab`, `/proc/mounts`) und unterstützt manuelle Konfiguration für `@`, `@home`, `@var`, `@opt` und andere @-prefixierte Subvolumes mit optionaler Quellbewahrung
     * **Inkrementelle Backups**: Intelligente Parent-Erkennung, automatisches Fallback und umfassende Ketten-Integritätsvalidierung
     * **Restore-Funktionen**: Vollständige Systemwiederherstellung, individuelle Subvolume-Wiederherstellung, Ordner-Level-Wiederherstellung und Bootloader-Integration *(Hinweis: Restore-Funktionen sind implementiert, benötigen aber umfassende Tests)*
     * **Sicherheitsfeatures**: Live-Umgebungs-Erkennung, Dateisystem-Gesundheitsprüfung, Rollback-Funktionen und Dry-Run-Unterstützung
@@ -254,10 +277,19 @@ CFG_LH_LANG="fr"      # Französisch (praktisch unbrauchbar, nur interne Meldung
 <details>
 <summary>📋 Anforderungen</summary>
 
+### Kern-Anforderungen:
 * Bash-Shell
 * Standard Linux-Dienstprogramme (wie `grep`, `awk`, `sed`, `find`, `df`, `lsblk`, `ip`, `ps`, `free`, `tar`, `rsync`, `btrfs-progs` etc.)
 * Einige Funktionen erfordern möglicherweise Root-Rechte und werden ggf. `sudo` verwenden.
-* Für spezifische Funktionen werden zusätzliche Pakete benötigt, die das Skript bei Bedarf zu installieren versucht:
+
+### GUI-Anforderungen (optional):
+* **Go** (1.21 oder neuer) für Backend-Server-Kompilierung
+* **Node.js** (16 oder neuer) und **npm** für Frontend-Entwicklung und -Erstellung
+* **Webbrowser** für den Zugriff auf die GUI-Oberfläche
+* Zusätzliche System-Abhängigkeiten: `github.com/gofiber/fiber/v2`, `github.com/gofiber/websocket/v2`, `github.com/creack/pty` (automatisch installiert)
+
+### Optionale Abhängigkeiten:
+Für spezifische Funktionen werden zusätzliche Pakete benötigt, die das Skript bei Bedarf zu installieren versucht:
     * `btrfs-progs` (für BTRFS Backup/Restore)
     * `rsync` (für RSYNC Backup/Restore)
     * `smartmontools` (für S.M.A.R.T.-Werte und Festplatten-Gesundheitsstatus)
@@ -284,11 +316,40 @@ Das Skript versucht, den verwendeten Paketmanager (pacman, yay, apt, dnf) automa
 <details>
 <summary>🚀 Installation & Setup</summary>
 
-1.  Klone das Repository oder lade die Skripte herunter.
-2.  Stelle sicher, dass das Hauptskript `help_master.sh` ausführbar ist:
+### CLI-Installation:
+1. Klone das Repository oder lade die Skripte herunter.
+2. Stelle sicher, dass das Hauptskript `help_master.sh` ausführbar ist:
     ```bash
     chmod +x help_master.sh
     ```
+3. Führe die CLI-Oberfläche aus:
+    ```bash
+    ./help_master.sh
+    ```
+
+### GUI-Installation (optional):
+1. Stelle sicher, dass Go (1.21+) und Node.js (16+) auf deinem System installiert sind.
+2. Mache den GUI-Launcher ausführbar:
+    ```bash
+    chmod +x gui_launcher.sh
+    ```
+3. Starte die GUI-Oberfläche:
+    ```bash
+    ./gui_launcher.sh
+    ```
+4. Die GUI wird automatisch:
+   - Abhängigkeiten beim ersten Start einrichten
+   - Die Anwendung bei Bedarf erstellen
+   - Den Webserver auf `http://localhost:3000` starten
+   - Deinen Standard-Webbrowser zur Oberfläche öffnen
+
+**GUI-Entwicklungsmodus:**
+Für Entwicklung mit Hot-Reload-Funktionen:
+```bash
+cd gui/
+./setup.sh    # Einmalige Einrichtung
+./dev.sh      # Entwicklungsserver starten
+```
 
 </details>
 

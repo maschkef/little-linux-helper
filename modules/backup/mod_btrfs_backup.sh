@@ -164,6 +164,8 @@ configure_backup() {
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_RETENTION')${LH_COLOR_RESET} $(lh_msg 'CONFIG_BACKUPS_COUNT' "$LH_RETENTION_BACKUP")"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'CONFIG_DEBUG_LOG_LIMIT_CURRENT'):${LH_COLOR_RESET} $(display_debug_log_limit)"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_LOGFILE')${LH_COLOR_RESET} $LH_BACKUP_LOG ($(lh_msg 'CONFIG_FILENAME' "$(basename "$LH_BACKUP_LOG")"))"
+    echo -e "  ${LH_COLOR_INFO}Backup subvolumes:${LH_COLOR_RESET} $LH_BACKUP_SUBVOLUMES"
+    echo -e "  ${LH_COLOR_INFO}Auto-detect subvolumes:${LH_COLOR_RESET} $LH_AUTO_DETECT_SUBVOLUMES"
     echo ""
     
     if lh_confirm_action "$(lh_msg 'CONFIG_CHANGE_QUESTION')" "n"; then
@@ -251,6 +253,78 @@ configure_backup() {
             fi
         fi
         
+        # Configure BTRFS subvolumes
+        echo ""
+        echo -e "${LH_COLOR_PROMPT}BTRFS Subvolume Configuration${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}Current subvolumes:${LH_COLOR_RESET} $LH_BACKUP_SUBVOLUMES"
+        echo -e "${LH_COLOR_INFO}Auto-detection enabled:${LH_COLOR_RESET} $LH_AUTO_DETECT_SUBVOLUMES"
+        
+        # Show detected subvolumes
+        echo ""
+        echo -e "${LH_COLOR_INFO}Auto-detected subvolumes:${LH_COLOR_RESET}"
+        local detected_subvols=()
+        readarray -t detected_subvols < <(detect_btrfs_subvolumes)
+        if [[ ${#detected_subvols[@]} -gt 0 ]]; then
+            for subvol in "${detected_subvols[@]}"; do
+                echo -e "  ${LH_COLOR_SUCCESS}✓${LH_COLOR_RESET} $subvol"
+            done
+        else
+            echo -e "  ${LH_COLOR_WARNING}No subvolumes auto-detected${LH_COLOR_RESET}"
+        fi
+        
+        # Show final effective list
+        echo ""
+        echo -e "${LH_COLOR_INFO}Final effective subvolumes for backup:${LH_COLOR_RESET}"
+        local effective_subvols=()
+        readarray -t effective_subvols < <(get_backup_subvolumes)
+        for subvol in "${effective_subvols[@]}"; do
+            if validate_subvolume_exists "$subvol"; then
+                echo -e "  ${LH_COLOR_SUCCESS}✓${LH_COLOR_RESET} $subvol (accessible)"
+            else
+                echo -e "  ${LH_COLOR_WARNING}⚠${LH_COLOR_RESET} $subvol (not accessible or missing)"
+            fi
+        done
+        
+        if lh_confirm_action "Configure subvolume settings?" "n"; then
+            # Configure manual subvolume list
+            echo ""
+            echo -e "${LH_COLOR_PROMPT}Manual Subvolume Configuration${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Enter subvolumes to backup (space-separated, e.g., '@ @home @var'):${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Current:${LH_COLOR_RESET} $LH_BACKUP_SUBVOLUMES"
+            local new_subvolumes=$(lh_ask_for_input "New subvolumes (or press Enter to keep current)")
+            if [ -n "$new_subvolumes" ]; then
+                # Validate subvolume format
+                local valid=true
+                for subvol in $new_subvolumes; do
+                    if [[ ! "$subvol" =~ ^@[a-zA-Z0-9/_-]*$ ]]; then
+                        echo -e "${LH_COLOR_ERROR}Invalid subvolume name: $subvol (must start with @)${LH_COLOR_RESET}"
+                        valid=false
+                    fi
+                done
+                
+                if [ "$valid" = true ]; then
+                    LH_BACKUP_SUBVOLUMES="$new_subvolumes"
+                    echo -e "${LH_COLOR_SUCCESS}Updated subvolumes:${LH_COLOR_RESET} $LH_BACKUP_SUBVOLUMES"
+                    changed=true
+                fi
+            fi
+            
+            # Configure auto-detection
+            echo ""
+            echo -e "${LH_COLOR_PROMPT}Auto-Detection Configuration${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Current auto-detection:${LH_COLOR_RESET} $LH_AUTO_DETECT_SUBVOLUMES"
+            if lh_confirm_action "Toggle auto-detection setting?" "n"; then
+                if [[ "$LH_AUTO_DETECT_SUBVOLUMES" == "true" ]]; then
+                    LH_AUTO_DETECT_SUBVOLUMES="false"
+                    echo -e "${LH_COLOR_INFO}Auto-detection disabled${LH_COLOR_RESET}"
+                else
+                    LH_AUTO_DETECT_SUBVOLUMES="true"
+                    echo -e "${LH_COLOR_INFO}Auto-detection enabled${LH_COLOR_RESET}"
+                fi
+                changed=true
+            fi
+        fi
+        
         # Additional parameters could be added here (e.g. LH_BACKUP_LOG_BASENAME)
         if [ "$changed" = true ]; then
             echo ""
@@ -261,6 +335,8 @@ configure_backup() {
             echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_CONFIG_RETENTION')${LH_COLOR_RESET} $LH_RETENTION_BACKUP"
             echo -e "  ${LH_COLOR_INFO}$(lh_msg 'CONFIG_NEW_EXCLUDES'):${LH_COLOR_RESET} $LH_TAR_EXCLUDES"
             echo -e "  ${LH_COLOR_INFO}$(lh_msg 'CONFIG_DEBUG_LOG_LIMIT_CURRENT'):${LH_COLOR_RESET} $(display_debug_log_limit)"
+            echo -e "  ${LH_COLOR_INFO}Backup subvolumes:${LH_COLOR_RESET} $LH_BACKUP_SUBVOLUMES"
+            echo -e "  ${LH_COLOR_INFO}Auto-detect subvolumes:${LH_COLOR_RESET} $LH_AUTO_DETECT_SUBVOLUMES"
             if lh_confirm_action "$(lh_msg 'CONFIG_SAVE_PERMANENTLY')" "y"; then
                 lh_save_backup_config
                 echo "$(lh_msg 'CONFIG_SAVED' "$LH_BACKUP_CONFIG_FILE")"
@@ -404,14 +480,22 @@ create_direct_snapshot() {
 
     backup_log_msg "INFO" "Creating fresh snapshot for reliable incremental backup chain" >&2
 
-    # Determine mount point for the subvolume
+    # Determine mount point for the subvolume using actual mount information
     local mount_point=""
-    if [ "$subvol" == "@" ]; then
-        mount_point="/"
-    elif [ "$subvol" == "@home" ]; then
-        mount_point="/home"
-    else
-        mount_point="/$subvol"
+    mount_point=$(grep "subvol=/$subvol" /proc/mounts 2>/dev/null | awk '{print $2}' | head -1)
+    
+    # Fallback to common mappings if not found in mounts
+    if [[ -z "$mount_point" ]]; then
+        case "$subvol" in
+            "@") mount_point="/" ;;
+            "@home") mount_point="/home" ;;
+            "@cache") mount_point="/var/cache" ;;
+            "@log") mount_point="/var/log" ;;
+            "@root") mount_point="/root" ;;
+            "@srv") mount_point="/srv" ;;
+            "@tmp") mount_point="/var/tmp" ;;
+            *) mount_point="/$subvol" ;;
+        esac
     fi
 
     backup_log_msg "DEBUG" "Determined mount point: $mount_point" >&2
@@ -555,6 +639,154 @@ CURRENT_TEMP_SNAPSHOT=""
 
 # Global variable for backup start time
 BACKUP_START_TIME=""
+
+# Function to detect BTRFS subvolumes automatically
+detect_btrfs_subvolumes() {
+    backup_log_msg "DEBUG" "Starting automatic BTRFS subvolume detection" >&2
+    local detected_subvolumes=()
+    declare -A seen_subvols
+    
+    # Parse /etc/fstab for subvol= entries
+    if [[ -r "/etc/fstab" ]]; then
+        backup_log_msg "DEBUG" "Scanning /etc/fstab for BTRFS subvolume entries" >&2
+        while IFS= read -r line; do
+            # Skip comments and empty lines
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line// }" ]] && continue
+            
+            # Look for BTRFS entries with subvol= option
+            if [[ "$line" =~ btrfs ]] && [[ "$line" =~ subvol= ]]; then
+                local subvol_name
+                subvol_name=$(echo "$line" | sed -n 's/.*subvol=\([^,[:space:]]*\).*/\1/p')
+                if [[ -n "$subvol_name" && "$subvol_name" =~ ^/@ ]]; then
+                    # Remove the leading / to get just the subvolume name
+                    subvol_name="${subvol_name#/}"
+                    backup_log_msg "DEBUG" "Found subvolume in /etc/fstab: $subvol_name" >&2
+                    detected_subvolumes+=("$subvol_name")
+                    seen_subvols["$subvol_name"]=1
+                fi
+            fi
+        done < "/etc/fstab"
+    fi
+    
+    # Parse /proc/mounts for active BTRFS subvolumes
+    if [[ -r "/proc/mounts" ]]; then
+        backup_log_msg "DEBUG" "Scanning /proc/mounts for active BTRFS subvolumes" >&2
+        while IFS= read -r line; do
+            # Look for BTRFS entries with subvol= option
+            if [[ "$line" =~ btrfs ]] && [[ "$line" =~ subvol= ]]; then
+                local subvol_name
+                subvol_name=$(echo "$line" | sed -n 's/.*subvol=\([^[:space:]]*\).*/\1/p')
+                if [[ -n "$subvol_name" && "$subvol_name" =~ ^/@ && -z "${seen_subvols[${subvol_name#/}]}" ]]; then
+                    # Remove the leading / to get just the subvolume name
+                    subvol_name="${subvol_name#/}"
+                    backup_log_msg "DEBUG" "Found active subvolume in /proc/mounts: $subvol_name" >&2
+                    detected_subvolumes+=("$subvol_name")
+                    seen_subvols["$subvol_name"]=1
+                fi
+            fi
+        done < "/proc/mounts"
+    fi
+    
+    # Output detected subvolumes (sorted and deduplicated)
+    if [[ ${#detected_subvolumes[@]} -gt 0 ]]; then
+        # Sort the array
+        IFS=$'\n' detected_subvolumes=($(sort <<<"${detected_subvolumes[*]}"))
+        unset IFS
+        backup_log_msg "INFO" "Auto-detected BTRFS subvolumes: ${detected_subvolumes[*]}" >&2
+        printf '%s\n' "${detected_subvolumes[@]}"
+    else
+        backup_log_msg "DEBUG" "No BTRFS subvolumes auto-detected" >&2
+    fi
+}
+
+# Function to get the final list of subvolumes to backup
+get_backup_subvolumes() {
+    backup_log_msg "DEBUG" "Determining final list of subvolumes to backup" >&2
+    local configured_subvolumes=()
+    local final_subvolumes=()
+    declare -A seen_subvols
+    
+    # Parse configured subvolumes from LH_BACKUP_SUBVOLUMES
+    if [[ -n "$LH_BACKUP_SUBVOLUMES" ]]; then
+        backup_log_msg "DEBUG" "Configured subvolumes: $LH_BACKUP_SUBVOLUMES" >&2
+        read -ra configured_subvolumes <<< "$LH_BACKUP_SUBVOLUMES"
+        for subvol in "${configured_subvolumes[@]}"; do
+            if [[ -n "$subvol" ]]; then
+                final_subvolumes+=("$subvol")
+                seen_subvols["$subvol"]=1
+            fi
+        done
+    fi
+    
+    # Add auto-detected subvolumes if enabled
+    if [[ "$LH_AUTO_DETECT_SUBVOLUMES" == "true" ]]; then
+        backup_log_msg "DEBUG" "Auto-detection enabled, detecting additional subvolumes" >&2
+        local detected_subvolumes
+        readarray -t detected_subvolumes < <(detect_btrfs_subvolumes)
+        
+        for subvol in "${detected_subvolumes[@]}"; do
+            if [[ -n "$subvol" && -z "${seen_subvols[$subvol]}" ]]; then
+                backup_log_msg "DEBUG" "Adding auto-detected subvolume: $subvol" >&2
+                final_subvolumes+=("$subvol")
+                seen_subvols["$subvol"]=1
+            fi
+        done
+    fi
+    
+    # Sort the final list
+    if [[ ${#final_subvolumes[@]} -gt 0 ]]; then
+        IFS=$'\n' final_subvolumes=($(sort <<<"${final_subvolumes[*]}"))
+        unset IFS
+        backup_log_msg "INFO" "Final subvolumes for backup: ${final_subvolumes[*]}" >&2
+        printf '%s\n' "${final_subvolumes[@]}"
+    else
+        # Fallback to default if nothing configured
+        backup_log_msg "WARN" "No subvolumes configured or detected, using default: @ @home" >&2
+        echo "@"
+        echo "@home"
+    fi
+}
+
+# Function to validate subvolume exists
+validate_subvolume_exists() {
+    local subvol="$1"
+    backup_log_msg "DEBUG" "Validating subvolume exists: $subvol"
+    
+    # Determine mount point for the subvolume using actual mount information
+    local mount_point
+    mount_point=$(grep "subvol=/$subvol" /proc/mounts 2>/dev/null | awk '{print $2}' | head -1)
+    
+    # Fallback to common mappings if not found in mounts
+    if [[ -z "$mount_point" ]]; then
+        case "$subvol" in
+            "@") mount_point="/" ;;
+            "@home") mount_point="/home" ;;
+            "@cache") mount_point="/var/cache" ;;
+            "@log") mount_point="/var/log" ;;
+            "@root") mount_point="/root" ;;
+            "@srv") mount_point="/srv" ;;
+            "@tmp") mount_point="/var/tmp" ;;
+            "@"*) 
+                backup_log_msg "DEBUG" "Could not find mount point for $subvol, will attempt backup anyway"
+                return 0  # Continue with backup attempt
+                ;;
+            *) 
+                backup_log_msg "WARN" "Subvolume $subvol does not start with @, skipping validation"
+                return 1
+                ;;
+        esac
+    fi
+    
+    # Check if mount point exists and is accessible
+    if [[ -d "$mount_point" && -r "$mount_point" ]]; then
+        backup_log_msg "DEBUG" "Subvolume $subvol validated (mount point: $mount_point)"
+        return 0
+    else
+        backup_log_msg "WARN" "Subvolume $subvol mount point $mount_point is not accessible"
+        return 1
+    fi
+}
 
 # BTRFS Backup main function
 btrfs_backup() {
@@ -815,7 +1047,11 @@ btrfs_backup() {
         local incremental_adjustment=1.0  # Default: assume full backup
         local backup_history_count=0
         
-        for subvol in @ @home; do
+        # Get dynamic list of subvolumes for space calculation
+        local space_check_subvolumes=()
+        readarray -t space_check_subvolumes < <(get_backup_subvolumes)
+        
+        for subvol in "${space_check_subvolumes[@]}"; do
             local backup_subvol_dir="$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol"
             if [ -d "$backup_subvol_dir" ]; then
                 local existing_backups=$(ls -1 "$backup_subvol_dir" 2>/dev/null | grep -v '\.backup_complete$' | wc -l)
@@ -939,8 +1175,10 @@ btrfs_backup() {
     # Timestamp for this backup session
     local timestamp=$(date +%Y-%m-%d_%H-%M-%S)
     
-    # List of subvolumes to backup
-    local subvolumes=("@" "@home")
+    # Get dynamic list of subvolumes to backup
+    backup_log_msg "DEBUG" "Determining subvolumes to backup (configured: '$LH_BACKUP_SUBVOLUMES', auto-detect: '$LH_AUTO_DETECT_SUBVOLUMES')"
+    local subvolumes=()
+    readarray -t subvolumes < <(get_backup_subvolumes)
     
     # Determine snapshot preservation setting once at the beginning
     local GLOBAL_KEEP_SNAPSHOTS="false"
@@ -1742,10 +1980,18 @@ cleanup_orphaned_temp_snapshots() {
                     echo -e "  ${LH_COLOR_SUCCESS}$(lh_msg 'SUCCESS_DELETED')${LH_COLOR_RESET}"
                     ((cleaned_count++))
                     
-                    # Also remove any associated marker file
+                    # Also remove any associated marker files
                     local associated_marker="${snapshot}.chain_parent"
                     if [ -f "$associated_marker" ]; then
                         rm -f "$associated_marker" 2>/dev/null
+                        backup_log_msg "DEBUG" "Deleted chain marker file: $associated_marker"
+                    fi
+                    
+                    # Also remove .lh_ marker files
+                    local lh_marker="$(dirname "$snapshot")/.lh_$(basename "$snapshot")"
+                    if [ -f "$lh_marker" ]; then
+                        rm -f "$lh_marker" 2>/dev/null
+                        backup_log_msg "DEBUG" "Deleted LH marker file: $lh_marker"
                     fi
                 else
                     echo -e "  ${LH_COLOR_ERROR}$(lh_msg 'ERROR_DELETION')${LH_COLOR_RESET}"
@@ -1761,6 +2007,7 @@ cleanup_orphaned_temp_snapshots() {
                 
                 if rm -f "$marker" 2>/dev/null; then
                     echo -e "  ${LH_COLOR_SUCCESS}$(lh_msg 'SUCCESS_DELETED')${LH_COLOR_RESET}"
+                    backup_log_msg "DEBUG" "Deleted orphaned marker file: $marker"
                     ((cleaned_count++))
                 else
                     echo -e "  ${LH_COLOR_ERROR}$(lh_msg 'ERROR_DELETION')${LH_COLOR_RESET}"
@@ -1875,6 +2122,13 @@ safe_cleanup_temp_snapshot() {
     # Delete the snapshot
     if btrfs subvolume delete "$snapshot_path" 2>/dev/null; then
         backup_log_msg "DEBUG" "Successfully cleaned up temporary snapshot: $(basename "$snapshot_path")"
+        
+        # Also remove .lh_ marker files
+        local lh_marker="$(dirname "$snapshot_path")/.lh_$(basename "$snapshot_path")"
+        if [ -f "$lh_marker" ]; then
+            rm -f "$lh_marker" 2>/dev/null
+            backup_log_msg "DEBUG" "Deleted LH marker file: $lh_marker"
+        fi
     else
         backup_log_msg "WARN" "Failed to clean up temporary snapshot: $(basename "$snapshot_path")"
     fi
@@ -1937,6 +2191,13 @@ cleanup_on_exit() {
         if btrfs subvolume delete "$CURRENT_TEMP_SNAPSHOT" >/dev/null 2>&1; then
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_TEMP_SNAPSHOT_CLEANED')${LH_COLOR_RESET}"
             backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_INTERRUPTED_SUCCESS')"
+            
+            # Also remove .lh_ marker files
+            local lh_marker="$(dirname "$CURRENT_TEMP_SNAPSHOT")/.lh_$(basename "$CURRENT_TEMP_SNAPSHOT")"
+            if [ -f "$lh_marker" ]; then
+                rm -f "$lh_marker" 2>/dev/null
+                backup_log_msg "DEBUG" "Deleted LH marker file during interrupt cleanup: $lh_marker"
+            fi
         else
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_CLEANUP_TEMP')${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_MANUAL_DELETE_HINT' "$CURRENT_TEMP_SNAPSHOT")${LH_COLOR_RESET}"
@@ -2410,6 +2671,7 @@ cleanup_script_created_snapshots() {
             echo -e "  ${LH_COLOR_SUCCESS}✓ Successfully deleted snapshot: $snapshot_name${LH_COLOR_RESET}"
             # Remove marker file
             rm -f "$marker_file" 2>/dev/null
+            backup_log_msg "DEBUG" "Deleted marker file: $marker_file"
             ((deleted_count++))
         else
             echo -e "  ${LH_COLOR_ERROR}✗ Failed to delete snapshot: $snapshot_name${LH_COLOR_RESET}"
@@ -2683,6 +2945,124 @@ check_backup_integrity() {
     echo "$status|${issues[*]}"
 }
 
+# Collect BTRFS filesystem configuration information
+collect_btrfs_filesystem_info() {
+    backup_log_msg "DEBUG" "Collecting BTRFS filesystem configuration information"
+    
+    # Get all BTRFS subvolumes from system
+    echo "# BTRFS Filesystem Configuration"
+    echo "# This information can be used to recreate the filesystem structure"
+    echo
+    
+    # 1. Collect all subvolumes with their details
+    echo "# BTRFS Subvolumes Configuration"
+    if command -v btrfs >/dev/null 2>&1; then
+        local btrfs_devices=()
+        declare -A seen_devices
+        
+        # Find unique BTRFS devices
+        while IFS= read -r line; do
+            if [[ "$line" =~ ^([^[:space:]]+).*btrfs ]]; then
+                local device="${BASH_REMATCH[1]}"
+                if [[ -z "${seen_devices[$device]}" ]]; then
+                    btrfs_devices+=("$device")
+                    seen_devices["$device"]=1
+                fi
+            fi
+        done < <(mount | grep btrfs)
+        
+        # Get subvolume information for each unique device
+        for device in "${btrfs_devices[@]}"; do
+            local mount_point
+            mount_point=$(mount | grep "$device.*btrfs" | head -1 | awk '{print $3}')
+            if [[ -n "$mount_point" ]]; then
+                echo "BTRFS_DEVICE=$device"
+                echo "BTRFS_MOUNT_POINT=$mount_point"
+                
+                # List all subvolumes
+                local subvol_list
+                subvol_list=$(btrfs subvolume list "$mount_point" 2>/dev/null || echo "")
+                if [[ -n "$subvol_list" ]]; then
+                    echo "# Subvolume list for $device:"
+                    while IFS= read -r subvol_line; do
+                        if [[ -n "$subvol_line" ]]; then
+                            echo "SUBVOL_INFO=$subvol_line"
+                        fi
+                    done <<< "$subvol_list"
+                fi
+                echo
+            fi
+        done
+    fi
+    
+    # 2. Collect fstab entries for BTRFS
+    echo "# FSTAB BTRFS Entries"
+    if [[ -r "/etc/fstab" ]]; then
+        while IFS= read -r line; do
+            if [[ "$line" =~ btrfs ]] && [[ ! "$line" =~ ^[[:space:]]*# ]]; then
+                echo "FSTAB_ENTRY=$line"
+            fi
+        done < "/etc/fstab"
+    fi
+    echo
+    
+    # 3. Collect current mount information  
+    echo "# Current BTRFS Mounts"
+    while IFS= read -r line; do
+        if [[ "$line" =~ btrfs ]]; then
+            echo "MOUNT_INFO=$line"
+        fi
+    done < <(mount | grep btrfs)
+    echo
+    
+    # 4. Collect detected subvolumes from our detection system
+    echo "# Detected Subvolumes (via little-linux-helper)"
+    local detected_subvols=()
+    # Get subvolumes - logging is controlled by LH_LOG_LEVEL configuration
+    readarray -t detected_subvols < <(get_backup_subvolumes)
+    echo "DETECTED_SUBVOLUMES=${detected_subvols[*]}"
+    echo "CONFIGURED_SUBVOLUMES=$LH_BACKUP_SUBVOLUMES"
+    echo "AUTO_DETECT_ENABLED=$LH_AUTO_DETECT_SUBVOLUMES"
+    echo
+    
+    # 5. Collect BTRFS filesystem properties
+    echo "# BTRFS Filesystem Properties"
+    if command -v btrfs >/dev/null 2>&1; then
+        local fs_devices=()
+        while IFS= read -r line; do
+            if [[ "$line" =~ ^([^[:space:]]+).*btrfs ]]; then
+                local device="${BASH_REMATCH[1]}"
+                fs_devices+=("$device")
+            fi
+        done < <(mount | grep btrfs)
+        
+        for device in "${fs_devices[@]}"; do
+            local mount_point
+            mount_point=$(mount | grep "$device.*btrfs" | head -1 | awk '{print $3}')
+            if [[ -n "$mount_point" ]]; then
+                echo "# Properties for $device mounted at $mount_point"
+                
+                # Filesystem show
+                local fs_show
+                fs_show=$(btrfs filesystem show "$device" 2>/dev/null || echo "")
+                if [[ -n "$fs_show" ]]; then
+                    echo "FS_SHOW_START"
+                    echo "$fs_show"
+                    echo "FS_SHOW_END"
+                fi
+                
+                # Get filesystem UUID
+                local fs_uuid
+                fs_uuid=$(btrfs filesystem show "$device" 2>/dev/null | grep "uuid:" | head -1 | sed 's/.*uuid: //')
+                if [[ -n "$fs_uuid" ]]; then
+                    echo "FS_UUID=$fs_uuid"
+                fi
+                echo
+            fi
+        done
+    fi
+}
+
 # Create marker file (must be called at the end of successful backup transfer)
 create_backup_marker() {
     local snapshot_path="$1"
@@ -2699,17 +3079,40 @@ create_backup_marker() {
         return 1
     fi
     
-    # Create marker file
+    backup_log_msg "DEBUG" "Creating enhanced backup marker with filesystem configuration"
+    
+    # Collect filesystem configuration info first to avoid log message mixing
+    local filesystem_config_info
+    filesystem_config_info=$(collect_btrfs_filesystem_info)
+    
+    # Create enhanced marker file with filesystem configuration
     cat > "$marker_file" << EOF
-# BTRFS Backup Completion Marker
+# BTRFS Backup Completion Marker (Enhanced)
 # Generated by little-linux-helper modules/backup/mod_btrfs_backup.sh
+# Version: 2.0 (includes filesystem configuration for restore)
+
+# Basic Backup Information
 BACKUP_TIMESTAMP=$timestamp
 BACKUP_SUBVOLUME=$subvol
 BACKUP_COMPLETED=$(date '+%Y-%m-%d %H:%M:%S')
 BACKUP_HOST=$(hostname)
-SCRIPT_VERSION=1.0
+SCRIPT_VERSION=2.0
 SNAPSHOT_PATH=$snapshot_path
 BACKUP_SIZE=$(du -sb "$snapshot_path" 2>/dev/null | cut -f1 || echo "unknown")
+
+# System Information
+OS_RELEASE=$(cat /etc/os-release 2>/dev/null | grep "^PRETTY_NAME=" | cut -d'=' -f2 | tr -d '"' || echo "Unknown")
+KERNEL_VERSION=$(uname -r)
+BTRFS_TOOLS_VERSION=$(btrfs --version 2>/dev/null | head -1 || echo "Unknown")
+
+$filesystem_config_info
+
+# Backup Session Information
+BACKUP_SESSION_ID=$timestamp
+BACKUP_METHOD=btrfs_send_receive
+COMPRESSION_USED=$(mount | grep "$(df "$snapshot_path" | tail -1 | awk '{print $1}')" | grep -o 'compress=[^,]*' || echo "none")
+
+# End of marker file
 EOF
     
     if [ $? -eq 0 ] && [ -f "$marker_file" ]; then
@@ -2911,7 +3314,10 @@ show_backup_status() {
         # BTRFS Backups
         echo -e "${LH_COLOR_INFO}$(lh_msg 'STATUS_BTRFS_BACKUPS')${LH_COLOR_RESET}"
         local btrfs_count=0
-        for subvol in @ @home; do
+        # Get dynamic list of subvolumes for status display
+        local status_subvolumes=()
+        readarray -t status_subvolumes < <(get_backup_subvolumes)
+        for subvol in "${status_subvolumes[@]}"; do
             if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" ]; then
                 local count=$(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" 2>/dev/null | grep -v '\.backup_complete$' | wc -l)
                 echo -e "  ${LH_COLOR_INFO}$subvol:${LH_COLOR_RESET} $(lh_msg 'STATUS_BTRFS_SNAPSHOTS' "$count")"
@@ -2958,7 +3364,10 @@ show_backup_status() {
             local backup_count=0
             
             # Calculate size from BTRFS backup marker files
-            for subvol in @ @home; do
+            # Get dynamic list of subvolumes for size calculation
+            local size_calc_subvolumes=()
+            readarray -t size_calc_subvolumes < <(get_backup_subvolumes)
+            for subvol in "${size_calc_subvolumes[@]}"; do
                 if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" ]; then
                     local subvol_size_bytes=0
                     local subvol_count=0
@@ -3093,8 +3502,16 @@ cleanup_problematic_backups() {
             fi
             
             if btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1; then
-                # Also delete marker file
+                # Also delete marker files
                 rm -f "${snapshot_path}.backup_complete" 2>/dev/null
+                
+                # Also remove .lh_ marker files
+                local lh_marker="$(dirname "$snapshot_path")/.lh_$(basename "$snapshot_path")"
+                if [ -f "$lh_marker" ]; then
+                    rm -f "$lh_marker" 2>/dev/null
+                    backup_log_msg "DEBUG" "Deleted LH marker file during problematic cleanup: $lh_marker"
+                fi
+                
                 echo -e "  ${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_CLEANUP_DELETED')${LH_COLOR_RESET}"
                 backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_CLEANUP_PROBLEMATIC_SUCCESS' "$snapshot_path")"
                 ((deleted_count++))

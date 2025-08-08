@@ -1,5 +1,9 @@
 # Little Linux Helper
 
+<div align="center">
+  <img src="gui/web/public/favicon.svg" alt="Little Linux Helper" width="128" height="128">
+</div>
+
 > **🎯 Project Status:**
 > - **Documentation**: Comprehensive technical documentation is available in the `docs/` directory for all modules and core components
 > - **BTRFS Modules**: Advanced BTRFS backup and restore modules with atomic operations, incremental backup chains, and comprehensive safety features
@@ -8,7 +12,7 @@
 
 ## Description
 
-Little Linux Helper is a collection of Bash scripts designed to simplify various system administration, diagnostic, and maintenance tasks on Linux. It provides a menu-driven interface for easy access to a variety of tools and functions.
+Little Linux Helper is a comprehensive collection of Bash scripts designed to simplify various system administration, diagnostic, and maintenance tasks on Linux. It provides both a traditional command-line menu-driven interface and a modern web-based GUI for easy access to a variety of tools and functions.
 
 More detailed technical English documentation for individual modules and core components can be found in the `docs` directory. This documentation was created in part to provide AI with the context of a module or file without having to read it completely and to save context.
 The `docs/DEVELOPER_GUIDE.md` contains all the information about `lib/lib_common.sh` and `help_master.sh` needed to create a new module.
@@ -55,7 +59,26 @@ Here is a list of known issues, limitations, or behaviors you might encounter wh
 
 ## Features
 
-The main script `help_master.sh` serves as the central entry point and provides access to the following modules:
+The project offers two interfaces for accessing its functionality:
+
+### 🖥️ **Command Line Interface (CLI)**
+The main script `help_master.sh` serves as the central CLI entry point and provides access to all modules through a traditional menu-driven interface.
+
+### 🌐 **Graphical User Interface (GUI)**
+A modern web-based GUI is available through `gui_launcher.sh`, providing:
+- **Web-based Interface**: Modern React frontend with responsive design accessible via web browser
+- **Real-time Terminal**: Integrated terminal display with ANSI color support and interactive input handling
+- **Module Navigation**: Categorized sidebar with intuitive module organization and search capabilities
+- **Documentation Integration**: Built-in markdown viewer for module documentation from the `docs/` directory
+- **Multi-panel Layout**: Resizable panels for optimal workspace organization
+- **Session Management**: Multiple concurrent module executions with independent sessions
+- **Advanced Features**: PTY integration for authentic terminal experience, WebSocket communication for real-time updates
+
+The GUI maintains full compatibility with all CLI functionality while providing an enhanced user experience.
+
+---
+
+Both interfaces provide access to the following modules:
 
 <details>
 <summary>🔄 Recovery & Restarts (<code>mod_restarts.sh</code>)</summary>
@@ -78,7 +101,7 @@ The main script `help_master.sh` serves as the central entry point and provides 
 * **BTRFS Snapshot Backup & Restore** (`modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`):
     * **Advanced Features**: Atomic backup operations, received_uuid protection, incremental chain validation
     * **Advanced BTRFS Library** (`lib/lib_btrfs.sh`): Specialized library solving critical BTRFS limitations with true atomic patterns
-    * **Snapshot Management**: Creates independent snapshots for `@` and `@home` subvolumes with optional source preservation
+    * **Dynamic Subvolume Support**: Automatically detects BTRFS subvolumes from system configuration (`/etc/fstab`, `/proc/mounts`) while supporting manual configuration for `@`, `@home`, `@var`, `@opt`, and other @-prefixed subvolumes with optional source preservation
     * **Incremental Backups**: Intelligent parent detection, automatic fallback, and comprehensive chain integrity validation
     * **Restore Capabilities**: Complete system restore, individual subvolume restore, folder-level restoration, and bootloader integration *(Note: Restore functions are implemented but require comprehensive testing)*
     * **Safety Features**: Live environment detection, filesystem health checking, rollback capabilities, and dry-run support
@@ -253,10 +276,19 @@ CFG_LH_LANG="fr"      # French (practically unusable, only internal messages)
 <details>
 <summary>📋 Requirements</summary>
 
+### Core Requirements:
 * Bash shell
 * Standard Linux utilities (such as `grep`, `awk`, `sed`, `find`, `df`, `lsblk`, `ip`, `ps`, `free`, `tar`, `rsync`, `btrfs-progs`, etc.)
 * Some functions may require root privileges and will use `sudo` if necessary.
-* For specific functions, additional packages are required that the script will attempt to install as needed:
+
+### GUI Requirements (optional):
+* **Go** (1.21 or later) for backend server compilation
+* **Node.js** (16 or later) and **npm** for frontend development and building
+* **Web browser** for accessing the GUI interface
+* Additional system dependencies: `github.com/gofiber/fiber/v2`, `github.com/gofiber/websocket/v2`, `github.com/creack/pty` (installed automatically)
+
+### Optional Dependencies:
+For specific functions, additional packages are required that the script will attempt to install as needed:
     * `btrfs-progs` (for BTRFS backup/restore)
     * `rsync` (for RSYNC backup/restore)
     * `smartmontools` (for S.M.A.R.T. values and disk health status)
@@ -283,11 +315,40 @@ The script attempts to automatically detect the package manager in use (pacman, 
 <details>
 <summary>🚀 Installation & Setup</summary>
 
+### CLI Installation:
 1. Clone the repository or download the scripts.
 2. Make sure the main script `help_master.sh` is executable:
     ```bash
     chmod +x help_master.sh
     ```
+3. Run the CLI interface:
+    ```bash
+    ./help_master.sh
+    ```
+
+### GUI Installation (optional):
+1. Ensure Go (1.21+) and Node.js (16+) are installed on your system.
+2. Make the GUI launcher executable:
+    ```bash
+    chmod +x gui_launcher.sh
+    ```
+3. Launch the GUI interface:
+    ```bash
+    ./gui_launcher.sh
+    ```
+4. The GUI will automatically:
+   - Set up dependencies on first run
+   - Build the application if needed
+   - Start the web server on `http://localhost:3000`
+   - Open your default web browser to the interface
+
+**GUI Development Mode:**
+For development with hot-reload capabilities:
+```bash
+cd gui/
+./setup.sh    # One-time setup
+./dev.sh      # Start development servers
+```
 
 </details>
 

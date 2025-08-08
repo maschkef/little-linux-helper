@@ -29,6 +29,8 @@ LH_TAR_EXCLUDES_DEFAULT="" # Default TAR exclusions
 LH_DEBUG_LOG_LIMIT_DEFAULT=10 # Maximum number of backup candidates to show in debug logs (0 = unlimited, only affects verbose backup listing)
 LH_KEEP_SOURCE_SNAPSHOTS_DEFAULT="prompt" # Source snapshot preservation: "prompt", "true", "false"
 LH_SOURCE_SNAPSHOT_DIR_DEFAULT="/.snapshots_lh" # Directory for permanent source snapshots
+LH_BACKUP_SUBVOLUMES_DEFAULT="@ @home" # Default BTRFS subvolumes to backup (space-separated)
+LH_AUTO_DETECT_SUBVOLUMES_DEFAULT="true" # Enable automatic subvolume detection
 
 # Default Docker configuration values
 LH_DOCKER_COMPOSE_ROOT_DEFAULT="/opt/containers"
@@ -51,6 +53,8 @@ LH_TAR_EXCLUDES="" # Active TAR exclusions
 LH_DEBUG_LOG_LIMIT="" # Maximum number of backup candidates to show in debug logs per backup session
 LH_KEEP_SOURCE_SNAPSHOTS="" # Source snapshot preservation setting
 LH_SOURCE_SNAPSHOT_DIR="" # Directory for permanent source snapshots
+LH_BACKUP_SUBVOLUMES="" # Active BTRFS subvolumes to backup (space-separated)
+LH_AUTO_DETECT_SUBVOLUMES="" # Active automatic subvolume detection setting
 
 # Active Docker configuration variables
 LH_DOCKER_COMPOSE_ROOT_EFFECTIVE=""
@@ -84,6 +88,8 @@ function lh_load_backup_config() {
     LH_DEBUG_LOG_LIMIT="$LH_DEBUG_LOG_LIMIT_DEFAULT"
     LH_KEEP_SOURCE_SNAPSHOTS="$LH_KEEP_SOURCE_SNAPSHOTS_DEFAULT"
     LH_SOURCE_SNAPSHOT_DIR="$LH_SOURCE_SNAPSHOT_DIR_DEFAULT"
+    LH_BACKUP_SUBVOLUMES="$LH_BACKUP_SUBVOLUMES_DEFAULT"
+    LH_AUTO_DETECT_SUBVOLUMES="$LH_AUTO_DETECT_SUBVOLUMES_DEFAULT"
 
     if [ -f "$LH_BACKUP_CONFIG_FILE" ]; then
         # Use English fallback before translation system is loaded
@@ -120,6 +126,12 @@ function lh_load_backup_config() {
         
         LH_SOURCE_SNAPSHOT_DIR="${CFG_LH_SOURCE_SNAPSHOT_DIR:-$LH_SOURCE_SNAPSHOT_DIR_DEFAULT}"
         [ -z "$LH_SOURCE_SNAPSHOT_DIR" ] && LH_SOURCE_SNAPSHOT_DIR="$LH_SOURCE_SNAPSHOT_DIR_DEFAULT"
+        
+        LH_BACKUP_SUBVOLUMES="${CFG_LH_BACKUP_SUBVOLUMES:-$LH_BACKUP_SUBVOLUMES_DEFAULT}"
+        [ -z "$LH_BACKUP_SUBVOLUMES" ] && LH_BACKUP_SUBVOLUMES="$LH_BACKUP_SUBVOLUMES_DEFAULT"
+        
+        LH_AUTO_DETECT_SUBVOLUMES="${CFG_LH_AUTO_DETECT_SUBVOLUMES:-$LH_AUTO_DETECT_SUBVOLUMES_DEFAULT}"
+        [ -z "$LH_AUTO_DETECT_SUBVOLUMES" ] && LH_AUTO_DETECT_SUBVOLUMES="$LH_AUTO_DETECT_SUBVOLUMES_DEFAULT"
     else
         # Use English fallback before translation system is loaded
         local msg="${MSG[LIB_BACKUP_CONFIG_NOT_FOUND]:-No backup configuration file (%s) found. Using internal default values.}"
@@ -175,6 +187,14 @@ function lh_save_backup_config() {
     
     if [ -n "$LH_SOURCE_SNAPSHOT_DIR" ]; then
         echo "CFG_LH_SOURCE_SNAPSHOT_DIR=\"$LH_SOURCE_SNAPSHOT_DIR\"" >> "$LH_BACKUP_CONFIG_FILE"
+    fi
+    
+    if [ -n "$LH_BACKUP_SUBVOLUMES" ]; then
+        echo "CFG_LH_BACKUP_SUBVOLUMES=\"$LH_BACKUP_SUBVOLUMES\"" >> "$LH_BACKUP_CONFIG_FILE"
+    fi
+    
+    if [ -n "$LH_AUTO_DETECT_SUBVOLUMES" ]; then
+        echo "CFG_LH_AUTO_DETECT_SUBVOLUMES=\"$LH_AUTO_DETECT_SUBVOLUMES\"" >> "$LH_BACKUP_CONFIG_FILE"
     fi
     
     # Use English fallback before translation system is loaded

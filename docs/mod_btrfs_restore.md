@@ -111,7 +111,8 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
             *   Presents detected options or allows manual path entry
             *   Validates backup source existence and filesystem health
         2. **Target System Configuration:**
-            *   Auto-detects BTRFS filesystems with standard subvolume layouts (`@`, `@home`)
+            *   Auto-detects BTRFS filesystems with available subvolumes using dynamic detection
+            *   Uses `get_restore_subvolumes()` to determine available subvolumes from system configuration and backup availability
             *   Allows manual target path configuration
             *   Creates target directories if needed with user confirmation
             *   Validates target filesystem health and available space
@@ -123,10 +124,35 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
             *   Requires final confirmation before proceeding
     *   **Auto-Detection Features:**
         *   `detect_backup_drives()`: Scans for BTRFS filesystems containing backup directories
-        *   `detect_target_drives()`: Scans for BTRFS filesystems with standard subvolume layouts
+        *   `detect_target_drives()`: Scans for BTRFS filesystems and uses dynamic subvolume detection
     *   **Dependencies (internal):** Multiple validation functions, `lh_ask_for_input`, `lh_confirm_action`
 
-**6. Snapshot Validation and Selection:**
+**6. Dynamic Subvolume Detection:**
+
+*   **`detect_btrfs_subvolumes()`**
+    *   **Purpose:** Automatically detects BTRFS subvolumes from system configuration files and active mounts.
+    *   **Mechanism:**
+        *   Scans `/etc/fstab` for BTRFS entries with `subvol=` options to find configured subvolumes
+        *   Parses `/proc/mounts` for active BTRFS subvolumes with `subvol=` options
+        *   Filters for @-prefixed subvolumes commonly used for system organization (e.g., `@`, `@home`, `@var`, `@opt`)
+        *   Removes duplicates and returns unique subvolume names without the leading `/`
+    *   **Returns:** Array of detected subvolume names (e.g., "@", "@home", "@var")
+    *   **Usage:** Called by `get_restore_subvolumes()` when `LH_AUTO_DETECT_SUBVOLUMES` is enabled for restore operations.
+    *   **Dependencies (internal):** `restore_log_msg`
+    *   **Dependencies (system):** `/etc/fstab`, `/proc/mounts`
+
+*   **`get_restore_subvolumes()`**
+    *   **Purpose:** Determines the final list of subvolumes available for restore by combining configured and auto-detected subvolumes.
+    *   **Mechanism:**
+        *   Parses manually configured subvolumes from `LH_BACKUP_SUBVOLUMES` variable
+        *   If `LH_AUTO_DETECT_SUBVOLUMES` is enabled, calls `detect_btrfs_subvolumes()` and merges results
+        *   Removes duplicates and sorts the final list alphabetically
+        *   Falls back to default "@" and "@home" if no subvolumes are configured or detected
+    *   **Returns:** Sorted array of unique subvolume names available for restore operations
+    *   **Usage:** Called during restore environment setup to determine which subvolumes can be restored.
+    *   **Dependencies (internal):** `detect_btrfs_subvolumes`, `restore_log_msg`
+
+**7. Snapshot Validation and Selection:**
 
 *   **`validate_restore_snapshot()`**
     *   **Purpose:** Validates BTRFS subvolumes for restore operations with comprehensive integrity checks.
@@ -145,7 +171,7 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
         *   Validates each snapshot using `validate_restore_snapshot()`
         *   Sorts snapshots by date (newest first) for easy selection
         *   Displays snapshot creation dates for user reference
-    *   **Parameters:** `subvolume` (e.g., "@" or "@home")
+    *   **Parameters:** `subvolume` (e.g., "@", "@home", "@var", "@opt" - any detected/configured subvolume)
     *   **Return Codes:** 0 for success with valid snapshots, 1 for no valid snapshots found
     *   **Dependencies (internal):** `validate_restore_snapshot`, `restore_log_msg`
 
@@ -153,14 +179,14 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
     *   **Purpose:** Interactive selection of restore type and matching snapshot pairs.
     *   **Mechanism:**
         *   Provides three restore options: Complete System, Root Only, Home Only
-        *   For complete system restore: finds matching root/@home snapshot pairs by timestamp
+        *   For complete system restore: finds matching subvolume snapshots by timestamp across available backups
         *   Validates selected snapshots and parent chain integrity
         *   Handles incremental snapshot validation using received UUID checks
         *   Provides coordinated restore execution with rollback capabilities
     *   **Restore Options:**
-        1. Complete System: Restores both @ and @home with matching timestamps
-        2. Root Only: Restores @ subvolume only
-        3. Home Only: Restores @home subvolume only
+        1. Complete System: Restores multiple subvolumes with matching timestamps (based on available backups)
+        2. Individual Subvolume: Restores specific subvolumes (@ for root, @home for user data, @var for variable data, etc.)
+        3. Selective Restore: Allows choosing specific subvolumes from available backups
     *   **Advanced Features:**
         *   Timestamp-based snapshot pairing for complete system restores
         *   Incremental backup chain validation before restore
@@ -168,7 +194,7 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
         *   Bootloader configuration detection and handling
     *   **Dependencies (internal):** `list_available_snapshots`, `validate_restore_snapshot`, `perform_subvolume_restore`, `detect_boot_configuration`, `perform_complete_system_rollback`
 
-**7. Subvolume Management and Safety:**
+**8. Subvolume Management and Safety:**
 
 *   **`safely_replace_subvolume()`**
     *   **Purpose:** Safely replaces existing subvolumes with backups using atomic operations.
@@ -197,7 +223,7 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
     *   **Dependencies (internal):** `verify_received_uuid_integrity`, `restore_log_msg`
     *   **Dependencies (system):** `btrfs property`, `btrfs subvolume show`
 
-**8. Atomic Restore Operations:**
+**9. Atomic Restore Operations:**
 
 *   **`perform_subvolume_restore()`**
     *   **Purpose:** Performs the actual atomic subvolume restore using library functions.
@@ -216,7 +242,7 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
     *   **Dependencies (internal):** `safely_replace_subvolume`, `validate_filesystem_health`, `create_manual_checkpoint`
     *   **Dependencies (library):** `atomic_receive_with_validation` (from lib_btrfs.sh)
 
-**9. Bootloader Configuration Management:**
+**10. Bootloader Configuration Management:**
 
 *   **`detect_boot_configuration()`**
     *   **Purpose:** Analyzes current boot configuration to determine safe bootloader update strategies.
@@ -308,13 +334,13 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
 *   **`restore_folder_from_snapshot()`**
     *   **Purpose:** Granular folder-level restore from snapshots without full subvolume replacement.
     *   **Mechanism:**
-        *   Interactive selection of source subvolume (@ or @home)
+        *   Interactive selection of source subvolume from available backups (any detected subvolume)
         *   Snapshot selection from available backups
         *   Specific folder/directory selection within the snapshot
         *   Flexible target destination selection (original location or custom path)
         *   Non-destructive restore preserving existing system state
     *   **Restore Process:**
-        1. Source subvolume selection (@, @home)
+        1. Source subvolume selection from available backups
         2. Snapshot selection from validated backups
         3. Source folder specification within snapshot
         4. Target destination selection
@@ -448,6 +474,9 @@ This integration transforms the restore module from a standard BTRFS restore scr
 *   **Backup Configuration:** Loads settings from `backup.conf` including:
     *   `LH_BACKUP_DIR`: Backup directory structure
     *   `LH_BACKUP_ROOT`: Default backup root path
+    *   `LH_BACKUP_SUBVOLUMES`: Space-separated list of configured subvolumes to consider for restore operations
+    *   `LH_AUTO_DETECT_SUBVOLUMES`: Enable automatic detection of available subvolumes from system configuration and backup availability
+*   **Dynamic Subvolume Configuration:** Uses the same subvolume detection system as the backup module for consistent restore operations
 *   **General Configuration:** Inherits logging settings and system configuration
 *   **Language Support:** Integrated with internationalization system for multi-language support
 
@@ -499,11 +528,11 @@ This integration transforms the restore module from a standard BTRFS restore scr
 
 The module provides an interactive menu-driven interface with the following main options:
 
-1. **Setup Restore Environment:** Interactive configuration of backup source, target system, and operation modes with auto-detection capabilities
+1. **Setup Restore Environment:** Interactive configuration of backup source, target system, and operation modes with dynamic subvolume detection capabilities
 2. **Restore Snapshots:** Advanced snapshot selection and restoration with support for:
-   - Complete System Restore (coordinated @ and @home with matching timestamps)
-   - Root-only Restore (@ subvolume only)
-   - Home-only Restore (@home subvolume only)
+   - Complete System Restore (coordinated restore of multiple subvolumes with matching timestamps)
+   - Individual Subvolume Restore (any available subvolume: @, @home, @var, @opt, etc.)
+   - Selective Restore (choose specific subvolumes from available backups)
    - Intelligent bootloader handling with multiple strategies
 3. **Restore Folder from Snapshot:** Granular folder-level restore without full subvolume replacement
 4. **Show Disk Information:** Comprehensive disk and filesystem analysis for restore planning
@@ -514,7 +543,7 @@ The module provides an interactive menu-driven interface with the following main
 **Advanced Features:**
 - **Real-time Progress Monitoring:** Live status updates during restore operations
 - **Interactive Strategy Selection:** User choice between explicit subvolume paths and default subvolume strategies for bootloader handling
-- **Timestamp-based Snapshot Pairing:** Automatic matching of @ and @home snapshots for consistent system restore
+- **Timestamp-based Snapshot Pairing:** Automatic matching of multiple subvolume snapshots for consistent system restore
 - **Dry-run Capabilities:** Test restore operations without making actual changes
 - **Comprehensive Error Recovery:** Pattern-based error analysis with specific recovery guidance
 

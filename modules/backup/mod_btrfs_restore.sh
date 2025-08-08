@@ -28,6 +28,345 @@
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_btrfs.sh"
 
+# Function to detect BTRFS subvolumes automatically (duplicate from backup module)
+detect_btrfs_subvolumes() {
+    restore_log_msg "DEBUG" "Starting automatic BTRFS subvolume detection" >&2
+    local detected_subvolumes=()
+    declare -A seen_subvols
+    
+    # Parse /etc/fstab for subvol= entries
+    if [[ -r "/etc/fstab" ]]; then
+        restore_log_msg "DEBUG" "Scanning /etc/fstab for BTRFS subvolume entries" >&2
+        while IFS= read -r line; do
+            # Skip comments and empty lines
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line// }" ]] && continue
+            
+            # Look for BTRFS entries with subvol= option
+            if [[ "$line" =~ btrfs ]] && [[ "$line" =~ subvol= ]]; then
+                local subvol_name
+                subvol_name=$(echo "$line" | sed -n 's/.*subvol=\([^,[:space:]]*\).*/\1/p')
+                if [[ -n "$subvol_name" && "$subvol_name" =~ ^/@ ]]; then
+                    # Remove the leading / to get just the subvolume name
+                    subvol_name="${subvol_name#/}"
+                    restore_log_msg "DEBUG" "Found subvolume in /etc/fstab: $subvol_name" >&2
+                    detected_subvolumes+=("$subvol_name")
+                    seen_subvols["$subvol_name"]=1
+                fi
+            fi
+        done < "/etc/fstab"
+    fi
+    
+    # Parse /proc/mounts for active BTRFS subvolumes
+    if [[ -r "/proc/mounts" ]]; then
+        restore_log_msg "DEBUG" "Scanning /proc/mounts for active BTRFS subvolumes" >&2
+        while IFS= read -r line; do
+            # Look for BTRFS entries with subvol= option
+            if [[ "$line" =~ btrfs ]] && [[ "$line" =~ subvol= ]]; then
+                local subvol_name
+                subvol_name=$(echo "$line" | sed -n 's/.*subvol=\([^[:space:]]*\).*/\1/p')
+                if [[ -n "$subvol_name" && "$subvol_name" =~ ^/@ && -z "${seen_subvols[${subvol_name#/}]}" ]]; then
+                    # Remove the leading / to get just the subvolume name
+                    subvol_name="${subvol_name#/}"
+                    restore_log_msg "DEBUG" "Found active subvolume in /proc/mounts: $subvol_name" >&2
+                    detected_subvolumes+=("$subvol_name")
+                    seen_subvols["$subvol_name"]=1
+                fi
+            fi
+        done < "/proc/mounts"
+    fi
+    
+    # Output detected subvolumes (sorted and deduplicated)
+    if [[ ${#detected_subvolumes[@]} -gt 0 ]]; then
+        # Sort the array
+        IFS=$'\n' detected_subvolumes=($(sort <<<"${detected_subvolumes[*]}"))
+        unset IFS
+        restore_log_msg "INFO" "Auto-detected BTRFS subvolumes: ${detected_subvolumes[*]}" >&2
+        printf '%s\n' "${detected_subvolumes[@]}"
+    else
+        restore_log_msg "DEBUG" "No BTRFS subvolumes auto-detected" >&2
+    fi
+}
+
+# Function to get the final list of subvolumes for restore operations
+get_restore_subvolumes() {
+    restore_log_msg "DEBUG" "Determining final list of subvolumes for restore operations" >&2
+    local configured_subvolumes=()
+    local final_subvolumes=()
+    declare -A seen_subvols
+    
+    # Parse configured subvolumes from LH_BACKUP_SUBVOLUMES
+    if [[ -n "$LH_BACKUP_SUBVOLUMES" ]]; then
+        restore_log_msg "DEBUG" "Configured subvolumes: $LH_BACKUP_SUBVOLUMES" >&2
+        read -ra configured_subvolumes <<< "$LH_BACKUP_SUBVOLUMES"
+        for subvol in "${configured_subvolumes[@]}"; do
+            if [[ -n "$subvol" ]]; then
+                final_subvolumes+=("$subvol")
+                seen_subvols["$subvol"]=1
+            fi
+        done
+    fi
+    
+    # Add auto-detected subvolumes if enabled
+    if [[ "$LH_AUTO_DETECT_SUBVOLUMES" == "true" ]]; then
+        restore_log_msg "DEBUG" "Auto-detection enabled, detecting additional subvolumes" >&2
+        local detected_subvolumes
+        readarray -t detected_subvolumes < <(detect_btrfs_subvolumes)
+        
+        for subvol in "${detected_subvolumes[@]}"; do
+            if [[ -n "$subvol" && -z "${seen_subvols[$subvol]}" ]]; then
+                restore_log_msg "DEBUG" "Adding auto-detected subvolume: $subvol" >&2
+                final_subvolumes+=("$subvol")
+                seen_subvols["$subvol"]=1
+            fi
+        done
+    fi
+    
+    # Sort the final list
+    if [[ ${#final_subvolumes[@]} -gt 0 ]]; then
+        IFS=$'\n' final_subvolumes=($(sort <<<"${final_subvolumes[*]}"))
+        unset IFS
+        restore_log_msg "INFO" "Final subvolumes for restore: ${final_subvolumes[*]}" >&2
+        printf '%s\n' "${final_subvolumes[@]}"
+    else
+        # Fallback to default if nothing configured
+        restore_log_msg "WARN" "No subvolumes configured or detected, using default: @ @home" >&2
+        echo "@"
+        echo "@home"
+    fi
+}
+
+# Parse filesystem configuration from backup marker
+parse_filesystem_config_from_marker() {
+    local marker_file="$1"
+    restore_log_msg "DEBUG" "Parsing filesystem configuration from marker: $marker_file"
+    
+    if [[ ! -f "$marker_file" ]]; then
+        restore_log_msg "ERROR" "Marker file not found: $marker_file"
+        return 1
+    fi
+    
+    # Check if this is an enhanced marker with filesystem config
+    if ! grep -q "SCRIPT_VERSION=2.0" "$marker_file" 2>/dev/null; then
+        restore_log_msg "WARN" "Legacy marker file detected, filesystem config not available"
+        return 1
+    fi
+    
+    restore_log_msg "INFO" "Enhanced marker file detected with filesystem configuration"
+    
+    # Extract key information
+    local detected_subvols
+    detected_subvols=$(grep "^DETECTED_SUBVOLUMES=" "$marker_file" | cut -d'=' -f2- || echo "")
+    
+    local configured_subvols
+    configured_subvols=$(grep "^CONFIGURED_SUBVOLUMES=" "$marker_file" | cut -d'=' -f2- || echo "")
+    
+    local auto_detect_enabled
+    auto_detect_enabled=$(grep "^AUTO_DETECT_ENABLED=" "$marker_file" | cut -d'=' -f2- || echo "true")
+    
+    local os_release
+    os_release=$(grep "^OS_RELEASE=" "$marker_file" | cut -d'=' -f2- || echo "Unknown")
+    
+    # Print summary
+    echo "Filesystem Configuration Summary:"
+    echo "  Original OS: $os_release"
+    echo "  Detected subvolumes: $detected_subvols"
+    echo "  Configured subvolumes: $configured_subvols" 
+    echo "  Auto-detection was: $auto_detect_enabled"
+    echo
+    
+    # Extract FSTAB entries
+    echo "Original FSTAB entries:"
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^FSTAB_ENTRY= ]]; then
+            echo "  ${line#FSTAB_ENTRY=}"
+        fi
+    done < "$marker_file"
+    echo
+    
+    return 0
+}
+
+# Create filesystem structure based on backup configuration  
+recreate_filesystem_structure() {
+    local target_device="$1"
+    local marker_file="$2"
+    
+    restore_log_msg "INFO" "Recreating BTRFS filesystem structure on $target_device"
+    
+    if [[ ! -f "$marker_file" ]]; then
+        restore_log_msg "ERROR" "Marker file required for filesystem recreation: $marker_file"
+        return 1
+    fi
+    
+    # Check if this is an enhanced marker
+    if ! grep -q "SCRIPT_VERSION=2.0" "$marker_file" 2>/dev/null; then
+        restore_log_msg "WARN" "Legacy marker - using default subvolume structure"
+        return create_default_filesystem_structure "$target_device"
+    fi
+    
+    restore_log_msg "DEBUG" "Using enhanced marker for filesystem recreation"
+    
+    # Extract subvolume information from marker
+    local detected_subvols
+    detected_subvols=$(grep "^DETECTED_SUBVOLUMES=" "$marker_file" | cut -d'=' -f2- || echo "@ @home")
+    
+    restore_log_msg "INFO" "Creating subvolumes: $detected_subvols"
+    
+    # Mount the target device temporarily to create subvolumes
+    local temp_mount="/tmp/btrfs_recreate_$$"
+    mkdir -p "$temp_mount"
+    
+    if ! mount "$target_device" "$temp_mount"; then
+        restore_log_msg "ERROR" "Failed to mount $target_device for subvolume creation"
+        rmdir "$temp_mount" 2>/dev/null
+        return 1
+    fi
+    
+    restore_log_msg "DEBUG" "Mounted $target_device at $temp_mount for subvolume creation"
+    
+    # Create subvolumes
+    local created_subvolumes=()
+    for subvol in $detected_subvols; do
+        restore_log_msg "INFO" "Creating subvolume: $subvol"
+        
+        if btrfs subvolume create "$temp_mount/$subvol" >/dev/null 2>&1; then
+            restore_log_msg "DEBUG" "Successfully created subvolume: $subvol"
+            created_subvolumes+=("$subvol")
+        else
+            restore_log_msg "WARN" "Failed to create subvolume: $subvol"
+        fi
+    done
+    
+    # Unmount temporary mount
+    umount "$temp_mount"
+    rmdir "$temp_mount" 2>/dev/null
+    
+    if [[ ${#created_subvolumes[@]} -gt 0 ]]; then
+        restore_log_msg "INFO" "Successfully created ${#created_subvolumes[@]} subvolumes: ${created_subvolumes[*]}"
+        return 0
+    else
+        restore_log_msg "ERROR" "Failed to create any subvolumes"
+        return 1
+    fi
+}
+
+# Create default filesystem structure (fallback)
+create_default_filesystem_structure() {
+    local target_device="$1"
+    
+    restore_log_msg "INFO" "Creating default BTRFS filesystem structure on $target_device"
+    
+    # Mount temporarily
+    local temp_mount="/tmp/btrfs_default_$$" 
+    mkdir -p "$temp_mount"
+    
+    if ! mount "$target_device" "$temp_mount"; then
+        restore_log_msg "ERROR" "Failed to mount $target_device"
+        rmdir "$temp_mount" 2>/dev/null
+        return 1
+    fi
+    
+    # Create default subvolumes
+    local default_subvols=("@" "@home")
+    local created=0
+    
+    for subvol in "${default_subvols[@]}"; do
+        if btrfs subvolume create "$temp_mount/$subvol" >/dev/null 2>&1; then
+            restore_log_msg "INFO" "Created default subvolume: $subvol"
+            ((created++))
+        else
+            restore_log_msg "WARN" "Failed to create default subvolume: $subvol"
+        fi
+    done
+    
+    umount "$temp_mount"
+    rmdir "$temp_mount" 2>/dev/null
+    
+    if [[ $created -gt 0 ]]; then
+        restore_log_msg "INFO" "Created $created default subvolumes"
+        return 0
+    else
+        restore_log_msg "ERROR" "Failed to create default subvolumes"
+        return 1
+    fi
+}
+
+# Generate fstab entries from backup configuration
+generate_fstab_entries() {
+    local marker_file="$1"
+    local target_device="$2"
+    
+    restore_log_msg "DEBUG" "Generating fstab entries from marker: $marker_file"
+    
+    if [[ ! -f "$marker_file" ]]; then
+        restore_log_msg "WARN" "No marker file for fstab generation, using defaults"
+        return generate_default_fstab_entries "$target_device"
+    fi
+    
+    # Check for enhanced marker
+    if ! grep -q "SCRIPT_VERSION=2.0" "$marker_file" 2>/dev/null; then
+        restore_log_msg "WARN" "Legacy marker, generating default fstab entries"
+        return generate_default_fstab_entries "$target_device"
+    fi
+    
+    echo "# Generated fstab entries from backup configuration"
+    echo "# Original system configuration:"
+    
+    # Show original entries as comments
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^FSTAB_ENTRY= ]]; then
+            echo "# ${line#FSTAB_ENTRY=}"
+        fi
+    done < "$marker_file"
+    
+    echo
+    echo "# New entries for restored system:"
+    
+    # Get device UUID
+    local device_uuid
+    device_uuid=$(blkid -s UUID -o value "$target_device" 2>/dev/null || echo "$target_device")
+    
+    # Get detected subvolumes
+    local detected_subvols
+    detected_subvols=$(grep "^DETECTED_SUBVOLUMES=" "$marker_file" | cut -d'=' -f2- || echo "@ @home")
+    
+    # Generate fstab entries based on subvolumes
+    for subvol in $detected_subvols; do
+        local mount_point
+        case "$subvol" in
+            "@") mount_point="/" ;;
+            "@home") mount_point="/home" ;;
+            "@root") mount_point="/root" ;;
+            "@srv") mount_point="/srv" ;;
+            "@cache") mount_point="/var/cache" ;;
+            "@log") mount_point="/var/log" ;;
+            "@tmp") mount_point="/var/tmp" ;;
+            *) mount_point="/$subvol" ;;  # Generic fallback
+        esac
+        
+        echo "UUID=$device_uuid $mount_point btrfs subvol=/$subvol,defaults,noatime,compress=zstd 0 0"
+    done
+    
+    return 0
+}
+
+# Generate default fstab entries (fallback)
+generate_default_fstab_entries() {
+    local target_device="$1"
+    
+    restore_log_msg "DEBUG" "Generating default fstab entries for $target_device"
+    
+    local device_uuid
+    device_uuid=$(blkid -s UUID -o value "$target_device" 2>/dev/null || echo "$target_device")
+    
+    echo "# Default BTRFS fstab entries"
+    echo "UUID=$device_uuid /        btrfs subvol=/@,defaults,noatime,compress=zstd 0 0"
+    echo "UUID=$device_uuid /home    btrfs subvol=/@home,defaults,noatime,compress=zstd 0 0"
+    
+    return 0
+}
+
 # Validate BTRFS library is properly loaded and all functions are available
 if ! declare -f atomic_receive_with_validation >/dev/null 2>&1; then
     echo "ERROR: BTRFS library not properly loaded - atomic functions unavailable" >&2
@@ -567,8 +906,19 @@ detect_target_drives() {
     while IFS= read -r mount_line; do
         local mount_point=$(echo "$mount_line" | awk '{print $3}')
         
-        # Check for standard BTRFS subvolume layout
-        if [[ -d "${mount_point}/@" ]] || [[ -d "${mount_point}/@home" ]]; then
+        # Check for BTRFS subvolume layout using dynamic detection
+        local has_subvolumes=false
+        local restore_subvolumes=()
+        readarray -t restore_subvolumes < <(get_restore_subvolumes)
+        
+        for subvol in "${restore_subvolumes[@]}"; do
+            if [[ -d "${mount_point}/${subvol}" ]]; then
+                has_subvolumes=true
+                break
+            fi
+        done
+        
+        if [[ "$has_subvolumes" == true ]]; then
             target_drives+=("$mount_point")
         fi
     done < <(mount | grep "type btrfs")
@@ -1268,8 +1618,10 @@ select_restore_type_and_snapshot() {
     
     case "$restore_type" in
         1)
-            # Complete system restore - both @ and @home
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_COMPLETE_SYSTEM_SELECTED')${LH_COLOR_RESET}"
+            # Complete system restore - all configured subvolumes
+            local restore_subvols=()
+            readarray -t restore_subvols < <(get_restore_subvolumes)
+            echo -e "${LH_COLOR_INFO}Complete system restore selected (subvolumes: ${restore_subvols[*]})${LH_COLOR_RESET}"
             
             # List snapshots and try to find matching pairs
             echo ""
@@ -2295,7 +2647,9 @@ cleanup_old_restore_artifacts() {
     # Use library's intelligent cleanup for safe removal respecting incremental chains
     if [[ "$artifact_type" == "snapshots" ]]; then
         # Clean up various subvolume artifacts using library function
-        for subvol_pattern in "@" "@home"; do
+        local cleanup_subvolumes=()
+        readarray -t cleanup_subvolumes < <(get_restore_subvolumes)
+        for subvol_pattern in "${cleanup_subvolumes[@]}"; do
             if intelligent_cleanup "$subvol_pattern" "$cleanup_dir"; then
                 restore_log_msg "DEBUG" "Successfully cleaned up old $subvol_pattern artifacts"
             else

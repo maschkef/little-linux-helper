@@ -4,3 +4,9 @@ logs/
 config/*.conf
 # For testing purposes
 temp/
+# GUI build artifacts
+gui/web/build/
+gui/web/node_modules/
+gui/little-linux-helper-gui
+# for using Claude
+CLAUDE.md

@@ -55,3 +55,25 @@ CFG_LH_KEEP_SOURCE_SNAPSHOTS="prompt"
 # This avoids conflicts with Snapper (/.snapshots) and Timeshift directories.
 # Script-created snapshots are marked with metadata for identification and cleanup.
 CFG_LH_SOURCE_SNAPSHOT_DIR="/.snapshots_lh"
+
+# CFG_LH_BACKUP_SUBVOLUMES:
+# List of BTRFS subvolumes to backup (space-separated).
+# Default: "@" "@home" (standard layout used by most distributions)
+# 
+# Examples:
+#   Standard layout:     "@" "@home"
+#   openSUSE layout:     "@" "@home" "@opt" "@srv" "@tmp" "@usr/local" "@var"
+#   Arch Linux layout:   "@" "@home" "@var/log" "@var/cache/pacman/pkg"
+#   Custom layout:       "@" "@home" "@docker" "@snapshots"
+# 
+# IMPORTANT: Each subvolume name should start with '@' and match your /etc/fstab entries.
+# Use 'btrfs subvolume list /' to see available subvolumes on your system.
+CFG_LH_BACKUP_SUBVOLUMES="@ @home"
+
+# CFG_LH_AUTO_DETECT_SUBVOLUMES:
+# Enable automatic detection of BTRFS subvolumes from /etc/fstab and /proc/mounts.
+# Values: "true" (detect automatically), "false" (use CFG_LH_BACKUP_SUBVOLUMES only)
+# When enabled, the script will scan for @-prefixed subvolumes commonly used for backups
+# and merge them with the manually configured list above.
+# Automatic detection helps ensure no important subvolumes are missed.
+CFG_LH_AUTO_DETECT_SUBVOLUMES="true"

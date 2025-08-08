@@ -1,0 +1,370 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #1a1a1a;
+  color: #e0e0e0;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+  padding: 1rem;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  border-bottom: 2px solid #444;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 300px;
+  background-color: #2a2a2a;
+  border-right: 1px solid #444;
+  overflow-y: auto;
+}
+
+.content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.panels {
+  flex: 1;
+  display: flex;
+  position: relative;
+}
+
+.panel-resizer {
+  width: 4px;
+  background-color: #444;
+  cursor: col-resize;
+  position: relative;
+  user-select: none;
+}
+
+.panel-resizer:hover {
+  background-color: #007acc;
+}
+
+.panel-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -2px;
+  right: -2px;
+  bottom: 0;
+}
+
+.terminal-panel {
+  flex: 1;
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  font-family: 'Courier New', monospace;
+  padding: 1rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 400px;
+}
+
+.terminal-output {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  height: 100%;
+}
+
+.terminal-input {
+  display: flex;
+  padding: 0.5rem;
+  background-color: #2d2d30;
+  border-top: 1px solid #333;
+  border-radius: 4px;
+  margin-top: auto;
+}
+
+.terminal-input input {
+  flex: 1;
+  background-color: #2d2d30;
+  border: 1px solid #464647;
+  color: #d4d4d4;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-family: inherit;
+}
+
+.terminal-input button {
+  margin-left: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #007acc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.terminal-input button:hover {
+  background-color: #005a9e;
+}
+
+.help-panel {
+  flex: 1;
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+  border-left: 1px solid #444;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  height: 100%;
+}
+
+.docs-panel {
+  flex: 1;
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+  border-left: 1px solid #444;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  height: 100%;
+}
+
+.module-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.module-category {
+  font-weight: bold;
+  padding: 0.75rem 1rem;
+  background-color: #34495e;
+  color: white;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.module-item {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #444;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  color: #e0e0e0;
+}
+
+.module-item:hover {
+  background-color: #3a3a3a;
+}
+
+.module-item.active {
+  background-color: #007acc;
+  color: white;
+}
+
+.module-name {
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.module-description {
+  font-size: 0.85rem;
+  color: #999;
+  margin: 0;
+}
+
+.module-item.active .module-description {
+  color: #ccc;
+}
+
+.module-item.submodule {
+  background-color: rgba(0, 122, 204, 0.05);
+  border-left: 2px solid #007acc;
+  margin-left: 0.5rem;
+  border-radius: 0 4px 4px 0;
+}
+
+.module-item.submodule:hover {
+  background-color: rgba(0, 122, 204, 0.1);
+}
+
+.module-item.submodule .module-name {
+  font-size: 0.9rem;
+  color: #007acc;
+}
+
+.module-item.submodule.active {
+  background-color: rgba(0, 122, 204, 0.2);
+  border-left-color: #ffffff;
+}
+
+.module-item.submodule.active .module-name {
+  color: #ffffff;
+}
+
+.panel-header {
+  font-weight: bold;
+  font-size: 1.2rem;
+  text-align: center;
+  margin-bottom: 1rem;
+  padding: 1rem 0.5rem 0.5rem;
+  border-bottom: 1px solid #444;
+  color: #e0e0e0;
+}
+
+.markdown-content {
+  line-height: 1.6;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  color: #ffffff;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.markdown-content h1 {
+  font-size: 1.5rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.3rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.1rem;
+}
+
+.markdown-content code {
+  background-color: #3a3a3a;
+  color: #e0e0e0;
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.9rem;
+}
+
+.markdown-content pre {
+  background-color: #3a3a3a;
+  color: #e0e0e0;
+  padding: 1rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.loading {
+  padding: 2rem;
+  text-align: center;
+  color: #999;
+}
+
+.error {
+  padding: 2rem;
+  text-align: center;
+  color: #e74c3c;
+}
+
+.session-controls {
+  padding: 1rem;
+  background-color: #2a2a2a;
+  border-bottom: 1px solid #444;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.session-controls button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #555;
+  background-color: #3a3a3a;
+  color: #e0e0e0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.session-controls button:hover {
+  background-color: #4a4a4a;
+}
+
+.session-controls button.primary {
+  background-color: #007acc;
+  color: white;
+  border-color: #007acc;
+}
+
+.session-controls button.primary:hover {
+  background-color: #005a9e;
+}
+
+.session-controls button.danger {
+  background-color: #dc3545;
+  color: white;
+  border-color: #dc3545;
+}
+
+.session-controls button.danger:hover {
+  background-color: #c82333;
+}
+
+.status-indicator {
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.status-indicator.running {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-indicator.stopped {
+  background-color: #f8d7da;
+  color: #721c24;
+}

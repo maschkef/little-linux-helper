@@ -10,7 +10,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 ## Module: `modules/backup/mod_btrfs_backup.sh` - BTRFS Snapshot-Based Backup Operations
 
 **1. Purpose:**
-This module provides comprehensive BTRFS snapshot-based backup functionality. It creates read-only snapshots of BTRFS subvolumes (`@` and `@home`) and transfers them to a backup destination using `btrfs send/receive`. The module includes integrity checking, cleanup mechanisms, and management tools for BTRFS backups. It is designed to work with standard BTRFS subvolume layouts commonly used by distributions like openSUSE, Arch Linux, and others.
+This module provides comprehensive BTRFS snapshot-based backup functionality with dynamic subvolume selection. It creates read-only snapshots of configured and auto-detected BTRFS subvolumes and transfers them to a backup destination using `btrfs send/receive`. The module includes integrity checking, cleanup mechanisms, and management tools for BTRFS backups. It supports both manual configuration and automatic detection of BTRFS subvolumes, making it compatible with various BTRFS layouts used by different Linux distributions.
 
 **2. Initialization & Dependencies:**
 *   **Library Source:** The module sources two critical libraries:
@@ -19,7 +19,7 @@ This module provides comprehensive BTRFS snapshot-based backup functionality. It
 *   **BTRFS Library Integration:** The module now heavily integrates with `lib_btrfs.sh` which provides atomic backup patterns, comprehensive error handling, and advanced BTRFS safety mechanisms.
 *   **BTRFS Implementation Validation:** The module performs comprehensive validation of all required BTRFS library functions at startup using `validate_btrfs_implementation()`, ensuring critical atomic functions are available before proceeding.
 *   **Package Manager Detection:** It calls `lh_detect_package_manager()` to set up `LH_PKG_MANAGER` for potential package installations (e.g., `btrfs-progs`).
-*   **Backup Configuration:** It loads backup-specific configurations by calling `lh_load_backup_config`. This function populates variables like `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_SOURCE_SNAPSHOT_DIR`, `LH_RETENTION_BACKUP`, `LH_BACKUP_LOG`, `LH_KEEP_SOURCE_SNAPSHOTS`, and `LH_DEBUG_LOG_LIMIT`.
+*   **Backup Configuration:** It loads backup-specific configurations by calling `lh_load_backup_config`. This function populates variables like `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_SOURCE_SNAPSHOT_DIR`, `LH_RETENTION_BACKUP`, `LH_BACKUP_LOG`, `LH_KEEP_SOURCE_SNAPSHOTS`, `LH_DEBUG_LOG_LIMIT`, `LH_BACKUP_SUBVOLUMES`, and `LH_AUTO_DETECT_SUBVOLUMES`.
 *   **Critical Safety Features:**
     *   `set -o pipefail`: Enables pipeline failure detection for critical backup operations
     *   Atomic backup patterns that prevent corrupted or incomplete backups
@@ -121,7 +121,8 @@ This is the entry point and main interactive loop for the BTRFS backup module. I
         *   Performs comprehensive space checking using `check_btrfs_space()` and `get_btrfs_available_space()` from lib_btrfs.sh, which includes metadata exhaustion detection.
         *   Ensures backup target (`$LH_BACKUP_ROOT$LH_BACKUP_DIR`) and temporary snapshot (`$LH_TEMP_SNAPSHOT_DIR`) directories exist, creating them if necessary.
         *   Calls `cleanup_orphaned_temp_snapshots()`.
-        *   Iterates through a predefined list of subvolumes (`@`, `@home`).
+        *   **Dynamic Subvolume Selection**: Uses `get_backup_subvolumes()` to determine the final list of subvolumes to backup, which combines configured subvolumes (`LH_BACKUP_SUBVOLUMES`) with auto-detected subvolumes when `LH_AUTO_DETECT_SUBVOLUMES` is enabled.
+        *   Iterates through the dynamically determined list of subvolumes.
         *   For each subvolume:
             *   Sets `CURRENT_TEMP_SNAPSHOT`.
             *   Calls `create_direct_snapshot()` to create a read-only snapshot.
@@ -276,6 +277,37 @@ This is the entry point and main interactive loop for the BTRFS backup module. I
         *   Provides user-friendly configuration display
     *   **Usage:** Called during configuration display and modification workflows.
 
+*   **`detect_btrfs_subvolumes()`**
+    *   **Purpose:** Automatically detects BTRFS subvolumes from system configuration files and active mounts.
+    *   **Mechanism:**
+        *   Scans `/etc/fstab` for BTRFS entries with `subvol=` options to find configured subvolumes
+        *   Parses `/proc/mounts` for active BTRFS subvolumes with `subvol=` options
+        *   Filters for @-prefixed subvolumes commonly used for backups (e.g., `@`, `@home`, `@var`, `@opt`)
+        *   Removes duplicates and returns unique subvolume names without the leading `/`
+    *   **Returns:** Array of detected subvolume names (e.g., "@", "@home", "@var")
+    *   **Usage:** Called by `get_backup_subvolumes()` when `LH_AUTO_DETECT_SUBVOLUMES` is enabled.
+
+*   **`get_backup_subvolumes()`**
+    *   **Purpose:** Determines the final list of subvolumes to backup by combining configured and auto-detected subvolumes.
+    *   **Mechanism:**
+        *   Parses manually configured subvolumes from `LH_BACKUP_SUBVOLUMES` variable
+        *   If `LH_AUTO_DETECT_SUBVOLUMES` is enabled, calls `detect_btrfs_subvolumes()` and merges results
+        *   Removes duplicates and sorts the final list alphabetically
+        *   Falls back to default "@" and "@home" if no subvolumes are configured or detected
+    *   **Returns:** Sorted array of unique subvolume names to backup
+    *   **Usage:** Called at the beginning of backup operations and by various status/configuration functions.
+
+*   **`validate_subvolume_exists(subvol)`**
+    *   **Purpose:** Validates that a specified subvolume exists and is accessible for backup operations.
+    *   **Mechanism:**
+        *   Maps common subvolume names to their expected mount points (`@` → `/`, `@home` → `/home`)
+        *   For other @-prefixed subvolumes, attempts to find mount point from `/proc/mounts`
+        *   Checks if the mount point directory exists and is readable
+        *   Provides validation feedback for configuration and status displays
+    *   **Parameters:** `subvol` (subvolume name, e.g., "@", "@home")
+    *   **Returns:** 0 (true) if subvolume is accessible, 1 (false) otherwise
+    *   **Usage:** Called during configuration display and subvolume validation processes.
+
 *   **`format_bytes_for_display(bytes)`**
     *   **Purpose:** Formats byte values into human-readable format with appropriate units.
     *   **Mechanism:**
@@ -323,42 +355,61 @@ This is the entry point and main interactive loop for the BTRFS backup module. I
 *   **Self-Managed Snapshots:** The module creates and manages its own snapshots exclusively for reliable incremental backup chains. External snapshot tools like Snapper/Timeshift are completely bypassed to avoid sibling snapshot issues that would break incremental backup chain integrity.
 *   **Source Snapshot Preservation:** The module can optionally preserve source snapshots used for incremental backup chains. This is controlled by the `LH_KEEP_SOURCE_SNAPSHOTS` configuration setting and ensures that parent snapshots remain available for future incremental backups.
 *   **Incremental Chain Integrity:** Source parent snapshots are automatically preserved with chain markers (`.chain_parent` files) to maintain incremental backup chain integrity. The module tracks and manages these preservation markers to prevent accidental deletion of snapshots needed for incremental operations.
-*   **Hardcoded Subvolumes:** The BTRFS backup logic primarily targets `@` and `@home` subvolumes. Other BTRFS configurations might require script modification.
+*   **Flexible Subvolume Support:** The BTRFS backup logic now supports dynamic subvolume selection through:
+    *   Manual configuration via `LH_BACKUP_SUBVOLUMES` for specific subvolume lists
+    *   Automatic detection via `LH_AUTO_DETECT_SUBVOLUMES` for scanning system configuration files
+    *   Validation of subvolume accessibility before backup operations
+    *   Support for any @-prefixed BTRFS subvolume layout used by different distributions
 
 **6. Globals:**
 *   `CURRENT_TEMP_SNAPSHOT`: Stores the path to the BTRFS snapshot currently being processed by `btrfs_backup()` for cleanup purposes in `cleanup_on_exit()`.
 *   `BACKUP_START_TIME`: Stores the start time of the backup operation for duration calculation.
 
-**7. New Configuration Variables:**
+**7. Configuration Variables:**
 *   `LH_KEEP_SOURCE_SNAPSHOTS`: Controls whether source snapshots are preserved for incremental backup chain integrity (true/false/ask).
 *   `LH_SOURCE_SNAPSHOT_DIR`: Directory path for preserving source snapshots when preservation is enabled.
 *   `LH_DEBUG_LOG_LIMIT`: Limits the number of debug log entries displayed (0 for unlimited, positive integer for limit).
+*   `LH_BACKUP_SUBVOLUMES`: Space-separated list of BTRFS subvolumes to backup (e.g., "@ @home @var @opt"). Default: "@ @home".
+*   `LH_AUTO_DETECT_SUBVOLUMES`: Enable automatic detection of BTRFS subvolumes from system configuration (true/false). Default: "true".
 
-**8. Supported BTRFS Layout:**
-The module is designed to work with the common BTRFS subvolume layout used by many Linux distributions:
+**8. Supported BTRFS Layouts:**
+The module supports flexible BTRFS subvolume configurations through both manual configuration and automatic detection:
+
+**Common Layouts:**
 *   `@` subvolume mounted at `/` (root filesystem)
 *   `@home` subvolume mounted at `/home` (user data)
+*   `@var` subvolume mounted at `/var` (variable data)
+*   `@opt` subvolume mounted at `/opt` (optional software)
+*   `@tmp` subvolume mounted at `/tmp` (temporary files)
+*   `@srv` subvolume mounted at `/srv` (service data)
+
+**Dynamic Detection:**
+*   Automatically scans `/etc/fstab` for configured BTRFS subvolumes with `subvol=` options
+*   Parses `/proc/mounts` for currently mounted BTRFS subvolumes
+*   Filters for @-prefixed subvolumes commonly used for system organization
+*   Combines detected subvolumes with manually configured ones for comprehensive coverage
 
 The module creates its own snapshots in the designated temporary snapshot directory and manages them independently for optimal incremental backup chain integrity.
 
 **9. Backup Process Flow:**
 1. **Implementation validation:** Use `validate_btrfs_implementation()` to ensure all required lib_btrfs.sh functions are available
 2. **Pre-flight checks:** Verify BTRFS support, root privileges, backup destination, filesystem health using `check_filesystem_health()`
-3. **Preservation settings:** Use `determine_snapshot_preservation()` to configure source snapshot preservation behavior
-4. **Advanced space checking:** Use `check_btrfs_space()` and `get_btrfs_available_space()` for comprehensive space analysis including metadata exhaustion detection
-5. **Cleanup:** Remove any orphaned temporary snapshots from previous runs using `intelligent_cleanup()`
-6. **Snapshot creation:** Create read-only snapshots of target subvolumes with comprehensive validation, optionally in permanent locations for preservation
-7. **Chain validation:** Use `validate_parent_snapshot_chain()` to verify incremental backup chain integrity from both temporary and preserved source snapshots
-8. **Atomic transfer:** Use `atomic_receive_with_validation()` for true atomic operations with comprehensive validation:
+3. **Subvolume determination:** Use `get_backup_subvolumes()` to determine final list of subvolumes combining configured (`LH_BACKUP_SUBVOLUMES`) and auto-detected subvolumes when enabled (`LH_AUTO_DETECT_SUBVOLUMES`)
+4. **Preservation settings:** Use `determine_snapshot_preservation()` to configure source snapshot preservation behavior
+5. **Advanced space checking:** Use `check_btrfs_space()` and `get_btrfs_available_space()` for comprehensive space analysis including metadata exhaustion detection
+6. **Cleanup:** Remove any orphaned temporary snapshots from previous runs using `intelligent_cleanup()`
+7. **Snapshot creation:** Create read-only snapshots of determined target subvolumes with comprehensive validation, optionally in permanent locations for preservation
+8. **Chain validation:** Use `validate_parent_snapshot_chain()` to verify incremental backup chain integrity from both temporary and preserved source snapshots
+9. **Atomic transfer:** Use `atomic_receive_with_validation()` for true atomic operations with comprehensive validation:
    - Incremental transfers when suitable parent snapshots with valid `received_uuid` are available
    - Automatic fallback to full backup when incremental chains are broken
    - Intelligent error handling with `handle_btrfs_error()` for automatic recovery strategies
-9. **UUID protection:** Use `verify_received_uuid_integrity()` and `protect_received_snapshots()` to maintain backup chain integrity
-10. **Verification:** Create completion markers and verify successful transfer with comprehensive integrity checking
-11. **Chain preservation:** Use `preserve_source_parent_snapshots()` to create chain markers and preserve parent snapshots needed for future incremental backups
-12. **Safe cleanup:** Use `intelligent_cleanup()` to remove temporary snapshots and old backups while respecting backup chains and preservation markers
-13. **Health monitoring:** Final filesystem health check using `check_filesystem_health()`
-14. **Reporting:** Log results and send desktop notifications with detailed status information
+10. **UUID protection:** Use `verify_received_uuid_integrity()` and `protect_received_snapshots()` to maintain backup chain integrity
+11. **Verification:** Create completion markers and verify successful transfer with comprehensive integrity checking
+12. **Chain preservation:** Use `preserve_source_parent_snapshots()` to create chain markers and preserve parent snapshots needed for future incremental backups
+13. **Safe cleanup:** Use `intelligent_cleanup()` to remove temporary snapshots and old backups while respecting backup chains and preservation markers
+14. **Health monitoring:** Final filesystem health check using `check_filesystem_health()`
+15. **Reporting:** Log results and send desktop notifications with detailed status information
 
 This module now provides a cutting-edge, enterprise-grade BTRFS backup solution with true atomic operations, comprehensive error handling, intelligent fallback strategies, advanced space management, and robust integrity checking that surpasses standard BTRFS backup implementations.
 
