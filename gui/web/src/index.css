@@ -5,8 +5,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #1a1a1a;
-  color: #e0e0e0;
+  background-color: #181818; 
+  color: #e8e8e8; 
 }
 
 code {
@@ -41,7 +41,7 @@ code {
 }
 
 .sidebar {
-  width: 300px;
+  width: 380px;
   background-color: #2a2a2a;
   border-right: 1px solid #444;
   overflow-y: auto;
@@ -82,8 +82,8 @@ code {
 
 .terminal-panel {
   flex: 1;
-  background-color: #1e1e1e;
-  color: #d4d4d4;
+  background-color: #1a1a1a; /* Slightly lighter than body for subtle distinction */
+  color: #e8e8e8; /* Better contrast on darker background */
   font-family: 'Courier New', monospace;
   padding: 1rem;
   overflow-y: auto;
@@ -92,6 +92,136 @@ code {
   display: flex;
   flex-direction: column;
   min-width: 400px;
+}
+
+/* ANSI color overrides for better contrast on dark background */
+/* Handle various ansi-to-html output formats */
+/* Old selectors removed - they don't match ansi-to-html output */
+
+/* Target the actual ansi-to-html output format for blue colors */
+.terminal-output span[style*="color:#00A"] {
+  color: #80ccff !important; /* Much lighter blue for better contrast */
+}
+
+.terminal-output b span[style*="color:#00A"] {
+  color: #66b3ff !important; /* Bright blue for bold INFO messages */
+}
+
+/* ERROR messages - Bold Red (#A00) */
+.terminal-output b span[style*="color:#A00"] {
+  color: #ff5252 !important; /* Bright red for ERROR messages */
+}
+
+/* WARNING messages - Bold Yellow (#A50) */
+.terminal-output b span[style*="color:#A50"] {
+  color: #ffeb3b !important; /* Bright yellow for WARNING messages */
+}
+
+/* SUCCESS messages - Bold Green (#0A0) */
+.terminal-output b span[style*="color:#0A0"] {
+  color: #4caf50 !important; /* Bright green for SUCCESS messages */
+}
+
+.terminal-output .ansi-red,
+.terminal-output .ansi-foreground-red,
+.terminal-output span[style*="color:#FF0000"],
+.terminal-output span[style*="color:red"] {
+  color: #ff6b6b !important; /* Slightly lighter red for better readability */
+}
+
+.terminal-output .ansi-bold.ansi-red,
+.terminal-output .ansi-bold.ansi-foreground-red,
+.terminal-output .ansi-bright-red,
+.terminal-output .ansi-foreground-bright-red,
+.terminal-output span[style*="color:#FF0000"][style*="font-weight:bold"],
+.terminal-output span[style*="color:red"][style*="font-weight:bold"] {
+  color: #ff5252 !important; /* Bright red for ERROR messages */
+  font-weight: bold;
+}
+
+.terminal-output .ansi-yellow,
+.terminal-output .ansi-foreground-yellow,
+.terminal-output span[style*="color:#FFFF00"],
+.terminal-output span[style*="color:yellow"] {
+  color: #ffd93d !important; /* Brighter yellow for better visibility */
+}
+
+.terminal-output .ansi-bold.ansi-yellow,
+.terminal-output .ansi-bold.ansi-foreground-yellow,
+.terminal-output .ansi-bright-yellow,
+.terminal-output .ansi-foreground-bright-yellow,
+.terminal-output span[style*="color:#FFFF00"][style*="font-weight:bold"],
+.terminal-output span[style*="color:yellow"][style*="font-weight:bold"] {
+  color: #ffeb3b !important; /* Bright yellow for WARNING messages */
+  font-weight: bold;
+}
+
+.terminal-output .ansi-green,
+.terminal-output .ansi-foreground-green,
+.terminal-output span[style*="color:#00FF00"],
+.terminal-output span[style*="color:green"] {
+  color: #66bb6a !important; /* Good green that works on dark background */
+}
+
+.terminal-output .ansi-bold.ansi-green,
+.terminal-output .ansi-bold.ansi-foreground-green,
+.terminal-output .ansi-bright-green,
+.terminal-output .ansi-foreground-bright-green,
+.terminal-output span[style*="color:#00FF00"][style*="font-weight:bold"],
+.terminal-output span[style*="color:green"][style*="font-weight:bold"] {
+  color: #4caf50 !important; /* Bright green for SUCCESS messages */
+  font-weight: bold;
+}
+
+.terminal-output .ansi-cyan,
+.terminal-output .ansi-foreground-cyan,
+.terminal-output span[style*="color:#00FFFF"],
+.terminal-output span[style*="color:cyan"] {
+  color: #4dd0e1 !important; /* Brighter cyan */
+}
+
+.terminal-output .ansi-bold.ansi-cyan,
+.terminal-output .ansi-bold.ansi-foreground-cyan,
+.terminal-output .ansi-bright-cyan,
+.terminal-output .ansi-foreground-bright-cyan,
+.terminal-output span[style*="color:#00FFFF"][style*="font-weight:bold"],
+.terminal-output span[style*="color:cyan"][style*="font-weight:bold"] {
+  color: #00bcd4 !important; /* Bright cyan for headers */
+  font-weight: bold;
+}
+
+.terminal-output .ansi-white,
+.terminal-output .ansi-foreground-white,
+.terminal-output span[style*="color:#FFFFFF"],
+.terminal-output span[style*="color:white"] {
+  color: #f5f5f5 !important; /* Slightly off-white for better readability */
+}
+
+.terminal-output .ansi-bold.ansi-white,
+.terminal-output .ansi-bold.ansi-foreground-white,
+.terminal-output .ansi-bright-white,
+.terminal-output .ansi-foreground-bright-white,
+.terminal-output span[style*="color:#FFFFFF"][style*="font-weight:bold"],
+.terminal-output span[style*="color:white"][style*="font-weight:bold"] {
+  color: #ffffff !important; /* Pure white for bold text */
+  font-weight: bold;
+}
+
+.terminal-output .ansi-magenta,
+.terminal-output .ansi-foreground-magenta,
+.terminal-output span[style*="color:#FF00FF"],
+.terminal-output span[style*="color:magenta"] {
+  color: #e91e63 !important; /* Better magenta for dark background */
+}
+
+.terminal-output .ansi-bold.ansi-magenta,
+.terminal-output .ansi-bold.ansi-foreground-magenta,
+.terminal-output .ansi-bright-magenta,
+.terminal-output .ansi-foreground-bright-magenta,
+.terminal-output span[style*="color:#FF00FF"][style*="font-weight:bold"],
+.terminal-output span[style*="color:magenta"][style*="font-weight:bold"] {
+  color: #f06292 !important; /* Bright magenta */
+  font-weight: bold;
 }
 
 .terminal-output {
@@ -149,6 +279,8 @@ code {
   word-wrap: break-word;
   overflow-wrap: break-word;
   height: 100%;
+  font-size: 1.1rem; /* Increased from default for better readability */
+  line-height: 1.6; /* Better line spacing */
 }
 
 .docs-panel {
@@ -199,6 +331,19 @@ code {
 .module-name {
   font-weight: 500;
   margin-bottom: 0.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.submodule-badge {
+  background-color: #2c3e50;
+  color: #bdc3c7;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: normal;
+  text-transform: lowercase;
 }
 
 .module-description {
@@ -350,6 +495,40 @@ code {
 
 .session-controls button.danger:hover {
   background-color: #c82333;
+}
+
+/* Panel toggle buttons styling */
+.panel-toggles {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.panel-toggles button {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  border: 1px solid #555;
+  background-color: #3a3a3a;
+  color: #e0e0e0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.panel-toggles button:hover {
+  background-color: #4a4a4a;
+  border-color: #666;
+}
+
+.panel-toggles button.active {
+  background-color: #007acc;
+  color: white;
+  border-color: #007acc;
+}
+
+.panel-toggles button.active:hover {
+  background-color: #005a9e;
 }
 
 .status-indicator {

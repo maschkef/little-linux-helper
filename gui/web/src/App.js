@@ -20,6 +20,8 @@ function App() {
   const [sessionStatus, setSessionStatus] = useState('stopped');
   const [moduleDocs, setModuleDocs] = useState('');
   const [panelWidths, setPanelWidths] = useState({ terminal: 50, help: 25, docs: 25 });
+  const [showHelpPanel, setShowHelpPanel] = useState(true); // Default: show help
+  const [showDocsPanel, setShowDocsPanel] = useState(false); // Default: hide docs
   const wsRef = useRef(null);
 
   useEffect(() => {
@@ -207,6 +209,22 @@ function App() {
                     Stop Module
                   </button>
                 )}
+                
+                {/* Panel toggle buttons */}
+                <div className="panel-toggles">
+                  <button 
+                    className={showHelpPanel ? 'active' : ''}
+                    onClick={() => setShowHelpPanel(!showHelpPanel)}
+                  >
+                    {showHelpPanel ? 'Hide Help' : 'Show Help'}
+                  </button>
+                  <button 
+                    className={showDocsPanel ? 'active' : ''}
+                    onClick={() => setShowDocsPanel(!showDocsPanel)}
+                  >
+                    {showDocsPanel ? 'Hide Docs' : 'Show Docs'}
+                  </button>
+                </div>
               </>
             )}
             {!selectedModule && (
@@ -217,6 +235,8 @@ function App() {
           <ResizablePanels 
             panelWidths={panelWidths}
             onPanelWidthChange={setPanelWidths}
+            showHelpPanel={showHelpPanel}
+            showDocsPanel={showDocsPanel}
           >
             <Terminal 
               key="main-terminal"

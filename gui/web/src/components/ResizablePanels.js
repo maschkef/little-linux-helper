@@ -8,7 +8,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 
-function ResizablePanels({ children, panelWidths, onPanelWidthChange }) {
+function ResizablePanels({ children, panelWidths, onPanelWidthChange, showHelpPanel = true, showDocsPanel = true }) {
   const [terminalWidth, setTerminalWidth] = useState(panelWidths?.terminal || 50);
   const [helpWidth, setHelpWidth] = useState(panelWidths?.help || 25);
   const [docsWidth, setDocsWidth] = useState(panelWidths?.docs || 25);
@@ -95,6 +95,25 @@ function ResizablePanels({ children, panelWidths, onPanelWidthChange }) {
     document.addEventListener('mouseup', handleMouseUp);
   }, [helpWidth, docsWidth, terminalWidth, onPanelWidthChange]);
 
+  // Calculate actual widths based on visible panels
+  const getActualWidths = () => {
+    if (showHelpPanel && showDocsPanel) {
+      // All panels visible - use stored widths
+      return { terminal: terminalWidth, help: helpWidth, docs: docsWidth };
+    } else if (showHelpPanel && !showDocsPanel) {
+      // Only help panel visible - terminal + help
+      return { terminal: terminalWidth, help: helpWidth + docsWidth, docs: 0 };
+    } else if (!showHelpPanel && showDocsPanel) {
+      // Only docs panel visible - terminal + docs
+      return { terminal: terminalWidth, help: 0, docs: helpWidth + docsWidth };
+    } else {
+      // No side panels - terminal takes full width
+      return { terminal: 100, help: 0, docs: 0 };
+    }
+  };
+
+  const actualWidths = getActualWidths();
+
   return (
     <div ref={containerRef} className="panels" style={{ 
       display: 'flex', 
@@ -102,31 +121,39 @@ function ResizablePanels({ children, panelWidths, onPanelWidthChange }) {
       boxSizing: 'border-box' 
     }}>
       {/* Terminal Panel */}
-      <div style={{ width: `${terminalWidth}%`, display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+      <div style={{ width: `${actualWidths.terminal}%`, display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
         {children[0]}
       </div>
       
-      {/* Resizer between terminal and help */}
-      <div 
-        className="panel-resizer"
-        onMouseDown={handleMouseDown('terminal-help')}
-      />
+      {/* Resizer between terminal and help - only show if help or docs panel is visible */}
+      {(showHelpPanel || showDocsPanel) && (
+        <div 
+          className="panel-resizer"
+          onMouseDown={handleMouseDown('terminal-help')}
+        />
+      )}
       
-      {/* Help Panel */}
-      <div style={{ width: `${helpWidth}%`, display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
-        {children[1]}
-      </div>
+      {/* Help Panel - only render if visible */}
+      {showHelpPanel && (
+        <div style={{ width: `${actualWidths.help}%`, display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+          {children[1]}
+        </div>
+      )}
       
-      {/* Resizer between help and docs */}
-      <div 
-        className="panel-resizer"
-        onMouseDown={handleMouseDown('help-docs')}
-      />
+      {/* Resizer between help and docs - only show if both panels are visible */}
+      {showHelpPanel && showDocsPanel && (
+        <div 
+          className="panel-resizer"
+          onMouseDown={handleMouseDown('help-docs')}
+        />
+      )}
       
-      {/* Docs Panel */}
-      <div style={{ width: `${docsWidth}%`, display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
-        {children[2]}
-      </div>
+      {/* Docs Panel - only render if visible */}
+      {showDocsPanel && (
+        <div style={{ width: `${actualWidths.docs}%`, display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+          {children[2]}
+        </div>
+      )}
     </div>
   );
 }

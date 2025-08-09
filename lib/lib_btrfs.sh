@@ -95,7 +95,7 @@ atomic_receive_with_validation() {
     
     # Verify source snapshot is read-only (required for btrfs send)
     local ro_property
-    ro_property=$(btrfs property get "$source_snapshot" ro 2>/dev/null | cut -d'=' -f2)
+    ro_property=$($LH_SUDO_CMD btrfs property get "$source_snapshot" ro 2>/dev/null | cut -d'=' -f2)
     if [[ "$ro_property" != "true" ]]; then
         lh_log_msg "ERROR" "atomic_receive_with_validation: Source snapshot must be read-only: $source_snapshot"
         return 1
@@ -105,7 +105,7 @@ atomic_receive_with_validation() {
     local backup_base_dir
     backup_base_dir=$(dirname "$final_destination")
     if [[ ! -d "$backup_base_dir" ]]; then
-        if ! mkdir -p "$backup_base_dir"; then
+        if ! $LH_SUDO_CMD mkdir -p "$backup_base_dir"; then
             lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot create backup directory: $backup_base_dir"
             return 1
         fi
@@ -117,7 +117,7 @@ atomic_receive_with_validation() {
         
         # Check if this is a received snapshot (has received_uuid) - CRITICAL: Never modify these
         local has_received_uuid
-        has_received_uuid=$(btrfs subvolume show "$final_destination" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+        has_received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$final_destination" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
         
         if [[ -n "$has_received_uuid" && "$has_received_uuid" != "-" ]]; then
             lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot overwrite received snapshot - this would break incremental chains"
@@ -128,11 +128,11 @@ atomic_receive_with_validation() {
         
         # Safe to delete - this is not a received snapshot
         lh_log_msg "DEBUG" "atomic_receive_with_validation: Removing existing non-received snapshot: $final_destination"
-        if ! btrfs subvolume delete "$final_destination" 2>/dev/null; then
+        if ! $LH_SUDO_CMD btrfs subvolume delete "$final_destination" 2>/dev/null; then
             # If deletion fails, try removing read-only flag (only for non-received snapshots)
             lh_log_msg "DEBUG" "atomic_receive_with_validation: Attempting to remove read-only flag for deletion"
-            if btrfs property set "$final_destination" ro false 2>/dev/null; then
-                if ! btrfs subvolume delete "$final_destination" 2>/dev/null; then
+            if $LH_SUDO_CMD btrfs property set "$final_destination" ro false 2>/dev/null; then
+                if ! $LH_SUDO_CMD btrfs subvolume delete "$final_destination" 2>/dev/null; then
                     lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot remove existing destination: $final_destination"
                     return 1
                 fi
@@ -171,13 +171,13 @@ atomic_receive_with_validation() {
         # Step 1: Receive into temporary location with .receiving suffix
         # Note: We use a subdirectory approach since btrfs receive creates snapshot with original name
         local temp_receive_dir="${backup_base_dir}/.receiving_$$"
-        if ! mkdir -p "$temp_receive_dir"; then
+        if ! $LH_SUDO_CMD mkdir -p "$temp_receive_dir"; then
             lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot create temporary receive directory: $temp_receive_dir"
             return 1
         fi
         
         lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 1 - Receiving into temporary directory: $temp_receive_dir"
-        if btrfs send -p "$parent_snapshot" "$source_snapshot" | btrfs receive "$temp_receive_dir"; then
+        if $LH_SUDO_CMD btrfs send -p "$parent_snapshot" "$source_snapshot" | $LH_SUDO_CMD btrfs receive "$temp_receive_dir"; then
             # Step 2: Validate operation success (exit code check)
             lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 2 - Receive successful, verifying result"
             
@@ -191,10 +191,10 @@ atomic_receive_with_validation() {
             fi
             
             # Validate the received snapshot
-            if ! btrfs subvolume show "$temp_received_snapshot" >/dev/null 2>&1; then
+            if ! $LH_SUDO_CMD btrfs subvolume show "$temp_received_snapshot" >/dev/null 2>&1; then
                 lh_log_msg "ERROR" "atomic_receive_with_validation: Received snapshot is not valid: $temp_received_snapshot"
-                btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                rmdir "$temp_receive_dir" 2>/dev/null || true
+                $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
+                $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || true
                 return 1
             fi
             
@@ -203,8 +203,8 @@ atomic_receive_with_validation() {
             lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 3 - Direct receive to final destination directory"
             
             # Clean up temporary attempt - we'll use direct receive instead
-            btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-            rmdir "$temp_receive_dir" 2>/dev/null || true
+            $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
+            $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || true
             
             # Receive directly to the parent directory of final destination
             # btrfs receive will create the snapshot with its original name
@@ -215,7 +215,7 @@ atomic_receive_with_validation() {
             lh_log_msg "DEBUG" "atomic_receive_with_validation: Receiving to parent directory: $final_parent_dir"
             lh_log_msg "DEBUG" "atomic_receive_with_validation: Expected received path: $expected_received_path"
             
-            if btrfs send -p "$parent_snapshot" "$source_snapshot" | btrfs receive "$final_parent_dir"; then
+            if $LH_SUDO_CMD btrfs send -p "$parent_snapshot" "$source_snapshot" | $LH_SUDO_CMD btrfs receive "$final_parent_dir"; then
                 # Verify the received snapshot exists
                 if [[ -d "$expected_received_path" ]]; then
                     lh_log_msg "INFO" "atomic_receive_with_validation: Incremental backup completed successfully at: $expected_received_path"
@@ -235,12 +235,12 @@ atomic_receive_with_validation() {
             
             # Step 4: Clean up temporary files on failure
             local partial_snapshot="$temp_receive_dir/$source_snapshot_name"
-            [[ -d "$partial_snapshot" ]] && btrfs subvolume delete "$partial_snapshot" 2>/dev/null || true
-            rmdir "$temp_receive_dir" 2>/dev/null || true
+            [[ -d "$partial_snapshot" ]] && $LH_SUDO_CMD btrfs subvolume delete "$partial_snapshot" 2>/dev/null || true
+            $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || true
             
             # Capture error details for analysis
             local error_details
-            error_details=$(dmesg | tail -10 | grep -i "btrfs\|error" || echo "No specific BTRFS errors in dmesg")
+            error_details=$($LH_SUDO_CMD dmesg | tail -10 | grep -i "btrfs\|error" || echo "No specific BTRFS errors in dmesg")
             
             # Use enhanced error handling to determine appropriate response
             local error_analysis_result
@@ -273,7 +273,7 @@ atomic_receive_with_validation() {
         
         # Step 1: Receive into temporary location with .receiving suffix
         local temp_receive_dir="${backup_base_dir}/.receiving_$$"
-        if ! mkdir -p "$temp_receive_dir"; then
+        if ! $LH_SUDO_CMD mkdir -p "$temp_receive_dir"; then
             lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot create temporary receive directory: $temp_receive_dir"
             return 1
         fi
@@ -281,10 +281,10 @@ atomic_receive_with_validation() {
         lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 1 - Receiving into temporary directory: $temp_receive_dir"
         # Create temporary file to capture error output
         local error_log=$(mktemp)
-        if btrfs send "$source_snapshot" 2>"$error_log" | btrfs receive "$temp_receive_dir" 2>>"$error_log"; then
+        if $LH_SUDO_CMD btrfs send "$source_snapshot" 2>"$error_log" | $LH_SUDO_CMD btrfs receive "$temp_receive_dir" 2>>"$error_log"; then
             # Step 2: Validate operation success (exit code check)
             lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 2 - Receive successful, verifying result"
-            rm -f "$error_log"
+            $LH_SUDO_CMD rm -f "$error_log"
             
             # The snapshot is created with its original name in temp_receive_dir
             local temp_received_snapshot="$temp_receive_dir/$source_snapshot_name"
@@ -296,10 +296,10 @@ atomic_receive_with_validation() {
             fi
             
             # Validate the received snapshot
-            if ! btrfs subvolume show "$temp_received_snapshot" >/dev/null 2>&1; then
+            if ! $LH_SUDO_CMD btrfs subvolume show "$temp_received_snapshot" >/dev/null 2>&1; then
                 lh_log_msg "ERROR" "atomic_receive_with_validation: Received snapshot is not valid: $temp_received_snapshot"
-                btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                rmdir "$temp_receive_dir" 2>/dev/null || true
+                $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
+                $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || true
                 return 1
             fi
             
@@ -307,8 +307,8 @@ atomic_receive_with_validation() {
             lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 3 - Direct receive for full backup"
             
             # Clean up temporary attempt - use direct receive instead
-            btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-            rmdir "$temp_receive_dir" 2>/dev/null || true
+            $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
+            $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || true
             
             # Receive directly to the parent directory of final destination
             local final_parent_dir=$(dirname "$final_destination")
@@ -316,7 +316,7 @@ atomic_receive_with_validation() {
             local expected_received_path="$final_parent_dir/$expected_name"
             
             # Ensure final destination parent directory exists
-            if ! mkdir -p "$final_parent_dir"; then
+            if ! $LH_SUDO_CMD mkdir -p "$final_parent_dir"; then
                 lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot create final parent directory: $final_parent_dir"
                 return 1
             fi
@@ -324,7 +324,7 @@ atomic_receive_with_validation() {
             lh_log_msg "DEBUG" "atomic_receive_with_validation: Receiving full backup to parent directory: $final_parent_dir"
             lh_log_msg "DEBUG" "atomic_receive_with_validation: Expected received path: $expected_received_path"
             
-            if btrfs send "$source_snapshot" | btrfs receive "$final_parent_dir"; then
+            if $LH_SUDO_CMD btrfs send "$source_snapshot" | $LH_SUDO_CMD btrfs receive "$final_parent_dir"; then
                 # Verify the received snapshot exists
                 if [[ -d "$expected_received_path" ]]; then
                     lh_log_msg "INFO" "atomic_receive_with_validation: Full backup completed successfully at: $expected_received_path"
@@ -350,9 +350,9 @@ atomic_receive_with_validation() {
             
             # Step 4: Clean up temporary files on failure
             local partial_snapshot="$temp_receive_dir/$source_snapshot_name"
-            [[ -d "$partial_snapshot" ]] && btrfs subvolume delete "$partial_snapshot" 2>/dev/null || true
-            rmdir "$temp_receive_dir" 2>/dev/null || true
-            rm -f "$error_log"
+            [[ -d "$partial_snapshot" ]] && $LH_SUDO_CMD btrfs subvolume delete "$partial_snapshot" 2>/dev/null || true
+            $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || true
+            $LH_SUDO_CMD rm -f "$error_log"
             return 1
         fi
     fi
@@ -409,7 +409,7 @@ validate_parent_snapshot_chain() {
         return 1
     fi
     
-    if ! btrfs subvolume show "$source_parent" >/dev/null 2>&1; then
+    if ! $LH_SUDO_CMD btrfs subvolume show "$source_parent" >/dev/null 2>&1; then
         lh_log_msg "WARN" "validate_parent_snapshot_chain: Source parent is not a valid BTRFS subvolume: $source_parent"
         return 1
     fi
@@ -420,14 +420,14 @@ validate_parent_snapshot_chain() {
         return 1
     fi
     
-    if ! btrfs subvolume show "$dest_parent" >/dev/null 2>&1; then
+    if ! $LH_SUDO_CMD btrfs subvolume show "$dest_parent" >/dev/null 2>&1; then
         lh_log_msg "WARN" "validate_parent_snapshot_chain: Destination parent is not a valid BTRFS subvolume: $dest_parent"
         return 1
     fi
     
     # Check received_uuid on destination parent (critical for incremental chain)
     local dest_received_uuid
-    dest_received_uuid=$(btrfs subvolume show "$dest_parent" | grep "Received UUID:" | awk '{print $3}' || echo "")
+    dest_received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$dest_parent" | grep "Received UUID:" | awk '{print $3}' || echo "")
     if [[ -z "$dest_received_uuid" || "$dest_received_uuid" == "-" ]]; then
         lh_log_msg "WARN" "validate_parent_snapshot_chain: Destination parent missing received_uuid: $dest_parent"
         lh_log_msg "WARN" "This indicates the parent was modified after receive, breaking incremental chain"
@@ -436,8 +436,8 @@ validate_parent_snapshot_chain() {
     
     # Step 3: Compare UUIDs between source and destination parents
     local source_uuid dest_uuid
-    source_uuid=$(btrfs subvolume show "$source_parent" | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
-    dest_uuid=$(btrfs subvolume show "$dest_parent" | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
+    source_uuid=$($LH_SUDO_CMD btrfs subvolume show "$source_parent" | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
+    dest_uuid=$($LH_SUDO_CMD btrfs subvolume show "$dest_parent" | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
     
     if [[ -z "$source_uuid" || -z "$dest_uuid" ]]; then
         lh_log_msg "WARN" "validate_parent_snapshot_chain: Cannot retrieve UUIDs for comparison"
@@ -988,16 +988,16 @@ check_filesystem_health() {
     
     # Test write access with a simple test
     local test_file="${filesystem_path}/.btrfs_health_check_$$"
-    if ! touch "$test_file" 2>/dev/null; then
+    if ! $LH_SUDO_CMD touch "$test_file" 2>/dev/null; then
         lh_log_msg "ERROR" "check_filesystem_health: Cannot write to filesystem: $filesystem_path"
         return 2
     else
-        rm -f "$test_file" 2>/dev/null
+        $LH_SUDO_CMD rm -f "$test_file" 2>/dev/null
     fi
     
     # Check for BTRFS errors in recent dmesg
     local recent_errors
-    recent_errors=$(dmesg | tail -50 | grep -i "btrfs.*error\|btrfs.*corrupt\|btrfs.*abort\|btrfs.*csum\|parent transid verify failed" || true)
+    recent_errors=$($LH_SUDO_CMD dmesg | tail -50 | grep -i "btrfs.*error\|btrfs.*corrupt\|btrfs.*abort\|btrfs.*csum\|parent transid verify failed" || true)
     if [[ -n "$recent_errors" ]]; then
         lh_log_msg "WARN" "check_filesystem_health: Recent BTRFS errors found in dmesg:"
         while IFS= read -r error_line; do
@@ -1013,7 +1013,7 @@ check_filesystem_health() {
     
     # BTRFS scrub status check
     local scrub_status
-    if scrub_status=$(btrfs scrub status "$filesystem_path" 2>/dev/null); then
+    if scrub_status=$($LH_SUDO_CMD btrfs scrub status "$filesystem_path" 2>/dev/null); then
         lh_log_msg "DEBUG" "check_filesystem_health: BTRFS scrub status retrieved"
         
         # Check for active scrub
@@ -1041,12 +1041,12 @@ check_filesystem_health() {
     
     # Additional proactive check: Verify BTRFS operations work
     local temp_subvol="${filesystem_path}/.health_check_subvol_$$"
-    if ! btrfs subvolume create "$temp_subvol" >/dev/null 2>&1; then
+    if ! $LH_SUDO_CMD btrfs subvolume create "$temp_subvol" >/dev/null 2>&1; then
         lh_log_msg "ERROR" "check_filesystem_health: Cannot create test subvolume - filesystem may be corrupted"
         return 2
     else
         # Clean up test subvolume
-        btrfs subvolume delete "$temp_subvol" >/dev/null 2>&1 || true
+        $LH_SUDO_CMD btrfs subvolume delete "$temp_subvol" >/dev/null 2>&1 || true
     fi
     
     lh_log_msg "DEBUG" "check_filesystem_health: Health check completed successfully"
@@ -1247,7 +1247,7 @@ verify_received_uuid_integrity() {
     
     # Check if this is a received snapshot by looking for received_uuid
     local received_uuid
-    received_uuid=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+    received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
     
     # If there's no received_uuid or it's "-", this is either:
     # 1. A locally created snapshot (not received) - this is OK

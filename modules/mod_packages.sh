@@ -425,7 +425,7 @@ function pkg_clean_cache() {
             echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_PACMAN_CLEAN_2)${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_PACMAN_CLEAN_3)${LH_COLOR_RESET}"
 
-            read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION "3"): ${LH_COLOR_RESET}")" clean_option
+            read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION "3") ${LH_COLOR_RESET}")" clean_option
 
             case $clean_option in
                 1)
@@ -463,7 +463,7 @@ function pkg_clean_cache() {
             echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_YAY_CLEAN_2)${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_YAY_CLEAN_3)${LH_COLOR_RESET}"
 
-            read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION "3"): ${LH_COLOR_RESET}")" clean_option
+            read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION "3") ${LH_COLOR_RESET}")" clean_option
 
             case $clean_option in
                 1)
@@ -726,7 +726,7 @@ function pkg_list_installed() {
     echo -e "${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_ALT_PACKAGES)${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_MENU_NUMBER}5.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_CANCEL)${LH_COLOR_RESET}"
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION \"1-5\"): ${LH_COLOR_RESET}")" list_option
+    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION \"1-5\") ${LH_COLOR_RESET}")" list_option
 
     case $list_option in
         1)
@@ -1164,7 +1164,7 @@ function package_management_menu() {
             echo ""
         fi
 
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_OPTION): ${LH_COLOR_RESET}")" option
+        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_OPTION) ${LH_COLOR_RESET}")" option
         
         case $option in
             1)

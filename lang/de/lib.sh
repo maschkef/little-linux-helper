@@ -67,6 +67,9 @@ MSG_DE[LIB_SUDO_CONFIRMED]="Benutzer bestätigte Fortsetzung mit sudo für einze
 MSG_DE[LIB_SUDO_DENIED]="Benutzer verweigerte Fortsetzung mit sudo"
 MSG_DE[LIB_SUDO_REEXECUTE]="Führe Skript mit sudo-Berechtigungen neu aus"
 MSG_DE[LIB_SUDO_DENIED_ELEVATION]="Benutzer verweigerte sudo-Erhöhung"
+MSG_DE[LIB_SUDO_GUI_MODE_INDIVIDUAL]="GUI-Modus: Verwende individuelle Befehls-Erhöhung anstatt Skript-Neuausführung"
+
+# ...existing messages...
 
 # General warnings
 MSG_DE[LIB_WARNING_INITIAL_LOG_DIR]="WARNUNG: Konnte initiales Log-Verzeichnis nicht erstellen: %s"

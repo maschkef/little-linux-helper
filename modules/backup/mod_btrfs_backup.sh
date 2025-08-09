@@ -117,7 +117,7 @@ find_btrfs_root() {
     
     # Method 2: Use btrfs filesystem show (fallback)
     if command -v btrfs >/dev/null 2>&1; then
-        local btrfs_info=$(btrfs filesystem show "$subvol_path" 2>/dev/null)
+        local btrfs_info=$($LH_SUDO_CMD btrfs filesystem show "$subvol_path" 2>/dev/null)
         if [ -n "$btrfs_info" ]; then
             # Extract mount point from /proc/mounts using the device
             local device=$(echo "$btrfs_info" | grep -o '/dev/[^ ]*' | head -n1)
@@ -389,10 +389,10 @@ mark_script_created_snapshot() {
     # Create a marker file to identify script-created snapshots
     # Note: For read-only snapshots, we store metadata in parent directory
     local marker_file="$(dirname "$snapshot_path")/.lh_$(basename "$snapshot_path")"
-    if ! echo "created_by=little-linux-helper
+    if ! $LH_SUDO_CMD sh -c "echo 'created_by=little-linux-helper
 created_at=$timestamp
 script_version=1.0
-snapshot_path=$snapshot_path" > "$marker_file" 2>/dev/null; then
+snapshot_path=$snapshot_path' > '$marker_file'" 2>/dev/null; then
         backup_log_msg "WARN" "Could not create marker file: $marker_file" >&2
         # Not a fatal error - continue without marker
     else
@@ -415,7 +415,7 @@ handle_snapshot_preservation() {
     fi
     
     # Ensure permanent snapshot directory exists
-    if ! mkdir -p "$LH_SOURCE_SNAPSHOT_DIR"; then
+    if ! $LH_SUDO_CMD mkdir -p "$LH_SOURCE_SNAPSHOT_DIR"; then
         backup_log_msg "ERROR" "Cannot create permanent snapshot directory: $LH_SOURCE_SNAPSHOT_DIR"
         return 1
     fi
@@ -427,7 +427,7 @@ handle_snapshot_preservation() {
     if [[ -d "$permanent_snapshot_path" ]]; then
         backup_log_msg "WARN" "Permanent snapshot location already exists: $permanent_snapshot_path"
         # Try to delete existing one first
-        if btrfs subvolume delete "$permanent_snapshot_path" >/dev/null 2>&1; then
+        if $LH_SUDO_CMD btrfs subvolume delete "$permanent_snapshot_path" >/dev/null 2>&1; then
             backup_log_msg "DEBUG" "Removed existing permanent snapshot: $permanent_snapshot_path"
         else
             backup_log_msg "ERROR" "Cannot remove existing permanent snapshot: $permanent_snapshot_path"
@@ -464,7 +464,7 @@ create_direct_snapshot() {
         snapshot_dir="$LH_SOURCE_SNAPSHOT_DIR"
         backup_log_msg "INFO" "Creating snapshot in permanent location for preservation" >&2
         # Ensure permanent directory exists
-        if ! mkdir -p "$snapshot_dir"; then
+        if ! $LH_SUDO_CMD mkdir -p "$snapshot_dir"; then
             backup_log_msg "ERROR" "Cannot create permanent snapshot directory: $snapshot_dir" >&2
             backup_log_msg "WARN" "Falling back to temporary location" >&2
             snapshot_dir="$LH_TEMP_SNAPSHOT_DIR"
@@ -511,7 +511,7 @@ create_direct_snapshot() {
     backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_ROOT_FOUND' "$btrfs_root")" >&2
 
     # Determine subvolume path relative to BTRFS root
-    local subvol_path=$(btrfs subvolume show "$mount_point" | grep "^[[:space:]]*Name:" | awk '{print $2}')
+    local subvol_path=$($LH_SUDO_CMD btrfs subvolume show "$mount_point" | grep "^[[:space:]]*Name:" | awk '{print $2}')
     if [ -z "$subvol_path" ]; then
         backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_SUBVOLUME_PATH_ERROR' "$mount_point")" >&2
         return 1
@@ -521,7 +521,7 @@ create_direct_snapshot() {
 
     # Create read-only snapshot with enhanced validation
     backup_log_msg "DEBUG" "Creating read-only snapshot (mandatory for btrfs send operations)" >&2
-    if ! mkdir -p "$LH_TEMP_SNAPSHOT_DIR"; then
+    if ! $LH_SUDO_CMD mkdir -p "$LH_TEMP_SNAPSHOT_DIR"; then
         backup_log_msg "ERROR" "Failed to create temporary snapshot directory: $LH_TEMP_SNAPSHOT_DIR" >&2
         return 1
     fi
@@ -529,7 +529,7 @@ create_direct_snapshot() {
     # Critical: Use -r flag as
     # "Die Verwendung von schreibgeschützten (-r) Snapshots ist keine bloße Empfehlung, 
     # sondern eine technische Notwendigkeit für die Konsistenz von btrfs send"
-    if ! btrfs subvolume snapshot -r "$mount_point" "$snapshot_path" >&2; then
+    if ! $LH_SUDO_CMD btrfs subvolume snapshot -r "$mount_point" "$snapshot_path" >&2; then
         backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_SNAPSHOT_ERROR' "$subvol")" >&2
         return 1
     fi
@@ -540,7 +540,7 @@ create_direct_snapshot() {
         backup_log_msg "ERROR" "Snapshot verification failed: $snapshot_path" >&2
         backup_log_msg "ERROR" "This violates BTRFS requirements for send operations" >&2
         # Cleanup failed snapshot
-        btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1 || true
+        $LH_SUDO_CMD btrfs subvolume delete "$snapshot_path" >/dev/null 2>&1 || true
         return 1
     fi
 
@@ -560,13 +560,13 @@ verify_snapshot_for_send() {
     local snapshot_path="$1"
     
     # Check 1: Verify snapshot exists and is a valid BTRFS subvolume
-    if ! btrfs subvolume show "$snapshot_path" >/dev/null 2>&1; then
+    if ! $LH_SUDO_CMD btrfs subvolume show "$snapshot_path" >/dev/null 2>&1; then
         backup_log_msg "ERROR" "Snapshot is not a valid BTRFS subvolume: $snapshot_path" >&2
         return 1
     fi
     
     # Check 2: Verify snapshot is read-only (critical for btrfs send)
-    local ro_output=$(btrfs property get "$snapshot_path" ro 2>/dev/null)
+    local ro_output=$($LH_SUDO_CMD btrfs property get "$snapshot_path" ro 2>/dev/null)
     local ro_status=$(echo "$ro_output" | cut -d'=' -f2)
     
     # Handle edge case where property get might fail or return unexpected format
@@ -582,14 +582,14 @@ verify_snapshot_for_send() {
     fi
     
     # Check 3: Verify snapshot has valid generation number
-    local generation=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Generation:" | awk '{print $2}')
+    local generation=$($LH_SUDO_CMD btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Generation:" | awk '{print $2}')
     if [ -z "$generation" ] || ! [[ "$generation" =~ ^[0-9]+$ ]]; then
         backup_log_msg "ERROR" "Snapshot has invalid generation number: $snapshot_path (gen=$generation)" >&2
         return 1
     fi
     
     # Check 4: Verify snapshot has valid UUID for chain integrity
-    local snapshot_uuid=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}')
+    local snapshot_uuid=$($LH_SUDO_CMD btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}')
     if [ -z "$snapshot_uuid" ] || ! [[ "$snapshot_uuid" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
         backup_log_msg "ERROR" "Snapshot has invalid UUID: $snapshot_path (UUID=$snapshot_uuid)" >&2
         return 1
@@ -1134,13 +1134,13 @@ btrfs_backup() {
     
     # Test write access to temporary directory
     local test_file="$LH_TEMP_SNAPSHOT_DIR/.write_test_$$"
-    if ! touch "$test_file" 2>/dev/null; then
+    if ! $LH_SUDO_CMD touch "$test_file" 2>/dev/null; then
         backup_log_msg "ERROR" "Cannot write to temporary snapshot directory: $LH_TEMP_SNAPSHOT_DIR"
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_TEMP_DIR_NOT_WRITABLE')${LH_COLOR_RESET}"
         trap - INT TERM EXIT
         return 1
     else
-        rm -f "$test_file" 2>/dev/null
+        $LH_SUDO_CMD rm -f "$test_file" 2>/dev/null
     fi
     
     # Clean up orphaned temporary snapshots
@@ -1587,7 +1587,7 @@ btrfs_backup() {
                         
                         # Enhanced error capture for analysis
                         local error_details recent_dmesg
-                        recent_dmesg=$(dmesg | tail -10 | grep -i "btrfs\|error" || echo "No specific BTRFS errors in dmesg")
+                        recent_dmesg=$($LH_SUDO_CMD dmesg | tail -10 | grep -i "btrfs\|error" || echo "No specific BTRFS errors in dmesg")
                         backup_log_msg "DEBUG" "Recent system errors: $recent_dmesg"
                         
                         # Try fallback anyway
@@ -1648,7 +1648,7 @@ btrfs_backup() {
                         
                         # Check for common error patterns
                         local recent_errors
-                        recent_errors=$(dmesg | tail -20 | grep -i "btrfs.*error\|no space left\|read-only\|permission denied" || echo "")
+                        recent_errors=$($LH_SUDO_CMD dmesg | tail -20 | grep -i "btrfs.*error\|no space left\|read-only\|permission denied" || echo "")
                         if [[ -n "$recent_errors" ]]; then
                             backup_log_msg "WARN" "Recent system errors detected:"
                             echo "$recent_errors" | while IFS= read -r error_line; do
@@ -2102,21 +2102,21 @@ safe_cleanup_temp_snapshot() {
     fi
     
     # Remove read-only flag if present (only for non-received snapshots)
-    local ro_status=$(btrfs property get "$snapshot_path" ro 2>/dev/null | cut -d'=' -f2)
+    local ro_status=$($LH_SUDO_CMD btrfs property get "$snapshot_path" ro 2>/dev/null | cut -d'=' -f2)
     if [ "$ro_status" = "true" ]; then
-        if ! btrfs property set "$snapshot_path" ro false 2>/dev/null; then
+        if ! $LH_SUDO_CMD btrfs property set "$snapshot_path" ro false 2>/dev/null; then
             backup_log_msg "WARN" "Could not remove read-only flag from temporary snapshot: $(basename "$snapshot_path")"
         fi
     fi
     
     # Delete the snapshot
-    if btrfs subvolume delete "$snapshot_path" 2>/dev/null; then
+    if $LH_SUDO_CMD btrfs subvolume delete "$snapshot_path" 2>/dev/null; then
         backup_log_msg "DEBUG" "Successfully cleaned up temporary snapshot: $(basename "$snapshot_path")"
         
         # Also remove .lh_ marker files
         local lh_marker="$(dirname "$snapshot_path")/.lh_$(basename "$snapshot_path")"
         if [ -f "$lh_marker" ]; then
-            rm -f "$lh_marker" 2>/dev/null
+            $LH_SUDO_CMD rm -f "$lh_marker" 2>/dev/null
             backup_log_msg "DEBUG" "Deleted LH marker file: $lh_marker"
         fi
     else
@@ -2848,6 +2848,7 @@ check_backup_integrity() {
     # 4. Size comparison (only if multiple snapshots exist)
     # This check should only set the status to SUSPICIOUS if it was previously OK and the marker is valid.
     if [ "$status" = "OK" ] && [ "$marker_is_valid" = true ]; then
+        backup_log_msg "DEBUG" "Starting size comparison check for snapshot: $snapshot_path"
         local subvol_dir="$(dirname "$snapshot_path")"
         # Only consider snapshots in the same subvolume directory that match the naming pattern
         # and are not marker files. `find` is more robust than `ls` here.
@@ -2857,10 +2858,27 @@ check_backup_integrity() {
             other_snapshots_paths+=("$other_snap_path")
         done < <(find "$subvol_dir" -maxdepth 1 -type d -name "${subvol}-20*" ! -path "$snapshot_path" -print0)
 
+        backup_log_msg "DEBUG" "Found ${#other_snapshots_paths[@]} other snapshots for comparison"
         
         if [ ${#other_snapshots_paths[@]} -gt 0 ]; then
-            local current_size_str=$(du -sb "$snapshot_path" 2>/dev/null)
-            local current_size=$(echo "$current_size_str" | cut -f1)
+            # Try to get current size from marker file first (fast)
+            local current_marker="${snapshot_path}.backup_complete"
+            local current_size=""
+            if [ -f "$current_marker" ]; then
+                current_size=$(grep "^BACKUP_SIZE=" "$current_marker" 2>/dev/null | cut -d'=' -f2)
+                if [[ "$current_size" =~ ^[0-9]+$ ]]; then
+                    backup_log_msg "DEBUG" "Current snapshot size from marker: $current_size bytes"
+                else
+                    current_size=""
+                fi
+            fi
+            
+            # Fallback to du only if marker file doesn't have valid size
+            if [ -z "$current_size" ]; then
+                backup_log_msg "DEBUG" "Marker file missing or invalid, falling back to du for current snapshot"
+                local current_size_str=$(du -sb "$snapshot_path" 2>/dev/null)
+                current_size=$(echo "$current_size_str" | cut -f1)
+            fi
             
             if [ -n "$current_size" ]; then # Only continue if current_size could be determined
                 local avg_size=0
@@ -2871,11 +2889,29 @@ check_backup_integrity() {
                 for (( i=0; i<${#other_snapshots_paths[@]} && i<3; i++ )); do
                     sample_snapshots+=("${other_snapshots_paths[i]}")
                 done
+                backup_log_msg "DEBUG" "Comparing against ${#sample_snapshots[@]} sample snapshots"
 
                 for other_path in "${sample_snapshots[@]}"; do
                     if [ -d "$other_path" ]; then # Ensure it's a directory
-                        local other_size_str=$(du -sb "$other_path" 2>/dev/null)
-                        local other_size=$(echo "$other_size_str" | cut -f1)
+                        # Try to get size from marker file first (fast)
+                        local other_marker="${other_path}.backup_complete"
+                        local other_size=""
+                        if [ -f "$other_marker" ]; then
+                            other_size=$(grep "^BACKUP_SIZE=" "$other_marker" 2>/dev/null | cut -d'=' -f2)
+                            if [[ "$other_size" =~ ^[0-9]+$ ]]; then
+                                backup_log_msg "DEBUG" "Comparison snapshot $(basename "$other_path") size from marker: $other_size bytes"
+                            else
+                                other_size=""
+                            fi
+                        fi
+                        
+                        # Fallback to du only if marker file doesn't have valid size
+                        if [ -z "$other_size" ]; then
+                            backup_log_msg "DEBUG" "Marker file missing for $(basename "$other_path"), falling back to du"
+                            local other_size_str=$(du -sb "$other_path" 2>/dev/null)
+                            other_size=$(echo "$other_size_str" | cut -f1)
+                        fi
+                        
                         if [ -n "$other_size" ] && [ "$other_size" -gt 0 ]; then
                             avg_size=$((avg_size + other_size))
                             ((count++))
@@ -2886,16 +2922,26 @@ check_backup_integrity() {
                 if [ $count -gt 0 ]; then
                     avg_size=$((avg_size / count))
                     local min_size=$((avg_size / 2)) # 50% threshold
+                    backup_log_msg "DEBUG" "Size comparison: current=$current_size, average=$avg_size, threshold=$min_size"
 
                     if [ "$current_size" -lt "$min_size" ] && [ "$avg_size" -gt 0 ]; then # avg_size > 0 to avoid false alarms with very small snapshots
-                        local current_size_hr=$(echo "$current_size_str" | awk '{print $1}' | numfmt --to=iec-i --suffix=B 2>/dev/null || echo "${current_size}B")
+                        local current_size_hr=$(numfmt --to=iec-i --suffix=B "$current_size" 2>/dev/null || echo "${current_size}B")
                         local avg_size_hr=$(numfmt --to=iec-i --suffix=B --padding=5 "$avg_size" 2>/dev/null || echo "${avg_size}B")
                         issues+=("$(lh_msg 'BTRFS_INTEGRITY_UNUSUALLY_SMALL' "$current_size_hr" "$avg_size_hr")")
+                        backup_log_msg "DEBUG" "Snapshot flagged as unusually small: $current_size_hr vs average $avg_size_hr"
                         # Only change status if it was previously OK (and marker is valid)
                         status="$(lh_msg 'BTRFS_STATUS_SUSPICIOUS')"
+                    else
+                        backup_log_msg "DEBUG" "Snapshot size within normal range"
                     fi
+                else
+                    backup_log_msg "DEBUG" "No valid comparison snapshots found for size check"
                 fi
+            else
+                backup_log_msg "DEBUG" "Could not determine current snapshot size, skipping size comparison"
             fi
+        else
+            backup_log_msg "DEBUG" "No other snapshots found for size comparison"
         fi
     fi
     
@@ -3172,6 +3218,10 @@ list_snapshots_with_integrity() {
         return 1
     fi
     
+    # Initialize integrity cache for this listing session
+    backup_log_msg "DEBUG" "Initializing integrity cache for ${#snapshots[@]} snapshots in subvolume $subvol"
+    declare -A integrity_cache
+    
     echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_AVAILABLE_SNAPSHOTS' "$subvol")${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_SNAPSHOT_LIST_NOTE')${LH_COLOR_RESET}"
     if [ "$show_sizes" = "true" ]; then
@@ -3205,8 +3255,17 @@ list_snapshots_with_integrity() {
             fi
         fi
         
-        # Integrity check
-        local integrity_result=$(check_backup_integrity "$snapshot_path" "$snapshot" "$subvol")
+        # Integrity check with caching
+        local cache_key="$snapshot_path"
+        local integrity_result
+        if [[ -n "${integrity_cache[$cache_key]:-}" ]]; then
+            backup_log_msg "DEBUG" "Using cached integrity result for $snapshot"
+            integrity_result="${integrity_cache[$cache_key]}"
+        else
+            backup_log_msg "DEBUG" "Computing integrity result for $snapshot"
+            integrity_result=$(check_backup_integrity "$snapshot_path" "$snapshot" "$subvol")
+            integrity_cache[$cache_key]="$integrity_result"
+        fi
         local integrity_status=$(echo "$integrity_result" | cut -d'|' -f1)
         local integrity_issues=$(echo "$integrity_result" | cut -d'|' -f2)
         
@@ -3244,14 +3303,23 @@ list_snapshots_with_integrity() {
         echo ""
     done
     
-    # Summary
+    # Summary using cached results
+    backup_log_msg "DEBUG" "Computing summary from cached integrity results"
     local total_count=${#snapshots[@]}
     local ok_count=0
     local problem_count=0
     
     for snapshot in "${snapshots[@]}"; do
         local snapshot_path="$snapshot_dir/$snapshot"
-        local integrity_result=$(check_backup_integrity "$snapshot_path" "$snapshot" "$subvol")
+        local cache_key="$snapshot_path"
+        local integrity_result
+        if [[ -n "${integrity_cache[$cache_key]:-}" ]]; then
+            integrity_result="${integrity_cache[$cache_key]}"
+        else
+            # Fallback if somehow not cached (shouldn't happen in normal flow)
+            backup_log_msg "DEBUG" "Cache miss in summary for $snapshot, computing integrity"
+            integrity_result=$(check_backup_integrity "$snapshot_path" "$snapshot" "$subvol")
+        fi
         local integrity_status=$(echo "$integrity_result" | cut -d'|' -f1)
         
         if [ "$integrity_status" = "OK" ]; then

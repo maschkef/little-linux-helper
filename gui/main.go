@@ -35,6 +35,7 @@ type ModuleInfo struct {
 	Path        string `json:"path"`
 	Category    string `json:"category"`
 	Parent      string `json:"parent,omitempty"` // Parent module ID for submodules
+	SubmoduleCount int    `json:"submodule_count,omitempty"` // Number of available submodules
 }
 
 type SessionManager struct {
@@ -132,135 +133,98 @@ func getModules(c *fiber.Ctx) error {
 		{
 			ID:          "restarts",
 			Name:        "Services & Desktop Restart Options",
-			Description: "Restart system services and desktop environment components",
+			Description: "Restart system services and desktop environment components (8 options available)",
 			Path:        "modules/mod_restarts.sh",
 			Category:    "Recovery & Restarts",
+			SubmoduleCount: 8,
 		},
 		{
 			ID:          "system_info",
 			Name:        "Display System Information",
-			Description: "Show comprehensive system information and hardware details",
+			Description: "Show comprehensive system information and hardware details (14 options available)",
 			Path:        "modules/mod_system_info.sh",
 			Category:    "System Diagnosis & Analysis",
+			SubmoduleCount: 14,
 		},
 		{
 			ID:          "disk",
 			Name:        "Disk Tools",
-			Description: "Disk utilities and storage analysis tools",
+			Description: "Disk utilities and storage analysis tools (11 options available)",
 			Path:        "modules/mod_disk.sh",
 			Category:    "System Diagnosis & Analysis",
+			SubmoduleCount: 11,
 		},
 		{
 			ID:          "logs",
 			Name:        "Log Analysis Tools",
-			Description: "Analyze system logs and troubleshoot issues",
+			Description: "Analyze system logs and troubleshoot issues (7 options available)",
 			Path:        "modules/mod_logs.sh",
 			Category:    "System Diagnosis & Analysis",
+			SubmoduleCount: 7,
 		},
 		{
 			ID:          "packages",
 			Name:        "Package Management & Updates",
-			Description: "Manage packages and system updates",
+			Description: "Manage packages and system updates (13 options available)",
 			Path:        "modules/mod_packages.sh",
 			Category:    "Maintenance & Security",
+			SubmoduleCount: 13,
 		},
 		{
 			ID:          "security",
 			Name:        "Security Checks",
-			Description: "Perform security audits and checks",
+			Description: "Perform security audits and checks (7 options available)",
 			Path:        "modules/mod_security.sh",
 			Category:    "Maintenance & Security",
+			SubmoduleCount: 7,
 		},
 		{
 			ID:          "energy",
 			Name:        "Energy Management",
-			Description: "Power management and energy optimization",
+			Description: "Power management and energy optimization (4 options available)",
 			Path:        "modules/mod_energy.sh",
 			Category:    "Maintenance & Security",
+			SubmoduleCount: 4,
 		},
 		
 		// Docker modules
 		{
 			ID:          "docker",
 			Name:        "Docker Functions",
-			Description: "Docker management and security tools",
+			Description: "Docker management and security tools (4 options available)",
 			Path:        "modules/mod_docker.sh",
 			Category:    "Docker & Containers",
-		},
-		{
-			ID:          "docker_security",
-			Name:        "Docker Security Analysis",
-			Description: "Security analysis and vulnerability scanning for Docker containers",
-			Path:        "modules/mod_docker_security.sh",
-			Category:    "Docker & Containers",
-			Parent:      "docker",
-		},
-		{
-			ID:          "docker_setup",
-			Name:        "Docker Setup & Configuration",
-			Description: "Docker installation and configuration tools",
-			Path:        "modules/mod_docker_setup.sh",
-			Category:    "Docker & Containers",
-			Parent:      "docker",
+			SubmoduleCount: 4,
 		},
 		
 		// Backup parent module
 		{
 			ID:          "backup",
 			Name:        "Backup & Recovery",
-			Description: "Backup and restore operations",
+			Description: "Backup and restore operations (7 options available)",
 			Path:        "modules/backup/mod_backup.sh",
 			Category:    "Backup & Recovery",
+			SubmoduleCount: 7,
 		},
 		
-		// Backup submodules
+		// Backup submodules (only BTRFS ones remain as direct options)
 		{
 			ID:          "btrfs_backup",
 			Name:        "BTRFS Backup",
-			Description: "Advanced BTRFS snapshot-based backup system",
+			Description: "Advanced BTRFS snapshot-based backup system (7 options available)",
 			Path:        "modules/backup/mod_btrfs_backup.sh",
 			Category:    "Backup & Recovery",
 			Parent:      "backup",
+			SubmoduleCount: 7,
 		},
 		{
 			ID:          "btrfs_restore",
 			Name:        "BTRFS Restore",
-			Description: "BTRFS snapshot restoration with dry-run support",
+			Description: "BTRFS snapshot restoration with dry-run support (6 options available)",
 			Path:        "modules/backup/mod_btrfs_restore.sh",
 			Category:    "Backup & Recovery",
 			Parent:      "backup",
-		},
-		{
-			ID:          "backup_tar",
-			Name:        "TAR Backup",
-			Description: "Traditional TAR archive backup system",
-			Path:        "modules/backup/mod_backup_tar.sh",
-			Category:    "Backup & Recovery",
-			Parent:      "backup",
-		},
-		{
-			ID:          "restore_tar",
-			Name:        "TAR Restore",
-			Description: "Restore files from TAR archives",
-			Path:        "modules/backup/mod_restore_tar.sh",
-			Category:    "Backup & Recovery",
-			Parent:      "backup",
-		},
-		{
-			ID:          "backup_rsync",
-			Name:        "RSYNC Backup",
-			Description: "Incremental backup using RSYNC",
-			Path:        "modules/backup/mod_backup_rsync.sh",
-			Category:    "Backup & Recovery",
-			Parent:      "backup",
-		},
-		{
-			ID:          "restore_rsync",
-			Name:        "RSYNC Restore",
-			Description: "Restore files from RSYNC backups",
-			Path:        "modules/backup/mod_restore_rsync.sh",
-			Category:    "Backup & Recovery",
-			Parent:      "backup",
+			SubmoduleCount: 6,
 		},
 	}
 
@@ -283,16 +247,11 @@ func getModuleDocs(c *fiber.Ctx) error {
 		
 		// Docker modules
 		"docker":         "mod_docker.md",
-		// Note: docker_security and docker_setup don't have separate docs yet
 		
 		// Backup modules
 		"backup":         "mod_backup.md",
 		"btrfs_backup":   "mod_btrfs_backup.md",
 		"btrfs_restore":  "mod_btrfs_restore.md",
-		"backup_tar":     "mod_backup_tar.md",
-		"restore_tar":    "mod_restore_tar.md",
-		"backup_rsync":   "mod_backup_rsync.md",
-		"restore_rsync":  "mod_restore_rsync.md",
 	}
 	
 	docFile, exists := docFiles[moduleId]
@@ -328,17 +287,11 @@ func startModule(c *fiber.Ctx) error {
 		
 		// Docker modules
 		"docker":         "modules/mod_docker.sh",
-		"docker_security": "modules/mod_docker_security.sh",
-		"docker_setup":   "modules/mod_docker_setup.sh",
 		
 		// Backup modules
 		"backup":         "modules/backup/mod_backup.sh",
 		"btrfs_backup":   "modules/backup/mod_btrfs_backup.sh",
 		"btrfs_restore":  "modules/backup/mod_btrfs_restore.sh",
-		"backup_tar":     "modules/backup/mod_backup_tar.sh",
-		"restore_tar":    "modules/backup/mod_restore_tar.sh",
-		"backup_rsync":   "modules/backup/mod_backup_rsync.sh",
-		"restore_rsync":  "modules/backup/mod_restore_rsync.sh",
 	}
 	
 	modulePath, exists := modulePaths[moduleId]

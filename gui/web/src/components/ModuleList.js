@@ -34,7 +34,14 @@ function ModuleList({ groupedModules, selectedModule, onModuleSelect, sessionSta
               opacity: sessionStatus === 'running' && selectedModule?.id !== module.id ? 0.5 : 1
             }}
           >
-            <div className="module-name">{module.name}</div>
+            <div className="module-name">
+              {module.name}
+              {module.submodule_count > 0 && (
+                <span className="submodule-badge">
+                  {module.submodule_count} options
+                </span>
+              )}
+            </div>
             <p className="module-description">{module.description}</p>
           </li>
           

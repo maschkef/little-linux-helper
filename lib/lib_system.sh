@@ -53,8 +53,17 @@ function lh_elevate_privileges() {
     if lh_confirm_action "$sudo_question" "y"; then
         lh_log_msg "INFO" "$(lh_msg 'LIB_SUDO_REEXECUTE')"
         
-        # In GUI mode, we want to use OS-level sudo prompts for proper password masking
-        # In CLI mode, we also use re-execution for consistency
+        # In GUI mode, we DON'T want to re-execute the script as that bypasses our GUI sudo handling
+        # Instead, we ensure LH_SUDO_CMD is properly set and continue with the current script
+        if [ "${LH_GUI_MODE:-false}" = "true" ]; then
+            lh_log_msg "INFO" "$(lh_msg 'LIB_SUDO_GUI_MODE_INDIVIDUAL')"
+            echo -e "${LH_COLOR_INFO}Continuing with GUI-aware privilege elevation for individual commands...${LH_COLOR_RESET}"
+            # Ensure LH_SUDO_CMD is set to our GUI-aware function
+            LH_SUDO_CMD='lh_sudo_cmd'
+            return 0
+        fi
+        
+        # In CLI mode, re-execute the script with sudo for full elevation
         # Clear any existing traps before re-execution
         trap - INT TERM EXIT
         exec sudo "$0" "$@"
@@ -271,21 +280,43 @@ function lh_sudo_cmd() {
         return $?
     fi
     
-    # In GUI mode, try to use OS-level sudo prompts for proper password masking
+    # In GUI mode, force OS-level prompts for proper password masking
     if [ "${LH_GUI_MODE:-false}" = "true" ]; then
-        # First try with -A (askpass) for GUI environments
-        # If that fails, fall back to regular sudo
-        if command -v pkexec >/dev/null 2>&1; then
-            # Prefer pkexec for GUI environments as it provides proper password dialogs
+        # Create a temporary askpass script for GUI password prompts
+        local askpass_script="/tmp/lh_askpass_$$"
+        local askpass_program=""
+        
+        # Determine which GUI password dialog to use
+        if command -v zenity >/dev/null 2>&1; then
+            askpass_program="zenity --password --title='Administrative privileges required'"
+        elif command -v kdialog >/dev/null 2>&1; then
+            askpass_program="kdialog --password 'Administrative privileges required:'"
+        elif command -v pkexec >/dev/null 2>&1; then
+            # Use pkexec directly for compatible commands
             pkexec "$@"
-        elif sudo -A "$@" 2>/dev/null; then
-            # Success with askpass
             return $?
-        else
-            # Fall back to regular sudo (this will use PTY but at least it works)
-            sudo "$@"
         fi
-        return $?
+        
+        if [ -n "$askpass_program" ]; then
+            # Create temporary askpass script
+            cat > "$askpass_script" << EOF
+#!/bin/bash
+$askpass_program
+EOF
+            chmod +x "$askpass_script"
+            
+            # Use the askpass script with sudo
+            SUDO_ASKPASS="$askpass_script" sudo -A "$@"
+            local exit_code=$?
+            
+            # Clean up
+            rm -f "$askpass_script"
+            return $exit_code
+        else
+            # No GUI askpass available, try to detach from terminal
+            setsid sudo "$@" < /dev/null
+            return $?
+        fi
     fi
     
     # In CLI mode, use regular sudo
