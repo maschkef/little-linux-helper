@@ -35,25 +35,17 @@ updates:
       prefix: "deps(npm)"
       prefix-development: "deps-dev(npm)"
     open-pull-requests-limit: 10
-    # Ignore major version updates for React and related packages to avoid breaking changes
+    # Selectively ignore major updates only for packages known to have frequent breaking changes
     ignore:
-      - dependency-name: "react"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "react-dom"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@types/react"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@types/react-dom"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "react-markdown"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "web-vitals"
-        update-types: ["version-update:semver-major"]
+      # Testing libraries often have breaking API changes
       - dependency-name: "@testing-library/react"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@testing-library/user-event"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@testing-library/jest-dom"
+        update-types: ["version-update:semver-major"]
+      # Keep react-scripts stable as it's the core build toolchain
+      - dependency-name: "react-scripts"
         update-types: ["version-update:semver-major"]
 
   # GitHub Actions workflows
