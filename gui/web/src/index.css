@@ -23,15 +23,27 @@ code {
 .header {
   background-color: #2a2a2a;
   color: #e0e0e0;
-  padding: 1rem;
+  padding: 0.6rem 1rem;
   text-align: center;
   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
   border-bottom: 2px solid #444;
 }
 
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
+
 .header h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.8rem;
+}
+
+.header-logo {
+  height: 55px;
+  width: 55px;
 }
 
 .main-content {

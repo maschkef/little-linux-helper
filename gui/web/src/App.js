@@ -88,7 +88,10 @@ function AppContent() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Little Linux Helper</h1>
+        <div className="header-content">
+          <h1>Little Linux Helper</h1>
+          <img src="/header-logo.svg" alt="Little Linux Helper" className="header-logo" />
+        </div>
       </header>
       
       <div className="main-content">

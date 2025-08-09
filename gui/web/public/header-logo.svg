@@ -22,9 +22,7 @@
     </filter>
   </defs>
   
-  <!-- Background (full square to avoid white borders) -->
-  <rect x="0" y="0" width="64" height="64" fill="url(#terminalGrad)"/>
-  <!-- Inner circle for design -->
+  <!-- Background circle for header (transparent background) -->
   <circle cx="32" cy="32" r="30" fill="url(#terminalGrad)" stroke="#4fd1c7" stroke-width="2"/>
   
   <!-- Terminal window representation -->
