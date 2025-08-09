@@ -2,7 +2,7 @@
 
 ## Description
 
-<img src="gui/web/public/favicon.svg" alt="Little Linux Helper" width="350" height="350" align="right" style="margin-left: 20px; margin-top: 20px;">
+<img src="gui/web/public/header-logo.svg" alt="Little Linux Helper" width="350" height="350" align="right" style="margin-left: 20px; margin-top: 20px;">
 
 Little Linux Helper is a comprehensive collection of Bash scripts designed to simplify various system administration, diagnostic, and maintenance tasks on Linux. It provides both a traditional command-line menu-driven interface and a modern web-based GUI for easy access to a variety of tools and functions.
 
