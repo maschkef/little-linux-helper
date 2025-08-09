@@ -8,5 +8,7 @@ temp/
 gui/web/build/
 gui/web/node_modules/
 gui/little-linux-helper-gui
+# Exclude package-lock.json (auto-generated, can cause conflicts)
+gui/web/package-lock.json
 # for using Claude
 CLAUDE.md
