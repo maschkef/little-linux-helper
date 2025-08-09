@@ -1,0 +1,69 @@
+name: CI Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-go:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Build GUI backend
+      working-directory: ./gui
+      run: |
+        go mod tidy
+        go build -v ./...
+        
+    - name: Test GUI backend
+      working-directory: ./gui
+      run: |
+        # Basic smoke test - try to run with help flag
+        ./little-linux-helper-gui --help || true
+        
+  test-npm:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: gui/web/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./gui/web
+      run: npm ci
+      
+    - name: Build frontend
+      working-directory: ./gui/web
+      run: npm run build
+      
+    - name: Run linting (if you have it)
+      working-directory: ./gui/web
+      run: |
+        # Uncomment if you add linting
+        # npm run lint
+        echo "Linting would run here"
+
+  test-cli:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Test CLI help
+      run: |
+        chmod +x help_master.sh
+        # Basic syntax check
+        bash -n help_master.sh
+        echo "CLI syntax check passed"

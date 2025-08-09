@@ -1,0 +1,72 @@
+# Dependabot configuration for Little Linux Helper
+# Automatically creates pull requests to update dependencies
+# See: https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Go modules for the GUI backend
+  - package-ecosystem: "gomod"
+    directory: "/gui"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    reviewers:
+      - "maschkef"
+    assignees:
+      - "maschkef"
+    commit-message:
+      prefix: "deps(go)"
+      prefix-development: "deps-dev(go)"
+    open-pull-requests-limit: 5
+
+  # NPM packages for the GUI frontend
+  - package-ecosystem: "npm"
+    directory: "/gui/web"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    reviewers:
+      - "maschkef"
+    assignees:
+      - "maschkef"
+    commit-message:
+      prefix: "deps(npm)"
+      prefix-development: "deps-dev(npm)"
+    open-pull-requests-limit: 10
+    # Ignore major version updates for React and related packages to avoid breaking changes
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-markdown"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "web-vitals"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@testing-library/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@testing-library/user-event"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@testing-library/jest-dom"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    reviewers:
+      - "maschkef"
+    assignees:
+      - "maschkef"
+    commit-message:
+      prefix: "deps(actions)"
+    open-pull-requests-limit: 5
