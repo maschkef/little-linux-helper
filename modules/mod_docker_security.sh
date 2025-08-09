@@ -1358,10 +1358,7 @@ function docker_security_menu() {
         lh_print_menu_item 0 "$(lh_msg 'DOCKER_MENU_BACK_MAIN')"
         echo ""
 
-        if ! read -t 30 -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DOCKER_MENU_CHOOSE_OPTION')${LH_COLOR_RESET}")" option; then
-            lh_log_msg "WARN" "Timeout beim Warten auf Eingabe - beende Security-Menü"
-            return 0
-        fi
+        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DOCKER_MENU_CHOOSE_OPTION')${LH_COLOR_RESET}")" option
         
         # Check for empty input
         if [ -z "$option" ]; then
@@ -1395,9 +1392,8 @@ function docker_security_menu() {
         # Short pause so user can read the output
         echo ""
         lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_WAIT_USER_INPUT')"
-        if ! read -t 1 -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")" -n1 -s; then
-            lh_log_msg "DEBUG" "Timeout beim Warten auf Tasteneingabe - fahre automatisch fort"
-        fi
+        read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")" -n1 -s
+        lh_log_msg "DEBUG" "Tasteneingabe erhalten - fahre fort"
         echo ""
     done
 }

@@ -277,10 +277,7 @@ function docker_functions_menu() {
         echo ""
         
         lh_log_msg "DEBUG" "Waiting for user input in Docker menu"
-        if ! read -t 30 -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" choice; then
-            lh_log_msg "WARN" "Timeout while waiting for input - exiting Docker menu"
-            break
-        fi
+        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" choice
         
         # Check for empty input which could indicate input stream issues
         if [ -z "$choice" ]; then
@@ -337,11 +334,8 @@ function docker_functions_menu() {
         if [ "$choice" != "0" ]; then
             echo ""
             lh_log_msg "DEBUG" "Waiting for key press to continue"
-            # Use timeout to avoid hanging on empty input
-            if ! read -t 1 -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")"; then
-                lh_log_msg "DEBUG" "Timeout while waiting for input - continuing automatically"
-            fi
-            lh_log_msg "DEBUG" "Continue key pressed or timeout"
+            read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")"
+            lh_log_msg "DEBUG" "Continue key pressed"
         fi
     done
 }
