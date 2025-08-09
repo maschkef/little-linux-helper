@@ -23,7 +23,7 @@ function AppContent() {
   const [showHelpPanel, setShowHelpPanel] = useState(true);
   const [showDocsPanel, setShowDocsPanel] = useState(false);
   
-  const { startNewSession, getActiveSession, sessions } = useSession();
+  const { startNewSession, sessions } = useSession();
 
   useEffect(() => {
     // Load modules on component mount
