@@ -11,12 +11,14 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -44,14 +46,25 @@ type SessionManager struct {
 }
 
 type ModuleSession struct {
-	ID      string
-	Module  string
-	Process *exec.Cmd
-	PTY     *os.File
-	Done    chan bool
-	Output  chan string
-	Buffer  []string
+	ID         string
+	Module     string
+	ModuleName string
+	CreatedAt  time.Time
+	Status     string
+	Process    *exec.Cmd
+	PTY        *os.File
+	Done       chan bool
+	Output     chan string
+	Buffer     []string
 	BufferMutex sync.RWMutex
+}
+
+type SessionInfo struct {
+	ID         string    `json:"id"`
+	Module     string    `json:"module"`
+	ModuleName string    `json:"module_name"`
+	CreatedAt  time.Time `json:"created_at"`
+	Status     string    `json:"status"`
 }
 
 type Message struct {
@@ -65,6 +78,64 @@ var (
 	}
 	lhRootDir string
 )
+
+// Config holds GUI configuration
+type Config struct {
+	Port string
+	Host string
+}
+
+// loadConfig reads configuration from config/general.conf
+func loadConfig() *Config {
+	config := &Config{
+		Port: "3000",      // default port
+		Host: "localhost", // default host (secure)
+	}
+	
+	configPath := filepath.Join(lhRootDir, "config", "general.conf")
+	file, err := os.Open(configPath)
+	if err != nil {
+		log.Printf("Warning: Could not read config file %s, using defaults: %v", configPath, err)
+		return config
+	}
+	defer file.Close()
+	
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		
+		// Skip comments and empty lines
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		
+		// Parse key=value pairs
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		
+		key := strings.TrimSpace(parts[0])
+		value := strings.Trim(strings.TrimSpace(parts[1]), "\"")
+		
+		switch key {
+		case "CFG_LH_GUI_PORT":
+			if value != "" {
+				config.Port = value
+			}
+		case "CFG_LH_GUI_HOST":
+			if value != "" {
+				config.Host = value
+			}
+		}
+	}
+	
+	if err := scanner.Err(); err != nil {
+		log.Printf("Warning: Error reading config file: %v", err)
+	}
+	
+	return config
+}
 
 func init() {
 	// Get the Little Linux Helper root directory
@@ -89,6 +160,65 @@ func init() {
 }
 
 func main() {
+	// Parse command line flags
+	var networkMode = flag.Bool("network", false, "Allow network access (bind to 0.0.0.0 instead of localhost)")
+	var networkModeShort = flag.Bool("n", false, "Allow network access (shorthand for --network)")
+	var portFlag = flag.String("port", "", "Port to run the server on (overrides config file)")
+	var portFlagShort = flag.String("p", "", "Port to run the server on (shorthand for --port)")
+	var helpFlag = flag.Bool("help", false, "Show help information")
+	var helpFlagShort = flag.Bool("h", false, "Show help information (shorthand for --help)")
+	flag.Parse()
+
+	if *helpFlag || *helpFlagShort {
+		fmt.Println("Little Linux Helper GUI")
+		fmt.Println("\nUsage:")
+		fmt.Println("  ./little-linux-helper-gui [options]")
+		fmt.Println("\nOptions:")
+		fmt.Println("  -n, --network   Allow network access (bind to 0.0.0.0, use with caution)")
+		fmt.Println("  -p, --port      Port to run the server on (overrides config)")
+		fmt.Println("  -h, --help      Show this help information")
+		fmt.Println("\nConfiguration:")
+		fmt.Println("  Default settings are read from config/general.conf")
+		fmt.Println("  Default port: 3000")
+		fmt.Println("  Default binding: localhost (secure)")
+		fmt.Println("\nExamples:")
+		fmt.Println("  ./little-linux-helper-gui                    # Default: localhost:3000")
+		fmt.Println("  ./little-linux-helper-gui --port 8080        # Custom port: localhost:8080")
+		fmt.Println("  ./little-linux-helper-gui -p 8080            # Custom port: localhost:8080")
+		fmt.Println("  ./little-linux-helper-gui --network          # Network access: 0.0.0.0:3000")
+		fmt.Println("  ./little-linux-helper-gui -n                 # Network access: 0.0.0.0:3000")
+		fmt.Println("  ./little-linux-helper-gui -n -p 80           # Network access: 0.0.0.0:80")
+		return
+	}
+
+	// Load configuration
+	config := loadConfig()
+
+	// Override port from command line if provided (either -p or --port)
+	portValue := *portFlag
+	if *portFlagShort != "" {
+		portValue = *portFlagShort
+	}
+	if portValue != "" {
+		// Validate port number
+		if port, err := strconv.Atoi(portValue); err != nil || port < 1 || port > 65535 {
+			log.Fatalf("Invalid port number: %s (must be between 1 and 65535)", portValue)
+		}
+		config.Port = portValue
+	}
+
+	// Override host binding if network flag is set (either -network or -n)
+	if *networkMode || *networkModeShort {
+		config.Host = "0.0.0.0"
+		log.Println("WARNING: Network mode enabled. GUI will be accessible from other machines.")
+		log.Println("WARNING: Ensure your firewall is properly configured.")
+	}
+
+	// Validate port
+	if port, err := strconv.Atoi(config.Port); err != nil || port < 1 || port > 65535 {
+		log.Fatalf("Invalid port in config: %s (must be between 1 and 65535)", config.Port)
+	}
+
 	app := fiber.New(fiber.Config{
 		AppName: "Little Linux Helper GUI",
 	})
@@ -114,6 +244,9 @@ func main() {
 	// Start a module session
 	api.Post("/modules/:id/start", startModule)
 	
+	// Get active sessions
+	api.Get("/sessions", getSessions)
+	
 	// Send input to module
 	api.Post("/sessions/:sessionId/input", sendInput)
 	
@@ -123,8 +256,19 @@ func main() {
 	// WebSocket for real-time communication
 	app.Use("/ws", websocket.New(handleWebSocket))
 
-	log.Println("Starting Little Linux Helper GUI on :3000")
-	log.Fatal(app.Listen(":3000"))
+	// Build listen address
+	listenAddr := fmt.Sprintf("%s:%s", config.Host, config.Port)
+	
+	// Show security information
+	if config.Host == "0.0.0.0" {
+		log.Printf("Starting Little Linux Helper GUI on %s (NETWORK ACCESS)", listenAddr)
+		log.Printf("GUI accessible at: http://%s:%s and http://localhost:%s", config.Host, config.Port, config.Port)
+	} else {
+		log.Printf("Starting Little Linux Helper GUI on %s (LOCAL ACCESS ONLY)", listenAddr)
+		log.Printf("GUI accessible at: http://localhost:%s", config.Port)
+	}
+	
+	log.Fatal(app.Listen(listenAddr))
 }
 
 func getModules(c *fiber.Ctx) error {
@@ -268,11 +412,44 @@ func getModuleDocs(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"content": string(content)})
 }
 
+func getSessions(c *fiber.Ctx) error {
+	sessionManager.mutex.RLock()
+	defer sessionManager.mutex.RUnlock()
+	
+	sessions := make([]SessionInfo, 0, len(sessionManager.sessions))
+	for _, session := range sessionManager.sessions {
+		sessions = append(sessions, SessionInfo{
+			ID:         session.ID,
+			Module:     session.Module,
+			ModuleName: session.ModuleName,
+			CreatedAt:  session.CreatedAt,
+			Status:     session.Status,
+		})
+	}
+	
+	return c.JSON(sessions)
+}
+
 func startModule(c *fiber.Ctx) error {
 	moduleId := c.Params("id")
 	
 	// Generate session ID
 	sessionId := fmt.Sprintf("%s_%d", moduleId, time.Now().Unix())
+	
+	// Map module ID to human-readable names
+	moduleNames := map[string]string{
+		"restarts":       "Services & Desktop Restart Options",
+		"system_info":    "Display System Information",
+		"disk":           "Disk Tools",
+		"logs":           "Log Analysis Tools",
+		"packages":       "Package Management & Updates",
+		"security":       "Security Checks",
+		"energy":         "Energy Management",
+		"docker":         "Docker Functions",
+		"backup":         "Backup & Recovery",
+		"btrfs_backup":   "BTRFS Backup",
+		"btrfs_restore":  "BTRFS Restore",
+	}
 	
 	// Map module ID to script path
 	modulePaths := map[string]string{
@@ -297,6 +474,11 @@ func startModule(c *fiber.Ctx) error {
 	modulePath, exists := modulePaths[moduleId]
 	if !exists {
 		return c.Status(400).JSON(fiber.Map{"error": "Unknown module"})
+	}
+	
+	moduleName, nameExists := moduleNames[moduleId]
+	if !nameExists {
+		moduleName = moduleId // Fallback to ID if name not found
 	}
 	
 	scriptPath := filepath.Join(lhRootDir, modulePath)
@@ -333,13 +515,16 @@ func startModule(c *fiber.Ctx) error {
 	
 	// Create session
 	session := &ModuleSession{
-		ID:      sessionId,
-		Module:  moduleId,
-		Process: cmd,
-		PTY:     ptmx,
-		Done:    make(chan bool),
-		Output:  make(chan string, 100),
-		Buffer:  make([]string, 0, 200), // Buffer first 200 output messages
+		ID:         sessionId,
+		Module:     moduleId,
+		ModuleName: moduleName,
+		CreatedAt:  time.Now(),
+		Status:     "running",
+		Process:    cmd,
+		PTY:        ptmx,
+		Done:       make(chan bool),
+		Output:     make(chan string, 100),
+		Buffer:     make([]string, 0, 200), // Buffer first 200 output messages
 	}
 	
 	// Store session
@@ -354,9 +539,18 @@ func startModule(c *fiber.Ctx) error {
 	go func() {
 		cmd.Wait()
 		ptmx.Close()
+		
+		// Update session status
+		sessionManager.mutex.Lock()
+		if s, exists := sessionManager.sessions[sessionId]; exists {
+			s.Status = "stopped"
+		}
+		sessionManager.mutex.Unlock()
+		
 		session.Done <- true
 		
-		// Clean up session
+		// Clean up session after a brief delay to allow status to be seen
+		time.Sleep(1 * time.Second)
 		sessionManager.mutex.Lock()
 		delete(sessionManager.sessions, sessionId)
 		sessionManager.mutex.Unlock()
@@ -422,7 +616,7 @@ func stopSession(c *fiber.Ctx) error {
 	sessionManager.mutex.Lock()
 	session, exists := sessionManager.sessions[sessionId]
 	if exists {
-		delete(sessionManager.sessions, sessionId)
+		session.Status = "stopped"
 	}
 	sessionManager.mutex.Unlock()
 	
@@ -437,6 +631,14 @@ func stopSession(c *fiber.Ctx) error {
 	if session.Process != nil {
 		session.Process.Process.Kill()
 	}
+	
+	// Clean up session after a brief delay
+	go func() {
+		time.Sleep(1 * time.Second)
+		sessionManager.mutex.Lock()
+		delete(sessionManager.sessions, sessionId)
+		sessionManager.mutex.Unlock()
+	}()
 	
 	return c.JSON(fiber.Map{"status": "stopped"})
 }

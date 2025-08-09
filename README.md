@@ -68,14 +68,45 @@ The main script `help_master.sh` serves as the central CLI entry point and provi
 ### 🌐 **Graphical User Interface (GUI)**
 A modern web-based GUI is available through `gui_launcher.sh`, providing:
 - **Web-based Interface**: Modern React frontend with responsive design accessible via web browser
+- **Multi-Session Support**: Unlimited concurrent module sessions with session dropdown management
 - **Real-time Terminal**: Integrated terminal display with ANSI color support and interactive input handling
-- **Module Navigation**: Categorized sidebar with intuitive module organization and search capabilities
+- **Advanced Session Management**: Session switching, status indicators, output preservation, and individual session control
+- **Module Navigation**: Categorized sidebar with individual "Start" buttons and intuitive module selection
 - **Documentation Integration**: Built-in markdown viewer for module documentation from the `docs/` directory
 - **Multi-panel Layout**: Resizable panels for optimal workspace organization
-- **Session Management**: Multiple concurrent module executions with independent sessions
+- **Security Features**: Localhost-only binding by default with optional network access via command line
+- **Configurable Networking**: Port and host configuration via `config/general.conf` or command line arguments
 - **Advanced Features**: PTY integration for authentic terminal experience, WebSocket communication for real-time updates
 
-The GUI maintains full compatibility with all CLI functionality while providing an enhanced user experience.
+<details>
+
+<summary>**GUI Configuration & Usage:**</summary>
+```bash
+# GUI Launcher (Recommended):
+./gui_launcher.sh              # Default: secure localhost
+./gui_launcher.sh -n           # Enable network access (-n shorthand)
+./gui_launcher.sh -p 8080      # Custom port (short form)
+./gui_launcher.sh --port 8080  # Custom port (long form)
+./gui_launcher.sh -n -p 80     # Network access on custom port
+./gui_launcher.sh -b -n        # Build and run with network access
+./gui_launcher.sh -h           # Comprehensive help
+
+# Custom configuration via config/general.conf:
+CFG_LH_GUI_PORT="3000"        # Set default port
+CFG_LH_GUI_HOST="localhost"   # Set binding (localhost/0.0.0.0)
+
+# Direct binary execution:
+./little-linux-helper-gui -p 8080             # Custom port (short form)
+./little-linux-helper-gui --port 8080         # Custom port (long form)
+./little-linux-helper-gui -n                  # Enable network access (-n shorthand)
+./little-linux-helper-gui --network -p 80     # Network access on port 80
+./little-linux-helper-gui -h                  # Show usage information (short form)
+./little-linux-helper-gui --help              # Show usage information (long form)
+```
+
+The GUI maintains full compatibility with all CLI functionality while providing an enhanced user experience with powerful multi-session capabilities.
+
+</details>
 
 ---
 
@@ -365,9 +396,22 @@ When the main script (`help_master.sh`) is started for the first time, default c
 **Important:** You will be notified when a configuration file is first created. It is recommended to review these newly created `.conf` files and adapt them to your specific needs if necessary.
 
 Configuration files are currently used for the following modules:
-* **General Settings (`help_master.sh`)**: Language, logging behavior, and other basic settings (`config/general.conf`).
+* **General Settings (`help_master.sh`)**: Language, logging behavior, GUI port/host configuration, and other basic settings (`config/general.conf`).
 * **Backup & Restore (`modules/backup/mod_backup.sh`, `modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`)**: Settings for backup paths, retention policies, etc. (`config/backup.conf`).
 * **Docker Security Check (`mod_security.sh`)**: Settings for search paths, warnings to skip, etc. (`config/docker.conf`).
+
+**GUI Configuration Options:**
+The GUI server can be configured via `config/general.conf`:
+```bash
+# GUI server port (default: 3000)
+CFG_LH_GUI_PORT="3000"
+
+# GUI server host binding (default: localhost for security)
+# Options: "localhost" (secure) or "0.0.0.0" (network access)
+CFG_LH_GUI_HOST="localhost"
+```
+
+Command line arguments (both short -x and long --word forms) override configuration file settings for temporary changes.
 
 </details>
 

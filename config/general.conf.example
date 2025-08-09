@@ -52,6 +52,48 @@ CFG_LH_LOG_TO_CONSOLE="true"
 CFG_LH_LOG_TO_FILE="true"
 
 # =============================================================================
+# GUI SETTINGS
+# =============================================================================
+#
+# The GUI provides a modern web-based interface for Little Linux Helper.
+# These settings control the GUI server configuration and network access.
+#
+# Quick Start:
+#   ./gui_launcher.sh              - Start with default settings (localhost:3000)
+#   ./gui_launcher.sh -n           - Enable network access for other machines
+#   ./gui_launcher.sh -p 8080      - Use custom port (short form)
+#   ./gui_launcher.sh --port 8080  - Use custom port (long form)
+#   ./gui_launcher.sh -h           - Show comprehensive help
+
+# GUI server port (default: 3000)
+# The port on which the web GUI will be available
+# Valid range: 1-65535
+# Can be overridden with -p or --port command line flag
+# Examples: "3000", "8080", "80"
+CFG_LH_GUI_PORT="3000"
+
+# GUI server host binding (default: localhost - SECURE)
+# Controls which network interfaces the GUI server binds to
+#
+# Security Options:
+# - "localhost" - Only accessible from local machine (RECOMMENDED)
+#   GUI URL: http://localhost:3000
+#   Security: High - No network exposure
+#
+# - "0.0.0.0" - Accessible from any network interface (USE WITH CAUTION)
+#   GUI URL: http://your-ip:3000 and http://localhost:3000
+#   Security: Low - Exposed to network, requires firewall configuration
+#   Note: Only use on trusted networks or with proper firewall rules
+#
+# Command Line Override:
+# - Use -n or --network flag to temporarily enable network access
+# - Use -p or --port flag to override the port setting
+# - Command line flags override this configuration file setting
+#
+# Priority: Command line arguments > config file > built-in defaults
+CFG_LH_GUI_HOST="localhost"
+
+# =============================================================================
 # FUTURE SETTINGS
 # =============================================================================
 # Additional general settings can be added here as the project grows

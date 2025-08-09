@@ -8,7 +8,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 
 import React from 'react';
 
-function ModuleList({ groupedModules, selectedModule, onModuleSelect, sessionStatus }) {
+function ModuleList({ groupedModules, selectedModule, onModuleSelect, onModuleStart }) {
   // Separate parent modules from submodules
   const renderModules = (modules) => {
     const parentModules = modules.filter(module => !module.parent);
@@ -24,23 +24,28 @@ function ModuleList({ groupedModules, selectedModule, onModuleSelect, sessionSta
             className={`module-item ${
               selectedModule?.id === module.id ? 'active' : ''
             }`}
-            onClick={() => {
-              if (sessionStatus !== 'running') {
-                onModuleSelect(module);
-              }
-            }}
-            style={{
-              cursor: sessionStatus === 'running' ? 'not-allowed' : 'pointer',
-              opacity: sessionStatus === 'running' && selectedModule?.id !== module.id ? 0.5 : 1
-            }}
+            onClick={() => onModuleSelect(module)}
+            style={{ cursor: 'pointer' }}
           >
-            <div className="module-name">
-              {module.name}
-              {module.submodule_count > 0 && (
-                <span className="submodule-badge">
-                  {module.submodule_count} options
-                </span>
-              )}
+            <div className="module-header">
+              <div className="module-name">
+                {module.name}
+                {module.submodule_count > 0 && (
+                  <span className="submodule-badge">
+                    {module.submodule_count} options
+                  </span>
+                )}
+              </div>
+              <button
+                className="start-module-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onModuleStart(module);
+                }}
+                title="Start new session with this module"
+              >
+                Start
+              </button>
             </div>
             <p className="module-description">{module.description}</p>
           </li>
@@ -52,19 +57,26 @@ function ModuleList({ groupedModules, selectedModule, onModuleSelect, sessionSta
               className={`module-item submodule ${
                 selectedModule?.id === subModule.id ? 'active' : ''
               }`}
-              onClick={() => {
-                if (sessionStatus !== 'running') {
-                  onModuleSelect(subModule);
-                }
-              }}
+              onClick={() => onModuleSelect(subModule)}
               style={{
-                cursor: sessionStatus === 'running' ? 'not-allowed' : 'pointer',
-                opacity: sessionStatus === 'running' && selectedModule?.id !== subModule.id ? 0.5 : 1,
+                cursor: 'pointer',
                 paddingLeft: '2rem', // Indent submodules
                 borderLeft: '2px solid #007acc' // Visual indicator
               }}
             >
-              <div className="module-name">↳ {subModule.name}</div>
+              <div className="module-header">
+                <div className="module-name">↳ {subModule.name}</div>
+                <button
+                  className="start-module-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onModuleStart(subModule);
+                  }}
+                  title="Start new session with this module"
+                >
+                  Start
+                </button>
+              </div>
               <p className="module-description">{subModule.description}</p>
             </li>
           ))}

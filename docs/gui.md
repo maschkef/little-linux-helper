@@ -33,6 +33,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
         *   `GET /api/modules` - List all available modules with metadata
         *   `GET /api/modules/:id/docs` - Retrieve module documentation
         *   `POST /api/modules/:id/start` - Start module execution session
+        *   `GET /api/sessions` - List all active sessions with metadata
         *   `POST /api/sessions/:sessionId/input` - Send input to running module
         *   `DELETE /api/sessions/:sessionId` - Stop module session
         *   `WS /ws` - WebSocket for real-time communication
@@ -41,9 +42,11 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 *   **Frontend Application (`web/`):**
     *   **Purpose:** Provides intuitive graphical interface with multi-panel layout for comprehensive module interaction.
     *   **Key Components:**
-        *   `ModuleList.js` - Categorized sidebar navigation with module hierarchy
-        *   `Terminal.js` - Real-time terminal output display with ANSI color support
-        *   `TerminalInput.js` - Interactive input handling for module prompts
+        *   `ModuleList.js` - Categorized sidebar navigation with module hierarchy and individual start buttons
+        *   `Terminal.js` - Real-time terminal output display with ANSI color support and session management
+        *   `TerminalInput.js` - Interactive input handling with "Send", "Any Key", and "Stop" buttons
+        *   `SessionDropdown.js` - Multi-session management with session switching and status indicators
+        *   `SessionContext.js` - React context for centralized session state management
         *   `HelpPanel.js` - Context-sensitive help and module guidance
         *   `DocsPanel.js` - Integrated markdown documentation viewer
         *   `ResizablePanels.js` - Flexible panel layout management
@@ -99,17 +102,27 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 
 *   **Multi-Panel Layout:**
     *   Resizable panels for optimal screen space utilization
-    *   Sidebar module navigation with search and filtering
+    *   Sidebar module navigation with individual "Start" buttons
+    *   Session dropdown for switching between multiple active sessions
     *   Main terminal area with real-time output display
     *   Integrated help panel with context-sensitive guidance
     *   Documentation viewer with markdown rendering
+
+*   **Multi-Session Management:**
+    *   Support for unlimited concurrent module sessions
+    *   Session dropdown with status indicators (running/stopped)
+    *   Session switching with output preservation
+    *   Individual session control (start/stop/close)
+    *   Session metadata (creation time, module name, status)
+    *   Automatic session cleanup and resource management
 
 *   **Terminal Experience:**
     *   Full ANSI color support preserving CLI aesthetics
     *   Real-time output streaming without buffering delays
     *   Interactive input handling for all module prompts
-    *   Session management for multiple concurrent modules
+    *   Session-aware terminal with automatic output switching
     *   Copy/paste functionality and text selection
+    *   Direct session control with integrated "Stop" button
 
 *   **Module Help System:**
     *   Comprehensive help content for each module
@@ -120,15 +133,19 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 **7. Special Considerations:**
 
 *   **Security & Access Control:**
-    *   Local-only operation (localhost binding) for security
-    *   No external network exposure by default
-    *   Maintains same security context as CLI operations
-    *   WebSocket connections restricted to local clients
+    *   **Secure by default:** Localhost-only binding prevents network exposure
+    *   **Configurable network access:** Optional `-network` flag for controlled network access
+    *   **Port configuration:** Configurable via `config/general.conf` or command line
+    *   **Security warnings:** Clear warnings when network mode is enabled
+    *   **Same security context:** Maintains CLI-equivalent security permissions
+    *   **WebSocket restrictions:** Connections limited by host binding configuration
 
 *   **Performance & Scalability:**
     *   Efficient WebSocket communication for minimal latency
     *   Buffered output management to handle high-volume logs
-    *   Session cleanup and resource management
+    *   **Multi-session resource management:** Isolated sessions with proper cleanup
+    *   **Session state preservation:** Output history maintained per session
+    *   **Concurrent execution:** Multiple modules can run simultaneously
     *   PTY size management for proper terminal formatting
 
 *   **Compatibility & Integration:**
@@ -146,25 +163,37 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 **8. Launcher Integration:**
 
 *   **Standalone Launcher (`gui_launcher.sh`):**
-    *   **Purpose:** Provides convenient entry point for GUI access from CLI environment.
+    *   **Purpose:** Provides convenient entry point for GUI access from CLI environment with full configuration support.
+    *   **Command Line Options:**
+        *   `-b, --build` - Rebuild GUI before launching
+        *   `-n, --network` - Enable network access (bind to 0.0.0.0)
+        *   `-p, --port PORT` - Set custom port (overrides config file)
+        *   `-h, --help` - Display comprehensive help information
     *   **Mechanism:**
-        *   Checks for production build availability
-        *   Falls back to development mode if needed
-        *   Handles port availability and browser launching
-        *   Provides status feedback and error handling
+        *   Checks for production build availability and builds if needed
+        *   Passes all GUI-specific arguments to the binary
+        *   Provides security warnings for network mode
+        *   Handles dynamic messaging based on selected options
+        *   Integrates with configuration file settings
 
 **9. Technical Specifications:**
 
 *   **Network Configuration:**
-    *   Default port: 3000 (configurable in source)
-    *   Protocol: HTTP with WebSocket upgrade
-    *   Binding: localhost only for security
+    *   **Default port:** 3000 (configurable via `config/general.conf` or `-p/--port` flag)
+    *   **Default binding:** localhost (secure, configurable via `config/general.conf`)
+    *   **Network access:** Available via `-n/--network` flag (binds to 0.0.0.0)
+    *   **Protocol:** HTTP with WebSocket upgrade
+    *   **Command line options:** `-p/--port`, `-n/--network`, `-h/--help`
+    *   **Configuration priority:** Command line > config file > defaults
 
-*   **Process Management:**
-    *   PTY integration for authentic terminal experience
-    *   Session isolation for concurrent module execution
-    *   Automatic cleanup on session termination
-    *   Signal handling for graceful shutdown
+*   **Session Management:**
+    *   **Multi-session architecture:** Support for unlimited concurrent sessions
+    *   **Session metadata:** Creation time, module name, status tracking
+    *   **PTY isolation:** Each session has its own pseudo-terminal
+    *   **Output preservation:** Session output history maintained independently
+    *   **Automatic cleanup:** Resources cleaned up on session termination
+    *   **Session persistence:** Accessible across browser windows/tabs
+    *   **Signal handling:** Graceful shutdown and session management
 
 *   **File System Integration:**
     *   Automatic detection of Little Linux Helper root directory
@@ -172,7 +201,49 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   Configuration file preservation and sharing
     *   Log file integration and monitoring
 
-**10. Future Extensibility:**
+**10. Configuration & Usage:**
+
+*   **Configuration File (`config/general.conf`):**
+    *   `CFG_LH_GUI_PORT="3000"` - Set default port for GUI server
+    *   `CFG_LH_GUI_HOST="localhost"` - Set default host binding (localhost/0.0.0.0)
+    *   Configuration automatically created from `config/general.conf.example`
+    *   Settings can be overridden by command line arguments
+
+*   **Command Line Usage:**
+
+    **Via GUI Launcher (Recommended):**
+    *   `./gui_launcher.sh` - Start with default settings (localhost, auto-detect port)
+    *   `./gui_launcher.sh -p 8080` - Use custom port (short form)
+    *   `./gui_launcher.sh --port 8080` - Use custom port (long form)
+    *   `./gui_launcher.sh -n` - Enable network access (0.0.0.0 binding)
+    *   `./gui_launcher.sh -n -p 80` - Network access on port 80
+    *   `./gui_launcher.sh -b -n` - Build and run with network access
+    *   `./gui_launcher.sh -h` - Show comprehensive help information
+
+    **Direct Binary Execution:**
+    *   `./little-linux-helper-gui` - Start with default settings (localhost:3000)
+    *   `./little-linux-helper-gui -p 8080` - Use custom port (short form)
+    *   `./little-linux-helper-gui --port 8080` - Use custom port (long form)
+    *   `./little-linux-helper-gui -n` - Enable network access (short form)
+    *   `./little-linux-helper-gui --network` - Enable network access (long form)
+    *   `./little-linux-helper-gui -n -p 80` - Network access on port 80
+    *   `./little-linux-helper-gui -h` - Show usage information (short form)
+    *   `./little-linux-helper-gui --help` - Show usage information (long form)
+
+*   **Multi-Session Workflow:**
+    *   **Module Selection:** Click modules in sidebar to select (doesn't start session)
+    *   **Starting Sessions:** Use "Start" buttons on modules or "+ New Session" button
+    *   **Session Management:** Use session dropdown to switch between active sessions
+    *   **Session Control:** Use "Stop" button in terminal or "×" in session dropdown
+    *   **Session Persistence:** Sessions remain accessible in new browser windows
+
+*   **Security Considerations:**
+    *   **Default secure:** GUI only accessible from localhost by default
+    *   **Network mode warnings:** Clear warnings displayed when network access enabled
+    *   **Firewall awareness:** Network mode requires proper firewall configuration
+    *   **Same privileges:** GUI runs with same user permissions as CLI
+
+**11. Future Extensibility:**
 
 *   **Module Compatibility:** Automatically supports new modules added to the system
 *   **Documentation Integration:** New documentation files are automatically discovered and integrated

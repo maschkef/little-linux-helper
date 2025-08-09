@@ -76,7 +76,37 @@ Eine moderne webbasierte GUI ist über `gui_launcher.sh` verfügbar und bietet:
 - **Sitzungs-Management**: Mehrere gleichzeitige Modul-Ausführungen mit unabhängigen Sitzungen
 - **Erweiterte Funktionen**: PTY-Integration für authentische Terminal-Erfahrung, WebSocket-Kommunikation für Echtzeit-Updates
 
-Die GUI behält vollständige Kompatibilität mit allen CLI-Funktionen bei und bietet gleichzeitig eine verbesserte Benutzererfahrung.
+Die GUI behält vollständige Kompatibilität mit allen CLI-Funktionen bei und bietet gleichzeitig eine verbesserte Benutzererfahrung mit leistungsstarken Multi-Session-Funktionen.
+
+<details>
+
+<summary>**GUI-Konfiguration & Verwendung:**</summary>
+```bash
+# GUI-Launcher (Empfohlen):
+./gui_launcher.sh              # Standard: sicherer localhost
+./gui_launcher.sh -n           # Netzwerkzugriff aktivieren (-n Kurzform)
+./gui_launcher.sh -p 8080      # Benutzerdefinierten Port (Kurzform)
+./gui_launcher.sh --port 8080  # Benutzerdefinierten Port (Langform)
+./gui_launcher.sh -n -p 80     # Netzwerkzugriff auf benutzerdefiniertem Port
+./gui_launcher.sh -b -n        # Erstellen und mit Netzwerkzugriff ausführen
+./gui_launcher.sh -h           # Umfassende Hilfe
+
+# Benutzerdefinierte Konfiguration via config/general.conf:
+CFG_LH_GUI_PORT="3000"        # Standard-Port setzen
+CFG_LH_GUI_HOST="localhost"   # Bindung setzen (localhost/0.0.0.0)
+
+# Direkte Binary-Ausführung:
+./little-linux-helper-gui -p 8080             # Benutzerdefinierten Port (Kurzform)
+./little-linux-helper-gui --port 8080         # Benutzerdefinierten Port (Langform)
+./little-linux-helper-gui -n                  # Netzwerkzugriff aktivieren (-n Kurzform)
+./little-linux-helper-gui --network -p 80     # Netzwerkzugriff auf Port 80
+./little-linux-helper-gui -h                  # Nutzungsinformationen anzeigen (Kurzform)
+./little-linux-helper-gui --help              # Nutzungsinformationen anzeigen (Langform)
+```
+
+Die GUI behält vollständige Kompatibilität mit allen CLI-Funktionen bei und bietet gleichzeitig eine verbesserte Benutzererfahrung mit leistungsstarken Multi-Session-Funktionen.
+
+</details>
 
 ---
 

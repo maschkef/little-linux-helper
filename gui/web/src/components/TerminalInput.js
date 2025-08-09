@@ -8,7 +8,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 
 import React, { useState } from 'react';
 
-function TerminalInput({ sessionId, onSendInput, isActive }) {
+function TerminalInput({ sessionId, onSendInput, onStopSession, isActive }) {
   const [input, setInput] = useState('');
 
   console.log('TerminalInput render - isActive:', isActive, 'sessionId:', sessionId);
@@ -33,6 +33,12 @@ function TerminalInput({ sessionId, onSendInput, isActive }) {
       console.log('Sending single character for "Press any key"');
       // Send a special marker to indicate this is a "press any key" input
       onSendInput('__PRESS_ANY_KEY__');
+    }
+  };
+
+  const handleStopSession = () => {
+    if (isActive && sessionId && onStopSession) {
+      onStopSession(sessionId);
     }
   };
 
@@ -99,6 +105,26 @@ function TerminalInput({ sessionId, onSendInput, isActive }) {
           }}
         >
           Any Key
+        </button>
+        <button 
+          type="button"
+          onClick={handleStopSession}
+          disabled={!isActive}
+          style={{ 
+            padding: '0.5rem 1rem',
+            backgroundColor: '#dc3545',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: isActive ? 'pointer' : 'not-allowed',
+            opacity: isActive ? 1 : 0.6,
+            fontSize: '0.9rem',
+            height: '36px',
+            fontWeight: '500'
+          }}
+          title="Stop current session"
+        >
+          Stop
         </button>
     </form>
   );

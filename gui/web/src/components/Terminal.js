@@ -9,74 +9,62 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 import React, { useState, useEffect, useRef } from 'react';
 import AnsiToHtml from 'ansi-to-html';
 import TerminalInput from './TerminalInput';
+import { useSession } from '../contexts/SessionContext';
 
-function Terminal({ sessionId, onSendInput, isActive }) {
-  const [output, setOutput] = useState('');
-  const [input, setInput] = useState('');
+function Terminal() {
+  const { activeSessionId, getActiveSession, getSessionOutput, sendInput, stopSession } = useSession();
+  const [localOutput, setLocalOutput] = useState('');
   const outputRef = useRef(null);
   const ansiConverter = useRef(new AnsiToHtml());
 
   useEffect(() => {
-    console.log('Terminal useEffect: setting up WebSocket listener');
-    // Listen for terminal output events from WebSocket
+    // Listen for terminal output events from WebSocket (for active session only)
     const handleOutput = (event) => {
-      const newOutput = event.detail;
-      console.log('Terminal received output:', newOutput.substring(0, 50) + '...');
-      setOutput(prev => prev + newOutput);
+      if (activeSessionId) {
+        const newOutput = event.detail;
+        setLocalOutput(prev => prev + newOutput);
+      }
     };
 
     window.addEventListener('terminal-output', handleOutput);
     
     return () => {
-      console.log('Terminal useEffect cleanup: removing WebSocket listener');
       window.removeEventListener('terminal-output', handleOutput);
     };
-  }, []);
+  }, [activeSessionId]);
+
+  useEffect(() => {
+    // Load session output when active session changes
+    if (activeSessionId) {
+      const sessionOutput = getSessionOutput(activeSessionId);
+      setLocalOutput(sessionOutput.join(''));
+    } else {
+      setLocalOutput('No active session. Select a module to start.\n');
+    }
+  }, [activeSessionId, getSessionOutput]);
 
   useEffect(() => {
     // Auto-scroll to bottom when new output is added
     if (outputRef.current) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
     }
-  }, [output]);
+  }, [localOutput]);
 
-  useEffect(() => {
-    console.log('Terminal sessionId changed:', sessionId);
-    // Clear terminal when session changes
-    if (sessionId) {
-      console.log('Setting output for new session:', sessionId);
-      setOutput('Terminal connected to session: ' + sessionId + '\n');
-    } else {
-      console.log('No session, clearing output');
-      setOutput('No active session. Select a module to start.\n');
-    }
-  }, [sessionId]);
-
-  const handleInputSubmit = (e) => {
-    e.preventDefault();
-    console.log('Terminal input submit:', input, 'isActive:', isActive);
-    if (input.trim() && isActive) {
-      // Add input to terminal display
-      setOutput(prev => prev + `> ${input}\n`);
-      
-      // Send input to backend
-      console.log('Sending input to backend:', input);
-      onSendInput(input);
-      
-      // Clear input field
-      setInput('');
-    } else {
-      console.log('Input not sent - input:', input.trim(), 'isActive:', isActive);
+  const handleSendInput = async (input) => {
+    if (activeSessionId && input.trim()) {
+      try {
+        await sendInput(activeSessionId, input);
+        // Add input to local display
+        setLocalOutput(prev => prev + `> ${input}\n`);
+      } catch (error) {
+        console.error('Failed to send input:', error);
+        setLocalOutput(prev => prev + `Error sending input: ${error.message}\n`);
+      }
     }
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleInputSubmit(e);
-    }
-  };
-
-  console.log('Terminal render - isActive:', isActive, 'sessionId:', sessionId);
+  const activeSession = getActiveSession();
+  const isActive = activeSession?.status === 'running';
   
   return (
     <div className="terminal-panel">
@@ -84,14 +72,9 @@ function Terminal({ sessionId, onSendInput, isActive }) {
         className="terminal-output" 
         ref={outputRef}
         dangerouslySetInnerHTML={{ 
-          __html: output ? ansiConverter.current.toHtml(output) : 'Waiting for module output...' 
+          __html: localOutput ? ansiConverter.current.toHtml(localOutput) : 'Waiting for module output...' 
         }}
       />
-      
-      {/* Debug info */}
-      <div style={{ fontSize: '10px', color: '#666', padding: '2px', backgroundColor: '#333' }}>
-        Debug - isActive: {isActive ? 'true' : 'false'}, sessionId: {sessionId || 'none'}, output length: {output.length}
-      </div>
       
       {/* Terminal input at bottom of terminal panel */}
       {isActive && (
@@ -102,8 +85,9 @@ function Terminal({ sessionId, onSendInput, isActive }) {
           marginTop: 'auto'
         }}>
           <TerminalInput 
-            sessionId={sessionId}
-            onSendInput={onSendInput}
+            sessionId={activeSessionId}
+            onSendInput={handleSendInput}
+            onStopSession={stopSession}
             isActive={isActive}
           />
         </div>
