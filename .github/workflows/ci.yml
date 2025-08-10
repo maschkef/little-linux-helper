@@ -9,7 +9,6 @@ on:
 # Security: Set minimal permissions for CI workflow
 permissions:
   contents: read      # Read repository contents
-  metadata: read      # Read repository metadata
 
 jobs:
   test-go:
