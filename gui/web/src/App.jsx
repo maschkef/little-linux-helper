@@ -7,13 +7,13 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 */
 
 import React, { useState, useEffect } from 'react';
-import ModuleList from './components/ModuleList';
-import Terminal from './components/Terminal';
-import HelpPanel from './components/HelpPanel';
-import DocsPanel from './components/DocsPanel';
-import ResizablePanels from './components/ResizablePanels';
-import SessionDropdown from './components/SessionDropdown';
-import { SessionProvider, useSession } from './contexts/SessionContext';
+import ModuleList from './components/ModuleList.jsx';
+import Terminal from './components/Terminal.jsx';
+import HelpPanel from './components/HelpPanel.jsx';
+import DocsPanel from './components/DocsPanel.jsx';
+import ResizablePanels from './components/ResizablePanels.jsx';
+import SessionDropdown from './components/SessionDropdown.jsx';
+import { SessionProvider, useSession } from './contexts/SessionContext.jsx';
 
 function AppContent() {
   const [modules, setModules] = useState([]);

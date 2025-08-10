@@ -8,7 +8,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 
 import React, { useState, useEffect, useRef } from 'react';
 import AnsiToHtml from 'ansi-to-html';
-import TerminalInput from './TerminalInput';
+import TerminalInput from './TerminalInput.jsx';
 import { useSession } from '../contexts/SessionContext';
 
 function Terminal() {
