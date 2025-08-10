@@ -7,48 +7,21 @@
 # This script is part of the 'little-linux-helper' collection.
 # Licensed under the MIT License. See the LICENSE file in the project root for more information.
 #
-# Hauptskript für Little Linux Helper
+# Main script for Little Linux Helper
 
-# Fehlerbehandlung aktivieren
+# Enable error handling
 set -e
 set -o pipefail
 
-# Pfad zum Hauptverzeichnis ermitteln und exportieren
+# Determine and export path to main directory
 export LH_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Bibliothek mit gemeinsamen Funktionen laden
+# Load library with common functions
 source "$LH_ROOT_DIR/lib/lib_common.sh"
 
-# Funktion zum Sicherstellen, dass Konfigurationsdateien existieren
-function lh_ensure_config_files_exist() {
-    local config_dir="$LH_ROOT_DIR/config"
-    local template_suffix=".example"
-    local template_config_file
-    local actual_config_file
-    local config_file_base
-
-    # Durchsuche das Konfigurationsverzeichnis nach allen .example-Dateien
-    for template_config_file in "$config_dir"/*"$template_suffix"; do
-        # Extrahiere den Basisdateinamen ohne .example
-        config_file_base=$(basename "$template_config_file" "$template_suffix")
-        local actual_config_file="$config_dir/$config_file_base"
-
-        if [ ! -f "$actual_config_file" ]; then
-            if [ -f "$template_config_file" ]; then
-                cp "$template_config_file" "$actual_config_file"
-                echo -e "${LH_COLOR_INFO}$(lh_msg "CONFIG_FILE_CREATED" "$config_file_base" "${config_file_base}${template_suffix}")${LH_COLOR_RESET}"
-                echo -e "${LH_COLOR_INFO}$(lh_msg "CONFIG_FILE_REVIEW" "$actual_config_file")${LH_COLOR_RESET}"
-            else
-                lh_log_msg "WARN" "$(lh_msg "LOG_CONFIG_FILE_MISSING" "$actual_config_file" "$template_config_file")"
-                echo -e "${LH_COLOR_WARNING}$(lh_msg "CONFIG_FILE_MISSING" "$actual_config_file" "$template_config_file")${LH_COLOR_RESET}"
-            fi
-        fi
-    done
-}
-
-# Initialisierungen
-lh_ensure_config_files_exist # Sicherstellen, dass Konfigurationsdateien vorhanden sind
-lh_load_general_config        # Lade allgemeine Konfiguration ZUERST (für Log-Level)
+# Initializations
+lh_ensure_config_files_exist  # Ensure configuration files exist
+lh_load_general_config        # Load general configuration FIRST (for log level)
 lh_initialize_logging
 lh_check_root_privileges
 lh_detect_package_manager
@@ -61,14 +34,14 @@ export LH_INITIALIZED=1
 # Load main menu translations
 lh_load_language_module "main_menu"
 
-# Willkommensnachricht
+# Welcome message
 echo -e "${LH_COLOR_BOLD_YELLOW}╔════════════════════════════════════════════╗${LH_COLOR_RESET}"
 echo -e "${LH_COLOR_BOLD_YELLOW}║           ${LH_COLOR_BOLD_WHITE}$(lh_msg "WELCOME_TITLE")${LH_COLOR_BOLD_YELLOW}              ║${LH_COLOR_RESET}"
 echo -e "${LH_COLOR_BOLD_YELLOW}╚════════════════════════════════════════════╝${LH_COLOR_RESET}"
 
 lh_log_msg "INFO" "$(lh_msg "LOG_HELPER_STARTED")"
 
-# Funktion für das Debugbündel
+# Function for debug bundle
 function create_debug_bundle() {
     lh_print_header "$(lh_msg "DEBUG_HEADER")"
 
@@ -76,7 +49,7 @@ function create_debug_bundle() {
 
     lh_log_msg "INFO" "$(lh_msg "LOG_DEBUG_REPORT_CREATING" "$debug_file")"
 
-    # Header für die Debug-Datei
+    # Header for debug file
     {
         echo "===== $(lh_msg "DEBUG_LITTLE_HELPER_REPORT") ====="
         echo "$(lh_msg "DEBUG_CREATED") $(date)"
@@ -85,7 +58,7 @@ function create_debug_bundle() {
         echo ""
     } > "$debug_file"
 
-    # Systeminformationen sammeln
+    # Collect system information
     echo "===== $(lh_msg "DEBUG_SYSTEM_INFO") =====" >> "$debug_file"
     echo "* $(lh_msg "DEBUG_OS")" >> "$debug_file"
     if [ -f /etc/os-release ]; then
@@ -111,13 +84,13 @@ function create_debug_bundle() {
     df -h >> "$debug_file"
     echo "" >> "$debug_file"
 
-    # Paketmanager-Information
+    # Package manager information
     echo "===== $(lh_msg "DEBUG_PACKAGE_MANAGER") =====" >> "$debug_file"
     echo "* $(lh_msg "DEBUG_PRIMARY_PKG_MGR") $LH_PKG_MANAGER" >> "$debug_file"
     echo "* $(lh_msg "DEBUG_ALT_PKG_MGR") ${LH_ALT_PKG_MANAGERS[*]}" >> "$debug_file"
     echo "" >> "$debug_file"
 
-    # Log-Auszüge sammeln
+    # Collect log excerpts
     echo "===== $(lh_msg "DEBUG_IMPORTANT_LOGS") =====" >> "$debug_file"
 
     echo "* $(lh_msg "DEBUG_LAST_SYSTEM_LOGS")" >> "$debug_file"
@@ -147,7 +120,7 @@ function create_debug_bundle() {
     ps aux | head -n 20 >> "$debug_file" 2>&1
     echo "" >> "$debug_file"
 
-    # Netzwerkinformationen
+    # Network information
     echo "===== $(lh_msg "DEBUG_NETWORK_INFO") =====" >> "$debug_file"
 
     echo "* $(lh_msg "DEBUG_NETWORK_INTERFACES")" >> "$debug_file"
@@ -166,11 +139,11 @@ function create_debug_bundle() {
     fi
     echo "" >> "$debug_file"
 
-    # Desktop-Umgebung
+    # Desktop environment
     echo "===== $(lh_msg "DEBUG_DESKTOP_ENV") =====" >> "$debug_file"
 
     echo "* $(lh_msg "DEBUG_CURRENT_DESKTOP")" >> "$debug_file"
-    # Versuche die Desktop-Umgebung zu ermitteln
+    # Try to determine desktop environment
     if [ -n "$XDG_CURRENT_DESKTOP" ]; then
         echo "$XDG_CURRENT_DESKTOP" >> "$debug_file" 2>&1
     elif [ -n "$DESKTOP_SESSION" ]; then
@@ -184,13 +157,13 @@ function create_debug_bundle() {
     echo -e "${LH_COLOR_SUCCESS}$(lh_msg "DEBUG_REPORT_CREATED") $debug_file${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_INFO}$(lh_msg "DEBUG_REPORT_INFO")${LH_COLOR_RESET}"
 
-    # Fragen, ob die Datei angezeigt werden soll
+    # Ask if file should be displayed
     if lh_confirm_action "$(lh_msg "DEBUG_VIEW_REPORT")" "n"; then
         less "$debug_file"
     fi
 }
 
-# Hauptschleife
+# Main loop
 while true; do
     lh_print_header "$(lh_msg "MAIN_MENU_TITLE")"
 
@@ -216,7 +189,7 @@ while true; do
     lh_print_menu_item 0 "$(lh_msg "EXIT")"
     echo ""
 
-    main_option_prompt="" # Initialisierung ohne local oder einfach direkt verwenden
+    main_option_prompt="" # Initialize without local or use directly
     main_option_prompt="$(echo -e "${LH_COLOR_PROMPT}$(lh_msg "CHOOSE_OPTION")${LH_COLOR_RESET} ")"
     read -p "$main_option_prompt" option
 
@@ -262,7 +235,7 @@ while true; do
             ;;
     esac
 
-    # Kurze Pause, damit Benutzer die Ausgabe lesen kann
+    # Brief pause so user can read output
     read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg "PRESS_KEY_CONTINUE")${LH_COLOR_RESET}")" -n1 -s
     echo ""
 done

@@ -56,11 +56,41 @@ source "$LH_ROOT_DIR/lib/lib_i18n.sh"
 source "$LH_ROOT_DIR/lib/lib_ui.sh"
 source "$LH_ROOT_DIR/lib/lib_notifications.sh"
 
+# Function to ensure configuration files exist
+function lh_ensure_config_files_exist() {
+    local config_dir="$LH_ROOT_DIR/config"
+    local template_suffix=".example"
+    local template_config_file
+    local actual_config_file
+    local config_file_base
+
+    # Search configuration directory for all .example files
+    for template_config_file in "$config_dir"/*"$template_suffix"; do
+        # Skip if no .example files exist (e.g., empty glob)
+        [ -f "$template_config_file" ] || continue
+        
+        # Extract base filename without .example
+        config_file_base=$(basename "$template_config_file" "$template_suffix")
+        local actual_config_file="$config_dir/$config_file_base"
+
+        if [ ! -f "$actual_config_file" ]; then
+            cp "$template_config_file" "$actual_config_file"
+            # Load main_menu translations for config messages if not already loaded
+            if [ -z "${MSG[CONFIG_FILE_CREATED]:-}" ]; then
+                lh_load_language_module "main_menu"
+            fi
+            echo -e "${LH_COLOR_INFO}$(lh_msg "CONFIG_FILE_CREATED" "$config_file_base" "${config_file_base}${template_suffix}")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg "CONFIG_FILE_REVIEW" "$actual_config_file")${LH_COLOR_RESET}"
+        fi
+    done
+}
+
 # At the end of the file lib_common.sh
 function lh_finalize_initialization() {
     # Only load general config if not already initialized
     if [[ -z "${LH_INITIALIZED:-}" ]]; then
-        lh_load_general_config     # Load general configuration first
+        lh_ensure_config_files_exist  # Ensure config files exist first
+        lh_load_general_config        # Load general configuration
     fi
     lh_load_backup_config     # Load backup configuration
     lh_initialize_i18n        # Initialize internationalization
