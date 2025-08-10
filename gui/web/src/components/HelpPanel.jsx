@@ -188,17 +188,18 @@ function HelpPanel({ module }) {
           "7. Restore BTRFS Backup - Enhanced restore with bootloader integration and set-default capability"
         ],
         notes: [
+          "⚠️ BETA SOFTWARE: Tested on limited systems - use with caution",
           "Supports flexible BTRFS subvolume layouts (@ @home @var @opt @tmp @srv, etc.)",
           "Auto-detects subvolumes from /etc/fstab and /proc/mounts when enabled",
           "Configurable subvolume list via LH_BACKUP_SUBVOLUMES setting", 
           "Backup destination must be on a BTRFS filesystem",
-          "Uses enterprise-grade atomic operations with comprehensive validation",
+          "Uses comprehensive atomic operations with thorough validation",
           "Automatically creates space-efficient incremental backups when possible",
           "Source snapshot preservation for maintaining incremental backup chains"
         ]
       },
       btrfs_restore: {
-        overview: "⚠️ DESTRUCTIVE: Enterprise-grade BTRFS disaster recovery system with dynamic subvolume detection. Designed to run from live environment to restore systems from BTRFS backups with atomic operations, bootloader integration, and comprehensive safety validation.",
+        overview: "⚠️ DESTRUCTIVE: Advanced BTRFS disaster recovery system with dynamic subvolume detection. Designed to run from live environment to restore systems from BTRFS backups with atomic operations, bootloader integration, and comprehensive safety validation.",
         options: [
           "1. Setup Restore Environment - Configure target system, backup source, and detect available subvolumes automatically",
           "2. System/Subvolume Restore - Restore any detected subvolumes (@, @home, @var, @opt, etc.) with timestamp matching",
@@ -208,13 +209,15 @@ function HelpPanel({ module }) {
           "6. Cleanup Restore Environment - Clean up temporary files, mount points, and restore artifacts"
         ],
         notes: [
+          "🚨 DANGER: REQUIRES TESTING - Do NOT use in production! For debugging/testing only!",
+          "🚨 Use only if you fully understand BTRFS restore procedures and potential data loss",
           "⚠️ CRITICAL: Only run from live environment, never on running system",
           "⚠️ Will destroy existing data on target subvolumes during full restore",
           "Auto-detects available subvolumes from backup structure and system configuration",
           "Supports flexible BTRFS layouts with any @-prefixed subvolumes",
           "Coordinated multi-subvolume restore with timestamp-based snapshot pairing", 
           "Advanced bootloader integration with multiple update strategies",
-          "Uses enterprise-grade 4-step atomic restore process with comprehensive validation and rollback"
+          "Uses robust 4-step atomic restore process with comprehensive validation and rollback"
         ]
       },
       backup_tar: {
