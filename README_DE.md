@@ -79,7 +79,7 @@ Eine moderne webbasierte GUI ist über `gui_launcher.sh` verfügbar und bietet:
 Die GUI behält vollständige Kompatibilität mit allen CLI-Funktionen bei und bietet gleichzeitig eine verbesserte Benutzererfahrung mit leistungsstarken Multi-Session-Funktionen.
 
 <details>
-<summary>**GUI-Konfiguration & Verwendung:**</summary>
+<summary>GUI-Konfiguration & Verwendung:</summary>
 
 ```bash
 # GUI-Launcher (Empfohlen):

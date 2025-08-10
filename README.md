@@ -79,7 +79,7 @@ A modern web-based GUI is available through `gui_launcher.sh`, providing:
 - **Advanced Features**: PTY integration for authentic terminal experience, WebSocket communication for real-time updates
 
 <details>
-<summary>**GUI Configuration & Usage:**</summary>
+<summary>GUI Configuration & Usage:</summary>
 
 ```bash
 # GUI Launcher (Recommended):
