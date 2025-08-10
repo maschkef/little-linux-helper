@@ -9,7 +9,7 @@ updates:
     directory: "/gui"
     schedule:
       interval: "weekly"
-      day: "monday"
+      day: "saturday"
       time: "09:00"
     reviewers:
       - "maschkef"
@@ -25,7 +25,7 @@ updates:
     directory: "/gui/web"
     schedule:
       interval: "weekly"
-      day: "monday"
+      day: "saturday"
       time: "09:00"
     reviewers:
       - "maschkef"
@@ -53,7 +53,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "monday"
+      day: "saturday"
       time: "09:00"
     reviewers:
       - "maschkef"
