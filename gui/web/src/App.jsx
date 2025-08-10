@@ -168,6 +168,8 @@ function AppContent() {
             
             <DocsPanel 
               content={moduleDocs}
+              selectedModule={selectedModule}
+              onModuleSelect={handleModuleSelect}
             />
           </ResizablePanels>
         </div>

@@ -31,7 +31,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
         *   Documentation serving from `docs/` directory
     *   **API Endpoints:**
         *   `GET /api/modules` - List all available modules with metadata
-        *   `GET /api/modules/:id/docs` - Retrieve module documentation
+        *   `GET /api/modules/:id/docs` - Retrieve module documentation (supports both main and related module docs)
         *   `POST /api/modules/:id/start` - Start module execution session
         *   `GET /api/sessions` - List all active sessions with metadata
         *   `POST /api/sessions/:sessionId/input` - Send input to running module
@@ -47,8 +47,8 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
         *   `TerminalInput.js` - Interactive input handling with "Send", "Any Key", and "Stop" buttons
         *   `SessionDropdown.js` - Multi-session management with session switching and status indicators
         *   `SessionContext.js` - React context for centralized session state management
-        *   `HelpPanel.js` - Context-sensitive help and module guidance
-        *   `DocsPanel.js` - Integrated markdown documentation viewer
+        *   `HelpPanel.js` - Context-sensitive help with user-friendly descriptions and practical guidance
+        *   `DocsPanel.js` - Integrated markdown documentation viewer with related documentation links and navigation
         *   `ResizablePanels.js` - Flexible panel layout management
     *   **Dependencies (system):** `node.js` (16+), `npm`, React ecosystem.
 
@@ -105,8 +105,8 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   Sidebar module navigation with individual "Start" buttons
     *   Session dropdown for switching between multiple active sessions
     *   Main terminal area with real-time output display
-    *   Integrated help panel with context-sensitive guidance
-    *   Documentation viewer with markdown rendering
+    *   Integrated help panel with user-friendly, context-sensitive guidance
+    *   Documentation viewer with markdown rendering and related module documentation links
 
 *   **Multi-Session Management:**
     *   Support for unlimited concurrent module sessions
@@ -124,11 +124,13 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   Copy/paste functionality and text selection
     *   Direct session control with integrated "Stop" button
 
-*   **Module Help System:**
-    *   Comprehensive help content for each module
-    *   Available options and menu explanations
-    *   Important notes and prerequisites
+*   **Module Help & Documentation System:**
+    *   Comprehensive help content for each module with user-friendly descriptions
+    *   Available options and menu explanations with practical context
+    *   Important notes and prerequisites clearly explained
     *   Real-time updates based on selected module
+    *   Related documentation links for module families (backup, docker, etc.)
+    *   Integrated navigation between main module docs and related documentation
 
 **7. Special Considerations:**
 

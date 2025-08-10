@@ -36,56 +36,60 @@ function HelpPanel({ module }) {
         ]
       },
       system_info: {
-        overview: "Display comprehensive system information and hardware details. Gathers data from various Linux commands and system files to provide a complete overview of your system's configuration and current status.",
+        overview: "View comprehensive information about your computer's hardware, software, and current system status. Perfect for troubleshooting, system monitoring, or getting to know your Linux system better.",
         options: [
-          "1. Operating System & Kernel - Shows OS details from /etc/os-release, kernel version, and system uptime",
-          "2. CPU Details - Processor information using lscpu (architecture, cores, threads, cache sizes, frequencies)",
-          "3. RAM Usage - Memory utilization with free/vmstat commands, shows total/available/cached memory",
-          "4. PCI Devices - Lists hardware components, offers detailed view with lspci -vnnk (requires sudo)",
-          "5. USB Devices - Connected USB devices, detailed view with lsusb -v shows full specifications (requires sudo)",
-          "6. Disk Overview - Block devices with lsblk, mounted filesystems with df, shows usage and types",
-          "7. Top Processes - Shows top CPU and memory consumers, offers real-time monitoring with top command",
-          "8. Network Configuration - Interface details, routing table, active connections, DNS servers",
-          "9. Temperatures/Sensors - Hardware sensors using sensors command or /sys/class/thermal data"
+          "1. Operating System & Kernel - Shows your Linux distribution, version, and kernel information",
+          "2. CPU Details - Display processor information including model, cores, and performance specs", 
+          "3. RAM Usage - Check memory usage and see how much RAM is available vs used",
+          "4. PCI Devices - List hardware components like graphics cards, network adapters, and sound cards",
+          "5. USB Devices - Show connected USB devices like keyboards, mice, storage drives, and webcams",
+          "6. Disk Overview - View hard drives, SSDs, and storage devices with their mount points and usage",
+          "7. Top Processes - See which programs are using the most CPU and memory resources",
+          "8. Network Configuration - Display network settings, IP addresses, and active connections", 
+          "9. Temperatures/Sensors - Monitor hardware temperatures and fan speeds (if sensors are available)"
         ],
         notes: [
-          "Missing commands (lspci, lsusb, sensors, ss) will be offered for installation",
-          "Detailed PCI/USB views require sudo privileges for hardware access",
-          "Temperature readings need lm-sensors package installed",
-          "Network connection details use ss command for better performance than netstat",
-          "System commands may vary slightly between Linux distributions"
+          "Some detailed information may require administrator privileges",
+          "Missing tools will be offered for automatic installation",
+          "Hardware sensor readings require the 'sensors' package to be installed",
+          "All information is read-only - this won't change any system settings"
         ]
       },
       disk: {
-        overview: "Disk utilities and storage analysis tools.",
+        overview: "Tools for managing and analyzing your storage devices and disk space. Check drive health, find large files, monitor disk usage, and perform disk diagnostics.",
         options: [
-          "1. Show Mounted Drives - Display mounted filesystems",
-          "2. SMART Values - Check disk health status",
-          "3. File Access Times - Analyze file access patterns",
-          "4. Directory Sizes - Show directory space usage",
-          "5. Largest Files - Find largest files in directories"
+          "1. Show Mounted Drives - See all connected drives and how much space they're using",
+          "2. SMART Values - Get detailed health information from your hard drives and SSDs", 
+          "3. File Access Times - Check which programs are currently using files in a folder",
+          "4. Directory Sizes - Analyze disk space usage with visual tools like ncdu",
+          "5. Disk Speed Test - Test read/write performance of your storage devices",
+          "6. Check Filesystem - Scan drives for errors and fix file system problems",
+          "7. Check Health - Quick health check of your drives using SMART data",
+          "8. Largest Files - Find the biggest files taking up space on your system"
         ],
         notes: [
-          "SMART values require smartmontools",
-          "Some operations may be slow on large filesystems",
-          "Root privileges may be required for some operations"
+          "Drive health checks require administrator privileges",
+          "Missing diagnostic tools will be offered for automatic installation", 
+          "Filesystem checks work best on unmounted drives",
+          "Speed tests and health checks are safe and won't modify data"
         ]
       },
       logs: {
-        overview: "Analyze system logs and troubleshoot issues.",
+        overview: "Find and analyze system logs to troubleshoot problems, monitor system health, or investigate what happened during crashes or errors.",
         options: [
-          "1. Recent Logs (Current Boot) - Show recent log entries",
-          "2. Recent Logs (Previous Boot) - Show logs from last boot",
-          "3. Service-Specific Logs - Show logs for specific services",
-          "4. X.org Logs - Display graphics system logs",
-          "5. Kernel Messages - Show dmesg output",
-          "6. Package Manager Logs - Show package installation logs",
-          "7. Advanced Analysis - Python-based log analysis"
+          "1. Recent Logs (Current Boot) - See what happened in the last few minutes or hours on your system",
+          "2. Recent Logs (Previous Boot) - Check what went wrong before your last reboot or crash",
+          "3. Service-Specific Logs - View logs for specific programs like SSH, web servers, or databases", 
+          "4. X.org Logs - Check graphics system logs to troubleshoot display or driver issues",
+          "5. Kernel Messages - View low-level system messages from the Linux kernel (hardware, drivers)",
+          "6. Package Manager Logs - See history of software installations, updates, and removals",
+          "7. Advanced Analysis - AI-powered log analysis to automatically find errors and patterns"
         ],
         notes: [
-          "Advanced analysis requires Python",
-          "Some logs may require sudo access",
-          "Log availability depends on systemd/journald"
+          "Most logs are automatically filtered to show errors and warnings first",
+          "You can save any log output to files for later review or sharing",
+          "Advanced analysis uses Python to intelligently parse logs and highlight issues",
+          "Some system logs require administrator privileges to access"
         ]
       },
       packages: {
@@ -125,34 +129,36 @@ function HelpPanel({ module }) {
         ]
       },
       backup: {
-        overview: "Backup and restore operations for data protection.",
+        overview: "Central hub for protecting your data with multiple backup methods. Choose from BTRFS snapshots, TAR archives, or RSYNC incremental backups depending on your needs.",
         options: [
-          "1. BTRFS Operations - Snapshot-based backups",
-          "2. TAR Backup - Archive-based backups", 
-          "3. RSYNC Backup - Incremental file-based backups",
-          "4. Restore Operations - Restore from backups",
-          "5. Backup Status - Check backup status and logs",
-          "6. Configure Backup - Modify backup settings"
+          "1. BTRFS Operations - Advanced snapshot-based backups for BTRFS filesystems (atomic, space-efficient)",
+          "2. TAR Backup - Create compressed archive backups of directories (compatible with all systems)",
+          "3. RSYNC Backup - Fast incremental backups that only copy changed files",
+          "4. Restore Operations - Access specialized restore tools for each backup type",
+          "5. Backup Status - View comprehensive status of all your backups and disk space usage", 
+          "6. Configure Backup - Set backup destinations, retention policies, and other settings"
         ],
         notes: [
-          "BTRFS backups require BTRFS filesystem",
-          "Configure backup paths before first use",
-          "Test restore procedures regularly"
+          "Each backup type has its own specialized tools accessible through this menu",
+          "BTRFS operations require BTRFS filesystem and provide the most advanced features",
+          "TAR backups work on any filesystem but create larger archive files",
+          "RSYNC is ideal for regular backups as it's fast and space-efficient",
+          "Configure your backup destination before creating your first backup"
         ]
       },
       docker: {
-        overview: "Docker container management and administration tools. Provides comprehensive Docker operations including container monitoring, configuration management, and security auditing.",
+        overview: "Manage Docker containers and ensure they're secure. Get container information, install Docker if needed, and run security audits on your containerized applications.",
         options: [
-          "1. Show Running Containers - Display active containers with detailed information",
-          "2. Manage Configuration - Configure Docker scanning settings, paths, exclusions, and security check parameters",
-          "3. Installation & Setup - Install Docker components and verify installation",
-          "4. Security Audit - Comprehensive Docker security scanning and vulnerability assessment"
+          "1. Show Running Containers - See all active Docker containers with resource usage and status",
+          "2. Manage Configuration - Configure Docker security scanning settings and parameters",
+          "3. Installation & Setup - Automatically install Docker and Docker Compose on your system", 
+          "4. Security Audit - Comprehensive security scan of containers, images, and Docker configuration"
         ],
         notes: [
-          "Requires Docker to be installed for container operations",
-          "Configuration settings affect security scanning behavior",
-          "Security audit performs comprehensive vulnerability assessment",
-          "Setup option handles complete Docker installation and configuration"
+          "Installation option includes complete Docker setup with user permissions",
+          "Security audit checks for vulnerabilities, misconfigurations, and best practices",
+          "Configuration settings control how thorough security scans will be",
+          "Docker must be installed to view and manage containers"
         ]
       },
       energy: {
