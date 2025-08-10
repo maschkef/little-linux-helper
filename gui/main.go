@@ -396,6 +396,8 @@ func getModuleDocs(c *fiber.Ctx) error {
 		
 		// Backup modules
 		"backup":         "mod_backup.md",
+		"btrfs_backup":   "mod_btrfs_backup.md",
+		"btrfs_restore":  "mod_btrfs_restore.md",
 		"mod_btrfs_backup":   "mod_btrfs_backup.md",
 		"mod_btrfs_restore":  "mod_btrfs_restore.md",
 		"mod_backup_tar":     "mod_backup_tar.md",
