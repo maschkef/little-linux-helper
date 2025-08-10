@@ -83,12 +83,12 @@ function HelpPanel({ module }) {
           "4. X.org Logs - Check graphics system logs to troubleshoot display or driver issues",
           "5. Kernel Messages - View low-level system messages from the Linux kernel (hardware, drivers)",
           "6. Package Manager Logs - See history of software installations, updates, and removals",
-          "7. Advanced Analysis - AI-powered log analysis to automatically find errors and patterns"
+          "7. Advanced Analysis - Python-powered log analysis to automatically find errors and patterns"
         ],
         notes: [
           "Most logs are automatically filtered to show errors and warnings first",
           "You can save any log output to files for later review or sharing",
-          "Advanced analysis uses Python to intelligently parse logs and highlight issues",
+          "Advanced analysis uses Python with regex patterns to parse logs and highlight issues",
           "Some system logs require administrator privileges to access"
         ]
       },
