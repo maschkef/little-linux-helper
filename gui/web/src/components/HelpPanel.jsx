@@ -139,6 +139,9 @@ function HelpPanel({ module }) {
           "6. Configure Backup - Set backup destinations, retention policies, and other settings"
         ],
         notes: [
+          "🚨 BTRFS WARNING: BTRFS backup is tested on limited systems - use with caution",
+          "🚨 BTRFS RESTORE: Requires testing - Do NOT use in production! For debugging/testing only!",
+          "💡 See individual BTRFS module help (when called directly) for more information",
           "Each backup type has its own specialized tools accessible through this menu",
           "BTRFS operations require BTRFS filesystem and provide the most advanced features",
           "TAR backups work on any filesystem but create larger archive files",
@@ -368,7 +371,7 @@ function HelpPanel({ module }) {
           <h4 style={{ margin: '0 0 0.5rem 0', color: '#2c3e50' }}>Important Notes</h4>
           <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.85rem' }}>
             {help.notes.map((note, index) => (
-              <li key={index} style={{ marginBottom: '0.3rem', color: '#666' }}>
+              <li key={index} style={{ marginBottom: '0.3rem', color: '#bb9900ff' }}>
                 {note}
               </li>
             ))}
