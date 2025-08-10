@@ -391,11 +391,20 @@ func getModuleDocs(c *fiber.Ctx) error {
 		
 		// Docker modules
 		"docker":         "mod_docker.md",
+		"mod_docker_setup": "mod_docker_setup.md",
+		"mod_docker_security": "mod_docker_security.md",
 		
 		// Backup modules
 		"backup":         "mod_backup.md",
-		"btrfs_backup":   "mod_btrfs_backup.md",
-		"btrfs_restore":  "mod_btrfs_restore.md",
+		"mod_btrfs_backup":   "mod_btrfs_backup.md",
+		"mod_btrfs_restore":  "mod_btrfs_restore.md",
+		"mod_backup_tar":     "mod_backup_tar.md",
+		"mod_restore_tar":    "mod_restore_tar.md",
+		"mod_backup_rsync":   "mod_backup_rsync.md",
+		"mod_restore_rsync":  "mod_restore_rsync.md",
+		
+		// Other documentation
+		"advanced_log_analyzer": "advanced_log_analyzer.md",
 	}
 	
 	docFile, exists := docFiles[moduleId]
