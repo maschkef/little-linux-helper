@@ -411,7 +411,7 @@ function logs_show_dmesg() {
 
             if [ -z "$keyword" ]; then # Check if anything was entered
                 echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_NO_KEYWORD')${LH_COLOR_RESET}"
-                read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")" -n1 -s
+                lh_press_any_key
                 echo
                 return 1
             fi
@@ -993,7 +993,7 @@ function log_analyzer_menu() {
 
         # Short pause so user can read the output
         echo ""
-        read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")" -n1 -s
+        lh_press_any_key
         echo ""
     done
 }

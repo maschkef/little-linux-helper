@@ -347,16 +347,16 @@ function HelpPanel({ module }) {
       <div className="panel-header">Module Help: {module.name}</div>
       
       <div style={{ marginBottom: '1rem' }}>
-        <h4 style={{ margin: '0 0 0.5rem 0', color: '#2c3e50' }}>Overview</h4>
-        <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: '1.4' }}>
+        <h4 style={{ margin: '0 0 0.5rem 0', color: '#5e97cfff' }}>Overview</h4>
+        <p style={{ margin: 0, fontSize: '1.0rem', lineHeight: '1.4' }}>
           {help.overview}
         </p>
       </div>
 
       {help.options.length > 0 && (
         <div style={{ marginBottom: '1rem' }}>
-          <h4 style={{ margin: '0 0 0.5rem 0', color: '#2c3e50' }}>Available Options</h4>
-          <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.85rem' }}>
+          <h4 style={{ margin: '0 0 0.5rem 0', color: '#5e97cfff' }}>Available Options</h4>
+          <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.9rem' }}>
             {help.options.map((option, index) => (
               <li key={index} style={{ marginBottom: '0.3rem' }}>
                 {option}
@@ -368,8 +368,8 @@ function HelpPanel({ module }) {
 
       {help.notes.length > 0 && (
         <div>
-          <h4 style={{ margin: '0 0 0.5rem 0', color: '#2c3e50' }}>Important Notes</h4>
-          <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.85rem' }}>
+          <h4 style={{ margin: '0 0 0.5rem 0', color: '#5e97cfff' }}>Important Notes</h4>
+          <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.9rem' }}>
             {help.notes.map((note, index) => (
               <li key={index} style={{ marginBottom: '0.3rem', color: '#bb9900ff' }}>
                 {note}

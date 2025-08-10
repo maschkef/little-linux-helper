@@ -15,6 +15,7 @@ function Terminal() {
   const { activeSessionId, getActiveSession, getSessionOutput, sendInput, stopSession } = useSession();
   const [localOutput, setLocalOutput] = useState('');
   const outputRef = useRef(null);
+  const terminalInputRef = useRef(null);
   const ansiConverter = useRef(new AnsiToHtml());
 
   useEffect(() => {
@@ -63,6 +64,13 @@ function Terminal() {
     }
   };
 
+  const handleTerminalClick = () => {
+    // Focus the input field when terminal is clicked
+    if (terminalInputRef.current && isActive) {
+      terminalInputRef.current.focus();
+    }
+  };
+
   const activeSession = getActiveSession();
   const isActive = activeSession?.status === 'running';
   
@@ -71,6 +79,8 @@ function Terminal() {
       <div 
         className="terminal-output" 
         ref={outputRef}
+        onClick={handleTerminalClick}
+        style={{ cursor: isActive ? 'text' : 'default' }}
         dangerouslySetInnerHTML={{ 
           __html: localOutput ? ansiConverter.current.toHtml(localOutput) : 'Waiting for module output...' 
         }}
@@ -85,6 +95,7 @@ function Terminal() {
           marginTop: 'auto'
         }}>
           <TerminalInput 
+            ref={terminalInputRef}
             sessionId={activeSessionId}
             onSendInput={handleSendInput}
             onStopSession={stopSession}

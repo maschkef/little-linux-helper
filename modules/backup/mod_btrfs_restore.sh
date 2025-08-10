@@ -1089,7 +1089,7 @@ create_manual_checkpoint() {
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_CHECKPOINT_VERIFY')${LH_COLOR_RESET}"
     echo ""
     
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTORE_CHECKPOINT_CONTINUE')${LH_COLOR_RESET}")" -n1 -s
+    lh_press_any_key 'RESTORE_CHECKPOINT_CONTINUE'
     echo ""
     
     restore_log_msg "INFO" "Manual checkpoint: $context_msg"
@@ -2861,7 +2861,7 @@ show_restore_menu() {
                 ;;
         esac
 
-        read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")" -n1 -s
+        lh_press_any_key
         echo ""
     done
 }

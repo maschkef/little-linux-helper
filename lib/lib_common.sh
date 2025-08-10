@@ -126,6 +126,8 @@ function lh_finalize_initialization() {
     export -f lh_t
     export -f lh_load_language
     export -f lh_load_language_module
+    # Export UI functions
+    export -f lh_press_any_key
     # Export log functions
     export -f lh_should_log
     export -f lh_initialize_logging

@@ -6,10 +6,20 @@ This project is part of the 'little-linux-helper' collection.
 Licensed under the MIT License. See the LICENSE file in the project root for more information.
 */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
 
-function TerminalInput({ sessionId, onSendInput, onStopSession, isActive }) {
+const TerminalInput = forwardRef(({ sessionId, onSendInput, onStopSession, isActive }, ref) => {
   const [input, setInput] = useState('');
+  const inputRef = useRef(null);
+
+  // Expose focus method to parent component
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      if (inputRef.current && isActive) {
+        inputRef.current.focus();
+      }
+    }
+  }));
 
   console.log('TerminalInput render - isActive:', isActive, 'sessionId:', sessionId);
 
@@ -28,13 +38,6 @@ function TerminalInput({ sessionId, onSendInput, onStopSession, isActive }) {
     }
   };
 
-  const handlePressAnyKey = () => {
-    if (isActive) {
-      console.log('Sending single character for "Press any key"');
-      // Send a special marker to indicate this is a "press any key" input
-      onSendInput('__PRESS_ANY_KEY__');
-    }
-  };
 
   const handleStopSession = () => {
     if (isActive && sessionId && onStopSession) {
@@ -51,6 +54,7 @@ function TerminalInput({ sessionId, onSendInput, onStopSession, isActive }) {
   return (
     <form onSubmit={handleInputSubmit} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '0.5rem' }}>
         <input
+          ref={inputRef}
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -90,24 +94,6 @@ function TerminalInput({ sessionId, onSendInput, onStopSession, isActive }) {
         </button>
         <button 
           type="button"
-          onClick={handlePressAnyKey}
-          disabled={!isActive}
-          style={{ 
-            padding: '0.5rem 1rem',
-            backgroundColor: '#28a745',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: isActive ? 'pointer' : 'not-allowed',
-            opacity: isActive ? 1 : 0.6,
-            fontSize: '0.9rem',
-            height: '36px'
-          }}
-        >
-          Any Key
-        </button>
-        <button 
-          type="button"
           onClick={handleStopSession}
           disabled={!isActive}
           style={{ 
@@ -128,6 +114,8 @@ function TerminalInput({ sessionId, onSendInput, onStopSession, isActive }) {
         </button>
     </form>
   );
-}
+});
+
+TerminalInput.displayName = 'TerminalInput';
 
 export default TerminalInput;

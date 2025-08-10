@@ -117,3 +117,20 @@ function lh_ask_for_input() {
         fi
     done
 }
+
+# Standard function for "Press any key to continue" prompts
+# Automatically skips prompt when running in GUI mode
+# $1: (Optional) Custom message key - defaults to 'PRESS_KEY_CONTINUE'
+function lh_press_any_key() {
+    local message_key="${1:-PRESS_KEY_CONTINUE}"
+    
+    # Skip prompt entirely when running in GUI mode
+    if [[ "${LH_GUI_MODE:-false}" == "true" ]]; then
+        lh_log_msg "DEBUG" "Skipping 'press any key' prompt in GUI mode"
+        return 0
+    fi
+    
+    # Show prompt in CLI mode
+    read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg "$message_key")${LH_COLOR_RESET}")" -n1 -s
+    echo  # Add newline after the prompt
+}

@@ -96,7 +96,7 @@ restore_menu() {
                 ;;
         esac
         
-        read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")" -n1 -s
+        lh_press_any_key
         echo ""
     done
 }
@@ -393,7 +393,7 @@ backup_menu() {
                 ;;
         esac
         
-        read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")" -n1 -s
+        lh_press_any_key
         echo ""
     done
 }

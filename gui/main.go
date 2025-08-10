@@ -596,17 +596,9 @@ func sendInput(c *fiber.Ctx) error {
 	// Send input to the PTY
 	log.Printf("Sending input to PTY: '%s'", input.Data)
 	
-	var inputBytes []byte
-	// Check if this is a "press any key" marker
-	if input.Data == "__PRESS_ANY_KEY__" {
-		// Send just a single space character without newline for "press any key" prompts
-		inputBytes = []byte(" ")
-		log.Printf("Sending 'press any key' input: space character (no newline)")
-	} else {
-		// Send normal input with newline (including single digit menu choices)
-		inputBytes = []byte(input.Data + "\n")
-		log.Printf("Sending normal input: '%s' + newline", input.Data)
-	}
+	// Send normal input with newline (including single digit menu choices)
+	inputBytes := []byte(input.Data + "\n")
+	log.Printf("Sending normal input: '%s' + newline", input.Data)
 	
 	_, err := session.PTY.Write(inputBytes)
 	if err != nil {
