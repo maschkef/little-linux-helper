@@ -27,8 +27,10 @@ The primary goal of this project is to be as compatible as possible across a wid
 
 **Purpose:**
 - Starting point of the program.
+- Parsing command line parameters (`-h/--help`, `-g/--gui`).
 - Setting basic shell options (`set -e`, `set -o pipefail`).
 - Determining and exporting the project root directory (`LH_ROOT_DIR`).
+- Setting GUI mode environment variable (`LH_GUI_MODE`) when requested.
 - Loading common library functions from `lib_common.sh`.
 - Executing basic library initialization functions (logging, root check, package manager detection).
 - Displaying the main menu.
@@ -39,14 +41,16 @@ The primary goal of this project is to be as compatible as possible across a wid
 1.  `set -e`: Exits the script immediately if a command fails with a non-zero exit code.
 2.  `set -o pipefail`: Ensures that the exit code of a pipe is that of the last command to return non-zero.
 3.  `export LH_ROOT_DIR`: Determines the directory where `help_master.sh` is located and sets it as `LH_ROOT_DIR`, making it globally available.
-4.  `source "$LH_ROOT_DIR/lib/lib_common.sh"`: Loads all functions and variables from the common library into the current shell environment.
-5.  `lh_ensure_config_files_exist`: Ensures that configuration files exist by copying example files if needed.
-6.  `lh_load_general_config`: Loads general configuration including language and logging settings from `general.conf`.
-7.  `lh_initialize_logging`: Initializes the logging system (see description in `lib_common.sh`).
-8.  `lh_check_root_privileges`: Checks for root privileges and sets `LH_SUDO_CMD` (see description in `lib_common.sh`).
-9.  `lh_detect_package_manager`: Detects the primary package manager and sets `LH_PKG_MANAGER` (see description in `lib_common.sh`).
-10. `lh_detect_alternative_managers`: Detects alternative package managers and sets `LH_ALT_PKG_MANAGERS` (see description in `lib_common.sh`).
-11. `lh_finalize_initialization`: Executes final library initialization steps, particularly loading the backup configuration, initializing the internationalization system, and exporting important variables (see description in `lib_common.sh`).
+4.  **Command Line Argument Parsing**: Processes `-h/--help` and `-g/--gui` parameters. Sets `LH_GUI_MODE=true` when GUI mode is requested.
+5.  **Help Display**: Shows comprehensive usage information if `-h/--help` is specified, then exits.
+6.  `source "$LH_ROOT_DIR/lib/lib_common.sh"`: Loads all functions and variables from the common library into the current shell environment.
+7.  `lh_ensure_config_files_exist`: Ensures that configuration files exist by copying example files if needed.
+8.  `lh_load_general_config`: Loads general configuration including language and logging settings from `general.conf`.
+9.  `lh_initialize_logging`: Initializes the logging system (see description in `lib_common.sh`).
+10. `lh_check_root_privileges`: Checks for root privileges and sets `LH_SUDO_CMD` (see description in `lib_common.sh`).
+11. `lh_detect_package_manager`: Detects the primary package manager and sets `LH_PKG_MANAGER` (see description in `lib_common.sh`).
+12. `lh_detect_alternative_managers`: Detects alternative package managers and sets `LH_ALT_PKG_MANAGERS` (see description in `lib_common.sh`).
+13. `lh_finalize_initialization`: Executes final library initialization steps, particularly loading the backup configuration, initializing the internationalization system, and exporting important variables (see description in `lib_common.sh`).
 
 **Main Menu and Navigation:**
 After initialization, the script enters an infinite loop that displays the main menu.
@@ -153,6 +157,7 @@ The following variables are defined across the library system. Those marked as "
 - `LH_BACKUP_CONFIG_FILE`: Absolute path to the backup configuration file (`$LH_CONFIG_DIR/backup.conf`).
 - `LH_LOG_FILE`: Absolute path to the current main log file. Set by `lh_initialize_logging`.
 - `LH_SUDO_CMD`: Contains the string 'sudo' if the script is not run as root, otherwise empty. Set by `lh_check_root_privileges`.
+- `LH_GUI_MODE`: Boolean flag ('true'/'false') indicating if the system is running in GUI mode. When 'true', modules automatically skip "Any Key" prompts for seamless operation. Set by the GUI backend or CLI `--gui` parameter. Exported.
 - `LH_PKG_MANAGER`: The detected primary package manager (e.g., 'pacman', 'apt', 'dnf'). Set by `lh_detect_package_manager`.
  `LH_ALT_PKG_MANAGERS`: An array of detected alternative package managers (e.g., 'flatpak', 'snap'). Set by `lh_detect_alternative_managers`. (Modules should call `lh_detect_alternative_managers()` after sourcing `lib_common.sh` to ensure this array is correctly populated in their context, see Section 3.)
 - `LH_TARGET_USER_INFO`: An associative array storing information about the target user for GUI interactions. Populated by `lh_get_target_user_info`. Contains keys like `TARGET_USER`, `USER_DISPLAY`, `USER_XDG_RUNTIME_DIR`, `USER_DBUS_SESSION_BUS_ADDRESS`, `USER_XAUTHORITY`.
@@ -329,6 +334,17 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
     *   **Dependencies:** `read`, `echo`.
     *   **Output:** Prints the user-entered (and validated) string to standard output.
     *   **Usage:** For safely querying user input that must conform to a specific format.
+
+*   `lh_press_any_key(message_key)`
+    *   **Purpose:** Standard function for "Press any key to continue" prompts that automatically handles GUI mode detection.
+    *   **Parameters:**
+        - `$1` (`message_key`): Optional, custom message key for translation (defaults to 'PRESS_KEY_CONTINUE').
+    *   **Dependencies:** `read`, `echo`, `lh_msg`, `lh_log_msg`.
+    *   **Side Effects:**
+        - In CLI mode: Shows translated prompt and waits for single key press.
+        - In GUI mode (`LH_GUI_MODE=true`): Automatically continues without prompt and logs the skip action.
+    *   **Return Value:** Always returns 0.
+    *   **Usage:** Replace all manual "Any Key" prompts with this function for consistent GUI/CLI behavior. Example: `lh_press_any_key` or `lh_press_any_key "CUSTOM_CONTINUE_KEY"`.
 
 *   `lh_get_target_user_info()`
     *   **Purpose:** Determines information about the user of the active graphical session (desktop user) to execute commands in their context.
@@ -748,6 +764,7 @@ When creating a new module for the Little Linux Helper, follow these essential s
 - `lh_msg "KEY"` or `lh_t "KEY"` - Get translated text
 - `lh_log_msg "INFO" "$(lh_msg 'LOG_MESSAGE_KEY')"` - Write internationalized log messages
 - `lh_confirm_action "$(lh_msg 'CONFIRMATION_QUESTION_KEY')"` - Ask yes/no with translated question
+- `lh_press_any_key` - Standard "Press any key" prompt (GUI-aware, automatically skips in GUI mode)
 - `lh_check_command "program"` - Check if program exists (program name doesn't need translation)
 - `lh_send_notification "info" "$(lh_msg 'NOTIFICATION_TITLE_KEY')" "$(lh_msg 'NOTIFICATION_MESSAGE_KEY')"` - Desktop notification with translated content
 

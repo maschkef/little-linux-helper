@@ -12,6 +12,7 @@
 # Main application
 MSG_DE[WELCOME_TITLE]="Little Linux Helper"
 MSG_DE[MAIN_MENU_TITLE]="Little Linux Helper - Hauptmenü"
+MSG_DE[GUI_MODE_ENABLED]="GUI-Modus aktiv - 'Beliebige Taste' Eingabeaufforderungen werden automatisch übersprungen."
 MSG_DE[GOODBYE]="Auf Wiedersehen!"
 
 # Menu categories

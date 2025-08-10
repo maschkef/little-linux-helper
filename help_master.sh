@@ -16,6 +16,58 @@ set -o pipefail
 # Determine and export path to main directory
 export LH_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Parse command line arguments
+show_help=false
+gui_mode=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            show_help=true
+            shift
+            ;;
+        -g|--gui)
+            gui_mode=true
+            shift
+            ;;
+        *)
+            echo "Unknown parameter: $1"
+            echo "Usage: $0 [-h|--help] [-g|--gui]"
+            echo "  -h, --help    Show this help message"
+            echo "  -g, --gui     Run in GUI mode (skip 'Any Key' prompts)"
+            exit 1
+            ;;
+    esac
+done
+
+# Show help if requested
+if [[ "$show_help" == true ]]; then
+    echo "Little Linux Helper - System Administration Toolkit"
+    echo ""
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "OPTIONS:"
+    echo "  -h, --help    Show this help message and exit"
+    echo "  -g, --gui     Run in GUI mode (automatically skip 'Any Key' prompts)"
+    echo ""
+    echo "DESCRIPTION:"
+    echo "  Interactive menu-driven system administration tool for Linux."
+    echo "  Provides modules for system information, backups, security checks,"
+    echo "  package management, and more."
+    echo ""
+    echo "EXAMPLES:"
+    echo "  $0              # Normal interactive mode"
+    echo "  $0 --gui        # GUI mode (no 'Any Key' prompts)"
+    echo "  $0 --help       # Show this help"
+    echo ""
+    exit 0
+fi
+
+# Set GUI mode environment variable if requested
+if [[ "$gui_mode" == true ]]; then
+    export LH_GUI_MODE=true
+fi
+
 # Load library with common functions
 source "$LH_ROOT_DIR/lib/lib_common.sh"
 
@@ -33,6 +85,11 @@ export LH_INITIALIZED=1
 
 # Load main menu translations
 lh_load_language_module "main_menu"
+
+# Log GUI mode message after translations are loaded
+if [[ "$LH_GUI_MODE" == "true" ]]; then
+    lh_log_msg "INFO" "$(lh_msg "GUI_MODE_ENABLED")"
+fi
 
 # Welcome message
 echo -e "${LH_COLOR_BOLD_YELLOW}╔════════════════════════════════════════════╗${LH_COLOR_RESET}"

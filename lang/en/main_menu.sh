@@ -12,6 +12,7 @@
 # Main application
 MSG_EN[WELCOME_TITLE]="Little Linux Helper"
 MSG_EN[MAIN_MENU_TITLE]="Little Linux Helper - Main Menu"
+MSG_EN[GUI_MODE_ENABLED]="Running in GUI mode - 'Any Key' prompts will be skipped automatically."
 MSG_EN[GOODBYE]="Goodbye!"
 
 # Menu categories

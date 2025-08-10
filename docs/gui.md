@@ -44,7 +44,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   **Key Components:**
         *   `ModuleList.js` - Categorized sidebar navigation with module hierarchy and individual start buttons
         *   `Terminal.js` - Real-time terminal output display with ANSI color support and session management
-        *   `TerminalInput.js` - Interactive input handling with "Send", "Any Key", and "Stop" buttons
+        *   `TerminalInput.js` - Interactive input handling with "Send" and "Stop" buttons, click-to-focus functionality
         *   `SessionDropdown.js` - Multi-session management with session switching and status indicators
         *   `SessionContext.js` - React context for centralized session state management
         *   `HelpPanel.js` - Context-sensitive help with user-friendly descriptions and practical guidance
@@ -70,8 +70,10 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 *   **Execution Environment:**
     *   Preserves all environment variables from the original CLI system
     *   Maintains `LH_ROOT_DIR` and other critical project variables
+    *   Sets `LH_GUI_MODE=true` environment variable for GUI-aware module behavior
     *   Uses PTY for authentic terminal behavior with color support
     *   Handles interactive prompts and menu selections seamlessly
+    *   Automatic "Any Key" prompt detection and continuation
 
 **5. Setup & Deployment:**
 
@@ -122,6 +124,8 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   Interactive input handling for all module prompts
     *   Session-aware terminal with automatic output switching
     *   Copy/paste functionality and text selection
+    *   Click-to-focus: clicking anywhere in terminal automatically focuses input field
+    *   Automatic "Any Key" prompt handling - modules continue without user intervention
     *   Direct session control with integrated "Stop" button
 
 *   **Module Help & Documentation System:**
@@ -231,6 +235,13 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   `./little-linux-helper-gui -n -p 80` - Network access on port 80
     *   `./little-linux-helper-gui -h` - Show usage information (short form)
     *   `./little-linux-helper-gui --help` - Show usage information (long form)
+
+    **CLI GUI Mode Testing:**
+    *   `./help_master.sh` - Normal CLI mode with "Any Key" prompts
+    *   `./help_master.sh -g` - CLI in GUI mode (short form) - skips "Any Key" prompts automatically
+    *   `./help_master.sh --gui` - CLI in GUI mode (long form) - skips "Any Key" prompts automatically
+    *   `./help_master.sh -h` - Show CLI help information (short form)
+    *   `./help_master.sh --help` - Show CLI help information (long form)
 
 *   **Multi-Session Workflow:**
     *   **Module Selection:** Click modules in sidebar to select (doesn't start session)
