@@ -314,7 +314,7 @@ CFG_LH_LANG="fr"      # French (practically unusable, only internal messages)
 * Some functions may require root privileges and will use `sudo` if necessary.
 
 ### GUI Requirements (optional):
-* **Go** (1.21 or later) for backend server compilation
+* **Go** (1.18 or later) for backend server compilation
 * **Node.js** (16 or later) and **npm** for frontend development and building
 * **Web browser** for accessing the GUI interface
 * Additional system dependencies: `github.com/gofiber/fiber/v2`, `github.com/gofiber/websocket/v2`, `github.com/creack/pty` (installed automatically)
@@ -359,7 +359,7 @@ The script attempts to automatically detect the package manager in use (pacman, 
     ```
 
 ### GUI Installation (optional):
-1. Ensure Go (1.21+) and Node.js (16+) are installed on your system.
+1. Ensure Go (1.18+) and Node.js (16+) are installed on your system.
 2. Make the GUI launcher executable:
     ```bash
     chmod +x gui_launcher.sh

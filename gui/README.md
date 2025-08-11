@@ -27,7 +27,7 @@ A modern web-based GUI for the Little Linux Helper system administration toolkit
 
 ## Prerequisites
 
-- Go 1.21 or later
+- Go 1.18 or later
 - Node.js 16 or later
 - npm (comes with Node.js)
 

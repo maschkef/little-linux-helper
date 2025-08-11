@@ -314,7 +314,7 @@ CFG_LH_LANG="fr"      # Französisch (praktisch unbrauchbar, nur interne Meldung
 * Einige Funktionen erfordern möglicherweise Root-Rechte und werden ggf. `sudo` verwenden.
 
 ### GUI-Anforderungen (optional):
-* **Go** (1.21 oder neuer) für Backend-Server-Kompilierung
+* **Go** (1.18 oder neuer) für Backend-Server-Kompilierung
 * **Node.js** (16 oder neuer) und **npm** für Frontend-Entwicklung und -Erstellung
 * **Webbrowser** für den Zugriff auf die GUI-Oberfläche
 * Zusätzliche System-Abhängigkeiten: `github.com/gofiber/fiber/v2`, `github.com/gofiber/websocket/v2`, `github.com/creack/pty` (automatisch installiert)
@@ -359,7 +359,7 @@ Das Skript versucht, den verwendeten Paketmanager (pacman, yay, apt, dnf) automa
     ```
 
 ### GUI-Installation (optional):
-1. Stelle sicher, dass Go (1.21+) und Node.js (16+) auf deinem System installiert sind.
+1. Stelle sicher, dass Go (1.18+) und Node.js (16+) auf deinem System installiert sind.
 2. Mache den GUI-Launcher ausführbar:
     ```bash
     chmod +x gui_launcher.sh
