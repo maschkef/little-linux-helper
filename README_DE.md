@@ -69,12 +69,20 @@ Das Hauptskript `help_master.sh` dient als zentraler CLI-Einstiegspunkt und biet
 ### 🌐 **Graphische Benutzeroberfläche (GUI)**
 Eine moderne webbasierte GUI ist über `gui_launcher.sh` verfügbar und bietet:
 - **Webbasierte Oberfläche**: Moderne React-Frontend mit responsivem Design, zugänglich über Webbrowser
+- **Multi-Session-Unterstützung**: Unbegrenzte gleichzeitige Modul-Sitzungen mit Session-Dropdown-Verwaltung
 - **Echtzeit-Terminal**: Integrierte Terminal-Anzeige mit ANSI-Farbunterstützung und interaktiver Eingabebehandlung
-- **Modul-Navigation**: Kategorisierte Seitenleiste mit intuitiver Modul-Organisation und Suchfunktionen
-- **Dokumentations-Integration**: Eingebauter Markdown-Viewer für Modul-Dokumentation aus dem `docs/` Verzeichnis
-- **Multi-Panel-Layout**: Größenveränderbare Panels für optimale Arbeitsbereich-Organisation
-- **Sitzungs-Management**: Mehrere gleichzeitige Modul-Ausführungen mit unabhängigen Sitzungen
+- **Erweiterte Sitzungsverwaltung**: Sitzungsumschaltung, Status-Anzeigen, Ausgabe-Erhaltung und individuelle Sitzungskontrolle
+- **Modul-Navigation**: Kategorisierte Seitenleiste mit individuellen "Start"-Schaltflächen und intuitiver Modul-Auswahl (ausblendbar)
+- **Erweiterte Dokumentations-System**: Dual-Modus-Dokumentation mit modulgebundenen Docs und unabhängigem Dokumenten-Browser
+- **Dokumenten-Browser**: Kategorisierte Navigation durch alle Dokumentation mit zusammenklappbaren Gruppen und Suche
+- **Panel-Kontroll-System**: Ein-/Ausblenden von Modul-Seitenleiste, Terminal-Panels, Hilfe und Docs für optimales Leseerlebnis
+- **Vollbild-Lesemodus**: Alle Panels außer Dokumentation ausblenden für maximalen Leseplatz
+- **Multi-Panel-Layout**: Größenveränderbare Panels mit flexiblen Ein-/Ausblenden-Kontrollen für optimale Arbeitsbereich-Organisation
+- **Sicherheits-Features**: Standardmäßig nur Localhost-Bindung mit optionalem Netzwerkzugriff über Kommandozeile
+- **Konfigurierbare Netzwerkeinstellungen**: Port- und Host-Konfiguration über `config/general.conf` oder Kommandozeilen-Argumente
 - **Erweiterte Funktionen**: PTY-Integration für authentische Terminal-Erfahrung, WebSocket-Kommunikation für Echtzeit-Updates
+
+> **⚠️ Wichtiger Hinweis zur Sprache:** Die GUI ist derzeit nur in englischer Sprache verfügbar. Eine deutsche Lokalisierung ist für zukünftige Versionen geplant. Die CLI-Module bleiben vollständig in deutscher Sprache verfügbar.
 
 Die GUI behält vollständige Kompatibilität mit allen CLI-Funktionen bei und bietet gleichzeitig eine verbesserte Benutzererfahrung mit leistungsstarken Multi-Session-Funktionen.
 

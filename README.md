@@ -71,12 +71,17 @@ A modern web-based GUI is available through `gui_launcher.sh`, providing:
 - **Multi-Session Support**: Unlimited concurrent module sessions with session dropdown management
 - **Real-time Terminal**: Integrated terminal display with ANSI color support and interactive input handling
 - **Advanced Session Management**: Session switching, status indicators, output preservation, and individual session control
-- **Module Navigation**: Categorized sidebar with individual "Start" buttons and intuitive module selection
-- **Documentation Integration**: Built-in markdown viewer for module documentation from the `docs/` directory
-- **Multi-panel Layout**: Resizable panels for optimal workspace organization
+- **Module Navigation**: Categorized sidebar with individual "Start" buttons and intuitive module selection (hideable)
+- **Enhanced Documentation System**: Dual-mode documentation with module-bound docs and independent document browser
+- **Document Browser**: Categorized navigation through all documentation with collapsible groups and search
+- **Panel Control System**: Hide/show modules sidebar, terminal panels, help, and docs for optimal reading experience
+- **Full-Screen Reading Mode**: Hide all panels except documentation for maximum reading space
+- **Multi-panel Layout**: Resizable panels with flexible show/hide controls for optimal workspace organization
 - **Security Features**: Localhost-only binding by default with optional network access via command line
 - **Configurable Networking**: Port and host configuration via `config/general.conf` or command line arguments
 - **Advanced Features**: PTY integration for authentic terminal experience, WebSocket communication for real-time updates
+
+> **📝 Note:** The GUI currently displays in English only. Internationalization (i18n) support is planned for future releases.
 
 <details>
 <summary>GUI Configuration & Usage:</summary>

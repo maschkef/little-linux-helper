@@ -6,13 +6,17 @@ A modern web-based GUI for the Little Linux Helper system administration toolkit
 
 - **Multi-session management** - Run unlimited concurrent module sessions
 - **Advanced session control** - Session dropdown with switching, status indicators, and individual session management
-- **Multi-panel interface** with module list, terminal output, help panel, and documentation viewer
+- **Flexible panel system** with hideable module list, terminal panels, help, and documentation areas
+- **Panel toggle controls** - Hide/show modules sidebar, terminal panels, help, and docs independently
+- **Full-screen reading mode** - Hide all panels except documentation for maximum reading space
 - **Real-time terminal output** via WebSockets with session-aware output switching
 - **Interactive module execution** with comprehensive input capabilities (Send, Any Key, Stop buttons)
 - **Flexible module starting** - Individual "Start" buttons per module plus global "New Session" button
 - **Session persistence** - Sessions remain accessible across browser windows and tabs
 - **Built-in help system** with module-specific guidance
-- **Markdown documentation viewer** for all modules
+- **Enhanced documentation system** - Dual-mode documentation with module-bound and independent browser modes
+- **Document browser** - Categorized navigation through all documentation with collapsible groups
+- **Scrollable documentation interface** - Navigation sidebar can be hidden and scrolls smoothly
 - **Configurable networking** - Port and host configuration with security-first defaults
 - **Security features** - Localhost-only binding by default with optional network access
 - **Responsive design** that works on different screen sizes
@@ -59,6 +63,7 @@ The Go backend serves the React build and provides API endpoints:
 
 - `/api/modules` - List available modules
 - `/api/modules/:id/docs` - Get module documentation
+- `/api/docs` - List all available documentation files with metadata for document browser
 - `/api/modules/:id/start` - Start a module session
 - `/api/sessions` - List all active sessions
 - `/api/sessions/:sessionId/input` - Send input to module
@@ -68,13 +73,15 @@ The Go backend serves the React build and provides API endpoints:
 ### Frontend Development
 The React frontend provides a modern interface with:
 
-- **ModuleList**: Sidebar with categorized modules and individual "Start" buttons
+- **ModuleList**: Sidebar with categorized modules and individual "Start" buttons (hideable)
 - **SessionDropdown**: Multi-session management with switching and status indicators
-- **Terminal**: Real-time terminal output and input with session awareness
+- **Terminal**: Real-time terminal output and input with session awareness (hideable)
 - **TerminalInput**: Enhanced input handling with Send, Any Key, and Stop buttons
 - **SessionContext**: React context for centralized session state management
-- **HelpPanel**: Context-sensitive help for each module
-- **DocsPanel**: Markdown documentation viewer
+- **HelpPanel**: Context-sensitive help for each module (hideable)
+- **DocsPanel**: Module-bound markdown documentation viewer (hideable)
+- **DocumentBrowser**: Independent documentation browser with categorized navigation and search
+- **ResizablePanels**: Flexible panel layout with show/hide controls for all panels
 
 ### Project Structure
 
@@ -89,10 +96,18 @@ gui/
     ├── package.json    # Node.js dependencies
     ├── public/         # Static files
     └── src/            # React source code
-        ├── App.js      # Main application component
-        ├── index.js    # Entry point
+        ├── App.jsx     # Main application component with panel controls
+        ├── index.jsx   # Entry point
         ├── index.css   # Global styles
         ├── components/ # React components
+        │   ├── ModuleList.jsx         # Module sidebar (hideable)
+        │   ├── Terminal.jsx           # Terminal output (hideable)
+        │   ├── TerminalInput.jsx      # Terminal input controls
+        │   ├── SessionDropdown.jsx    # Session management
+        │   ├── HelpPanel.jsx          # Context help (hideable)
+        │   ├── DocsPanel.jsx          # Module-bound docs (hideable)
+        │   ├── DocumentBrowser.jsx    # Independent document browser
+        │   └── ResizablePanels.jsx    # Panel layout management
         └── contexts/   # React contexts (SessionContext)
 ```
 
@@ -116,19 +131,37 @@ The GUI integrates seamlessly with the existing Little Linux Helper system:
    - Switch between active sessions
    - View session status (running/stopped)
    - Close individual sessions (except the last one)
-4. **Monitor Output**: Watch real-time output in the terminal panel (switches with active session)
-5. **Send Input**: Use the terminal input area with:
+4. **Control Panel Layout**: Use the panel toggle buttons to:
+   - **Hide Modules**: Hide sidebar to expand content area
+   - **Hide Terminal**: Hide terminal panels for documentation focus
+   - **Hide Help**: Hide help panel when not needed
+   - **Show/Hide Docs**: Toggle documentation panel visibility
+5. **Monitor Output**: Watch real-time output in the terminal panel (switches with active session)
+6. **Send Input**: Use the terminal input area with:
    - **Text Input**: Type responses and click "Send" or press Enter
    - **Any Key**: Click for "press any key" prompts
    - **Stop**: Red button to immediately stop the current session
-6. **View Help**: Context-sensitive help appears in the help panel
-7. **Read Documentation**: Full module documentation is shown in the docs panel
+7. **View Help**: Context-sensitive help appears in the help panel
+8. **Browse Documentation**: Choose between:
+   - **Module-bound docs**: Traditional documentation tied to selected modules
+   - **Document browser**: Independent browsing through all documentation with categories
 
 ### Multi-Session Features
 - **Unlimited Sessions**: Run as many concurrent modules as needed
 - **Session Persistence**: Sessions remain accessible when opening new browser windows
 - **Output Preservation**: Each session maintains its own output history
 - **Status Tracking**: Visual indicators show which sessions are running or stopped
+
+### Documentation & Reading Features
+- **Dual Documentation Modes**:
+  - **Module-bound Mode**: Traditional docs that update based on selected module
+  - **Document Browser Mode**: Independent browsing through all available documentation
+- **Categorized Navigation**: Documents organized into logical groups (System Admin, Backup, Docker, etc.)
+- **Collapsible Categories**: Expand/collapse document groups for better organization
+- **Hideable Navigation**: Document browser sidebar can be hidden to maximize reading space
+- **Scrollable Interface**: Long document lists scroll smoothly within navigation panel
+- **Full-Screen Reading**: Hide all panels except documentation for distraction-free reading
+- **Flexible Panel Layout**: All panels (modules, terminal, help, docs) can be hidden independently
 
 ## Configuration
 
@@ -232,10 +265,13 @@ CFG_LH_GUI_HOST="localhost"
 
 This GUI is designed to be extended easily:
 
-1. **Add new modules**: They will be automatically detected
-2. **Extend help content**: Update the help content in `HelpPanel.js`
-3. **Improve UI**: React components are modular and easy to modify
-4. **Add features**: The API can be extended for new functionality
+1. **Add new modules**: They will be automatically detected and categorized
+2. **Extend help content**: Update the help content in `HelpPanel.jsx`
+3. **Improve documentation**: Add new docs to `docs/` directory - they'll appear in the document browser
+4. **Enhance UI**: React components are modular and easy to modify
+5. **Add panel features**: Extend panel controls in `App.jsx` and `ResizablePanels.jsx`
+6. **Improve document browser**: Extend categories and features in `DocumentBrowser.jsx`
+7. **Add API features**: The backend API can be extended for new functionality
 
 ## License
 

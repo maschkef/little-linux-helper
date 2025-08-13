@@ -8,6 +8,9 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
+import { defaultSchema } from 'hast-util-sanitize';
 
 function DocsPanel({ content, selectedModule, onModuleSelect }) {
   const [currentDoc, setCurrentDoc] = useState('');
@@ -65,6 +68,24 @@ function DocsPanel({ content, selectedModule, onModuleSelect }) {
 
   const displayContent = currentDoc || content;
   const cleanContent = stripLicenseHeader(displayContent);
+  
+  // Custom sanitize schema to allow HTML elements used in README files
+  const customSanitizeSchema = {
+    ...defaultSchema,
+    tagNames: [
+      ...defaultSchema.tagNames,
+      'details',
+      'summary',
+      'img'
+    ],
+    attributes: {
+      ...defaultSchema.attributes,
+      img: ['src', 'alt', 'width', 'height', 'align', 'style'],
+      details: ['open', 'style'],
+      summary: ['style'],
+      '*': ['className', 'style'] // Allow style attributes for custom styling
+    }
+  };
   
   // Get related docs for current module
   const moduleRelatedDocs = selectedModule && relatedDocs[selectedModule.id] ? relatedDocs[selectedModule.id] : [];
@@ -133,7 +154,65 @@ function DocsPanel({ content, selectedModule, onModuleSelect }) {
           {isLoadingRelated ? (
             <p>Loading related documentation...</p>
           ) : (
-            <ReactMarkdown>{cleanContent}</ReactMarkdown>
+            <ReactMarkdown 
+              key={displayContent} // Prevent unnecessary re-renders
+              rehypePlugins={[rehypeRaw, [rehypeSanitize, customSanitizeSchema]]}
+              components={{
+                img: ({node, ...props}) => {
+                  // Handle image paths for README files
+                  let src = props.src;
+                  if (src && !src.startsWith('http') && !src.startsWith('/')) {
+                    // Special handling for header logo in README files
+                    if (src.includes('header-logo.svg')) {
+                      src = '/header-logo.svg';
+                    } else {
+                      src = '/' + src;
+                    }
+                  }
+                  return (
+                    <img 
+                      {...props} 
+                      src={src}
+                      style={{
+                        maxWidth: '100%',
+                        height: 'auto',
+                        ...props.style
+                      }}
+                    />
+                  );
+                },
+                details: ({node, ...props}) => {
+                  // Use a controlled component approach to prevent auto-closing
+                  return (
+                    <details 
+                      {...props}
+                      style={{
+                        marginBottom: '10px',
+                        border: '1px solid #34495e',
+                        borderRadius: '4px',
+                        backgroundColor: '#34495e'
+                      }}
+                    />
+                  );
+                },
+                summary: ({node, ...props}) => (
+                  <summary 
+                    {...props}
+                    style={{
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      backgroundColor: '#2c3e50',
+                      borderRadius: '3px',
+                      outline: 'none',
+                      ...props.style
+                    }}
+                  />
+                )
+              }}
+            >
+              {cleanContent}
+            </ReactMarkdown>
           )}
         </div>
       ) : (

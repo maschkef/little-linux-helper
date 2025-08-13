@@ -241,6 +241,9 @@ func main() {
 	// Get module documentation
 	api.Get("/modules/:id/docs", getModuleDocs)
 
+	// Get all available documentation
+	api.Get("/docs", getAllDocs)
+
 	// Start a module session
 	api.Post("/modules/:id/start", startModule)
 
@@ -380,33 +383,47 @@ func getModuleDocs(c *fiber.Ctx) error {
 
 	// Map module IDs to documentation files
 	docFiles := map[string]string{
-		// Main modules
-		"restarts":    "mod_restarts.md",
-		"system_info": "mod_system_info.md",
-		"disk":        "mod_disk.md",
-		"logs":        "mod_logs.md",
-		"packages":    "mod_packages.md",
-		"security":    "mod_security.md",
-		"energy":      "mod_energy.md",
+		// Main modules (both with and without mod_ prefix)
+		"restarts":        "mod_restarts.md",
+		"mod_restarts":    "mod_restarts.md",
+		"system_info":     "mod_system_info.md",
+		"mod_system_info": "mod_system_info.md",
+		"disk":            "mod_disk.md",
+		"mod_disk":        "mod_disk.md",
+		"logs":            "mod_logs.md",
+		"mod_logs":        "mod_logs.md",
+		"packages":        "mod_packages.md",
+		"mod_packages":    "mod_packages.md",
+		"security":        "mod_security.md",
+		"mod_security":    "mod_security.md",
+		"energy":          "mod_energy.md",
+		"mod_energy":      "mod_energy.md",
 
 		// Docker modules
 		"docker":              "mod_docker.md",
+		"mod_docker":          "mod_docker.md",
 		"mod_docker_setup":    "mod_docker_setup.md",
 		"mod_docker_security": "mod_docker_security.md",
 
 		// Backup modules
-		"backup":            "mod_backup.md",
-		"btrfs_backup":      "mod_btrfs_backup.md",
-		"btrfs_restore":     "mod_btrfs_restore.md",
-		"mod_btrfs_backup":  "mod_btrfs_backup.md",
-		"mod_btrfs_restore": "mod_btrfs_restore.md",
-		"mod_backup_tar":    "mod_backup_tar.md",
-		"mod_restore_tar":   "mod_restore_tar.md",
-		"mod_backup_rsync":  "mod_backup_rsync.md",
-		"mod_restore_rsync": "mod_restore_rsync.md",
+		"backup":              "mod_backup.md",
+		"mod_backup":          "mod_backup.md",
+		"btrfs_backup":        "mod_btrfs_backup.md",
+		"mod_btrfs_backup":    "mod_btrfs_backup.md",
+		"btrfs_restore":       "mod_btrfs_restore.md",
+		"mod_btrfs_restore":   "mod_btrfs_restore.md",
+		"mod_backup_tar":      "mod_backup_tar.md",
+		"mod_restore_tar":     "mod_restore_tar.md",
+		"mod_backup_rsync":    "mod_backup_rsync.md",
+		"mod_restore_rsync":   "mod_restore_rsync.md",
 
 		// Other documentation
 		"advanced_log_analyzer": "advanced_log_analyzer.md",
+		"lib_btrfs":              "lib_btrfs.md",
+		"DEVELOPER_GUIDE":        "DEVELOPER_GUIDE.md",
+		"gui":                    "gui.md",
+		"README":                 "../README.md",
+		"gui_README":             "../gui/README.md",
 	}
 
 	docFile, exists := docFiles[moduleId]
@@ -421,6 +438,66 @@ func getModuleDocs(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"content": string(content)})
+}
+
+func getAllDocs(c *fiber.Ctx) error {
+	// Define all available documentation with metadata
+	allDocs := []struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Filename    string `json:"filename"`
+	}{
+		// System Administration
+		{ID: "mod_system_info", Name: "System Information", Description: "Show comprehensive system information and hardware details", Filename: "mod_system_info.md"},
+		{ID: "mod_security", Name: "Security Analysis", Description: "Perform security audits and checks", Filename: "mod_security.md"},
+		{ID: "mod_disk", Name: "Disk Management", Description: "Disk utilities and storage analysis tools", Filename: "mod_disk.md"},
+		{ID: "mod_packages", Name: "Package Management", Description: "Manage packages and system updates", Filename: "mod_packages.md"},
+		{ID: "mod_energy", Name: "Energy Management", Description: "Power management and energy optimization", Filename: "mod_energy.md"},
+
+		// Backup & Recovery
+		{ID: "mod_backup", Name: "General Backup", Description: "Backup and restore operations", Filename: "mod_backup.md"},
+		{ID: "mod_btrfs_backup", Name: "BTRFS Backup", Description: "Advanced BTRFS snapshot-based backup system", Filename: "mod_btrfs_backup.md"},
+		{ID: "mod_btrfs_restore", Name: "BTRFS Restore", Description: "BTRFS snapshot restoration with dry-run support", Filename: "mod_btrfs_restore.md"},
+		{ID: "mod_backup_tar", Name: "TAR Backup", Description: "Archive-based backups", Filename: "mod_backup_tar.md"},
+		{ID: "mod_restore_tar", Name: "TAR Restore", Description: "Restore from TAR archives", Filename: "mod_restore_tar.md"},
+		{ID: "mod_backup_rsync", Name: "RSYNC Backup", Description: "Incremental file-based backups", Filename: "mod_backup_rsync.md"},
+		{ID: "mod_restore_rsync", Name: "RSYNC Restore", Description: "Restore from RSYNC backups", Filename: "mod_restore_rsync.md"},
+
+		// Docker & Containers
+		{ID: "mod_docker", Name: "Docker Management", Description: "Docker management and security tools", Filename: "mod_docker.md"},
+		{ID: "mod_docker_setup", Name: "Docker Setup", Description: "Install and configure Docker", Filename: "mod_docker_setup.md"},
+		{ID: "mod_docker_security", Name: "Docker Security", Description: "Security audit for Docker containers", Filename: "mod_docker_security.md"},
+
+		// Logs & Analysis
+		{ID: "mod_logs", Name: "Log Analysis", Description: "Analyze system logs and troubleshoot issues", Filename: "mod_logs.md"},
+		{ID: "advanced_log_analyzer", Name: "Advanced Log Analyzer", Description: "Python-based log analysis tool", Filename: "advanced_log_analyzer.md"},
+
+		// System Maintenance
+		{ID: "mod_restarts", Name: "System Restarts", Description: "Restart system services and desktop environment components", Filename: "mod_restarts.md"},
+
+		// Development & Libraries
+		{ID: "lib_btrfs", Name: "BTRFS Library", Description: "Advanced BTRFS operations and utilities", Filename: "lib_btrfs.md"},
+		{ID: "DEVELOPER_GUIDE", Name: "Developer Guide", Description: "Development guidelines and architecture documentation", Filename: "DEVELOPER_GUIDE.md"},
+
+		// Project Information
+		{ID: "gui", Name: "GUI Documentation", Description: "Web-based graphical interface documentation", Filename: "gui.md"},
+		{ID: "README", Name: "Project README", Description: "Main project overview, features, and usage guide", Filename: "../README.md"},
+		{ID: "gui_README", Name: "GUI README", Description: "GUI-specific setup, development, and usage guide", Filename: "../gui/README.md"},
+	}
+
+	// Filter to only include documents that actually exist
+	var availableDocs []interface{}
+	docsDir := filepath.Join(lhRootDir, "docs")
+
+	for _, doc := range allDocs {
+		docPath := filepath.Join(docsDir, doc.Filename)
+		if _, err := os.Stat(docPath); err == nil {
+			availableDocs = append(availableDocs, doc)
+		}
+	}
+
+	return c.JSON(availableDocs)
 }
 
 func getSessions(c *fiber.Ctx) error {

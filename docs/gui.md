@@ -32,6 +32,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   **API Endpoints:**
         *   `GET /api/modules` - List all available modules with metadata
         *   `GET /api/modules/:id/docs` - Retrieve module documentation (supports both main and related module docs)
+        *   `GET /api/docs` - List all available documentation files with metadata for document browser
         *   `POST /api/modules/:id/start` - Start module execution session
         *   `GET /api/sessions` - List all active sessions with metadata
         *   `POST /api/sessions/:sessionId/input` - Send input to running module
@@ -42,14 +43,15 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 *   **Frontend Application (`web/`):**
     *   **Purpose:** Provides intuitive graphical interface with multi-panel layout for comprehensive module interaction.
     *   **Key Components:**
-        *   `ModuleList.js` - Categorized sidebar navigation with module hierarchy and individual start buttons
-        *   `Terminal.js` - Real-time terminal output display with ANSI color support and session management
-        *   `TerminalInput.js` - Interactive input handling with "Send" and "Stop" buttons, click-to-focus functionality
-        *   `SessionDropdown.js` - Multi-session management with session switching and status indicators
-        *   `SessionContext.js` - React context for centralized session state management
-        *   `HelpPanel.js` - Context-sensitive help with user-friendly descriptions and practical guidance
-        *   `DocsPanel.js` - Integrated markdown documentation viewer with related documentation links and navigation
-        *   `ResizablePanels.js` - Flexible panel layout management
+        *   `ModuleList.jsx` - Categorized sidebar navigation with module hierarchy and individual start buttons
+        *   `Terminal.jsx` - Real-time terminal output display with ANSI color support and session management
+        *   `TerminalInput.jsx` - Interactive input handling with "Send" and "Stop" buttons, click-to-focus functionality
+        *   `SessionDropdown.jsx` - Multi-session management with session switching and status indicators
+        *   `SessionContext.jsx` - React context for centralized session state management
+        *   `HelpPanel.jsx` - Context-sensitive help with user-friendly descriptions and practical guidance
+        *   `DocsPanel.jsx` - Module-bound documentation viewer with related documentation links and navigation
+        *   `DocumentBrowser.jsx` - Independent documentation browser with categorized navigation and search
+        *   `ResizablePanels.jsx` - Flexible panel layout management with hide/show panel controls
     *   **Dependencies (system):** `node.js` (16+), `npm`, React ecosystem.
 
 **4. Module Integration & Discovery:**
@@ -104,11 +106,13 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 
 *   **Multi-Panel Layout:**
     *   Resizable panels for optimal screen space utilization
-    *   Sidebar module navigation with individual "Start" buttons
+    *   Sidebar module navigation with individual "Start" buttons (hideable for reading mode)
     *   Session dropdown for switching between multiple active sessions
-    *   Main terminal area with real-time output display
+    *   Main terminal area with real-time output display (hideable for documentation focus)
     *   Integrated help panel with user-friendly, context-sensitive guidance
-    *   Documentation viewer with markdown rendering and related module documentation links
+    *   Advanced documentation system with both module-bound and independent browser modes
+    *   **Panel Toggle Controls:** Hide/show modules sidebar, terminal panels, help, and docs for optimal screen usage
+    *   **Full-Screen Reading Mode:** Hide all panels except documentation for maximum reading space
 
 *   **Multi-Session Management:**
     *   Support for unlimited concurrent module sessions
@@ -128,13 +132,15 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   Automatic "Any Key" prompt handling - modules continue without user intervention
     *   Direct session control with integrated "Stop" button
 
-*   **Module Help & Documentation System:**
-    *   Comprehensive help content for each module with user-friendly descriptions
-    *   Available options and menu explanations with practical context
-    *   Important notes and prerequisites clearly explained
-    *   Real-time updates based on selected module
-    *   Related documentation links for module families (backup, docker, etc.)
-    *   Integrated navigation between main module docs and related documentation
+*   **Advanced Documentation System:**
+    *   **Module-Bound Mode:** Traditional documentation tied to selected modules with related doc links
+    *   **Independent Document Browser:** Browse all documentation regardless of current module selection
+    *   **Categorized Navigation:** Documents organized by logical groups (System Admin, Backup, Docker, etc.)
+    *   **Collapsible Categories:** Expandable/collapsible document groups for better organization
+    *   **Hideable Sidebar:** Document browser navigation can be hidden to maximize reading space
+    *   **Scrollable Interface:** Long document lists scroll smoothly within navigation panel
+    *   **Dual View Toggle:** Switch between module-bound and browser modes with on/off slider
+    *   **Full Documentation Coverage:** Access to all project documentation from single interface
 
 **7. Special Considerations:**
 
@@ -250,13 +256,35 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   **Session Control:** Use "Stop" button in terminal or "×" in session dropdown
     *   **Session Persistence:** Sessions remain accessible in new browser windows
 
+*   **Panel Control & Reading Modes:**
+    *   **Hide Modules:** Click "Hide Modules" to hide sidebar and expand content area to full width
+    *   **Hide Terminal:** Click "Hide Terminal" to hide all terminal panels for documentation focus
+    *   **Full-Screen Reading:** Hide both modules and terminal panels for maximum documentation space
+    *   **Document Browser:** Toggle between module-bound docs and independent document browser
+    *   **Flexible Layout:** All panels can be shown/hidden independently for optimal workflow
+    *   **Navigation Toggle:** Document browser navigation can be hidden to maximize reading area
+
 *   **Security Considerations:**
     *   **Default secure:** GUI only accessible from localhost by default
     *   **Network mode warnings:** Clear warnings displayed when network access enabled
     *   **Firewall awareness:** Network mode requires proper firewall configuration
     *   **Same privileges:** GUI runs with same user permissions as CLI
 
-**11. Future Extensibility:**
+**11. Version Management:**
+
+*   **Version Tracking:** The GUI component version (`gui/web/package.json`) reflects significant GUI changes and improvements
+*   **Current Version:** `0.2.0-beta` - reflects the recent GUI enhancements including document browser, panel controls, and HTML support
+*   **Version Policy:** GUI version should be updated when:
+    *   Main project version changes (major/minor releases)
+    *   Significant GUI features are added or changed
+    *   Breaking changes occur in GUI functionality
+*   **Beta Status:** The `-beta` suffix indicates the GUI is under active development with evolving features
+*   **Maintenance Responsibility:** Version numbers should be updated in both `package.json` and `package-lock.json` files
+*   **Version Locations:**
+    *   `gui/web/package.json` - Primary version declaration
+    *   `gui/web/package-lock.json` - Lock file version (should match package.json)
+
+**12. Future Extensibility:**
 
 *   **Module Compatibility:** Automatically supports new modules added to the system
 *   **Documentation Integration:** New documentation files are automatically discovered and integrated
