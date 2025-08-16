@@ -14,7 +14,9 @@
 
 # Parse command line arguments
 BUILD_FLAG=false
+OPEN_FIREWALL_FLAG=false
 GUI_ARGS=()
+LAUNCH_PORT=""
 while [[ $# -gt 0 ]]; do
     case $1 in
         -b|--build)
@@ -26,15 +28,21 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -p|--port)
+            LAUNCH_PORT="$2"
             GUI_ARGS+=("-port" "$2")
             shift 2
             ;;
+        -f|--open-firewall)
+            OPEN_FIREWALL_FLAG=true
+            shift
+            ;;
         -h|--help)
-            echo "Usage: $0 [-b|--build] [-n|--network] [-p|--port PORT] [-h|--help]"
+            echo "Usage: $0 [-b|--build] [-n|--network] [-f|--open-firewall] [-p|--port PORT] [-h|--help]"
             echo ""
             echo "Options:"
             echo "  -b, --build      Rebuild the GUI before launching"
             echo "  -n, --network    Allow network access (bind to 0.0.0.0, use with caution)"
+            echo "  -f, --open-firewall  Open the configured port in the firewall (with -n)"
             echo "  -p, --port PORT  Set custom port (default: 3000 or from config)"
             echo "  -h, --help       Show this help message"
             echo ""
@@ -46,13 +54,15 @@ while [[ $# -gt 0 ]]; do
             echo "Security:"
             echo "  - Default: GUI accessible only from localhost (secure)"
             echo "  - Network mode: GUI accessible from other machines (use with caution)"
+            echo "  - --open-firewall can add a firewall rule for the selected port (ufw/firewalld/iptables)"
             echo ""
             echo "Examples:"
             echo "  $0                    # Default: localhost:3000"
             echo "  $0 -p 8080           # Custom port: localhost:8080"
             echo "  $0 --port 8080       # Custom port: localhost:8080"
             echo "  $0 -n                # Network access: 0.0.0.0:3000"
-            echo "  $0 -n -p 80          # Network access: 0.0.0.0:80"
+            echo "  $0 -n -f             # Network access and open firewall for port 3000"
+            echo "  $0 -n -p 80 -f       # Network access and open firewall for port 80"
             echo "  $0 -b -n             # Build and run with network access"
             exit 0
             ;;
@@ -145,6 +155,153 @@ echo "Press Ctrl+C to stop the GUI server."
 echo
 
 cd "$GUI_DIR"
+
+# Determine port from CLI or config (default 3000)
+_determine_gui_port() {
+    local port
+    if [ -n "$LAUNCH_PORT" ]; then
+        port="$LAUNCH_PORT"
+    else
+        # Read from config if available
+        if [ -f "$SCRIPT_DIR/config/general.conf" ]; then
+            # shellcheck source=/dev/null
+            source "$SCRIPT_DIR/config/general.conf"
+            if [ -n "${CFG_LH_GUI_PORT:-}" ]; then
+                port="$CFG_LH_GUI_PORT"
+            fi
+        fi
+        port="${port:-3000}"
+    fi
+    echo "$port"
+}
+
+_open_firewall_port() {
+    local port="$1"
+    local proto="tcp"
+
+    # Load library to get LH_SUDO_CMD if available
+    if [ -f "$SCRIPT_DIR/lib/lib_common.sh" ]; then
+        # shellcheck source=/dev/null
+        source "$SCRIPT_DIR/lib/lib_common.sh"
+        if type -t lh_check_root_privileges >/dev/null 2>&1; then
+            lh_check_root_privileges || true
+        fi
+    else
+        LH_SUDO_CMD="${LH_SUDO_CMD:-sudo}"
+    fi
+
+    echo "🔐 Opening firewall for port ${port}/${proto} (if a supported firewall is active)..."
+
+    # firewalld
+    if command -v firewall-cmd >/dev/null 2>&1; then
+        if $LH_SUDO_CMD firewall-cmd --state 2>/dev/null | grep -q running; then
+            if $LH_SUDO_CMD firewall-cmd --permanent --add-port=${port}/${proto}; then
+                $LH_SUDO_CMD firewall-cmd --reload || true
+                echo "✅ firewalld: opened ${port}/${proto}"
+                return 0
+            else
+                echo "❌ firewalld: failed to add ${port}/${proto}"
+            fi
+        else
+            echo "ℹ️  firewalld detected but not running; skipping."
+        fi
+    fi
+
+    # UFW
+    if command -v ufw >/dev/null 2>&1; then
+        if $LH_SUDO_CMD ufw allow ${port}/${proto}; then
+            echo "✅ ufw: allowed ${port}/${proto}"
+            return 0
+        else
+            echo "❌ ufw: failed to allow ${port}/${proto}"
+        fi
+    fi
+
+    # iptables (non-persistent)
+    if command -v iptables >/dev/null 2>&1; then
+        if $LH_SUDO_CMD iptables -C INPUT -p ${proto} --dport ${port} -j ACCEPT 2>/dev/null; then
+            echo "✅ iptables: rule already present for ${port}/${proto}"
+            return 0
+        fi
+        if $LH_SUDO_CMD iptables -A INPUT -p ${proto} --dport ${port} -j ACCEPT; then
+            echo "✅ iptables: added ACCEPT rule for ${port}/${proto} (not persistent)"
+            echo "ℹ️  Consider saving rules (e.g., iptables-persistent) if needed."
+            return 0
+        else
+            echo "❌ iptables: failed to add rule for ${port}/${proto}"
+        fi
+    fi
+
+    echo "ℹ️  No supported firewall tool detected (firewalld/ufw/iptables)."
+    return 1
+}
+
+_close_firewall_port() {
+    local port="$1"
+    local proto="tcp"
+
+    echo "🔐 Closing firewall for port ${port}/${proto}..."
+
+    # firewalld
+    if command -v firewall-cmd >/dev/null 2>&1; then
+        if $LH_SUDO_CMD firewall-cmd --state 2>/dev/null | grep -q running; then
+            if $LH_SUDO_CMD firewall-cmd --permanent --remove-port=${port}/${proto}; then
+                $LH_SUDO_CMD firewall-cmd --reload || true
+                echo "✅ firewalld: closed ${port}/${proto}"
+                return 0
+            else
+                echo "❌ firewalld: failed to remove ${port}/${proto}"
+            fi
+        fi
+    fi
+
+    # UFW
+    if command -v ufw >/dev/null 2>&1; then
+        if $LH_SUDO_CMD ufw delete allow ${port}/${proto}; then
+            echo "✅ ufw: removed allow rule for ${port}/${proto}"
+            return 0
+        else
+            echo "❌ ufw: failed to remove rule for ${port}/${proto}"
+        fi
+    fi
+
+    # iptables
+    if command -v iptables >/dev/null 2>&1; then
+        if $LH_SUDO_CMD iptables -C INPUT -p ${proto} --dport ${port} -j ACCEPT 2>/dev/null; then
+            if $LH_SUDO_CMD iptables -D INPUT -p ${proto} --dport ${port} -j ACCEPT; then
+                echo "✅ iptables: removed ACCEPT rule for ${port}/${proto}"
+                return 0
+            else
+                echo "❌ iptables: failed to remove rule for ${port}/${proto}"
+            fi
+        else
+            echo "ℹ️  iptables: no rule found for ${port}/${proto}"
+        fi
+    fi
+
+    return 1
+}
+
+# Cleanup function to close firewall port on exit
+cleanup_firewall() {
+    if [ -n "${OPENED_PORT:-}" ]; then
+        echo
+        echo "🛑 Cleaning up firewall rule..."
+        _close_firewall_port "$OPENED_PORT" || true
+    fi
+}
+
+# If requested and in network mode, open the firewall for the chosen port
+OPENED_PORT=""
+if [[ " ${GUI_ARGS[*]} " =~ " -network " ]] && [ "$OPEN_FIREWALL_FLAG" = true ]; then
+    PORT_TO_OPEN=$(_determine_gui_port)
+    if _open_firewall_port "$PORT_TO_OPEN"; then
+        OPENED_PORT="$PORT_TO_OPEN"
+        # Set up cleanup trap
+        trap cleanup_firewall EXIT INT TERM
+        echo "ℹ️  Firewall rule will be automatically removed when GUI stops."
+    fi
+fi
 
 # Execute with or without arguments
 if [ ${#GUI_ARGS[@]} -eq 0 ]; then
