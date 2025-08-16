@@ -69,6 +69,10 @@ declare -A package_names_pacman=(
     ["wireplumber"]="wireplumber"
     ["amixer"]="alsa-utils"
     ["nmcli"]="networkmanager"
+    ["go"]="go"
+    ["node"]="nodejs"
+    ["nodejs"]="nodejs"
+    ["npm"]="npm"
 )
 
 declare -A package_names_apt=(
@@ -131,6 +135,10 @@ declare -A package_names_apt=(
     ["wireplumber"]="wireplumber"
     ["amixer"]="alsa-utils"
     ["nmcli"]="network-manager"
+    ["go"]="golang-go"
+    ["node"]="nodejs"
+    ["nodejs"]="nodejs"
+    ["npm"]="npm"
 )
 
 declare -A package_names_dnf=(
@@ -193,6 +201,10 @@ declare -A package_names_dnf=(
     ["wireplumber"]="wireplumber"
     ["amixer"]="alsa-utils"
     ["nmcli"]="NetworkManager"
+    ["go"]="golang"
+    ["node"]="nodejs"
+    ["nodejs"]="nodejs"
+    ["npm"]="npm"
 )
 
 declare -A package_names_zypper=(
@@ -254,4 +266,8 @@ declare -A package_names_zypper=(
     ["wireplumber"]="wireplumber"
     ["amixer"]="alsa-utils"
     ["nmcli"]="NetworkManager"
+    ["go"]="go"
+    ["node"]="nodejs"
+    ["nodejs"]="nodejs"
+    ["npm"]="npm"
 )

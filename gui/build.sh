@@ -15,6 +15,17 @@ set -e
 echo "=== Building Little Linux Helper GUI ==="
 echo
 
+# Ensure dependencies (Go, Node.js/npm)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/ensure_deps.sh" ]; then
+	# shellcheck source=/dev/null
+	source "$SCRIPT_DIR/ensure_deps.sh"
+	if ! lh_gui_ensure_deps "build"; then
+		echo "Build aborted due to missing dependencies."
+		exit 1
+	fi
+fi
+
 # Build frontend
 echo "🔨 Building React frontend..."
 cd web

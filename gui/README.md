@@ -35,6 +35,8 @@ A modern web-based GUI for the Little Linux Helper system administration toolkit
 - Node.js 18+
 - npm (comes with Node.js)
 
+Note: All GUI scripts (setup/build/dev) automatically check for Go and Node.js and can attempt installation using the Little Linux Helper libraries when available.
+
 ## Quick Start
 
 1. **Setup** (run once):
@@ -55,6 +57,8 @@ A modern web-based GUI for the Little Linux Helper system administration toolkit
    ./build.sh
    ./little-linux-helper-gui
    ```
+
+If dependencies are missing, the scripts will list all missing tools (e.g., both Go and Node.js) rather than failing on the first one.
 
 ## Development
 

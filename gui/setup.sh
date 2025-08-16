@@ -15,36 +15,16 @@ set -e
 echo "=== Little Linux Helper GUI Setup ==="
 echo
 
-# Check if Go is installed
-if ! command -v go &> /dev/null; then
-    echo "❌ Go is not installed. Please install Go 1.18+ (1.21+ recommended)."
-    echo "   Visit: https://golang.org/dl/"
-    exit 1
+# Ensure dependencies via shared helper (attempts install via project library)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/ensure_deps.sh" ]; then
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/ensure_deps.sh"
+    if ! lh_gui_ensure_deps "setup"; then
+        echo "Setup aborted due to missing dependencies."
+        exit 1
+    fi
 fi
-
-# Check Go version
-GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
-echo "✅ Go version: $GO_VERSION"
-
-# Check if Node.js is installed
-if ! command -v node &> /dev/null; then
-    echo "❌ Node.js is not installed. Please install Node.js 18 or later."
-    echo "   Visit: https://nodejs.org/"
-    exit 1
-fi
-
-# Check Node.js version
-NODE_VERSION=$(node --version)
-echo "✅ Node.js version: $NODE_VERSION"
-
-# Check if npm is installed
-if ! command -v npm &> /dev/null; then
-    echo "❌ npm is not installed. Please install npm."
-    exit 1
-fi
-
-NPM_VERSION=$(npm --version)
-echo "✅ npm version: $NPM_VERSION"
 
 echo
 echo "=== Installing Dependencies ==="

@@ -15,6 +15,17 @@ set -e
 echo "=== Starting Little Linux Helper GUI Development Server ==="
 echo
 
+# Ensure dependencies (Go, Node.js/npm)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/ensure_deps.sh" ]; then
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/ensure_deps.sh"
+    if ! lh_gui_ensure_deps "development"; then
+        echo "Development startup aborted due to missing dependencies."
+        exit 1
+    fi
+fi
+
 # Function to kill background processes on exit
 cleanup() {
     echo

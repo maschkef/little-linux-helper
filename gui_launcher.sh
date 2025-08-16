@@ -77,6 +77,15 @@ fi
 
 # Handle build requests
 if [ "$BUILD_FLAG" = true ] || [ ! -f "$GUI_DIR/little-linux-helper-gui" ]; then
+    # Ensure build dependencies (Go, Node.js/npm)
+    if [ -f "$GUI_DIR/ensure_deps.sh" ]; then
+        # shellcheck source=/dev/null
+        source "$GUI_DIR/ensure_deps.sh"
+        if ! lh_gui_ensure_deps "launcher"; then
+            echo "❌ Missing dependencies required for building the GUI."
+            exit 1
+        fi
+    fi
     if [ "$BUILD_FLAG" = true ]; then
         echo "🔨 Rebuilding GUI as requested..."
     else
