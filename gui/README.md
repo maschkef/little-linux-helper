@@ -35,7 +35,7 @@ A modern web-based GUI for the Little Linux Helper system administration toolkit
 - Node.js 18+
 - npm (comes with Node.js)
 
-Note: All GUI scripts (setup/build/dev) automatically check for Go and Node.js and can attempt installation using the Little Linux Helper libraries when available.
+**Automatic Dependency Management**: All GUI scripts (setup/build/dev) automatically check for Go and Node.js and can attempt installation using the Little Linux Helper libraries when available. Missing dependencies are reported comprehensively (e.g., both Go and Node.js at once) rather than failing on the first missing tool.
 
 ## Quick Start
 
@@ -200,12 +200,15 @@ CFG_LH_GUI_HOST="localhost"
 # Enable network access with shorthand
 ./gui_launcher.sh -n
 
+# Enable network access and open firewall port
+./gui_launcher.sh -n -f
+
 # Custom port (both short and long forms)
 ./gui_launcher.sh -p 8080
 ./gui_launcher.sh --port 8080
 
-# Combined options
-./gui_launcher.sh -n -p 80
+# Combined options - network access on custom port with firewall
+./gui_launcher.sh -n -p 80 -f
 
 # Build and run with network access
 ./gui_launcher.sh -b -n
@@ -241,7 +244,8 @@ CFG_LH_GUI_HOST="localhost"
 
 - **Secure by default**: GUI binds to localhost only, preventing network exposure
 - **Network mode warnings**: Clear warnings displayed when network access is enabled
-- **Firewall considerations**: Network mode requires proper firewall configuration
+- **Firewall management**: Automatic firewall port opening/closing with `-f` flag (supports ufw, firewalld, iptables)
+- **Automatic cleanup**: Firewall rules are automatically removed when GUI stops (Ctrl+C, normal exit, or termination)
 - **Same security context**: All module executions maintain the same privileges as CLI usage
 - **WebSocket security**: Connections are restricted by host binding configuration
 - **CORS**: Disabled by default in production (same-origin frontend). Dev uses Vite proxy to avoid CORS.
@@ -254,12 +258,16 @@ CFG_LH_GUI_HOST="localhost"
 1. **Port already in use**: 
    - Use `-p 8080` or `--port 8080` flag for a different port
    - Or configure `CFG_LH_GUI_PORT` in `config/general.conf`
-2. **Go modules errors**: Run `go mod tidy` to resolve dependencies
-3. **React build fails**: Ensure Node.js 18+ is installed
-4. **Module not found**: Check that the Little Linux Helper root directory is correctly detected
-5. **Sessions not working**: Ensure WebSocket connections are not blocked by firewall
-6. **Network access issues**: Use `-n` or `--network` flag if access from other machines is needed
-7. **Input too large**: Requests to `/api/sessions/:sessionId/input` are limited (413 if oversized)
+2. **Missing dependencies**: 
+   - All GUI scripts automatically check and can install Go/Node.js/npm
+   - If installation fails, install manually via your package manager
+3. **Go modules errors**: Run `go mod tidy` to resolve dependencies
+4. **React build fails**: Ensure Node.js 18+ is installed
+5. **Module not found**: Check that the Little Linux Helper root directory is correctly detected
+6. **Sessions not working**: Ensure WebSocket connections are not blocked by firewall
+7. **Network access issues**: Use `-n` or `--network` flag if access from other machines is needed
+8. **Firewall issues**: Use `-f` flag with `-n` to automatically open/close the required port
+9. **Input too large**: Requests to `/api/sessions/:sessionId/input` are limited (413 if oversized)
 
 ### Logs
 

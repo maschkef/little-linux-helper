@@ -83,21 +83,24 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 *   **Development Setup (`setup.sh`):**
     *   **Purpose:** Initializes the development environment with all required dependencies.
     *   **Mechanism:**
-    *   Verifies Go installation (1.18+; 1.21+ recommended) and Node.js (18+)
+    *   **Automatic Dependency Management:** Checks for Go (1.18+; 1.21+ recommended) and Node.js (18+) using integrated Little Linux Helper libraries; attempts installation via detected package manager if missing
+        *   **Comprehensive Error Reporting:** Lists all missing tools (e.g., both Go and Node.js) in a single message rather than failing on the first missing dependency
         *   Installs Go dependencies via `go mod tidy`
         *   Installs React dependencies via `npm install`
         *   Builds production-ready frontend assets
-    *   **Dependencies:** Go, Node.js, npm, internet connection for package downloads.
+    *   **Dependencies:** Go, Node.js, npm automatically managed; internet connection for package downloads.
 
 *   **Development Workflow (`dev.sh`):**
     *   **Purpose:** Starts development servers for both backend and frontend with hot-reload capabilities.
     *   **Mechanism:**
+    *   **Dependency Validation:** Performs automatic dependency checking before startup; installs missing components if needed
     *   Backend: `go run main.go` for API server (listens on 3000)
     *   Frontend: Vite dev server on 3001 (proxies `/api` to 3000)
 
 *   **Production Build (`build.sh`):**
     *   **Purpose:** Creates optimized production build for deployment.
     *   **Mechanism:**
+        *   **Pre-Build Validation:** Ensures all required tools (Go, Node.js, npm) are available before building
         *   Builds React application with production optimizations
         *   Compiles Go binary with embedded frontend assets
         *   Results in single executable `little-linux-helper-gui`
@@ -147,6 +150,8 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 *   **Security & Access Control:**
     *   **Secure by default:** Localhost-only binding prevents network exposure
     *   **Configurable network access:** Optional `-network` flag for controlled network access
+    *   **Automatic firewall management:** `-f/--open-firewall` flag automatically opens/closes firewall ports (supports ufw, firewalld, iptables)
+    *   **Firewall cleanup:** Automatic port closure when GUI stops (Ctrl+C, normal exit, termination signals)
     *   **Port configuration:** Configurable via `config/general.conf` or command line
     *   **Security warnings:** Clear warnings when network mode is enabled
     *   **Same security context:** Maintains CLI-equivalent security permissions
@@ -269,7 +274,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 *   **Security Considerations:**
     *   **Default secure:** GUI only accessible from localhost by default
     *   **Network mode warnings:** Clear warnings displayed when network access enabled
-    *   **Firewall awareness:** Network mode requires proper firewall configuration
+    *   **Automatic firewall management:** Optional firewall port opening/closing with cleanup on exit
     *   **Same privileges:** GUI runs with same user permissions as CLI
 
 **11. Version Management:**

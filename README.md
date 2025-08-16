@@ -90,9 +90,10 @@ A modern web-based GUI is available through `gui_launcher.sh`, providing:
 # GUI Launcher (Recommended):
 ./gui_launcher.sh              # Default: secure localhost
 ./gui_launcher.sh -n           # Enable network access (-n shorthand)
+./gui_launcher.sh -n -f        # Network access with firewall port opening
 ./gui_launcher.sh -p 8080      # Custom port (short form)
 ./gui_launcher.sh --port 8080  # Custom port (long form)
-./gui_launcher.sh -n -p 80     # Network access on custom port
+./gui_launcher.sh -n -p 80 -f  # Network access on custom port with firewall
 ./gui_launcher.sh -b -n        # Build and run with network access
 ./gui_launcher.sh -h           # Comprehensive help
 

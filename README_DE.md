@@ -93,9 +93,10 @@ Die GUI behält vollständige Kompatibilität mit allen CLI-Funktionen bei und b
 # GUI-Launcher (Empfohlen):
 ./gui_launcher.sh              # Standard: sicherer localhost
 ./gui_launcher.sh -n           # Netzwerkzugriff aktivieren (-n Kurzform)
+./gui_launcher.sh -n -f        # Netzwerkzugriff mit Firewall-Port-Öffnung
 ./gui_launcher.sh -p 8080      # Benutzerdefinierten Port (Kurzform)
 ./gui_launcher.sh --port 8080  # Benutzerdefinierten Port (Langform)
-./gui_launcher.sh -n -p 80     # Netzwerkzugriff auf benutzerdefiniertem Port
+./gui_launcher.sh -n -p 80 -f  # Netzwerkzugriff auf benutzerdefiniertem Port mit Firewall
 ./gui_launcher.sh -b -n        # Erstellen und mit Netzwerkzugriff ausführen
 ./gui_launcher.sh -h           # Umfassende Hilfe
 
