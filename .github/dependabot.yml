@@ -7,6 +7,7 @@ updates:
   # Go modules for the GUI backend
   - package-ecosystem: "gomod"
     directory: "/gui"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
       day: "saturday"
@@ -23,6 +24,7 @@ updates:
   # NPM packages for the GUI frontend
   - package-ecosystem: "npm"
     directory: "/gui/web"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
       day: "saturday"
@@ -35,6 +37,13 @@ updates:
       prefix: "deps(npm)"
       prefix-development: "deps-dev(npm)"
     open-pull-requests-limit: 10
+    groups:
+      # Group minor and patch updates together to reduce PR noise
+      npm-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
     # Selectively ignore major updates only for packages known to have frequent breaking changes
     ignore:
       # Testing libraries often have breaking API changes
@@ -51,6 +60,7 @@ updates:
   # GitHub Actions workflows
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
       day: "saturday"
