@@ -25,9 +25,9 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/websocket/v2"
+	"golang.org/x/sys/unix"
 )
 
 type ModuleInfo struct {
@@ -76,7 +76,8 @@ var (
 	sessionManager = &SessionManager{
 		sessions: make(map[string]*ModuleSession),
 	}
-	lhRootDir string
+	lhRootDir    string
+	appStartTime time.Time
 )
 
 // Config holds GUI configuration
@@ -160,6 +161,7 @@ func init() {
 }
 
 func main() {
+	appStartTime = time.Now()
 	// Parse command line flags
 	var networkMode = flag.Bool("network", false, "Allow network access (bind to 0.0.0.0 instead of localhost)")
 	var networkModeShort = flag.Bool("n", false, "Allow network access (shorthand for --network)")
@@ -225,7 +227,8 @@ func main() {
 
 	// Middleware
 	app.Use(logger.New())
-	app.Use(cors.New())
+	// Note: CORS intentionally not enabled in production since we serve the frontend from the same origin.
+	// For development, the Vite dev server proxies /api to this backend, avoiding cross-origin requests.
 
 	// Serve static files (React build)
 	app.Static("/", "./web/build", fiber.Static{
@@ -237,6 +240,9 @@ func main() {
 
 	// Get available modules
 	api.Get("/modules", getModules)
+
+	// Health endpoint
+	api.Get("/health", getHealth)
 
 	// Get module documentation
 	api.Get("/modules/:id/docs", getModuleDocs)
@@ -406,24 +412,24 @@ func getModuleDocs(c *fiber.Ctx) error {
 		"mod_docker_security": "mod_docker_security.md",
 
 		// Backup modules
-		"backup":              "mod_backup.md",
-		"mod_backup":          "mod_backup.md",
-		"btrfs_backup":        "mod_btrfs_backup.md",
-		"mod_btrfs_backup":    "mod_btrfs_backup.md",
-		"btrfs_restore":       "mod_btrfs_restore.md",
-		"mod_btrfs_restore":   "mod_btrfs_restore.md",
-		"mod_backup_tar":      "mod_backup_tar.md",
-		"mod_restore_tar":     "mod_restore_tar.md",
-		"mod_backup_rsync":    "mod_backup_rsync.md",
-		"mod_restore_rsync":   "mod_restore_rsync.md",
+		"backup":            "mod_backup.md",
+		"mod_backup":        "mod_backup.md",
+		"btrfs_backup":      "mod_btrfs_backup.md",
+		"mod_btrfs_backup":  "mod_btrfs_backup.md",
+		"btrfs_restore":     "mod_btrfs_restore.md",
+		"mod_btrfs_restore": "mod_btrfs_restore.md",
+		"mod_backup_tar":    "mod_backup_tar.md",
+		"mod_restore_tar":   "mod_restore_tar.md",
+		"mod_backup_rsync":  "mod_backup_rsync.md",
+		"mod_restore_rsync": "mod_restore_rsync.md",
 
 		// Other documentation
 		"advanced_log_analyzer": "advanced_log_analyzer.md",
-		"lib_btrfs":              "lib_btrfs.md",
-		"DEVELOPER_GUIDE":        "DEVELOPER_GUIDE.md",
-		"gui":                    "gui.md",
-		"README":                 "../README.md",
-		"gui_README":             "../gui/README.md",
+		"lib_btrfs":             "lib_btrfs.md",
+		"DEVELOPER_GUIDE":       "DEVELOPER_GUIDE.md",
+		"gui":                   "gui.md",
+		"README":                "../README.md",
+		"gui_README":            "../gui/README.md",
 	}
 
 	docFile, exists := docFiles[moduleId]
@@ -659,6 +665,12 @@ func sendInput(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
 	}
 
+	// Enforce a maximum input size to prevent abuse (bytes)
+	const maxInputSize = 4096
+	if len(input.Data) > maxInputSize {
+		return c.Status(fiber.StatusRequestEntityTooLarge).JSON(fiber.Map{"error": fmt.Sprintf("Input too large (max %d bytes)", maxInputSize)})
+	}
+
 	log.Printf("Received input for session %s: '%s'", sessionId, input.Data)
 
 	sessionManager.mutex.RLock()
@@ -708,8 +720,16 @@ func stopSession(c *fiber.Ctx) error {
 	if session.PTY != nil {
 		session.PTY.Close()
 	}
-	if session.Process != nil {
-		session.Process.Process.Kill()
+	if session.Process != nil && session.Process.Process != nil {
+		// Try graceful shutdown first
+		_ = session.Process.Process.Signal(unix.SIGTERM)
+		select {
+		case <-session.Done:
+			// Process exited gracefully
+		case <-time.After(2 * time.Second):
+			// Force kill if still running
+			_ = session.Process.Process.Kill()
+		}
 	}
 
 	// Clean up session after a brief delay
@@ -721,6 +741,22 @@ func stopSession(c *fiber.Ctx) error {
 	}()
 
 	return c.JSON(fiber.Map{"status": "stopped"})
+}
+
+func getHealth(c *fiber.Ctx) error {
+	// Calculate uptime
+	uptime := time.Since(appStartTime).Round(time.Second).Seconds()
+
+	// Count sessions
+	sessionManager.mutex.RLock()
+	sCount := len(sessionManager.sessions)
+	sessionManager.mutex.RUnlock()
+
+	return c.JSON(fiber.Map{
+		"status":   "ok",
+		"uptime":   uptime,
+		"sessions": sCount,
+	})
 }
 
 func readPTYOutput(session *ModuleSession) {

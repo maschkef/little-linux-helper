@@ -31,6 +31,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
         *   Documentation serving from `docs/` directory
     *   **API Endpoints:**
         *   `GET /api/modules` - List all available modules with metadata
+    *   `GET /api/health` - Health/status info (uptime, active sessions)
         *   `GET /api/modules/:id/docs` - Retrieve module documentation (supports both main and related module docs)
         *   `GET /api/docs` - List all available documentation files with metadata for document browser
         *   `POST /api/modules/:id/start` - Start module execution session
@@ -50,9 +51,9 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
         *   `SessionContext.jsx` - React context for centralized session state management
         *   `HelpPanel.jsx` - Context-sensitive help with user-friendly descriptions and practical guidance
         *   `DocsPanel.jsx` - Module-bound documentation viewer with related documentation links and navigation
-        *   `DocumentBrowser.jsx` - Independent documentation browser with categorized navigation and search
+    *   `DocumentBrowser.jsx` - Independent documentation browser with categorized navigation
         *   `ResizablePanels.jsx` - Flexible panel layout management with hide/show panel controls
-    *   **Dependencies (system):** `node.js` (16+), `npm`, React ecosystem.
+    *   **Dependencies (system):** `node.js` (18+), `npm`, React ecosystem.
 
 **4. Module Integration & Discovery:**
 
@@ -75,14 +76,14 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   Sets `LH_GUI_MODE=true` environment variable for GUI-aware module behavior
     *   Uses PTY for authentic terminal behavior with color support
     *   Handles interactive prompts and menu selections seamlessly
-    *   Automatic "Any Key" prompt detection and continuation
+    *   Automatic "Any Key" prompt handling via module behavior when `LH_GUI_MODE=true`
 
 **5. Setup & Deployment:**
 
 *   **Development Setup (`setup.sh`):**
     *   **Purpose:** Initializes the development environment with all required dependencies.
     *   **Mechanism:**
-        *   Verifies Go installation (1.21+) and Node.js (16+)
+    *   Verifies Go installation (1.18+; 1.21+ recommended) and Node.js (18+)
         *   Installs Go dependencies via `go mod tidy`
         *   Installs React dependencies via `npm install`
         *   Builds production-ready frontend assets
@@ -91,9 +92,8 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 *   **Development Workflow (`dev.sh`):**
     *   **Purpose:** Starts development servers for both backend and frontend with hot-reload capabilities.
     *   **Mechanism:**
-        *   Backend: `go run main.go` for API server
-        *   Frontend: `npm start` for React development server
-        *   Automatic browser launching to `http://localhost:3000`
+    *   Backend: `go run main.go` for API server (listens on 3000)
+    *   Frontend: Vite dev server on 3001 (proxies `/api` to 3000)
 
 *   **Production Build (`build.sh`):**
     *   **Purpose:** Creates optimized production build for deployment.
@@ -151,6 +151,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   **Security warnings:** Clear warnings when network mode is enabled
     *   **Same security context:** Maintains CLI-equivalent security permissions
     *   **WebSocket restrictions:** Connections limited by host binding configuration
+    *   **CORS:** Disabled in production (same-origin). In development, the Vite dev server proxies `/api` to avoid cross-origin.
 
 *   **Performance & Scalability:**
     *   Efficient WebSocket communication for minimal latency
@@ -171,6 +172,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   Clear error messages and troubleshooting guidance
     *   Port conflict detection and resolution suggestions
     *   Comprehensive logging for debugging purposes
+    *   Input request size limits on `/api/sessions/:sessionId/input` (413 on oversized payloads)
 
 **8. Launcher Integration:**
 

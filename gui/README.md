@@ -10,7 +10,7 @@ A modern web-based GUI for the Little Linux Helper system administration toolkit
 - **Panel toggle controls** - Hide/show modules sidebar, terminal panels, help, and docs independently
 - **Full-screen reading mode** - Hide all panels except documentation for maximum reading space
 - **Real-time terminal output** via WebSockets with session-aware output switching
-- **Interactive module execution** with comprehensive input capabilities (Send, Any Key, Stop buttons)
+- **Interactive module execution** with comprehensive input capabilities (Send, Stop buttons)
 - **Flexible module starting** - Individual "Start" buttons per module plus global "New Session" button
 - **Session persistence** - Sessions remain accessible across browser windows and tabs
 - **Built-in help system** with module-specific guidance
@@ -31,8 +31,8 @@ A modern web-based GUI for the Little Linux Helper system administration toolkit
 
 ## Prerequisites
 
-- Go 1.18 or later
-- Node.js 16 or later
+- Go 1.18+ (1.21+ recommended)
+- Node.js 18+
 - npm (comes with Node.js)
 
 ## Quick Start
@@ -62,6 +62,7 @@ A modern web-based GUI for the Little Linux Helper system administration toolkit
 The Go backend serves the React build and provides API endpoints:
 
 - `/api/modules` - List available modules
+- `/api/health` - Simple health/status (uptime, session count)
 - `/api/modules/:id/docs` - Get module documentation
 - `/api/docs` - List all available documentation files with metadata for document browser
 - `/api/modules/:id/start` - Start a module session
@@ -76,11 +77,11 @@ The React frontend provides a modern interface with:
 - **ModuleList**: Sidebar with categorized modules and individual "Start" buttons (hideable)
 - **SessionDropdown**: Multi-session management with switching and status indicators
 - **Terminal**: Real-time terminal output and input with session awareness (hideable)
-- **TerminalInput**: Enhanced input handling with Send, Any Key, and Stop buttons
+- **TerminalInput**: Enhanced input handling with Send and Stop buttons
 - **SessionContext**: React context for centralized session state management
 - **HelpPanel**: Context-sensitive help for each module (hideable)
 - **DocsPanel**: Module-bound markdown documentation viewer (hideable)
-- **DocumentBrowser**: Independent documentation browser with categorized navigation and search
+- **DocumentBrowser**: Independent documentation browser with categorized navigation
 - **ResizablePanels**: Flexible panel layout with show/hide controls for all panels
 
 ### Project Structure
@@ -139,7 +140,6 @@ The GUI integrates seamlessly with the existing Little Linux Helper system:
 5. **Monitor Output**: Watch real-time output in the terminal panel (switches with active session)
 6. **Send Input**: Use the terminal input area with:
    - **Text Input**: Type responses and click "Send" or press Enter
-   - **Any Key**: Click for "press any key" prompts
    - **Stop**: Red button to immediately stop the current session
 7. **View Help**: Context-sensitive help appears in the help panel
 8. **Browse Documentation**: Choose between:
@@ -240,6 +240,7 @@ CFG_LH_GUI_HOST="localhost"
 - **Firewall considerations**: Network mode requires proper firewall configuration
 - **Same security context**: All module executions maintain the same privileges as CLI usage
 - **WebSocket security**: Connections are restricted by host binding configuration
+- **CORS**: Disabled by default in production (same-origin frontend). Dev uses Vite proxy to avoid CORS.
 - **No sensitive data exposure**: No sensitive information is transmitted unnecessarily
 
 ## Troubleshooting
@@ -250,10 +251,11 @@ CFG_LH_GUI_HOST="localhost"
    - Use `-p 8080` or `--port 8080` flag for a different port
    - Or configure `CFG_LH_GUI_PORT` in `config/general.conf`
 2. **Go modules errors**: Run `go mod tidy` to resolve dependencies
-3. **React build fails**: Ensure Node.js 16+ is installed
+3. **React build fails**: Ensure Node.js 18+ is installed
 4. **Module not found**: Check that the Little Linux Helper root directory is correctly detected
 5. **Sessions not working**: Ensure WebSocket connections are not blocked by firewall
 6. **Network access issues**: Use `-n` or `--network` flag if access from other machines is needed
+7. **Input too large**: Requests to `/api/sessions/:sessionId/input` are limited (413 if oversized)
 
 ### Logs
 

@@ -42,7 +42,7 @@ sleep 2
 # Start frontend development server
 echo "🚀 Starting React frontend on :3001..."
 cd web
-PORT=3001 npm start &
+PORT=3001 npm run dev &
 FRONTEND_PID=$!
 cd ..
 

@@ -17,7 +17,7 @@ echo
 
 # Check if Go is installed
 if ! command -v go &> /dev/null; then
-    echo "❌ Go is not installed. Please install Go 1.21 or later."
+    echo "❌ Go is not installed. Please install Go 1.18+ (1.21+ recommended)."
     echo "   Visit: https://golang.org/dl/"
     exit 1
 fi
@@ -28,7 +28,7 @@ echo "✅ Go version: $GO_VERSION"
 
 # Check if Node.js is installed
 if ! command -v node &> /dev/null; then
-    echo "❌ Node.js is not installed. Please install Node.js 16 or later."
+    echo "❌ Node.js is not installed. Please install Node.js 18 or later."
     echo "   Visit: https://nodejs.org/"
     exit 1
 fi
@@ -73,11 +73,11 @@ cd ..
 echo
 echo "✅ Setup completed successfully!"
 echo
-echo "To start the development server:"
-echo "  1. Backend:  go run main.go"
-echo "  2. Frontend: cd web && npm start"
+echo "To start the development servers:"
+echo "  1. Backend (API on http://localhost:3000):  go run main.go"
+echo "  2. Frontend (Dev on http://localhost:3001): cd web && npm run dev"
 echo
 echo "To build for production:"
 echo "  ./build.sh"
 echo
-echo "The GUI will be available at: http://localhost:3000"
+echo "The production GUI will be available at: http://localhost:3000"
