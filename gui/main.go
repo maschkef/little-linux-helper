@@ -433,7 +433,7 @@ func getModules(c *fiber.Ctx) error {
 			Description:    "Restart system services and desktop environment components",
 			Path:           "modules/mod_restarts.sh",
 			Category:       "Recovery & Restarts",
-			SubmoduleCount: 8,
+			SubmoduleCount: 4,
 		},
 		{
 			ID:             "system_info",
@@ -441,7 +441,7 @@ func getModules(c *fiber.Ctx) error {
 			Description:    "Show comprehensive system information and hardware details",
 			Path:           "modules/mod_system_info.sh",
 			Category:       "System Diagnosis & Analysis",
-			SubmoduleCount: 14,
+			SubmoduleCount: 9,
 		},
 		{
 			ID:             "disk",
@@ -449,7 +449,7 @@ func getModules(c *fiber.Ctx) error {
 			Description:    "Disk utilities and storage analysis tools",
 			Path:           "modules/mod_disk.sh",
 			Category:       "System Diagnosis & Analysis",
-			SubmoduleCount: 11,
+			SubmoduleCount: 8,
 		},
 		{
 			ID:             "logs",
@@ -465,7 +465,7 @@ func getModules(c *fiber.Ctx) error {
 			Description:    "Manage packages and system updates",
 			Path:           "modules/mod_packages.sh",
 			Category:       "Maintenance & Security",
-			SubmoduleCount: 13,
+			SubmoduleCount: 7,
 		},
 		{
 			ID:             "security",
@@ -569,28 +569,36 @@ func getModuleDocs(c *fiber.Ctx) error {
 
 		// Other documentation
 		"advanced_log_analyzer": "tools/doc_advanced_log_analyzer.md",
-		
+
 		// Library documentation
-		"lib_btrfs":             "lib/doc_btrfs.md",
-		"lib_common":            "lib/doc_common.md",
-		"lib_colors":            "lib/doc_colors.md",
-		"lib_config":            "lib/doc_config.md",
-		"lib_filesystem":        "lib/doc_filesystem.md",
-		"lib_i18n":              "lib/doc_i18n.md",
-		"lib_logging":           "lib/doc_logging.md",
-		"lib_notifications":     "lib/doc_notifications.md",
-		"lib_package_mappings":  "lib/doc_package_mappings.md",
-		"lib_packages":          "lib/doc_packages.md",
-		"lib_system":            "lib/doc_system.md",
-		"lib_ui":                "lib/doc_ui.md",
-		
+		"lib_btrfs":            "lib/doc_btrfs.md",
+		"lib_common":           "lib/doc_common.md",
+		"lib_colors":           "lib/doc_colors.md",
+		"lib_config":           "lib/doc_config.md",
+		"lib_filesystem":       "lib/doc_filesystem.md",
+		"lib_i18n":             "lib/doc_i18n.md",
+		"lib_logging":          "lib/doc_logging.md",
+		"lib_notifications":    "lib/doc_notifications.md",
+		"lib_package_mappings": "lib/doc_package_mappings.md",
+		"lib_packages":         "lib/doc_packages.md",
+		"lib_system":           "lib/doc_system.md",
+		"lib_ui":               "lib/doc_ui.md",
+
 		// Project documentation
-		"DEVELOPER_GUIDE":       "CLI_DEVELOPER_GUIDE.md",
-		"GUI_DEVELOPER_GUIDE":   "GUI_DEVELOPER_GUIDE.md",
-		"gui":                   "gui/doc_interface.md",
-		"README":                "../README.md",
-		"README_DE":             "../README_DE.md",
-		"gui_README":            "../gui/README.md",
+		"DEVELOPER_GUIDE":     "CLI_DEVELOPER_GUIDE.md",
+		"GUI_DEVELOPER_GUIDE": "GUI_DEVELOPER_GUIDE.md",
+		"gui":                 "gui/doc_interface.md",
+
+		// GUI specialized documentation
+		"gui_backend_api":        "gui/doc_backend_api.md",
+		"gui_frontend_react":     "gui/doc_frontend_react.md",
+		"gui_i18n":               "gui/doc_i18n.md",
+		"gui_module_integration": "gui/doc_module_integration.md",
+		"gui_customization":      "gui/doc_customization.md",
+
+		"README":     "../README.md",
+		"README_DE":  "../README_DE.md",
+		"gui_README": "../gui/README.md",
 	}
 
 	docFile, exists := docFiles[moduleId]
@@ -658,6 +666,13 @@ func getAllDocs(c *fiber.Ctx) error {
 		{ID: "lib_ui", Name: "User Interface Library", Description: "User interface functions and input handling", Filename: "lib/doc_ui.md"},
 		{ID: "DEVELOPER_GUIDE", Name: "CLI Developer Guide", Description: "CLI development guidelines and architecture documentation", Filename: "CLI_DEVELOPER_GUIDE.md"},
 		{ID: "GUI_DEVELOPER_GUIDE", Name: "GUI Developer Guide", Description: "GUI development guidelines and architecture documentation", Filename: "GUI_DEVELOPER_GUIDE.md"},
+
+		// GUI Specialized Documentation
+		{ID: "gui_backend_api", Name: "GUI Backend API", Description: "Go backend development, API endpoints, and data structures", Filename: "gui/doc_backend_api.md"},
+		{ID: "gui_frontend_react", Name: "GUI React Frontend", Description: "React component development and frontend architecture", Filename: "gui/doc_frontend_react.md"},
+		{ID: "gui_i18n", Name: "GUI Internationalization", Description: "Internationalization system for frontend and backend", Filename: "gui/doc_i18n.md"},
+		{ID: "gui_module_integration", Name: "GUI Module Integration", Description: "How CLI modules automatically integrate with GUI", Filename: "gui/doc_module_integration.md"},
+		{ID: "gui_customization", Name: "GUI Customization", Description: "Theme customization, extensions, and advanced modifications", Filename: "gui/doc_customization.md"},
 
 		// Project Information
 		{ID: "gui", Name: "GUI Documentation", Description: "Web-based graphical interface documentation", Filename: "gui/doc_interface.md"},
