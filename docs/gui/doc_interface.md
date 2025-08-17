@@ -342,7 +342,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 **12. Version Management:**
 
 *   **Version Tracking:** The GUI component version (`gui/web/package.json`) reflects significant GUI changes and improvements
-*   **Current Version:** `0.2.0-beta` - reflects the recent GUI enhancements including document browser, panel controls, and HTML support
+*   **Current Version:** `0.3.0-beta`
 *   **Version Policy:** GUI version should be updated when:
     *   Main project version changes (major/minor releases)
     *   Significant GUI features are added or changed
