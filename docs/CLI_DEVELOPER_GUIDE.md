@@ -19,7 +19,7 @@ This document provides a streamlined guide for developers to understand and work
 
 This document describes the core components of the "Little Linux Helper" project, based on the files `help_master.sh` and `lib_common.sh`. It aims to enable developers and AI to understand the structure, global variables, and available functions to extend or modify the project without needing to study the source code of the described files in detail.
 
-The primary goal of this project is to be as compatible as possible across a wide range of Linux distributions. Compatibility with other operating systems like macOS or native Windows is not a target; however, functionality within Windows Subsystem for Linux (WSL) environments is desirable where reasonably achievable.
+The primary goal of this project is to be as compatible as possible across a wide range of Linux distributions. Compatibility with other operating systems like macOS or native Windows is not a target.
  
 ### 1. The Main File: `help_master.sh`
 
@@ -201,280 +201,24 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
 - **Usage:** Use with `echo -e` for colored output. Always end a colored string with `${LH_COLOR_RESET}` to prevent color bleeding. Example: `echo -e "${LH_COLOR_ERROR}$(lh_msg 'ERROR_MESSAGE')${LH_COLOR_RESET}"`
 - **Library Integration:** Many library functions like `lh_print_header`, `lh_print_menu_item`, `lh_log_msg`, `lh_confirm_action`, and `lh_ask_for_input` already incorporate these colors for their output. When using these functions, manual color application is often not needed for their standard output.
 
-**Functions:**
-*   `lh_initialize_logging()`
-    *   **Purpose:** Sets up the logging system.
-    *   **Dependencies:** `date`, `mkdir`, `touch`, `lh_log_msg`.
-    *   **Side Effects:**
-        - Creates the monthly log directory (`$LH_LOG_DIR`) if it doesn't exist.
-        - Writes an info message to the log.
-    *   **Usage:** Should be called once at the beginning of the main script.
+## Library Function Reference
 
-*   `lh_load_backup_config()`
-    *   **Purpose:** Loads the backup configuration from the `$LH_BACKUP_CONFIG_FILE` file or uses default values.
-    *   **Dependencies:** `source`, `basename`, `lh_log_msg`.
-    *   **Side Effects:**
-        - Sets the global variables `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_TIMESHIFT_BASE_DIR`, `LH_RETENTION_BACKUP`, and `LH_BACKUP_LOG_BASENAME`.
-        - Writes info messages to the log.
-    *   **Usage:** Should be called once during initialization.
+The library functions are now organized in individual documentation files for better maintainability. For detailed function documentation, refer to:
 
-*   `lh_save_backup_config()`
-    *   **Purpose:** Saves the current values of the backup configuration variables to the `$LH_BACKUP_CONFIG_FILE` file.
-    *   **Dependencies:** `mkdir`, `echo`, `basename`, `lh_log_msg`.
-    *   **Side Effects:**
-        - Creates the `$LH_CONFIG_DIR` directory if it doesn't exist.
-        - Writes an info message to the log.
-    *   **Usage:** Can be called by modules that modify the backup configuration.
+- **[`lib_common.sh`](docs/lib/doc_common.md)** - Core library coordinator and initialization functions
+- **[`lib_colors.sh`](docs/lib/doc_colors.md)** - Color definitions for console output
+- **[`lib_config.sh`](docs/lib/doc_config.md)** - Configuration management functions
+- **[`lib_filesystem.sh`](docs/lib/doc_filesystem.md)** - Filesystem operations and utilities
+- **[`lib_i18n.sh`](docs/lib/doc_i18n.md)** - Internationalization support functions
+- **[`lib_logging.sh`](docs/lib/doc_logging.md)** - Logging system functions
+- **[`lib_notifications.sh`](docs/lib/doc_notifications.md)** - Desktop notification functions
+- **[`lib_package_mappings.sh`](docs/lib/doc_package_mappings.md)** - Package name mappings for different distributions
+- **[`lib_packages.sh`](docs/lib/doc_packages.md)** - Package management functions
+- **[`lib_system.sh`](docs/lib/doc_system.md)** - System management and privilege handling
+- **[`lib_ui.sh`](docs/lib/doc_ui.md)** - User interface functions
+- **[`lib_btrfs.sh`](docs/lib/doc_btrfs.md)** - BTRFS-specific operations (specialized library)
 
-*   `lh_log_msg(level, message)`
-    *   **Purpose:** Writes a formatted log message with filtering based on log level configuration.
-    *   **Parameters:**
-        - `$1` (`level`): The log level (e.g., "INFO", "WARN", "ERROR", "DEBUG").
-        - `$2` (`message`): The actual log message.
-    *   **Dependencies:** `date`, `echo`, `lh_should_log`.
-    *   **Side Effects:**
-        - Checks if the message should be logged based on current `LH_LOG_LEVEL` setting.
-        - Returns early if the log level doesn't meet the configured threshold.
-    *   **Usage:** Should be used for all output that needs to appear on the console and be logged. The log level hierarchy is: ERROR < WARN < INFO < DEBUG.
-
-*   `lh_check_root_privileges()`
-    *   **Purpose:** Checks if the script is run as root.
-    *   **Dependencies:** `EUID`, `lh_log_msg`.
-    *   **Side Effects:**
-        - Sets the global variable `LH_SUDO_CMD` to 'sudo' if the current user is not root (`EUID != 0`), otherwise to an empty string.
-        - Writes an info message to the log.
-    *   **Usage:** Should be called once during initialization. `LH_SUDO_CMD` can then be used before commands requiring root privileges (e.g., `$LH_SUDO_CMD apt update`).
-
-*   `lh_backup_log(level, message)`
-    *   **Purpose:** Writes a formatted log message specifically to the current, timestamped backup log file (`$LH_BACKUP_LOG`).
-    *   **Parameters:**
-        - `$1` (`level`): The log level.
-        - `$2` (`message`): The log message.
-    *   **Dependencies:** `date`, `touch`, `echo`, `tee`.
-    *   **Side Effects:**
-        - Creates the `$LH_BACKUP_LOG` file if it doesn't exist.
-        - Appends the formatted message to the `$LH_BACKUP_LOG` file.
-    *   **Usage:** Should be used for all log messages specifically related to backup operations.
-
-*   `lh_get_filesystem_type(path)`
-    *   **Purpose:** Determines the filesystem type of a given path.
-    *   **Parameters:**
-        - `$1` (`path`): The path (file or directory) whose filesystem type is to be determined.
-    *   **Dependencies:** `df`, `tail`, `awk`.
-    *   **Output:** Prints the filesystem type as a string to standard output (e.g., "ext4", "btrfs", "xfs").
-    *   **Usage:** Useful for performing filesystem-specific operations.
-
-*   `lh_cleanup_old_backups(backup_dir, retention_count, pattern)`
-    *   **Purpose:** Removes old directories or files based on a pattern in a given directory, retaining a specified number of the newest ones.
-    *   **Parameters:**
-        - `$1` (`backup_dir`): The directory to clean up.
-        - `$2` (`retention_count`): The number of newest items to retain.
-        - `$3` (`pattern`): A shell pattern (glob) identifying the items to be cleaned (e.g., `snapshot_*`).
-    *   **Dependencies:** `ls`, `sort`, `tail`, `read`, `rm`, `lh_log_msg`.
-    *   **Side Effects:**
-        - Deletes directories/files matching the pattern that are older than the `retention_count` newest ones.
-        - Writes info messages to the log about removed items.
-    *   **Usage:** Useful for implementing backup retention policies.
-
-*   `lh_detect_package_manager()`
-    *   **Purpose:** Detects the system's primary package manager.
-    *   **Dependencies:** `command -v`, `lh_log_msg`.
-    *   **Side Effects:**
-        - Sets the global variable `LH_PKG_MANAGER` to 'yay', 'pacman', 'apt', or 'dnf', depending on which command is found first. If none are found, the variable remains empty.
-        - Writes an info message to the log.
-    *   **Usage:** Should be called once during initialization. `LH_PKG_MANAGER` is used by other functions (e.g., `lh_check_command`, `lh_map_program_to_package`).
-
-*   `lh_detect_alternative_managers()`
-    *   **Purpose:** Detects alternative package managers like Flatpak, Snap, Nix, or AppImage.
-    *   **Dependencies:** `command -v`, `find`, `grep`, `lh_log_msg`.
-    *   **Side Effects:**
-        - Populates the global array `LH_ALT_PKG_MANAGERS` with the names of the found managers.
-        - Writes an info message to the log.
-    *   **Usage:** Should be called once during initialization. `LH_ALT_PKG_MANAGERS` can be used to provide the user with information about installed alternative systems.
-
-*   `lh_map_program_to_package(program_name)`
-    *   **Purpose:** Maps a program name to the corresponding package name for the detected package manager.
-    *   **Parameters:**
-        - `$1` (`program_name`): The name of the program (e.g., "smartctl").
-    *   **Dependencies:** `lh_detect_package_manager` (if `LH_PKG_MANAGER` is not yet set), the global associative arrays `package_names_*`.
-    *   **Output:** Prints the package name to standard output. If no mapping is found, the original program name is returned.
-    *   **Usage:** Primarily used by `lh_check_command` to find the correct package name for installation.
-
-*   `lh_check_command(command_name, install_prompt_if_missing, is_python_script)`
-    *   **Purpose:** Checks if a command or Python script exists. Optionally offers to install the associated package if the command is missing.
-    *   **Parameters:**
-        - `$1` (`command_name`): The name of the command to check or the path to the Python script.
-        - `$2` (`install_prompt_if_missing`): Optional, 'true' or 'false'. If 'true' (default), the user is asked if the package should be installed if the command is missing.
-        - `$3` (`is_python_script`): Optional, 'true' or 'false'. If 'true', checks if Python3 is installed and if the file `$command_name` exists.
-    *   **Dependencies:** `command -v`, `read`, `tr`, `case`, `$LH_SUDO_CMD`, `$LH_PKG_MANAGER`, `lh_map_program_to_package`, `lh_log_msg`.
-    *   **Return Value:** Returns 0 if the command/script was found or successfully installed. Returns 1 if the command/script is missing and could not be installed or installation was declined.
-    *   **Side Effects:**
-        - Outputs warnings/errors to the console and log.
-        - May execute package manager commands with `sudo` to install packages.
-    *   **Usage:** Should be called before executing external commands to ensure necessary programs are available.
-
-*   `lh_confirm_action(prompt_message, default_choice)`
-    *   **Purpose:** Asks the user a yes/no question and waits for confirmation with language-aware input validation.
-    *   **Parameters:**
-        - `$1` (`prompt_message`): The question to ask the user.
-        - `$2` (`default_choice`): Optional, 'y' or 'n'. The default choice if the user just presses Enter (default: 'n').
-    *   **Dependencies:** `read`, `echo`, `tr`, `LH_LANG` environment variable.
-    *   **Language-Aware Input:** Accepts different responses based on the current language setting (`LH_LANG`):
-        - **English (`en`)**: Accepts `y`, `yes`
-        - **Other languages**: Default to English behavior (`y`, `yes` only)
-    *   **Return Value:** Returns 0 if the user answers yes with language-appropriate responses. Returns 1 if the user answers no or the default choice is no and Enter was pressed.
-    *   **Usage:** For interactive decisions requiring confirmation. The function automatically adapts to the user's language setting to accept natural yes/no responses.
-
-*   `lh_ask_for_input(prompt_message, validation_regex, error_message)`
-    *   **Purpose:** Prompts the user for input and optionally validates it against a regular expression.
-    *   **Parameters:**
-        - `$1` (`prompt_message`): The message to display as a prompt.
-        - `$2` (`validation_regex`): Optional, a regular expression to validate the input.
-        - `$3` (`error_message`): Optional, the error message to display for invalid input.
-    *   **Dependencies:** `read`, `echo`.
-    *   **Output:** Prints the user-entered (and validated) string to standard output.
-    *   **Usage:** For safely querying user input that must conform to a specific format.
-
-*   `lh_press_any_key(message_key)`
-    *   **Purpose:** Standard function for "Press any key to continue" prompts that automatically handles GUI mode detection.
-    *   **Parameters:**
-        - `$1` (`message_key`): Optional, custom message key for translation (defaults to 'PRESS_KEY_CONTINUE').
-    *   **Dependencies:** `read`, `echo`, `lh_msg`, `lh_log_msg`.
-    *   **Side Effects:**
-        - In CLI mode: Shows translated prompt and waits for single key press.
-        - In GUI mode (`LH_GUI_MODE=true`): Automatically continues without prompt and logs the skip action.
-    *   **Return Value:** Always returns 0.
-    *   **Usage:** Replace all manual "Any Key" prompts with this function for consistent GUI/CLI behavior. Example: `lh_press_any_key` or `lh_press_any_key "CUSTOM_CONTINUE_KEY"`.
-
-*   `lh_get_target_user_info()`
-    *   **Purpose:** Determines information about the user of the active graphical session (desktop user) to execute commands in their context.
-    *   **Dependencies:** `loginctl`, `sudo`, `ps`, `grep`, `awk`, `head`, `cut`, `id`, `env`, `who`, `sed`, `basename`, `tr`, `cat`, `lh_log_msg`.
-    *   **Side Effects:**
-        - Populates the global associative array `LH_TARGET_USER_INFO` with the keys `TARGET_USER`, `USER_DISPLAY`, `USER_XDG_RUNTIME_DIR`, `USER_DBUS_SESSION_BUS_ADDRESS`, `USER_XAUTHORITY`.
-        - Writes info/warning messages to the log.
-    *   **Return Value:** Returns 0 if a target user could be determined, 1 otherwise.
-    *   **Usage:** Must be called before `lh_run_command_as_target_user`. The determined information is cached.
-
-*   `lh_run_command_as_target_user(command_to_run)`
-    *   **Purpose:** Executes a given shell command in the context of the determined target user, including necessary environment variables for GUI interactions.
-    *   **Parameters:**
-        - `$1` (`command_to_run`): The shell command as a string to be executed.
-    *   **Dependencies:** `lh_get_target_user_info`, `sudo`, `sh -c`.
-    *   **Return Value:** Returns the exit code of the executed command.
-    *   **Side Effects:** Executes the command as the user stored in `LH_TARGET_USER_INFO[TARGET_USER]`, with the environment variables stored there.
-    *   **Usage:** For executing commands that need to run in the context of the desktop user (e.g., GUI notifications, commands accessing their home directory).
-
-*   `lh_send_notification(type, title, message, urgency)`
-    *   **Purpose:** Sends a desktop notification to the determined graphical session user.
-    *   **Parameters:**
-        - `$1` (`type`): Notification type ("success", "error", "warning", "info"). Used for icons and default urgency.
-        - `$2` (`title`): The title of the notification.
-        - `$3` (`message`): The body text of the notification.
-        - `$4` (`urgency`): Optional. Urgency level ("low", "normal", "critical"). If omitted, it's inferred from the type.
-    *   **Dependencies:** `lh_get_target_user_info`, `lh_run_command_as_target_user`. System commands like `notify-send`, `zenity`, `kdialog`.
-    *   **Return Value:** Returns 0 on success, 1 on failure (e.g., no target user or no notification tool found).
-    *   **Side Effects:** Tries to send a notification using available tools (`notify-send`, `zenity`, `kdialog`) in the context of the target user.
-    *   **Usage:** To provide non-interactive feedback to the desktop user about the result of a long-running or background task.
-
-*   `lh_check_notification_tools()`
-    *   **Purpose:** Checks for available desktop notification tools, reports their status, and offers to install them.
-    *   **Dependencies:** `lh_get_target_user_info`, `lh_run_command_as_target_user`, `lh_confirm_action`, package manager commands.
-    *   **Return Value:** Returns 0 if at least one tool is available, 1 otherwise.
-    *   **Side Effects:** Prints the status of available tools to the console. May prompt the user to install missing tools.
-    *   **Usage:** Can be used in a settings or diagnostics module to ensure the notification system is working.
-
-*   `lh_print_header(title)`
-    *   **Purpose:** Prints a formatted header with a title.
-    *   **Parameters:**
-        - `$1` (`title`): The text for the header.
-    *   **Dependencies:** `echo`.
-    *   **Side Effects:** Prints the formatted header to standard output.
-    *   **Usage:** For structuring console output, e.g., for menus or sections.
-
-*   `lh_print_menu_item(number, text)`
-    *   **Purpose:** Prints a formatted menu item.
-    *   **Parameters:**
-        - `$1` (`number`): The number of the menu item.
-        - `$2` (`text`): The text of the menu item.
-    *   **Dependencies:** `printf`.
-    *   **Side Effects:** Prints the formatted menu item to standard output.
-    *   **Usage:** For creating menus.
-
-*   `lh_finalize_initialization()`
-    *   **Purpose:** Executes final initialization steps and exports important variables and functions.
-    *   **Dependencies:** `lh_load_backup_config`, `lh_initialize_i18n`, `export`.
-    *   **Side Effects:**
-        - Calls `lh_load_backup_config`.
-        - **Exports the functions** `lh_send_notification`, `lh_check_notification_tools`, `lh_t`, `lh_should_log`, and other core functions using `export -f`, making them directly callable by module scripts.
-    *   **Usage:** Should be called once at the end of the initialization sequence in the main script.
-
-*   `lh_load_general_config()`
-    *   **Purpose:** Loads the general configuration including language and logging settings.
-    *   **Dependencies:** `source`, `lh_log_msg`.
-    *   **Side Effects:**
-        - Sets the global variable `LH_GENERAL_CONFIG_FILE` to the general configuration file path.
-        - Logs the configuration loading operation (using direct echo for early initialization).
-    *   **Usage:** Should be called early during initialization, before `lh_initialize_logging`.
-
-*   `lh_save_general_config()`
-    *   **Purpose:** Saves the general configuration to the configuration file.
-    *   **Dependencies:** `mkdir`, `cp`, `sed`, `lh_log_msg`.
-    *   **Side Effects:**
-        - Creates the `$LH_CONFIG_DIR` directory if it doesn't exist.
-        - Logs the configuration save operation.
-    *   **Usage:** Called when the user changes settings and wants to save them permanently.
-
-*   `lh_should_log(level)`
-    *   **Purpose:** Determines whether a message with the given level should be logged based on current log level configuration.
-    *   **Parameters:**
-        - `$1` (`level`): The log level to check ('ERROR', 'WARN', 'INFO', 'DEBUG').
-    *   **Return Value:** 0 if the message should be logged, 1 otherwise.
-    *   **Dependencies:** None.
-    *   **Side Effects:** None.
-    *   **Usage:** Called internally by `lh_log_msg` to filter messages. Available for external use.
-
-*   `lh_load_language(lang)`
-    *   **Purpose:** Loads translation strings for the specified language into the global `MSG` array with comprehensive fallback support.
-    *   **Parameters:**
-        - `$1` (`lang`): The language code (e.g., 'de', 'en'). Optional, defaults to current `$LH_LANG`.
-    *   **Dependencies:** `source`, `lh_log_msg`.
-    *   **Side Effects:**
-        - **Always loads English first:** Sources all English language files as a baseline, ensuring every key has at least an English translation.
-        - **Comprehensive logging:** Logs the language loading operation, any fallbacks, and final language state.
-    *   **Return Value:** Returns 0 on success, 1 on critical errors (e.g., English directory missing).
-    *   **Usage:** Called by `lh_initialize_i18n` and when switching languages dynamically. Provides robust operation even with incomplete language directories.
-
-*   `lh_load_language_module(module_name, lang)`
-    *   **Purpose:** Loads translation strings for a specific module into the global `MSG` array with module-level fallback support.
-    *   **Parameters:**
-        - `$1` (`module_name`): The name of the module (e.g., 'backup', 'disk').
-        - `$2` (`lang`): Optional language code (defaults to current `$LH_LANG`).
-    *   **Dependencies:** `source`, `lh_log_msg`.
-    *   **Side Effects:**
-        - **English module first:** Always attempts to load the English version of the module (`$LH_ROOT_DIR/lang/en/${module_name}.sh`) as a baseline.
-        - **Updates MSG array:** Adds module-specific translations to the global `MSG` array.
-    *   **Return Value:** Returns 0 on success, 1 if English module file is also missing.
-    *   **Usage:** Called by modules that need additional translations beyond the common ones. Ensures graceful operation even with missing module translation files.
-
-*   `lh_t(key, ...)` / `lh_msg(key, ...)`
-    *   **Purpose:** Enhanced translation function that returns the localized string for a given key with robust error handling and parameter support. `lh_t` is an alias for `lh_msg` for backward compatibility.
-    *   **Parameters:**
-        - `$1` (`key`): The translation key (e.g., 'MENU_MAIN_TITLE').
-        - `$2...` (`parameters`): Optional parameters for printf-style string formatting.
-    *   **Dependencies:** `MSG` associative array, `printf`.
-    *   **Output:** Prints the translated string to standard output with the following behaviors:
-        - **Found key:** Returns the translated string, supporting printf-style formatting with additional parameters.
-        - **Missing key:** Returns `[KEY_NAME]` as a placeholder and logs the missing key (once per session).
-        - **Empty key:** Returns `[KEY_NAME]` as a placeholder and logs the empty key issue (once per session).
-    *   **Advanced Features:**
-        - **Deduplication:** Missing/empty keys are logged only once per session to prevent log spam.
-        - **Debug assistance:** Clearly differentiates between missing keys (not defined) and empty keys (defined but blank).
-    *   **Usage:** Used throughout the application to display localized text: `echo "$(lh_msg 'WELCOME_MESSAGE')"` or `lh_msg 'USER_COUNT' "$count"`.
-
-*   `lh_msgln(key, ...)`
-    *   **Purpose:** Same as `lh_msg` but adds a newline at the end.
-    *   **Parameters:** Same as `lh_msg`, supporting both translation keys and printf-style parameters.
-    *   **Usage:** Convenient for single-line messages: `lh_msgln 'SUCCESS_MESSAGE'` or `lh_msgln 'PROCESSED_FILES' "$file_count"`.
+Each documentation file contains comprehensive information about the functions, their parameters, usage examples, and integration guidelines.
 
 ### Internationalization System
 
