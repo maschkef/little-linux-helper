@@ -11,7 +11,9 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 
 ## Overview
 
-This library provides comprehensive internationalization (i18n) support for the Little Linux Helper system, including translation management, language detection, and robust fallback mechanisms for multilingual user interfaces.
+This library provides comprehensive internationalization (i18n) support for the Little Linux Helper **CLI system**, including translation management, language detection, and robust fallback mechanisms for multilingual user interfaces.
+
+> **Note**: This documentation covers internationalization for the **CLI components only**. For GUI internationalization (web-based interface), please refer to [`docs/GUI_DEVELOPER_GUIDE.md`](../GUI_DEVELOPER_GUIDE.md) which describes the React-based i18n system using React i18next framework.
 
 ## Purpose
 

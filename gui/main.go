@@ -569,10 +569,27 @@ func getModuleDocs(c *fiber.Ctx) error {
 
 		// Other documentation
 		"advanced_log_analyzer": "tools/doc_advanced_log_analyzer.md",
+		
+		// Library documentation
 		"lib_btrfs":             "lib/doc_btrfs.md",
+		"lib_common":            "lib/doc_common.md",
+		"lib_colors":            "lib/doc_colors.md",
+		"lib_config":            "lib/doc_config.md",
+		"lib_filesystem":        "lib/doc_filesystem.md",
+		"lib_i18n":              "lib/doc_i18n.md",
+		"lib_logging":           "lib/doc_logging.md",
+		"lib_notifications":     "lib/doc_notifications.md",
+		"lib_package_mappings":  "lib/doc_package_mappings.md",
+		"lib_packages":          "lib/doc_packages.md",
+		"lib_system":            "lib/doc_system.md",
+		"lib_ui":                "lib/doc_ui.md",
+		
+		// Project documentation
 		"DEVELOPER_GUIDE":       "CLI_DEVELOPER_GUIDE.md",
+		"GUI_DEVELOPER_GUIDE":   "GUI_DEVELOPER_GUIDE.md",
 		"gui":                   "gui/doc_interface.md",
 		"README":                "../README.md",
+		"README_DE":             "../README_DE.md",
 		"gui_README":            "../gui/README.md",
 	}
 
@@ -628,11 +645,24 @@ func getAllDocs(c *fiber.Ctx) error {
 
 		// Development & Libraries
 		{ID: "lib_btrfs", Name: "BTRFS Library", Description: "Advanced BTRFS operations and utilities", Filename: "lib/doc_btrfs.md"},
-		{ID: "DEVELOPER_GUIDE", Name: "Developer Guide", Description: "Development guidelines and architecture documentation", Filename: "CLI_DEVELOPER_GUIDE.md"},
+		{ID: "lib_common", Name: "Common Functions Library", Description: "Core shared functions and utilities", Filename: "lib/doc_common.md"},
+		{ID: "lib_colors", Name: "Color Functions Library", Description: "Terminal color formatting and styling", Filename: "lib/doc_colors.md"},
+		{ID: "lib_config", Name: "Configuration Library", Description: "Configuration file handling and management", Filename: "lib/doc_config.md"},
+		{ID: "lib_filesystem", Name: "Filesystem Library", Description: "File system operations and utilities", Filename: "lib/doc_filesystem.md"},
+		{ID: "lib_i18n", Name: "Internationalization Library", Description: "Multi-language support and message handling", Filename: "lib/doc_i18n.md"},
+		{ID: "lib_logging", Name: "Logging Library", Description: "Structured logging and error handling", Filename: "lib/doc_logging.md"},
+		{ID: "lib_notifications", Name: "Notifications Library", Description: "Desktop notification system integration", Filename: "lib/doc_notifications.md"},
+		{ID: "lib_package_mappings", Name: "Package Mappings Library", Description: "Cross-distribution package name mappings", Filename: "lib/doc_package_mappings.md"},
+		{ID: "lib_packages", Name: "Package Management Library", Description: "Distribution-agnostic package management", Filename: "lib/doc_packages.md"},
+		{ID: "lib_system", Name: "System Information Library", Description: "System detection and hardware information", Filename: "lib/doc_system.md"},
+		{ID: "lib_ui", Name: "User Interface Library", Description: "User interface functions and input handling", Filename: "lib/doc_ui.md"},
+		{ID: "DEVELOPER_GUIDE", Name: "CLI Developer Guide", Description: "CLI development guidelines and architecture documentation", Filename: "CLI_DEVELOPER_GUIDE.md"},
+		{ID: "GUI_DEVELOPER_GUIDE", Name: "GUI Developer Guide", Description: "GUI development guidelines and architecture documentation", Filename: "GUI_DEVELOPER_GUIDE.md"},
 
 		// Project Information
 		{ID: "gui", Name: "GUI Documentation", Description: "Web-based graphical interface documentation", Filename: "gui/doc_interface.md"},
 		{ID: "README", Name: "Project README", Description: "Main project overview, features, and usage guide", Filename: "../README.md"},
+		{ID: "README_DE", Name: "Project README (German)", Description: "German project overview, features, and usage guide", Filename: "../README_DE.md"},
 		{ID: "gui_README", Name: "GUI README", Description: "GUI-specific setup, development, and usage guide", Filename: "../gui/README.md"},
 	}
 

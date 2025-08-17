@@ -24,7 +24,8 @@ function DocumentBrowser() {
     'Docker & Containers': false,
     'Logs & Analysis': false,
     'System Maintenance': false,
-    'Development & Libraries': false,
+    'Libraries': false,
+    'Development & Tools': false,
     'Project Information': false
   });
 
@@ -46,11 +47,16 @@ function DocumentBrowser() {
     'System Maintenance': [
       'mod_restarts'
     ],
-    'Development & Libraries': [
-      'lib_btrfs', 'DEVELOPER_GUIDE'
+    'Libraries': [
+      'lib_btrfs', 'lib_common', 'lib_colors', 'lib_config', 'lib_filesystem',
+      'lib_i18n', 'lib_logging', 'lib_notifications', 'lib_package_mappings',
+      'lib_packages', 'lib_system', 'lib_ui'
+    ],
+    'Development & Tools': [
+      'DEVELOPER_GUIDE', 'GUI_DEVELOPER_GUIDE'
     ],
     'Project Information': [
-      'gui', 'README', 'gui_README'
+      'gui', 'README', 'README_DE', 'gui_README'
     ]
   };
 
@@ -75,9 +81,22 @@ function DocumentBrowser() {
     'advanced_log_analyzer': 'Advanced Log Analyzer',
     'mod_restarts': 'System Restarts',
     'lib_btrfs': 'BTRFS Library',
-    'DEVELOPER_GUIDE': 'Developer Guide',
+    'lib_common': 'Common Functions Library',
+    'lib_colors': 'Color Functions Library', 
+    'lib_config': 'Configuration Library',
+    'lib_filesystem': 'Filesystem Library',
+    'lib_i18n': 'Internationalization Library',
+    'lib_logging': 'Logging Library',
+    'lib_notifications': 'Notifications Library',
+    'lib_package_mappings': 'Package Mappings Library',
+    'lib_packages': 'Package Management Library',
+    'lib_system': 'System Information Library',
+    'lib_ui': 'User Interface Library',
+    'DEVELOPER_GUIDE': 'CLI Developer Guide',
+    'GUI_DEVELOPER_GUIDE': 'GUI Developer Guide',
     'gui': 'GUI Documentation',
     'README': 'Project README',
+    'README_DE': 'Project README (German)',
     'gui_README': 'GUI README'
   };
 
