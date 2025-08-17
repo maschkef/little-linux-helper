@@ -95,7 +95,8 @@
       "3. Rootkit-Erkennung - Führt rkhunter (schneller/vollständiger Scan) und optional chkrootkit für Malware-Erkennung aus",
       "4. Firewall-Status - Überprüft UFW, firewalld oder iptables-Status, zeigt Regeln und Aktivierungshilfe",
       "5. Sicherheits-Updates - Sucht nach verfügbaren Sicherheits-Patches mit Ihrem Paket-Manager",
-      "6. Passwort-Sicherheit - Überprüft Passwort-Richtlinien, Alterungseinstellungen und Konten ohne Passwörter"
+      "6. Passwort-Sicherheit - Überprüft Passwort-Richtlinien, Alterungseinstellungen und Konten ohne Passwörter",
+      "7. Docker-Sicherheitsüberprüfung - Umfassendes Sicherheitsaudit von Docker-Containern, Images und Konfigurationen"
     ],
     "notes": [
       "Die meisten Funktionen erfordern sudo-Rechte für Log-Zugriff und System-Scanning",
@@ -107,18 +108,20 @@
     ]
   },
   "energy": {
-    "overview": "Energieverwaltung und Energieoptimierung.",
+    "overview": "Energieverwaltung und Energieoptimierung für Linux-Systeme. Bietet Schlafkontrolle, CPU-Frequenzskalierung, Bildschirmhelligkeitsanpassung und Energieüberwachungsfunktionen.",
     "options": [
-      "1. Energieprofile - Zwischen Energiemodi wechseln",
-      "2. CPU-Frequenz - Prozessorfrequenz anpassen",
-      "3. Display-Helligkeit - Bildschirmhelligkeit steuern",
-      "4. Energiestatistiken - Stromverbrauch anzeigen",
-      "5. Schlaf/Suspend - Schlafmodi konfigurieren"
+      "1. Schlaf/Ruhezustand deaktivieren - Verhindert temporär Systemschlaf und Ruhezustand mit Optionen für Dauerkontrolle",
+      "2. CPU-Governor - Verwaltet CPU-Frequenzskalierungs-Richtlinien (performance, powersave, ondemand, conservative, custom)",
+      "3. Bildschirmhelligkeit - Steuert die Hintergrundbeleuchtung des Displays (25%, 50%, 75%, 100% oder benutzerdefinierter Prozentsatz)",
+      "4. Energiestatistiken - Zeigt Batteriestatus, Netzteilinformationen und Thermosensor-Messwerte an"
     ],
     "notes": [
-      "Features hängen von der Hardware-Unterstützung ab",
-      "Einige Steuerungen erfordern Root-Rechte",
-      "Energieprofile variieren je nach System"
+      "Schlafkontrolle verwendet systemd-inhibit für temporäre Energieverwaltung",
+      "CPU-Governor-Änderungen erfordern das cpupower-Tool und benötigen möglicherweise sudo-Rechte",
+      "Helligkeitskontrolle unterstützt brightnessctl, xbacklight oder direkte sysfs-Manipulation",
+      "Energiestatistiken lesen aus /sys/class/power_supply/ und /sys/class/thermal/ Schnittstellen",
+      "Modul integriert sich mit dem Bibliotheks-Energieverwaltungssystem für konsistentes Verhalten",
+      "Desktop-Benachrichtigungen für wichtige Energieverwaltungsänderungen bereitgestellt"
     ]
   },
   "docker": {
@@ -143,8 +146,8 @@
       "2. TAR-Backup - Komprimierte Archiv-Backups von Verzeichnissen erstellen (kompatibel mit allen Systemen)",
       "3. RSYNC-Backup - Schnelle inkrementelle Backups, die nur geänderte Dateien kopieren",
       "4. Wiederherstellungsvorgänge - Spezialisierte Wiederherstellungstools für jeden Backup-Typ aufrufen",
-      "5. Backup-Status - Umfassenden Status aller Ihrer Backups und Festplattenplatz-Nutzung anzeigen", 
-      "6. Backup konfigurieren - Backup-Ziele, Aufbewahrungsrichtlinien und andere Einstellungen festlegen"
+      "6. Backup-Status - Umfassenden Status aller Ihrer Backups und Festplattenplatz-Nutzung anzeigen", 
+      "7. Backup konfigurieren - Backup-Ziele, Aufbewahrungsrichtlinien und andere Einstellungen festlegen"
     ],
     "notes": [
       "🚨 BTRFS-WARNUNG: BTRFS-Backup ist auf begrenzten Systemen getestet - mit Vorsicht verwenden",

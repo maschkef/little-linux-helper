@@ -95,7 +95,8 @@
       "3. Rootkit Detection - Runs rkhunter (quick/full scan) and optionally chkrootkit for malware detection",
       "4. Firewall Status - Checks UFW, firewalld, or iptables status, shows rules and activation help",
       "5. Security Updates - Scans for available security patches using your package manager",
-      "6. Password Security - Reviews password policies, aging settings, and accounts without passwords"
+      "6. Password Security - Reviews password policies, aging settings, and accounts without passwords",
+      "7. Docker Security Check - Comprehensive security audit of Docker containers, images, and configurations"
     ],
     "notes": [
       "Most functions require sudo privileges for log access and system scanning",
@@ -107,18 +108,20 @@
     ]
   },
   "energy": {
-    "overview": "Power management and energy optimization.",
+    "overview": "Power management and energy optimization for Linux systems. Provides sleep control, CPU frequency scaling, screen brightness adjustment, and power monitoring capabilities.",
     "options": [
-      "1. Power Profiles - Switch between power modes",
-      "2. CPU Frequency - Adjust processor frequency",
-      "3. Display Brightness - Control screen brightness",
-      "4. Energy Statistics - Show power consumption",
-      "5. Sleep/Suspend - Configure sleep modes"
+      "1. Disable Sleep/Hibernate - Temporarily prevent system sleep and hibernation with options for duration control",
+      "2. CPU Governor - Manage CPU frequency scaling policies (performance, powersave, ondemand, conservative, custom)",
+      "3. Screen Brightness - Control display backlight brightness levels (25%, 50%, 75%, 100%, or custom percentage)",
+      "4. Power Statistics - Display battery status, AC adapter information, and thermal sensor readings"
     ],
     "notes": [
-      "Features depend on hardware support",
-      "Some controls require root privileges",
-      "Power profiles vary by system"
+      "Sleep control uses systemd-inhibit for temporary power management",
+      "CPU governor changes require cpupower tool and may need sudo privileges",
+      "Brightness control supports brightnessctl, xbacklight, or direct sysfs manipulation",
+      "Power statistics read from /sys/class/power_supply/ and /sys/class/thermal/ interfaces",
+      "Module integrates with library power management system for consistent behavior",
+      "Desktop notifications provided for significant power management changes"
     ]
   },
   "docker": {
@@ -143,8 +146,8 @@
       "2. TAR Backup - Create compressed archive backups of directories (compatible with all systems)",
       "3. RSYNC Backup - Fast incremental backups that only copy changed files",
       "4. Restore Operations - Access specialized restore tools for each backup type",
-      "5. Backup Status - View comprehensive status of all your backups and disk space usage", 
-      "6. Configure Backup - Set backup destinations, retention policies, and other settings"
+      "6. Backup Status - View comprehensive status of all your backups and disk space usage", 
+      "7. Configure Backup - Set backup destinations, retention policies, and other settings"
     ],
     "notes": [
       "🚨 BTRFS WARNING: BTRFS backup is tested on limited systems - use with caution",
