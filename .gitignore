@@ -10,3 +10,5 @@ gui/web/node_modules/
 gui/little-linux-helper-gui
 # for using Claude
 CLAUDE.md
+# VS Code personal settings
+.vscode/
