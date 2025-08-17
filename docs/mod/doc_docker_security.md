@@ -1,5 +1,5 @@
 <!--
-File: docs/mod_docker_security.md
+File: docs/mod/doc_docker_security.md
 Copyright (c) 2025 maschkef
 SPDX-License-Identifier: MIT
 

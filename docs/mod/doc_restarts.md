@@ -1,5 +1,5 @@
 <!--
-File: docs/mod_restarts.md
+File: docs/mod/doc_restarts.md
 Copyright (c) 2025 maschkef
 SPDX-License-Identifier: MIT
 

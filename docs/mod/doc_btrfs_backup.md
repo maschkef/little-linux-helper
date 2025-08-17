@@ -1,5 +1,5 @@
 <!--
-File: docs/mod_btrfs_backup.md
+File: docs/mod/doc_btrfs_backup.md
 Copyright (c) 2025 maschkef
 SPDX-License-Identifier: MIT
 

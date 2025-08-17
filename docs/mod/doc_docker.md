@@ -1,5 +1,5 @@
 <!--
-File: docs/mod_docker.md
+File: docs/mod/doc_docker.md
 Copyright (c) 2025 maschkef
 SPDX-License-Identifier: MIT
 

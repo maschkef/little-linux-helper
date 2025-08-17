@@ -1,5 +1,5 @@
 <!--
-File: docs/DEVELOPER_GUIDE.md
+File: docs/CLI_DEVELOPER_GUIDE.md
 Copyright (c) 2025 maschkef
 SPDX-License-Identifier: MIT
 

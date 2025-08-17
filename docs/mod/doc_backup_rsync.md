@@ -1,5 +1,5 @@
 <!--
-File: docs/mod_backup_rsync.md
+File: docs/mod/doc_backup_rsync.md
 Copyright (c) 2025 maschkef
 SPDX-License-Identifier: MIT
 

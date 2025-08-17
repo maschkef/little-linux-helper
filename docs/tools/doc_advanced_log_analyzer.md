@@ -1,5 +1,5 @@
 <!--
-File: docs/advanced_log_analyzer.md
+File: docs/tools/doc_advanced_log_analyzer.md
 Copyright (c) 2025 maschkef
 SPDX-License-Identifier: MIT
 

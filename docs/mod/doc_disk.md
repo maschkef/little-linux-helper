@@ -1,5 +1,5 @@
 <!--
-File: docs/mod_disk.md
+File: docs/mod/doc_disk.md
 Copyright (c) 2025 maschkef
 SPDX-License-Identifier: MIT
 

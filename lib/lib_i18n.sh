@@ -24,11 +24,24 @@ function lh_load_language() {
     # Always load English first as fallback base (even when target language is English)
     local en_dir="$LH_LANG_DIR/en"
     if [[ -d "$en_dir" ]]; then
+        # Load from new categorized structure first
+        for category_dir in "$en_dir/core" "$en_dir/modules"; do
+            if [[ -d "$category_dir" ]]; then
+                for lang_file in "$category_dir"/*.sh; do
+                    if [[ -f "$lang_file" ]]; then
+                        source "$lang_file"
+                    fi
+                done
+            fi
+        done
+        
+        # Fallback to old flat structure if no files found in new structure
         for lang_file in "$en_dir"/*.sh; do
             if [[ -f "$lang_file" ]]; then
                 source "$lang_file"
             fi
         done
+        
         # Copy English to MSG array as fallback base
         for key in "${!MSG_EN[@]}"; do
             MSG["$key"]="${MSG_EN[$key]}"
@@ -48,7 +61,19 @@ function lh_load_language() {
             return 0
         fi
         
-        # Load all language files in the target language directory
+        # Load target language files (overlay on English fallback)
+        # Load from new categorized structure first
+        for category_dir in "$lang_dir/core" "$lang_dir/modules"; do
+            if [[ -d "$category_dir" ]]; then
+                for lang_file in "$category_dir"/*.sh; do
+                    if [[ -f "$lang_file" ]]; then
+                        source "$lang_file"
+                    fi
+                done
+            fi
+        done
+        
+        # Fallback to old flat structure if needed
         for lang_file in "$lang_dir"/*.sh; do
             if [[ -f "$lang_file" ]]; then
                 source "$lang_file"
@@ -103,12 +128,33 @@ function lh_load_language_module() {
     local module_name="$1"
     local lang_code="${2:-$LH_LANG}"
     local original_lang_code="$lang_code"
-    local lang_file="$LH_LANG_DIR/${lang_code}/${module_name}.sh"
+    
+    # Determine category based on module name
+    local category="modules"
+    case "$module_name" in
+        "common"|"lib"|"main_menu")
+            category="core"
+            ;;
+    esac
+    
+    # Try new categorized structure first
+    local lang_file="$LH_LANG_DIR/${lang_code}/${category}/${module_name}.sh"
+    # Fallback to old flat structure
+    local lang_file_fallback="$LH_LANG_DIR/${lang_code}/${module_name}.sh"
     
     # Always try to load English first as fallback base for this module
-    local en_file="$LH_LANG_DIR/en/${module_name}.sh"
+    local en_file="$LH_LANG_DIR/en/${category}/${module_name}.sh"
+    local en_file_fallback="$LH_LANG_DIR/en/${module_name}.sh"
+    
+    # Load English fallback (try new structure first, then old)
     if [[ -f "$en_file" ]]; then
         source "$en_file"
+        # Copy English module translations to MSG array as fallback base
+        for key in "${!MSG_EN[@]}"; do
+            MSG["$key"]="${MSG_EN[$key]}"
+        done
+    elif [[ -f "$en_file_fallback" ]]; then
+        source "$en_file_fallback"
         # Copy English module translations to MSG array as fallback base
         for key in "${!MSG_EN[@]}"; do
             MSG["$key"]="${MSG_EN[$key]}"
@@ -117,7 +163,15 @@ function lh_load_language_module() {
     
     # If target language is not English, overlay it on top of English
     if [[ "$lang_code" != "en" ]]; then
-        if [[ ! -f "$lang_file" ]]; then
+        # Try new structure first, then fallback to old structure
+        local target_file=""
+        if [[ -f "$lang_file" ]]; then
+            target_file="$lang_file"
+        elif [[ -f "$lang_file_fallback" ]]; then
+            target_file="$lang_file_fallback"
+        fi
+        
+        if [[ -z "$target_file" ]]; then
             # Fallback to English if specified language file doesn't exist
             local msg="${MSG[LIB_I18N_LANG_FILE_NOT_FOUND]:-Language file for module '%s' in '%s' not found, trying English}"
             lh_log_msg "WARN" "$(printf "$msg" "$module_name" "$lang_code")"
@@ -128,7 +182,7 @@ function lh_load_language_module() {
         fi
         
         # Source the module language file
-        source "$lang_file"
+        source "$target_file"
         
         # Copy the language-specific array to the global MSG array (overriding English fallbacks)
         case "$lang_code" in
@@ -149,10 +203,17 @@ function lh_load_language_module() {
                 ;;
         esac
     else
-        # For English, check if English module file exists
-        if [[ ! -f "$en_file" ]]; then
+        # For English, check if English module file exists (try new structure first)
+        local en_target_file=""
+        if [[ -f "$en_file" ]]; then
+            en_target_file="$en_file"
+        elif [[ -f "$en_file_fallback" ]]; then
+            en_target_file="$en_file_fallback"
+        fi
+        
+        if [[ -z "$en_target_file" ]]; then
             local msg="${MSG[LIB_I18N_MODULE_FILE_NOT_FOUND]:-Language file for module '%s' not found: %s}"
-            lh_log_msg "WARN" "$(printf "$msg" "$module_name" "$en_file")"
+            lh_log_msg "WARN" "$(printf "$msg" "$module_name" "$en_file (or $en_file_fallback)")"
             return 1
         fi
         # English is already loaded above
@@ -286,4 +347,52 @@ function lh_initialize_i18n() {
     
     # Load the appropriate language file
     lh_load_language "$LH_LANG"
+}
+
+# New language loading functions for reorganized structure
+# Supports both old flat structure and new categorized structure
+
+load_language_file_with_fallback() {
+    local lang="$1"
+    local filename="$2"
+    local category="${3:-}"
+    
+    local lang_file=""
+    
+    # Try new structure first (with category)
+    if [[ -n "$category" ]]; then
+        lang_file="$LANG_DIR/$lang/$category/$filename"
+        if [[ -f "$lang_file" ]]; then
+            source "$lang_file"
+            return 0
+        fi
+    fi
+    
+    # Fallback to old flat structure
+    lang_file="$LANG_DIR/$lang/$filename" 
+    if [[ -f "$lang_file" ]]; then
+        source "$lang_file"
+        return 0
+    fi
+    
+    # If neither exists, log warning
+    log_warning "Language file not found: $filename for language $lang"
+    return 1
+}
+
+load_core_language_files() {
+    local lang="$1"
+    
+    # Load core system language files
+    load_language_file_with_fallback "$lang" "common.sh" "core"
+    load_language_file_with_fallback "$lang" "lib.sh" "core"
+    load_language_file_with_fallback "$lang" "main_menu.sh" "core"
+}
+
+load_module_language_file() {
+    local lang="$1" 
+    local module="$2"
+    
+    # Load module-specific language file
+    load_language_file_with_fallback "$lang" "${module}.sh" "modules"
 }

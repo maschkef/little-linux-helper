@@ -1,5 +1,5 @@
 <!--
-File: docs/mod_energy.md
+File: docs/mod/doc_energy.md
 Copyright (c) 2025 maschkef
 SPDX-License-Identifier: MIT
 

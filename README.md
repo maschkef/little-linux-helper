@@ -7,7 +7,7 @@
 Little Linux Helper is a comprehensive collection of Bash scripts designed to simplify various system administration, diagnostic, and maintenance tasks on Linux. It provides both a traditional command-line menu-driven interface and a modern web-based GUI for easy access to a variety of tools and functions.
 
 More detailed technical English documentation for individual modules and core components can be found in the `docs` directory.
-The `docs/DEVELOPER_GUIDE.md` contains all the information about `lib/lib_common.sh` and `help_master.sh` needed to create a new module.
+The `docs/CLI_DEVELOPER_GUIDE.md` contains all the information about `lib/lib_common.sh` and `help_master.sh` needed to create a new module.
 Note: The original `lib_common.sh` has been split into multiple specialized libraries for better organization (e.g., `lib_colors.sh`, `lib_i18n.sh`, `lib_notifications.sh`, etc.), but `lib_common.sh` remains the main entry point and automatically loads all other core libraries. Additionally, `lib_btrfs.sh` is a specialized library used exclusively by BTRFS modules and is not part of the core library system.
 
 My environment is typically Arch (main system) or Debian (various services on my Proxmox - hence the Docker components), so there may be unknown issues on other distributions, although I try to keep everything compatible.
@@ -50,7 +50,7 @@ Here is a list of known issues, limitations, or behaviors you might encounter wh
 * **Advanced Log Analysis (`scripts/advanced_log_analyzer.py`):**
     * Known limitations regarding log format recognition and character encoding
     * Complex regular expressions may not handle all log variations
-    * See `docs/advanced_log_analyzer.md` for detailed limitations and usage notes
+    * See `docs/tools/doc_advanced_log_analyzer.md` for detailed limitations and usage notes
 
 * **Module-Specific Limitations:**
     * **BTRFS Operations**: Requires BTRFS filesystem and appropriate privileges
@@ -147,21 +147,21 @@ Both interfaces provide access to the following modules:
     * **Incremental Backups**: Intelligent parent detection, automatic fallback, and comprehensive chain integrity validation
     * **Restore Capabilities**: Complete system restore, individual subvolume restore, folder-level restoration, and bootloader integration *(Note: Restore functions are implemented but require comprehensive testing)*
     * **Safety Features**: Live environment detection, filesystem health checking, rollback capabilities, and dry-run support
-    * **Detailed Documentation**: See `docs/mod_btrfs_backup.md`, `docs/mod_btrfs_restore.md`, and `docs/lib_btrfs.md`
+    * **Detailed Documentation**: See `docs/mod/doc_btrfs_backup.md`, `docs/mod/doc_btrfs_restore.md`, and `docs/lib/doc_btrfs.md`
 
 * **TAR Archive Backup & Restore** (`modules/backup/mod_backup_tar.sh`, `modules/backup/mod_restore_tar.sh`):
     * **Flexible Backup Options**: Home only, system config, full system, or custom directory selection
     * **Intelligent Exclusions**: Built-in system exclusions, user-configurable patterns, and interactive exclusion management
     * **Archive Management**: Compressed `.tar.gz` archives with automatic cleanup and retention policies
     * **Safe Restoration**: Multiple destination options with safety warnings and confirmation prompts
-    * **Documentation**: See `docs/mod_backup_tar.md` and `docs/mod_restore_tar.md`
+    * **Documentation**: See `docs/mod/doc_backup_tar.md` and `docs/mod/doc_restore_tar.md`
 
 * **RSYNC Incremental Backup & Restore** (`modules/backup/mod_backup_rsync.sh`, `modules/backup/mod_restore_rsync.sh`):
     * **Incremental Intelligence**: Space-efficient backups using hardlink optimization with `--link-dest`
     * **Backup Types**: Full backups and incremental backups with automatic parent detection
     * **Advanced Options**: Comprehensive RSYNC configuration with atomic operations and progress monitoring
     * **Flexible Restoration**: Real-time progress monitoring and complete directory tree restoration
-    * **Documentation**: See `docs/mod_backup_rsync.md` and `docs/mod_restore_rsync.md`
+    * **Documentation**: See `docs/mod/doc_backup_rsync.md` and `docs/mod/doc_restore_rsync.md`
 
 </details>
 

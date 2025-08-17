@@ -1,5 +1,5 @@
 <!--
-File: docs/mod_logs.md
+File: docs/mod/doc_logs.md
 Copyright (c) 2025 maschkef
 SPDX-License-Identifier: MIT
 

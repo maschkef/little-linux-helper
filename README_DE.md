@@ -8,7 +8,7 @@ Little Linux Helper ist eine umfassende Sammlung von Bash-Skripten, die entwicke
 
 Eine detailliertere technische englische Dokumentation der einzelnen Module und Kernkomponenten befindet sich im `docs`-Verzeichnis, 
 diese wurde mitunter erstellt um einer KI den kontext eines modules bzw einer Datei zu geben ohne dieses selbst komplett lesen zu müssen und kontext zusparen.
-Die `docs/DEVELOPER_GUIDE.md` enthält alle Informationen zu `lib/lib_common.sh` und `help_master.sh` die benötigt werden um ein neues Modul zu erstellen. 
+Die `docs/CLI_DEVELOPER_GUIDE.md` enthält alle Informationen zu `lib/lib_common.sh` und `help_master.sh` die benötigt werden um ein neues Modul zu erstellen. 
 Hinweis: Die ursprüngliche `lib_common.sh` wurde zur besseren Organisation in mehrere spezialisierte Bibliotheken aufgeteilt (z.B. `lib_colors.sh`, `lib_i18n.sh`, `lib_notifications.sh`, etc.), aber `lib_common.sh` bleibt der Haupteinstiegspunkt und lädt alle anderen Kern-Bibliotheken automatisch. Zusätzlich ist `lib_btrfs.sh` eine spezialisierte Bibliothek, die ausschließlich von BTRFS-Modulen verwendet wird und nicht Teil des Kern-Bibliothekssystems ist.
 
 Meine Umgebung ist i.d.R. Arch (hauptsystem) oder Debian (diverse Dienste auf meinem Proxmox - daher auch die docker-Anteile), entsprechend kann es unter anderen Distributionen noch unbekannte Probleme geben, auch wenn ich versuche, alles kompatibel zu halten.
@@ -51,7 +51,7 @@ Hier ist eine Liste von bekannten Problemen, Einschränkungen oder Verhaltenswei
 * **Erweiterte Log-Analyse (`scripts/advanced_log_analyzer.py`):**
     * Bekannte Einschränkungen bezüglich Log-Format-Erkennung und Zeichenkodierung
     * Komplexe reguläre Ausdrücke können nicht alle Log-Varianten handhaben
-    * Siehe `docs/advanced_log_analyzer.md` für detaillierte Einschränkungen und Nutzungshinweise
+    * Siehe `docs/tools/doc_advanced_log_analyzer.md` für detaillierte Einschränkungen und Nutzungshinweise
 
 * **Modul-spezifische Einschränkungen:**
     * **BTRFS-Operationen**: Erfordert BTRFS-Dateisystem und entsprechende Berechtigungen
@@ -147,21 +147,21 @@ Beide Schnittstellen bieten Zugriff auf folgende Module:
     * **Inkrementelle Backups**: Intelligente Parent-Erkennung, automatisches Fallback und umfassende Ketten-Integritätsvalidierung
     * **Restore-Funktionen**: Vollständige Systemwiederherstellung, individuelle Subvolume-Wiederherstellung, Ordner-Level-Wiederherstellung und Bootloader-Integration *(Hinweis: Restore-Funktionen sind implementiert, benötigen aber umfassende Tests)*
     * **Sicherheitsfeatures**: Live-Umgebungs-Erkennung, Dateisystem-Gesundheitsprüfung, Rollback-Funktionen und Dry-Run-Unterstützung
-    * **Detaillierte Dokumentation**: Siehe `docs/mod_btrfs_backup.md`, `docs/mod_btrfs_restore.md` und `docs/lib_btrfs.md`
+    * **Detaillierte Dokumentation**: Siehe `docs/mod/doc_btrfs_backup.md`, `docs/mod/doc_btrfs_restore.md` und `docs/lib/doc_btrfs.md`
 
 * **TAR Archiv Backup & Restore** (`modules/backup/mod_backup_tar.sh`, `modules/backup/mod_restore_tar.sh`):
     * **Flexible Backup-Optionen**: Nur Home, Systemkonfiguration, vollständiges System oder benutzerdefinierte Verzeichnisauswahl
     * **Intelligente Ausschlüsse**: Eingebaute System-Ausschlüsse, benutzer-konfigurierbare Muster und interaktive Ausschluss-Verwaltung
     * **Archiv-Verwaltung**: Komprimierte `.tar.gz` Archive mit automatischer Bereinigung und Aufbewahrungsrichtlinien
     * **Sichere Wiederherstellung**: Mehrere Zieloptionen mit Sicherheitswarnungen und Bestätigungsabfragen
-    * **Dokumentation**: Siehe `docs/mod_backup_tar.md` und `docs/mod_restore_tar.md`
+    * **Dokumentation**: Siehe `docs/mod/doc_backup_tar.md` und `docs/mod/doc_restore_tar.md`
 
 * **RSYNC Inkrementelle Backup & Restore** (`modules/backup/mod_backup_rsync.sh`, `modules/backup/mod_restore_rsync.sh`):
     * **Inkrementelle Intelligenz**: Speicher-effiziente Backups mit Hardlink-Optimierung über `--link-dest`
     * **Backup-Typen**: Vollbackups und inkrementelle Backups mit automatischer Parent-Erkennung
     * **Erweiterte Optionen**: Umfassende RSYNC-Konfiguration mit atomaren Operationen und Fortschrittsüberwachung
     * **Flexible Wiederherstellung**: Echtzeit-Fortschrittsüberwachung und vollständige Verzeichnisbaum-Wiederherstellung
-    * **Dokumentation**: Siehe `docs/mod_backup_rsync.md` und `docs/mod_restore_rsync.md`
+    * **Dokumentation**: Siehe `docs/mod/doc_backup_rsync.md` und `docs/mod/doc_restore_rsync.md`
 
 </details>
 

@@ -1,5 +1,5 @@
 <!--
-File: docs/gui.md
+File: docs/gui/doc_interface.md
 Copyright (c) 2025 maschkef
 SPDX-License-Identifier: MIT
 
