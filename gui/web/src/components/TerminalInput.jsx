@@ -7,8 +7,10 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 */
 
 import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const TerminalInput = forwardRef(({ sessionId, onSendInput, onStopSession, isActive }, ref) => {
+  const { t } = useTranslation('common');
   const [input, setInput] = useState('');
   const inputRef = useRef(null);
 
@@ -59,7 +61,7 @@ const TerminalInput = forwardRef(({ sessionId, onSendInput, onStopSession, isAct
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder={isActive ? "Type your input and press Enter..." : "Start a module to enable input"}
+          placeholder={isActive ? t('terminal.inputPlaceholder') : t('terminal.startModulePrompt')}
           disabled={!isActive}
           style={{ 
             flex: 1,
@@ -90,7 +92,7 @@ const TerminalInput = forwardRef(({ sessionId, onSendInput, onStopSession, isAct
             height: '36px'
           }}
         >
-          Send
+{t('terminal.send')}
         </button>
         <button 
           type="button"
@@ -108,9 +110,9 @@ const TerminalInput = forwardRef(({ sessionId, onSendInput, onStopSession, isAct
             height: '36px',
             fontWeight: '500'
           }}
-          title="Stop current session"
+          title={t('terminal.stopTooltip')}
         >
-          Stop
+{t('terminal.stop')}
         </button>
     </form>
   );

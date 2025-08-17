@@ -1,0 +1,312 @@
+{
+  "restarts": {
+    "overview": "Systemdienste und Desktop-Komponenten sicher neustarten.",
+    "options": [
+      "1. Login-Manager neustarten - Startet den Display-Manager neu (GDM, SDDM, etc.)",
+      "2. Sound-System neustarten - Startet PulseAudio/PipeWire neu",
+      "3. Desktop-Umgebung neustarten - Startet Ihre Desktop-Sitzung neu",
+      "4. Netzwerkdienste neustarten - Startet Netzwerkkomponenten neu"
+    ],
+    "notes": [
+      "Einige Vorgänge erfordern möglicherweise sudo-Rechte",
+      "Desktop-Neustart schließt alle Anwendungen",
+      "Netzwerk-Neustart kann Sie vorübergehend vom Netz trennen"
+    ]
+  },
+  "system_info": {
+    "overview": "Umfassende Informationen über Hardware, Software und aktuellen Systemstatus anzeigen. Perfekt für Fehlerbehebung, Systemüberwachung oder um Ihr Linux-System besser kennenzulernen.",
+    "options": [
+      "1. Betriebssystem & Kernel - Zeigt Ihre Linux-Distribution, Version und Kernel-Informationen",
+      "2. CPU-Details - Zeigt Prozessor-Informationen einschließlich Modell, Kerne und Leistungsspezifikationen",
+      "3. RAM-Nutzung - Überprüft Speichernutzung und zeigt verfügbaren vs. verwendeten RAM",
+      "4. PCI-Geräte - Listet Hardware-Komponenten wie Grafikkarten, Netzwerkadapter und Soundkarten auf",
+      "5. USB-Geräte - Zeigt angeschlossene USB-Geräte wie Tastaturen, Mäuse, Speicherlaufwerke und Webcams",
+      "6. Festplatten-Übersicht - Zeigt Festplatten, SSDs und Speichergeräte mit Mount-Punkten und Nutzung",
+      "7. Top-Prozesse - Zeigt welche Programme die meisten CPU- und Speicher-Ressourcen verwenden",
+      "8. Netzwerk-Konfiguration - Zeigt Netzwerkeinstellungen, IP-Adressen und aktive Verbindungen",
+      "9. Temperaturen/Sensoren - Überwacht Hardware-Temperaturen und Lüftergeschwindigkeiten (falls Sensoren verfügbar)"
+    ],
+    "notes": [
+      "Einige detaillierte Informationen erfordern möglicherweise Administrator-Rechte",
+      "Fehlende Tools werden zur automatischen Installation angeboten",
+      "Hardware-Sensor-Werte erfordern die Installation des 'sensors'-Pakets",
+      "Alle Informationen sind schreibgeschützt - dies ändert keine Systemeinstellungen"
+    ]
+  },
+  "disk": {
+    "overview": "Tools zur Verwaltung und Analyse Ihrer Speichergeräte und des Festplattenplatzes. Überprüfen Sie die Laufwerksgesundheit, finden Sie große Dateien, überwachen Sie die Festplattennutzung und führen Sie Festplattendiagnosen durch.",
+    "options": [
+      "1. Eingehängte Laufwerke anzeigen - Alle angeschlossenen Laufwerke und deren Speicherplatznutzung",
+      "2. SMART-Werte - Detaillierte Gesundheitsinformationen von Festplatten und SSDs",
+      "3. Dateizugriffszeiten - Überprüfen welche Programme gerade Dateien in einem Ordner verwenden",
+      "4. Verzeichnisgrößen - Festplattenplatz-Nutzung mit visuellen Tools wie ncdu analysieren",
+      "5. Festplatten-Geschwindigkeitstest - Lese-/Schreibgeschwindigkeit Ihrer Speichergeräte testen",
+      "6. Dateisystem überprüfen - Laufwerke auf Fehler scannen und Dateisystem-Probleme reparieren",
+      "7. Gesundheit überprüfen - Schnelle Gesundheitsprüfung Ihrer Laufwerke mit SMART-Daten",
+      "8. Größte Dateien - Die größten Dateien finden, die Speicherplatz auf Ihrem System belegen"
+    ],
+    "notes": [
+      "Laufwerks-Gesundheitsprüfungen erfordern Administrator-Rechte",
+      "Fehlende Diagnose-Tools werden zur automatischen Installation angeboten",
+      "Dateisystem-Prüfungen funktionieren am besten bei nicht eingehängten Laufwerken",
+      "Geschwindigkeitstests und Gesundheitsprüfungen sind sicher und ändern keine Daten"
+    ]
+  },
+  "logs": {
+    "overview": "Systemprotokolle finden und analysieren um Probleme zu beheben, Systemgesundheit zu überwachen oder zu untersuchen was bei Abstürzen oder Fehlern passiert ist.",
+    "options": [
+      "1. Aktuelle Logs (Aktueller Start) - Was in den letzten Minuten oder Stunden auf Ihrem System passiert ist",
+      "2. Aktuelle Logs (Vorheriger Start) - Was vor Ihrem letzten Neustart oder Absturz schief gelaufen ist",
+      "3. Dienst-spezifische Logs - Protokolle für spezifische Programme wie SSH, Webserver oder Datenbanken",
+      "4. X.org Logs - Grafik-System-Logs zur Fehlerbehebung bei Display- oder Treiberproblemen",
+      "5. Kernel-Meldungen - Low-Level-System-Meldungen vom Linux-Kernel (Hardware, Treiber)",
+      "6. Paket-Manager-Logs - Historie von Software-Installationen, Updates und Entfernungen",
+      "7. Erweiterte Analyse - Python-gestützte Log-Analyse zur automatischen Erkennung von Fehlern und Mustern"
+    ],
+    "notes": [
+      "Die meisten Logs werden automatisch gefiltert um Fehler und Warnungen zuerst zu zeigen",
+      "Sie können jede Log-Ausgabe zur späteren Überprüfung oder zum Teilen in Dateien speichern",
+      "Erweiterte Analyse verwendet Python mit Regex-Mustern um Logs zu parsen und Probleme hervorzuheben",
+      "Einige System-Logs erfordern Administrator-Rechte für den Zugriff"
+    ]
+  },
+  "packages": {
+    "overview": "Pakete und System-Updates verwalten.",
+    "options": [
+      "1. System-Update - Alle Pakete aktualisieren",
+      "2. Verwaiste Pakete finden - Unbenutzte Pakete erkennen",
+      "3. Paket-Cache bereinigen - Zwischengespeicherte Paket-Dateien löschen",
+      "4. Suchen & Installieren - Neue Pakete finden und installieren",
+      "5. Docker-Setup - Docker installieren und konfigurieren",
+      "6. Installierte auflisten - Installierte Pakete anzeigen",
+      "7. Paket-Logs anzeigen - Paket-Manager-Protokolle anzeigen"
+    ],
+    "notes": [
+      "Unterstützt mehrere Paket-Manager",
+      "Automatische Erkennung verfügbarer Manager",
+      "Einige Vorgänge erfordern eine Internetverbindung"
+    ]
+  },
+  "security": {
+    "overview": "Umfassendes Sicherheitsaudit-Toolkit für Linux-Systeme. Führt verschiedene Sicherheitsüberprüfungen durch, einschließlich Netzwerkanalyse, Login-Überwachung, Malware-Erkennung, Firewall-Status und System-Härtungs-Verifizierung.",
+    "options": [
+      "1. Offene Ports anzeigen - Listet TCP/UDP-lauschende Ports mit ss auf, optionaler nmap localhost-Scan (1-1000)",
+      "2. Fehlgeschlagene Login-Versuche - Analysiert SSH/PAM-Fehler aus journalctl oder Log-Dateien, zeigt lastb-Ausgabe",
+      "3. Rootkit-Erkennung - Führt rkhunter (schneller/vollständiger Scan) und optional chkrootkit für Malware-Erkennung aus",
+      "4. Firewall-Status - Überprüft UFW, firewalld oder iptables-Status, zeigt Regeln und Aktivierungshilfe",
+      "5. Sicherheits-Updates - Sucht nach verfügbaren Sicherheits-Patches mit Ihrem Paket-Manager",
+      "6. Passwort-Sicherheit - Überprüft Passwort-Richtlinien, Alterungseinstellungen und Konten ohne Passwörter"
+    ],
+    "notes": [
+      "Die meisten Funktionen erfordern sudo-Rechte für Log-Zugriff und System-Scanning",
+      "Fehlende Tools (ss, nmap, rkhunter, chkrootkit) werden zur Installation angeboten",
+      "Rootkit-Scans können zeitaufwändig sein und Benutzerinteraktion erfordern",
+      "Port-Scanning von localhost ist sicher, aber externe Scans können Alarme auslösen",
+      "Fehlgeschlagene Login-Analyse deckt SSH, PAM und systemd Login-Services ab",
+      "Passwort-Richtlinien-Überprüfungen untersuchen /etc/security/pwquality.conf und PAM-Konfiguration"
+    ]
+  },
+  "energy": {
+    "overview": "Energieverwaltung und Energieoptimierung.",
+    "options": [
+      "1. Energieprofile - Zwischen Energiemodi wechseln",
+      "2. CPU-Frequenz - Prozessorfrequenz anpassen",
+      "3. Display-Helligkeit - Bildschirmhelligkeit steuern",
+      "4. Energiestatistiken - Stromverbrauch anzeigen",
+      "5. Schlaf/Suspend - Schlafmodi konfigurieren"
+    ],
+    "notes": [
+      "Features hängen von der Hardware-Unterstützung ab",
+      "Einige Steuerungen erfordern Root-Rechte",
+      "Energieprofile variieren je nach System"
+    ]
+  },
+  "docker": {
+    "overview": "Docker-Container verwalten und ihre Sicherheit gewährleisten. Container-Informationen abrufen, Docker bei Bedarf installieren und Sicherheitsaudits für Ihre containerisierten Anwendungen durchführen.",
+    "options": [
+      "1. Laufende Container anzeigen - Alle aktiven Docker-Container mit Ressourcenverbrauch und Status anzeigen",
+      "2. Konfiguration verwalten - Docker-Sicherheitsscanning-Einstellungen und -Parameter konfigurieren",
+      "3. Installation & Setup - Docker und Docker Compose automatisch auf Ihrem System installieren", 
+      "4. Sicherheits-Audit - Umfassende Sicherheitsprüfung von Containern, Images und Docker-Konfiguration"
+    ],
+    "notes": [
+      "Installationsoption beinhaltet vollständiges Docker-Setup mit Benutzerberechtigungen",
+      "Sicherheitsaudit prüft auf Schwachstellen, Fehlkonfigurationen und Best Practices",
+      "Konfigurationseinstellungen steuern, wie gründlich Sicherheitsscans sind",
+      "Docker muss installiert sein, um Container anzuzeigen und zu verwalten"
+    ]
+  },
+  "backup": {
+    "overview": "Zentrale Anlaufstelle zum Schutz Ihrer Daten mit mehreren Backup-Methoden. Wählen Sie zwischen BTRFS-Snapshots, TAR-Archiven oder RSYNC inkrementellen Backups je nach Bedarf.",
+    "options": [
+      "1. BTRFS-Operationen - Erweiterte snapshot-basierte Backups für BTRFS-Dateisysteme (atomisch, platzsparend)",
+      "2. TAR-Backup - Komprimierte Archiv-Backups von Verzeichnissen erstellen (kompatibel mit allen Systemen)",
+      "3. RSYNC-Backup - Schnelle inkrementelle Backups, die nur geänderte Dateien kopieren",
+      "4. Wiederherstellungsvorgänge - Spezialisierte Wiederherstellungstools für jeden Backup-Typ aufrufen",
+      "5. Backup-Status - Umfassenden Status aller Ihrer Backups und Festplattenplatz-Nutzung anzeigen", 
+      "6. Backup konfigurieren - Backup-Ziele, Aufbewahrungsrichtlinien und andere Einstellungen festlegen"
+    ],
+    "notes": [
+      "🚨 BTRFS-WARNUNG: BTRFS-Backup ist auf begrenzten Systemen getestet - mit Vorsicht verwenden",
+      "🚨 BTRFS-WIEDERHERSTELLUNG: Erfordert Tests - NICHT in Produktion verwenden! Nur zum Debuggen/Testen!",
+      "💡 Siehe individuelle BTRFS-Modul-Hilfe (bei direktem Aufruf) für weitere Informationen",
+      "Jeder Backup-Typ hat seine eigenen spezialisierten Tools, die über dieses Menü zugänglich sind",
+      "BTRFS-Operationen erfordern BTRFS-Dateisystem und bieten die fortschrittlichsten Features",
+      "TAR-Backups funktionieren auf jedem Dateisystem, erstellen aber größere Archivdateien",
+      "RSYNC ist ideal für regelmäßige Backups, da es schnell und platzsparend ist",
+      "Konfigurieren Sie Ihr Backup-Ziel vor dem Erstellen Ihres ersten Backups"
+    ]
+  },
+  "btrfs_backup": {
+    "overview": "Erweiterte BTRFS-Snapshot-basierte Backup-System mit dynamischer Subvolume-Erkennung. Erstellt atomische Backups konfigurierbarer BTRFS-Subvolumes mit btrfs send/receive mit umfassender Integritätsprüfung und automatischen inkrementellen Backup-Ketten.",
+    "options": [
+      "1. BTRFS-Backup erstellen - Erstellt Snapshots konfigurierter und automatisch erkannter Subvolumes und überträgt sie zum Backup-Ziel",
+      "2. Konfiguration anzeigen/ändern - Backup-Einstellungen anzeigen und ändern (Subvolumes, Pfade, Aufbewahrung, Auto-Erkennung)",
+      "3. Backup-Status anzeigen - Backup-Historie, Speicherplatzverbrauch und erkannte Subvolume-Informationen anzeigen", 
+      "4. BTRFS-Backups löschen - Alte Backups mit Optionen für selektives oder automatisches Löschen entfernen",
+      "5. Problematische Backups bereinigen - Beschädigte oder unvollständige Backup-Operationen reparieren",
+      "6. Skript-erstellte Quell-Snapshots bereinigen - Temporäre Snapshots entfernen und bewahrte Snapshots verwalten",
+      "7. BTRFS-Backup wiederherstellen - Erweiterte Wiederherstellung mit Bootloader-Integration und set-default-Fähigkeit"
+    ],
+    "notes": [
+      "⚠️ BETA-SOFTWARE: Auf begrenzten Systemen getestet - mit Vorsicht verwenden",
+      "Unterstützt flexible BTRFS-Subvolume-Layouts (@ @home @var @opt @tmp @srv, etc.)",
+      "Erkennt automatisch Subvolumes aus /etc/fstab und /proc/mounts wenn aktiviert",
+      "Konfigurierbare Subvolume-Liste über LH_BACKUP_SUBVOLUMES-Einstellung", 
+      "Backup-Ziel muss auf einem BTRFS-Dateisystem sein",
+      "Verwendet umfassende atomische Operationen mit gründlicher Validierung",
+      "Erstellt automatisch platzsparende inkrementelle Backups wenn möglich",
+      "Quell-Snapshot-Bewahrung zur Aufrechterhaltung inkrementeller Backup-Ketten"
+    ]
+  },
+  "btrfs_restore": {
+    "overview": "⚠️ DESTRUKTIV: Erweiterte BTRFS-Disaster-Recovery-System mit dynamischer Subvolume-Erkennung. Entwickelt für den Betrieb aus Live-Umgebung zur Wiederherstellung von Systemen aus BTRFS-Backups mit atomischen Operationen, Bootloader-Integration und umfassender Sicherheitsvalidierung.",
+    "options": [
+      "1. Wiederherstellungsumgebung einrichten - Zielsystem, Backup-Quelle konfigurieren und verfügbare Subvolumes automatisch erkennen",
+      "2. System-/Subvolume-Wiederherstellung - Beliebige erkannte Subvolumes (@, @home, @var, @opt, etc.) mit Zeitstempel-Matching wiederherstellen",
+      "3. Individuelle Ordner-Wiederherstellung - Spezifische Dateien/Ordner aus beliebigen verfügbaren Subvolume-Snapshots wiederherstellen", 
+      "4. Festplatten-Informationen anzeigen - Zielsystem-Festplattenlayout, BTRFS-Struktur und erkannte Subvolumes anzeigen",
+      "5. Sicherheitsinformationen überprüfen - Kritische Sicherheitswarnungen, Live-Umgebungs-Erkennung und Wiederherstellungsverfahren anzeigen",
+      "6. Wiederherstellungsumgebung bereinigen - Temporäre Dateien, Mount-Punkte und Wiederherstellungsartefakte aufräumen"
+    ],
+    "notes": [
+      "🚨 GEFAHR: ERFORDERT TESTS - NICHT in Produktion verwenden! Nur zum Debuggen/Testen!",
+      "🚨 Nur verwenden, wenn Sie BTRFS-Wiederherstellungsverfahren und potentiellen Datenverlust vollständig verstehen",
+      "⚠️ KRITISCH: Nur aus Live-Umgebung ausführen, niemals auf laufendem System",
+      "⚠️ Wird bestehende Daten auf Ziel-Subvolumes während vollständiger Wiederherstellung zerstören",
+      "Erkennt automatisch verfügbare Subvolumes aus Backup-Struktur und Systemkonfiguration",
+      "Unterstützt flexible BTRFS-Layouts mit beliebigen @-präfixierten Subvolumes",
+      "Koordinierte Multi-Subvolume-Wiederherstellung mit zeitstempel-basiertem Snapshot-Pairing", 
+      "Erweiterte Bootloader-Integration mit mehreren Update-Strategien",
+      "Verwendet robusten 4-Schritt-atomischen Wiederherstellungsprozess mit umfassender Validierung und Rollback"
+    ]
+  },
+  "backup_tar": {
+    "overview": "TAR-Archiv-basiertes Backup-System zur Erstellung komprimierter Backups von System-Verzeichnissen und Benutzerdaten. Einfache und weitgehend kompatible Backup-Methode mit Standard-tar-Befehl.",
+    "options": [
+      "1. Nur /home - Benutzer-Verzeichnisse und persönliche Daten sichern",
+      "2. Nur /etc - System-Konfigurationsdateien sichern",
+      "3. /home und /etc - Sowohl Benutzerdaten als auch System-Konfiguration sichern",
+      "4. Vollsystem (außer temporäre Dateien) - Komplettes System-Backup unter Ausschluss temporärer Verzeichnisse",
+      "5. Benutzerdefinierte Verzeichnisse - Spezifische Pfade zum Sichern angeben"
+    ],
+    "notes": [
+      "Erstellt komprimierte tar.gz-Archive für Speichereffizienz",
+      "Behält Datei-Berechtigungen und Besitz-Informationen bei",
+      "Vollsystem-Backups können je nach System sehr groß sein",
+      "Benutzerdefinierte Verzeichnis-Option ermöglicht flexible Backup spezifischer Pfade",
+      "Backup-Speicherort ist in backup.conf konfigurierbar"
+    ]
+  },
+  "restore_tar": {
+    "overview": "System-Dateien und -Verzeichnisse aus TAR-Archiv-Backups wiederherstellen. Bietet flexible Wiederherstellungsoptionen einschließlich sicherer temporärer Extraktion für Datei-Recovery.",
+    "options": [
+      "1. An ursprünglichen Ort (überschreibt bestehende Dateien) - Direkte Wiederherstellung, die aktuelle Dateien ersetzt",
+      "2. In temporäres Verzeichnis (/tmp/restore_tar) - Sichere Extraktion zum Durchsuchen von Dateien und selektiver Wiederherstellung",
+      "3. Benutzerdefinierter Pfad - In ein vom Benutzer angegebenes Verzeichnis wiederherstellen"
+    ],
+    "notes": [
+      "⚠️ Wiederherstellung am ursprünglichen Ort überschreibt bestehende Dateien",
+      "Temporäre Verzeichnis-Wiederherstellung ist am sichersten zum Erkunden von Backup-Inhalten",
+      "Benutzerdefinierte Pfad-Wiederherstellung ermöglicht flexiblen Extraktionsort",
+      "Behält ursprüngliche Datei-Berechtigungen und Besitz während der Wiederherstellung bei",
+      "Temporäre Extraktionen werden automatisch bereinigt"
+    ]
+  },
+  "backup_rsync": {
+    "overview": "RSYNC-basiertes Backup-System für effiziente inkrementelle Backups. Verwendet rsync zur Erstellung platzsparender Backups, die nur geänderte Dateien kopieren, ideal für regelmäßige Backup-Zeitpläne.",
+    "options": [
+      "1. Nur /home - Benutzer-Verzeichnisse und persönliche Daten sichern",
+      "2. Vollsystem (außer temporäre Dateien) - Komplettes System-Backup unter Ausschluss temporärer Verzeichnisse", 
+      "3. Benutzerdefinierte Verzeichnisse - Spezifische Pfade zum Sichern angeben",
+      "Nach Verzeichnisauswahl:",
+      "• Vollbackup (alles kopieren) - Komplette Kopie aller ausgewählten Dateien",
+      "• Inkrementelles Backup (nur Änderungen) - Nur Dateien kopieren, die sich seit letztem Backup geändert haben"
+    ],
+    "notes": [
+      "Inkrementelle Backups sind viel schneller und verbrauchen weniger Platz als Vollbackups",
+      "Erstes Backup ist immer vollständig, nachfolgende Backups können inkrementell sein",
+      "Behält Datei-Berechtigungen, Besitz und Zeitstempel bei", 
+      "Bietet Dry-Run-Modus zur Vorschau von Operationen ohne Änderungen",
+      "Backup-Ziel ist in backup.conf konfigurierbar",
+      "Erfordert rsync-Befehl (wird installiert falls fehlend)"
+    ]
+  },
+  "restore_rsync": {
+    "overview": "Dateien und Verzeichnisse aus RSYNC-Backups wiederherstellen. Bietet flexible Wiederherstellungsoptionen mit der Effizienz und Zuverlässigkeit von rsync.",
+    "options": [
+      "1. An ursprünglichen Ort (überschreibt bestehende Dateien) - Direkte Wiederherstellung, die aktuelle Dateien ersetzt",
+      "2. In temporäres Verzeichnis (/tmp/restore_rsync) - Sichere Extraktion zum Durchsuchen von Dateien und selektiver Wiederherstellung", 
+      "3. Benutzerdefinierter Pfad - In ein vom Benutzer angegebenes Verzeichnis wiederherstellen"
+    ],
+    "notes": [
+      "⚠️ Wiederherstellung am ursprünglichen Ort überschreibt bestehende Dateien",
+      "Temporäre Verzeichnis-Wiederherstellung ist am sichersten zum Erkunden von Backup-Inhalten",
+      "Benutzerdefinierte Pfad-Wiederherstellung ermöglicht flexiblen Extraktionsort",
+      "Behält ursprüngliche Datei-Berechtigungen, Besitz und Zeitstempel bei",
+      "Kann aus sowohl vollständigen als auch inkrementellen RSYNC-Backups wiederherstellen",
+      "Temporäre Extraktionen werden automatisch bereinigt"
+    ]
+  },
+  "docker_setup": {
+    "overview": "Docker-Installations- und Setup-Utilities. Erkennt, installiert und konfiguriert Docker und Docker Compose automatisch auf Ihrem System mit ordnungsgemäßen Benutzerberechtigungen.",
+    "options": [
+      "Führt automatisch diese Aufgaben aus:",
+      "• Überprüfen, ob Docker bereits installiert ist und Versionsinformationen anzeigen",
+      "• Docker installieren falls nicht vorhanden mit dem Paket-Manager Ihres Systems",
+      "• Überprüfen, ob Docker Compose verfügbar ist (docker-compose oder docker compose)",
+      "• Docker Compose installieren falls benötigt",
+      "• Aktuellen Benutzer zur docker-Gruppe für Root-freie Docker-Nutzung hinzufügen",
+      "• Docker-Service starten und aktivieren",
+      "• Installation mit Test-Container-Lauf verifizieren"
+    ],
+    "notes": [
+      "Installationsmethode hängt von Ihrer Linux-Distribution ab",
+      "Kann Abmelden/Anmelden erfordern nach Hinzufügen des Benutzers zur docker-Gruppe",
+      "Erkennt automatisch, ob docker-compose oder docker compose Befehl verwendet werden soll",
+      "Startet Docker-Service und aktiviert ihn für automatischen Start",
+      "Führt Verifizierungstest durch um sicherzustellen, dass Docker ordnungsgemäß funktioniert"
+    ]
+  },
+  "docker_security": {
+    "overview": "Umfassendes Docker-Sicherheits-Audit-Tool. Scannt Docker-Container, Images und Konfigurationen auf Sicherheitsschwachstellen und Best-Practice-Verletzungen.",
+    "options": [
+      "1. Docker-Sicherheitsprüfung - Führt komplettes Sicherheitsaudit durch einschließlich:",
+      "• Container-Sicherheitskonfigurationsanalyse",
+      "• Image-Schwachstellen-Scanning",
+      "• Docker-Daemon-Sicherheitseinstellungen-Review", 
+      "• Netzwerk-Sicherheitskonfigurationsprüfung",
+      "• Volume- und Mount-Sicherheitsanalyse",
+      "• Berechtigungseskalations-Erkennung",
+      "• Ressourcenlimit-Verifizierung"
+    ],
+    "notes": [
+      "Erfordert Docker installiert und laufend",
+      "Scannt alle laufenden Container und verfügbaren Images",
+      "Konfigurationsoptionen beeinflussen Scan-Tiefe und -Strenge",
+      "Kann häufige Sicherheitsfehlkonfigurationen erkennen",
+      "Berichtet Befunde mit Schweregrad und Behebungsvorschlägen",
+      "Sollte regelmäßig ausgeführt werden zur Aufrechterhaltung der Docker-Sicherheitslage"
+    ]
+  }
+}

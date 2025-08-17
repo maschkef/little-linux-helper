@@ -7,6 +7,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 */
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const SessionContext = createContext();
 
@@ -19,6 +20,7 @@ export const useSession = () => {
 };
 
 export const SessionProvider = ({ children }) => {
+  const { i18n } = useTranslation();
   const [sessions, setSessions] = useState(new Map());
   const [activeSessionId, setActiveSessionId] = useState(null);
   const wsConnections = useRef(new Map());
@@ -69,6 +71,12 @@ export const SessionProvider = ({ children }) => {
     try {
       const response = await fetch(`/api/modules/${module.id}/start`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          language: i18n.language
+        })
       });
       
       if (response.ok) {

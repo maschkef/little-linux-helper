@@ -72,6 +72,10 @@ type Message struct {
 	Content interface{} `json:"content"`
 }
 
+type StartModuleRequest struct {
+	Language string `json:"language"`
+}
+
 var (
 	sessionManager = &SessionManager{
 		sessions: make(map[string]*ModuleSession),
@@ -145,13 +149,24 @@ func init() {
 		log.Fatal("Could not determine executable path:", err)
 	}
 
-	// Assume GUI is in gui/ subdirectory of the main project
-	lhRootDir = filepath.Dir(filepath.Dir(executable))
+	// If running from source (go run), the executable will be in a temporary cache directory
+	// In this case, use the current working directory to determine the root
+	if strings.Contains(executable, "go-build") || strings.Contains(executable, "/tmp/") {
+		wd, err := os.Getwd()
+		if err != nil {
+			log.Fatal("Could not determine working directory:", err)
+		}
 
-	// If running from source (go run), use current directory structure
-	if strings.Contains(executable, "/tmp/") {
-		wd, _ := os.Getwd()
-		lhRootDir = filepath.Dir(wd)
+		// If we're in the gui directory, go up one level
+		if filepath.Base(wd) == "gui" {
+			lhRootDir = filepath.Dir(wd)
+		} else {
+			// Otherwise, assume we're already in the root directory
+			lhRootDir = wd
+		}
+	} else {
+		// Assume GUI is in gui/ subdirectory of the main project (for production builds)
+		lhRootDir = filepath.Dir(filepath.Dir(executable))
 	}
 
 	// Set environment variable for the scripts
@@ -280,6 +295,135 @@ func main() {
 	log.Fatal(app.Listen(listenAddr))
 }
 
+// detectLanguage extracts language preference from Accept-Language header or query param
+func detectLanguage(c *fiber.Ctx) string {
+	// First check for explicit lang query parameter
+	if lang := c.Query("lang"); lang != "" {
+		return lang
+	}
+
+	// Then check Accept-Language header
+	acceptLang := c.Get("Accept-Language")
+	if acceptLang != "" {
+		// Simple language detection - take first language code
+		if strings.HasPrefix(acceptLang, "de") {
+			return "de"
+		}
+		if strings.HasPrefix(acceptLang, "en") {
+			return "en"
+		}
+	}
+
+	// Default to English
+	return "en"
+}
+
+// translateModuleCategory translates module category based on language
+func translateModuleCategory(category, lang string) string {
+	categoryTranslations := map[string]map[string]string{
+		"Recovery & Restarts": {
+			"en": "Recovery & Restarts",
+			"de": "Wiederherstellung & Neustarts",
+		},
+		"System Diagnosis & Analysis": {
+			"en": "System Diagnosis & Analysis",
+			"de": "Systemdiagnose & Analyse",
+		},
+		"Maintenance & Security": {
+			"en": "Maintenance & Security",
+			"de": "Wartung & Sicherheit",
+		},
+		"Docker & Containers": {
+			"en": "Docker & Containers",
+			"de": "Docker & Container",
+		},
+		"Backup & Recovery": {
+			"en": "Backup & Recovery",
+			"de": "Backup & Wiederherstellung",
+		},
+	}
+
+	if translations, exists := categoryTranslations[category]; exists {
+		if translated, exists := translations[lang]; exists {
+			return translated
+		}
+	}
+
+	// Return original if no translation found
+	return category
+}
+
+// translateModuleName translates module name based on language
+func translateModuleName(name, lang string) string {
+	nameTranslations := map[string]map[string]string{
+		"Services & Desktop Restart Options": {
+			"en": "Services & Desktop Restart Options",
+			"de": "Dienste & Desktop Neustart-Optionen",
+		},
+		"Display System Information": {
+			"en": "Display System Information",
+			"de": "Systeminformationen anzeigen",
+		},
+		"Disk Tools": {
+			"en": "Disk Tools",
+			"de": "Festplatten-Tools",
+		},
+		"Log Analysis Tools": {
+			"en": "Log Analysis Tools",
+			"de": "Log-Analyse-Tools",
+		},
+		"Package Management & Updates": {
+			"en": "Package Management & Updates",
+			"de": "Paketmanagement & Updates",
+		},
+		"Security Checks": {
+			"en": "Security Checks",
+			"de": "Sicherheitsprüfungen",
+		},
+		"Energy Management": {
+			"en": "Energy Management",
+			"de": "Energieverwaltung",
+		},
+		"Docker Management": {
+			"en": "Docker Management",
+			"de": "Docker-Verwaltung",
+		},
+		"Complete System Backup": {
+			"en": "Complete System Backup",
+			"de": "Vollständige Systemsicherung",
+		},
+		"BTRFS Snapshot Backup": {
+			"en": "BTRFS Snapshot Backup",
+			"de": "BTRFS Snapshot-Backup",
+		},
+		"BTRFS System Restore": {
+			"en": "BTRFS System Restore",
+			"de": "BTRFS System-Wiederherstellung",
+		},
+		"Backup & Recovery": {
+			"en": "Backup & Recovery",
+			"de": "Backup & Wiederherstellung",
+		},
+		"BTRFS Backup": {
+			"en": "BTRFS Backup",
+			"de": "BTRFS Backup",
+		},
+		"BTRFS Restore": {
+			"en": "BTRFS Restore",
+			"de": "BTRFS Wiederherstellung",
+		},
+	}
+
+	if translations, exists := nameTranslations[name]; exists {
+		if translated, exists := translations[lang]; exists {
+			return translated
+		}
+	}
+
+	// Return original if no translation found
+	return name
+}
+
 func getModules(c *fiber.Ctx) error {
 	modules := []ModuleInfo{
 		// Main modules
@@ -360,7 +504,7 @@ func getModules(c *fiber.Ctx) error {
 			SubmoduleCount: 7,
 		},
 
-		// Backup submodules (only BTRFS ones remain as direct options)
+		// Backup submodules
 		{
 			ID:             "btrfs_backup",
 			Name:           "BTRFS Backup",
@@ -527,6 +671,18 @@ func getSessions(c *fiber.Ctx) error {
 func startModule(c *fiber.Ctx) error {
 	moduleId := c.Params("id")
 
+	// Parse request body for language preference
+	var req StartModuleRequest
+	if err := c.BodyParser(&req); err != nil {
+		// If parsing fails, default to English
+		req.Language = "en"
+	}
+
+	// Validate language - fallback to English if invalid
+	if req.Language == "" || (req.Language != "en" && req.Language != "de") {
+		req.Language = "en"
+	}
+
 	// Generate session ID
 	sessionId := fmt.Sprintf("%s_%d", moduleId, time.Now().Unix())
 
@@ -585,6 +741,7 @@ func startModule(c *fiber.Ctx) error {
 	cmd.Env = append(os.Environ(),
 		"LH_ROOT_DIR="+lhRootDir,
 		"LH_GUI_MODE=true",
+		"LH_LANG="+req.Language,   // Set language for CLI modules
 		"TERM=xterm-256color",     // Ensure color support
 		"FORCE_COLOR=1",           // Force color output
 		"COLUMNS=120",             // Set terminal width

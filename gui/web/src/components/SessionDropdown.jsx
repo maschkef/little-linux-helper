@@ -7,10 +7,12 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSession } from '../contexts/SessionContext';
 import './SessionDropdown.css';
 
 const SessionDropdown = () => {
+  const { t } = useTranslation('common');
   const {
     sessions,
     activeSessionId,
@@ -87,11 +89,11 @@ const SessionDropdown = () => {
               </span>
             </>
           ) : (
-            <span className="session-name">No active session</span>
+            <span className="session-name">{t('session.noActiveSession')}</span>
           )}
         </span>
         <span className="session-count">
-          {sessions.size} session{sessions.size !== 1 ? 's' : ''}
+{t('session.sessionCount', { count: sessions.size })}
         </span>
         <span className={`dropdown-arrow ${isOpen ? 'open' : ''}`}>▼</span>
       </button>
@@ -99,7 +101,7 @@ const SessionDropdown = () => {
       {isOpen && (
         <div className="session-dropdown-menu">
           <div className="session-dropdown-header">
-            <span>Active Sessions</span>
+            <span>{t('session.activeSessions')}</span>
           </div>
           
           {Array.from(sessions.values()).map(session => (
@@ -112,7 +114,7 @@ const SessionDropdown = () => {
                 <div className="session-item-info">
                   <span className="session-item-name">{session.module_name}</span>
                   <span className="session-item-time">
-                    Started at {formatCreatedAt(session.created_at)}
+{t('session.startedAt', { time: formatCreatedAt(session.created_at) })}
                   </span>
                 </div>
                 <div className="session-item-controls">
@@ -126,7 +128,7 @@ const SessionDropdown = () => {
                     <button
                       className="session-close-btn"
                       onClick={(e) => handleSessionClose(e, session.id)}
-                      title="Close session"
+                      title={t('session.closeTooltip')}
                     >
                       ×
                     </button>

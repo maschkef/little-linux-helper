@@ -16,6 +16,7 @@ My environment is typically Arch (main system) or Debian (various services on my
 
 > **🎯 Project Status:**
 > - **Documentation**: Comprehensive technical documentation is available in the `docs/` directory for all modules and core components
+> - **GUI Interface**: Full internationalization (English/German) with error-resilient translation system and comprehensive help content
 > - **BTRFS Modules**: Advanced BTRFS backup and restore modules with atomic operations, incremental backup chains, and comprehensive safety features
 > - **Modular Architecture**: Clean separation of backup types into specialized modules (BTRFS, TAR, RSYNC) with unified dispatcher interface
 > - **Testing Status**: Backup functions are well-tested and stable; restore functions are implemented but require comprehensive testing before production use
@@ -79,9 +80,12 @@ A modern web-based GUI is available through `gui_launcher.sh`, providing:
 - **Multi-panel Layout**: Resizable panels with flexible show/hide controls for optimal workspace organization
 - **Security Features**: Localhost-only binding by default with optional network access via command line
 - **Configurable Networking**: Port and host configuration via `config/general.conf` or command line arguments
+- **Internationalization Support**: Full English/German translations with dynamic language switching
+- **Error-Resilient Design**: Missing translation keys display fallback content instead of crashing
+- **Comprehensive Help System**: Context-sensitive help with detailed module guidance and usage notes
 - **Advanced Features**: PTY integration for authentic terminal experience, WebSocket communication for real-time updates
 
-> **📝 Note:** The GUI currently displays in English only. Internationalization (i18n) support is planned for future releases.
+> **🌐 Internationalization:** The GUI supports full English/German translations with dynamic language switching and GUI-to-CLI language inheritance.
 
 <details>
 <summary>GUI Configuration & Usage:</summary>
@@ -110,7 +114,7 @@ CFG_LH_GUI_HOST="localhost"   # Set binding (localhost/0.0.0.0)
 ./little-linux-helper-gui --help              # Show usage information (long form)
 ```
 
-The GUI maintains full compatibility with all CLI functionality while providing an enhanced user experience with powerful multi-session capabilities.
+The GUI maintains full compatibility with all CLI functionality while providing an enhanced user experience with powerful multi-session capabilities and **full internationalization support (English/German)** with dynamic language switching.
 
 </details>
 

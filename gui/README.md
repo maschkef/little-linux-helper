@@ -20,14 +20,19 @@ A modern web-based GUI for the Little Linux Helper system administration toolkit
 - **Configurable networking** - Port and host configuration with security-first defaults
 - **Security features** - Localhost-only binding by default with optional network access
 - **Responsive design** that works on different screen sizes
+- **Full internationalization support** - Dynamic language switching (English/German) with GUI-to-CLI language inheritance
+- **Robust error handling** - Missing translation keys show fallback text with console warnings instead of crashes
+- **Safe translation system** - Graceful degradation when translation resources are unavailable
+- **Comprehensive help system** - Context-sensitive help with detailed module guidance and usage notes
 - **Preserves CLI functionality** - the original `help_master.sh` continues to work unchanged
 
 ## Architecture
 
 - **Backend**: Go + Fiber web framework
-- **Frontend**: React with modern JavaScript
+- **Frontend**: React with modern JavaScript and React i18next for internationalization
 - **Communication**: REST API + WebSockets for real-time updates
 - **Documentation**: Automatic markdown rendering from `docs/` directory
+- **Internationalization**: React i18next with language inheritance to CLI modules
 
 ## Prerequisites
 
@@ -69,7 +74,7 @@ The Go backend serves the React build and provides API endpoints:
 - `/api/health` - Simple health/status (uptime, session count)
 - `/api/modules/:id/docs` - Get module documentation
 - `/api/docs` - List all available documentation files with metadata for document browser
-- `/api/modules/:id/start` - Start a module session
+- `/api/modules/:id/start` - Start a module session (accepts language parameter)
 - `/api/sessions` - List all active sessions
 - `/api/sessions/:sessionId/input` - Send input to module
 - `/api/sessions/:sessionId` - Stop module session
@@ -82,7 +87,8 @@ The React frontend provides a modern interface with:
 - **SessionDropdown**: Multi-session management with switching and status indicators
 - **Terminal**: Real-time terminal output and input with session awareness (hideable)
 - **TerminalInput**: Enhanced input handling with Send and Stop buttons
-- **SessionContext**: React context for centralized session state management
+- **SessionContext**: React context for centralized session state management with language inheritance
+- **LanguageSelector**: Language selection component with flag emojis for dynamic language switching
 - **HelpPanel**: Context-sensitive help for each module (hideable)
 - **DocsPanel**: Module-bound markdown documentation viewer (hideable)
 - **DocumentBrowser**: Independent documentation browser with categorized navigation
@@ -112,8 +118,12 @@ gui/
         │   ├── HelpPanel.jsx          # Context help (hideable)
         │   ├── DocsPanel.jsx          # Module-bound docs (hideable)
         │   ├── DocumentBrowser.jsx    # Independent document browser
+        │   ├── LanguageSelector.jsx   # Language selection component
         │   └── ResizablePanels.jsx    # Panel layout management
         └── contexts/   # React contexts (SessionContext)
+            └── i18n/       # Internationalization files
+                ├── index.js     # i18n configuration
+                └── locales/     # Translation files (en, de)
 ```
 
 ## Integration with Little Linux Helper
@@ -123,7 +133,8 @@ The GUI integrates seamlessly with the existing Little Linux Helper system:
 1. **Module Discovery**: Automatically detects and lists all available modules
 2. **Documentation Integration**: Reads module documentation from `docs/` directory
 3. **Environment Preservation**: Maintains all environment variables and configuration
-4. **CLI Compatibility**: Original CLI interface remains fully functional
+4. **Language Integration**: GUI language selection automatically passed to CLI modules via LH_LANG
+5. **CLI Compatibility**: Original CLI interface remains fully functional
 
 ## Usage
 
@@ -149,6 +160,9 @@ The GUI integrates seamlessly with the existing Little Linux Helper system:
 8. **Browse Documentation**: Choose between:
    - **Module-bound docs**: Traditional documentation tied to selected modules
    - **Document browser**: Independent browsing through all documentation with categories
+9. **Switch Languages**: Use the language selector (🇺🇸 🇩🇪) for real-time language switching
+   - **GUI Language**: Immediately updates all interface elements
+   - **Module Language**: New module sessions automatically inherit the selected language
 
 ### Multi-Session Features
 - **Unlimited Sessions**: Run as many concurrent modules as needed
@@ -175,7 +189,10 @@ The GUI respects all existing Little Linux Helper configuration:
 - Environment variables are preserved
 - Configuration files in `config/` are used
 - Logging system integration
-- Internationalization support (planned)
+- **Internationalization support**: Full English/German translations with dynamic language switching
+- **Error resilience**: Missing translation keys display fallback text instead of crashing the application
+- **Development debugging**: Comprehensive console logging for missing translations and errors
+- **Stable operation**: Application remains functional even with incomplete translation resources
 
 ### GUI-Specific Configuration
 
@@ -188,6 +205,10 @@ CFG_LH_GUI_PORT="3000"
 # GUI server host binding (default: localhost for security)
 # Options: "localhost" (secure) or "0.0.0.0" (network access)
 CFG_LH_GUI_HOST="localhost"
+
+# Language setting (applies to both CLI and GUI if not overridden)
+# Options: "en" (English), "de" (German), "auto" (detect from system)
+CFG_LH_LANG="en"
 ```
 
 ### Command Line Options

@@ -1,0 +1,98 @@
+{
+  "app": {
+    "title": "Little Linux Helper",
+    "moduleHelp": "Module Help"
+  },
+  "session": {
+    "currentModule": "Current Module:",
+    "selectModule": "Select a module from the sidebar to get started",
+    "newSession": "+ New Session", 
+    "selectModuleFirst": "Please select a module first",
+    "startNewSessionTooltip": "Start new session",
+    "noActiveSession": "No active session",
+    "sessionCount": "{{count}} session",
+    "sessionCount_other": "{{count}} sessions",
+    "activeSessions": "Active Sessions",
+    "startedAt": "Started at {{time}}",
+    "closeTooltip": "Close session"
+  },
+  "panels": {
+    "hideModules": "Hide Modules",
+    "showModules": "Show Modules",
+    "hideTerminal": "Hide Terminal", 
+    "showTerminal": "Show Terminal",
+    "hideHelp": "Hide Help",
+    "showHelp": "Show Help",
+    "hideDocs": "Hide Docs",
+    "showDocs": "Show Docs",
+    "docBrowser": "Doc Browser:"
+  },
+  "modules": {
+    "availableModules": "Available Modules",
+    "start": "Start",
+    "startTooltip": "Start new session with this module",
+    "options": "options",
+    "submoduleCount": "{{count}} options",
+    "categories": {
+      "recovery_and_restarts": "Recovery & Restarts",
+      "system_diagnosis_and_analysis": "System Diagnosis & Analysis", 
+      "maintenance_and_security": "Maintenance & Security",
+      "docker_and_containers": "Docker & Containers",
+      "backup_and_recovery": "Backup & Recovery"
+    },
+    "names": {
+      "restarts": "Services & Desktop Restart Options",
+      "system_info": "Display System Information",
+      "disk": "Disk Tools", 
+      "logs": "Log Analysis Tools",
+      "packages": "Package Management & Updates",
+      "security": "Security Checks",
+      "energy": "Energy Management",
+      "docker": "Docker Functions",
+      "backup": "Backup & Recovery",
+      "btrfs_backup": "BTRFS Backup",
+      "btrfs_restore": "BTRFS Restore"
+    },
+    "descriptions": {
+      "restarts": "Restart system services and desktop environment components",
+      "system_info": "Show comprehensive system information and hardware details",
+      "disk": "Disk utilities and storage analysis tools",
+      "logs": "Analyze system logs and troubleshoot issues", 
+      "packages": "Manage packages and system updates",
+      "security": "Perform security audits and checks",
+      "energy": "Power management and energy optimization",
+      "docker": "Docker management and security tools",
+      "backup": "Backup and restore operations including BTRFS, TAR, and RSYNC",
+      "btrfs_backup": "Advanced BTRFS snapshot-based backup system",
+      "btrfs_restore": "BTRFS snapshot restoration with dry-run support"
+    }
+  },
+  "help": {
+    "selectModulePrompt": "Select a module to see help information and available options.",
+    "overview": "Overview",
+    "availableOptions": "Available Options",
+    "importantNotes": "Important Notes",
+    "noHelpAvailable": "Help information not available for this module."
+  },
+  "docs": {
+    "notAvailable": "Documentation not available for this module.",
+    "errorLoading": "Error loading documentation."
+  },
+  "terminal": {
+    "noActiveSession": "No active session. Select a module to start.",
+    "inputPlaceholder": "Type your input and press Enter...",
+    "startModulePrompt": "Start a module to enable input",
+    "send": "Send",
+    "stop": "Stop",
+    "stopTooltip": "Stop current session"
+  },
+  "general": {
+    "loading": "Loading...",
+    "error": "Error", 
+    "success": "Success",
+    "cancel": "Cancel",
+    "ok": "OK",
+    "yes": "Yes",
+    "no": "No"
+  }
+}

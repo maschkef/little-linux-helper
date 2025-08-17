@@ -7,11 +7,13 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import AnsiToHtml from 'ansi-to-html';
 import TerminalInput from './TerminalInput.jsx';
 import { useSession } from '../contexts/SessionContext';
 
 function Terminal() {
+  const { t } = useTranslation('common');
   const { activeSessionId, getActiveSession, getSessionOutput, sendInput, stopSession } = useSession();
   const [localOutput, setLocalOutput] = useState('');
   const outputRef = useRef(null);
@@ -40,7 +42,7 @@ function Terminal() {
       const sessionOutput = getSessionOutput(activeSessionId);
       setLocalOutput(sessionOutput.join(''));
     } else {
-      setLocalOutput('No active session. Select a module to start.\n');
+      setLocalOutput(t('terminal.noActiveSession') + '\n');
     }
   }, [activeSessionId, getSessionOutput]);
 

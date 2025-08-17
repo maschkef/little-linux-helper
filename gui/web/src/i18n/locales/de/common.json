@@ -1,0 +1,98 @@
+{
+  "app": {
+    "title": "Little Linux Helper",
+    "moduleHelp": "Modul-Hilfe"
+  },
+  "session": {
+    "currentModule": "Aktuelles Modul:",
+    "selectModule": "Wählen Sie ein Modul aus der Seitenleiste aus, um zu beginnen",
+    "newSession": "+ Neue Sitzung",
+    "selectModuleFirst": "Bitte wählen Sie zuerst ein Modul aus",
+    "startNewSessionTooltip": "Neue Sitzung starten",
+    "noActiveSession": "Keine aktive Sitzung",
+    "sessionCount": "{{count}} Sitzung",
+    "sessionCount_other": "{{count}} Sitzungen",
+    "activeSessions": "Aktive Sitzungen",
+    "startedAt": "Gestartet um {{time}}",
+    "closeTooltip": "Sitzung schließen"
+  },
+  "panels": {
+    "hideModules": "Module ausblenden",
+    "showModules": "Module anzeigen", 
+    "hideTerminal": "Terminal ausblenden",
+    "showTerminal": "Terminal anzeigen",
+    "hideHelp": "Hilfe ausblenden",
+    "showHelp": "Hilfe anzeigen",
+    "hideDocs": "Docs ausblenden",
+    "showDocs": "Docs anzeigen",
+    "docBrowser": "Doc Browser:"
+  },
+  "modules": {
+    "availableModules": "Verfügbare Module",
+    "start": "Starten",
+    "startTooltip": "Neue Sitzung mit diesem Modul starten",
+    "options": "Optionen",
+    "submoduleCount": "{{count}} Optionen",
+    "categories": {
+      "recovery_and_restarts": "Wiederherstellung & Neustarts",
+      "system_diagnosis_and_analysis": "Systemdiagnose & Analyse",
+      "maintenance_and_security": "Wartung & Sicherheit",
+      "docker_and_containers": "Docker & Container",
+      "backup_and_recovery": "Backup & Wiederherstellung"
+    },
+    "names": {
+      "restarts": "Dienste & Desktop-Neustart-Optionen",
+      "system_info": "Systeminformationen anzeigen",
+      "disk": "Festplatten-Tools",
+      "logs": "Log-Analyse-Tools",
+      "packages": "Paketverwaltung & Updates",
+      "security": "Sicherheitsprüfungen",
+      "energy": "Energieverwaltung",
+      "docker": "Docker-Funktionen",
+      "backup": "Backup & Wiederherstellung",
+      "btrfs_backup": "BTRFS Backup",
+      "btrfs_restore": "BTRFS Wiederherstellung"
+    },
+    "descriptions": {
+      "restarts": "Systemdienste und Desktop-Umgebungskomponenten neustarten",
+      "system_info": "Umfassende Systeminformationen und Hardware-Details anzeigen",
+      "disk": "Festplatten-Utilities und Speicher-Analyse-Tools",
+      "logs": "System-Logs analysieren und Probleme beheben",
+      "packages": "Pakete und System-Updates verwalten",
+      "security": "Sicherheitsaudits und -prüfungen durchführen", 
+      "energy": "Energieverwaltung und Energieoptimierung",
+      "docker": "Docker-Verwaltung und Sicherheits-Tools",
+      "backup": "Backup- und Wiederherstellungsoperationen einschließlich BTRFS, TAR und RSYNC",
+      "btrfs_backup": "Erweiterte BTRFS-Snapshot-basierte Backup-System",
+      "btrfs_restore": "BTRFS-Snapshot-Wiederherstellung mit Trockenlauf-Unterstützung"
+    }
+  },
+  "help": {
+    "selectModulePrompt": "Wählen Sie ein Modul aus, um Hilfeinformationen und verfügbare Optionen anzuzeigen.",
+    "overview": "Übersicht",
+    "availableOptions": "Verfügbare Optionen",
+    "importantNotes": "Wichtige Hinweise",
+    "noHelpAvailable": "Hilfeinformationen für dieses Modul nicht verfügbar."
+  },
+  "docs": {
+    "notAvailable": "Dokumentation für dieses Modul nicht verfügbar.",
+    "errorLoading": "Fehler beim Laden der Dokumentation."
+  },
+  "terminal": {
+    "noActiveSession": "Keine aktive Sitzung. Wählen Sie ein Modul zum Starten aus.",
+    "inputPlaceholder": "Geben Sie Ihre Eingabe ein und drücken Sie Enter...",
+    "startModulePrompt": "Starten Sie ein Modul, um die Eingabe zu aktivieren",
+    "send": "Senden",
+    "stop": "Stoppen",
+    "stopTooltip": "Aktuelle Sitzung stoppen"
+  },
+  "general": {
+    "loading": "Lade...",
+    "error": "Fehler",
+    "success": "Erfolgreich", 
+    "cancel": "Abbrechen",
+    "ok": "OK",
+    "yes": "Ja",
+    "no": "Nein"
+  }
+}

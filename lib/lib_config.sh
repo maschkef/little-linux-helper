@@ -235,8 +235,8 @@ function lh_load_general_config() {
         LH_LOG_TO_CONSOLE="${CFG_LH_LOG_TO_CONSOLE:-$LH_LOG_TO_CONSOLE}"
         LH_LOG_TO_FILE="${CFG_LH_LOG_TO_FILE:-$LH_LOG_TO_FILE}"
         
-        # Set language variable as well
-        if [ -n "${CFG_LH_LANG:-}" ]; then
+        # Set language variable as well, but only if not already set (preserves GUI language setting)
+        if [ -n "${CFG_LH_LANG:-}" ] && [ -z "${LH_LANG:-}" ]; then
             export LH_LANG="${CFG_LH_LANG}"
         fi
     else

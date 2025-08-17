@@ -29,12 +29,13 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
         *   Interactive input handling for module prompts
         *   Session management for concurrent module executions
         *   Documentation serving from `docs/` directory
+        *   **Internationalization support:** Dynamic language inheritance from GUI to CLI modules
     *   **API Endpoints:**
         *   `GET /api/modules` - List all available modules with metadata
     *   `GET /api/health` - Health/status info (uptime, active sessions)
         *   `GET /api/modules/:id/docs` - Retrieve module documentation (supports both main and related module docs)
         *   `GET /api/docs` - List all available documentation files with metadata for document browser
-        *   `POST /api/modules/:id/start` - Start module execution session
+        *   `POST /api/modules/:id/start` - Start module execution session (accepts language parameter for dynamic i18n)
         *   `GET /api/sessions` - List all active sessions with metadata
         *   `POST /api/sessions/:sessionId/input` - Send input to running module
         *   `DELETE /api/sessions/:sessionId` - Stop module session
@@ -48,12 +49,22 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
         *   `Terminal.jsx` - Real-time terminal output display with ANSI color support and session management
         *   `TerminalInput.jsx` - Interactive input handling with "Send" and "Stop" buttons, click-to-focus functionality
         *   `SessionDropdown.jsx` - Multi-session management with session switching and status indicators
-        *   `SessionContext.jsx` - React context for centralized session state management
-        *   `HelpPanel.jsx` - Context-sensitive help with user-friendly descriptions and practical guidance
+        *   `SessionContext.jsx` - React context for centralized session state management with language inheritance
+        *   `HelpPanel.jsx` - Context-sensitive help with comprehensive module guidance, practical usage notes, and error-resilient translation handling
         *   `DocsPanel.jsx` - Module-bound documentation viewer with related documentation links and navigation
     *   `DocumentBrowser.jsx` - Independent documentation browser with categorized navigation
         *   `ResizablePanels.jsx` - Flexible panel layout management with hide/show panel controls
-    *   **Dependencies (system):** `node.js` (18+), `npm`, React ecosystem.
+        *   `LanguageSelector.jsx` - Language selection component with real-time switching
+    *   **Dependencies (system):** `node.js` (18+), `npm`, React ecosystem, React i18next.
+    *   **Internationalization Features:**
+        *   Full multi-language support with React i18next framework
+        *   Language selector with flag emojis for English and German
+        *   Browser language detection with localStorage persistence
+        *   Dynamic language inheritance: new modules automatically use selected GUI language
+        *   Comprehensive translations for all UI elements, module names, descriptions, and categories
+        *   **Robust error handling:** Missing translation keys show fallback text with console warnings instead of crashes
+        *   **Safe translation system:** Graceful degradation when translation resources are unavailable
+        *   **Debug logging:** Development mode provides detailed translation debugging information
 
 **4. Module Integration & Discovery:**
 
@@ -68,12 +79,19 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   **System Diagnosis & Analysis:** System information, disk tools, log analysis
     *   **Maintenance & Security:** Package management, security checks, energy management
     *   **Docker & Containers:** Docker management, security, and setup modules
-    *   **Backup & Recovery:** BTRFS, TAR, and RSYNC backup/restore operations
+    *   **Backup & Recovery:** BTRFS, TAR, and RSYNC backup/restore operations with comprehensive help documentation
+
+*   **Enhanced Error Handling & Stability:**
+    *   **Translation Error Recovery:** Missing translation keys display fallback content instead of causing application crashes
+    *   **Help System Resilience:** Missing help content shows placeholder text with clear error messages
+    *   **Console Debugging:** Comprehensive logging of missing translations and errors for development debugging
+    *   **Graceful Degradation:** Application remains functional even with incomplete translation resources
 
 *   **Execution Environment:**
     *   Preserves all environment variables from the original CLI system
     *   Maintains `LH_ROOT_DIR` and other critical project variables
     *   Sets `LH_GUI_MODE=true` environment variable for GUI-aware module behavior
+    *   **Dynamic language setting:** Sets `LH_LANG` environment variable based on GUI language selection
     *   Uses PTY for authentic terminal behavior with color support
     *   Handles interactive prompts and menu selections seamlessly
     *   Automatic "Any Key" prompt handling via module behavior when `LH_GUI_MODE=true`
@@ -116,6 +134,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   Advanced documentation system with both module-bound and independent browser modes
     *   **Panel Toggle Controls:** Hide/show modules sidebar, terminal panels, help, and docs for optimal screen usage
     *   **Full-Screen Reading Mode:** Hide all panels except documentation for maximum reading space
+    *   **Language Selection:** Integrated language selector with flag emojis for immediate language switching
 
 *   **Multi-Session Management:**
     *   Support for unlimited concurrent module sessions
@@ -144,6 +163,21 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   **Scrollable Interface:** Long document lists scroll smoothly within navigation panel
     *   **Dual View Toggle:** Switch between module-bound and browser modes with on/off slider
     *   **Full Documentation Coverage:** Access to all project documentation from single interface
+
+*   **Internationalization (i18n) Features:**
+    *   **Multi-Language Support:** English and German translations with framework for additional languages
+    *   **Dynamic Language Switching:** Real-time language changes without page reload
+    *   **Language Inheritance:** New module sessions automatically inherit GUI language selection
+    *   **Comprehensive Translation Coverage:**
+        *   All GUI interface elements and navigation
+        *   Module names, descriptions, and categories
+        *   Help content and documentation elements
+        *   Session management and status messages
+    *   **Language Persistence:** Language selection saved in browser localStorage
+    *   **Browser Language Detection:** Automatic language detection from browser settings
+    *   **Graceful Fallbacks:** Missing translations fall back to English
+    *   **Flag Emojis:** Visual language indicators (🇺🇸 English, 🇩🇪 German)
+    *   **CLI Integration:** GUI language setting passed to CLI modules via LH_LANG environment variable
 
 **7. Special Considerations:**
 
@@ -277,7 +311,35 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   **Automatic firewall management:** Optional firewall port opening/closing with cleanup on exit
     *   **Same privileges:** GUI runs with same user permissions as CLI
 
-**11. Version Management:**
+**11. Help System & Error Resilience:**
+
+*   **Comprehensive Help Content:**
+    *   **Complete Coverage:** Help documentation for all module categories including backup, system tools, Docker, and security
+    *   **Structured Information:** Each module help includes overview, available options, and important usage notes
+    *   **Practical Guidance:** User-friendly descriptions with step-by-step option explanations
+    *   **Safety Notes:** Important warnings and considerations for each module type
+
+*   **Multi-Language Help:**
+    *   **Full Translation:** Help content available in English and German
+    *   **Consistent Structure:** Same help structure across all supported languages
+    *   **Cultural Adaptation:** Terminology and explanations adapted for language-specific audiences
+
+*   **Error Handling & Stability:**
+    *   **Translation Error Recovery:** Missing translation keys display fallback text instead of crashing the application
+    *   **Console Debugging:** Missing translations logged with detailed information for developers
+    *   **Graceful Degradation:** Application remains fully functional even with incomplete translation resources
+    *   **Help Content Fallbacks:** Missing help content shows clear placeholder messages
+    *   **Safe Translation Functions:** Protected translation calls prevent React crashes from i18n errors
+    *   **Development Logging:** Comprehensive error tracking for translation issues in development mode
+
+*   **Help Content Coverage:**
+    *   **Backup Modules:** BTRFS backup/restore operations with snapshot management details
+    *   **System Modules:** System information, disk tools, log analysis, and restart utilities
+    *   **Maintenance Tools:** Package management, security audits, and energy optimization
+    *   **Docker Integration:** Container management, security analysis, and setup procedures
+    *   **Usage Guidelines:** Best practices, prerequisites, and safety considerations for each tool
+
+**12. Version Management:**
 
 *   **Version Tracking:** The GUI component version (`gui/web/package.json`) reflects significant GUI changes and improvements
 *   **Current Version:** `0.2.0-beta` - reflects the recent GUI enhancements including document browser, panel controls, and HTML support
@@ -291,7 +353,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   `gui/web/package.json` - Primary version declaration
     *   `gui/web/package-lock.json` - Lock file version (should match package.json)
 
-**12. Future Extensibility:**
+**13. Future Extensibility:**
 
 *   **Module Compatibility:** Automatically supports new modules added to the system
 *   **Documentation Integration:** New documentation files are automatically discovered and integrated

@@ -17,6 +17,7 @@ Meine Umgebung ist i.d.R. Arch (hauptsystem) oder Debian (diverse Dienste auf me
 
 > **🎯 Projekt-Status:**
 > - **Dokumentation**: Umfassende technische Dokumentation ist im `docs/` Verzeichnis für alle Module und Kernkomponenten verfügbar
+> - **GUI-Interface**: Vollständige Internationalisierung (Englisch/Deutsch) mit fehlerresistentem Übersetzungssystem und umfassenden Hilfeinhalten
 > - **BTRFS-Module**: Erweiterte BTRFS-Backup- und -Restore-Module mit atomaren Operationen, inkrementellen Backup-Ketten und umfassenden Sicherheitsfeatures
 > - **Modulare Architektur**: Klare Trennung der Backup-Typen in spezialisierte Module (BTRFS, TAR, RSYNC) mit einheitlicher Dispatcher-Schnittstelle
 > - **Test-Status**: Backup-Funktionen sind gut getestet und stabil; Restore-Funktionen sind implementiert, benötigen aber umfassende Tests vor Produktionseinsatz
@@ -81,10 +82,10 @@ Eine moderne webbasierte GUI ist über `gui_launcher.sh` verfügbar und bietet:
 - **Sicherheits-Features**: Standardmäßig nur Localhost-Bindung mit optionalem Netzwerkzugriff über Kommandozeile
 - **Konfigurierbare Netzwerkeinstellungen**: Port- und Host-Konfiguration über `config/general.conf` oder Kommandozeilen-Argumente
 - **Erweiterte Funktionen**: PTY-Integration für authentische Terminal-Erfahrung, WebSocket-Kommunikation für Echtzeit-Updates
+- **Fehlerresistente Gestaltung**: Fehlende Übersetzungsschlüssel zeigen Fallback-Inhalt anstatt die Anwendung zum Absturz zu bringen
+- **Umfassendes Hilfesystem**: Kontextsensitive Hilfe mit detaillierter Modulführung und Nutzungshinweisen
 
-> **⚠️ Wichtiger Hinweis zur Sprache:** Die GUI ist derzeit nur in englischer Sprache verfügbar. Eine deutsche Lokalisierung ist für zukünftige Versionen geplant. Die CLI-Module bleiben vollständig in deutscher Sprache verfügbar.
-
-Die GUI behält vollständige Kompatibilität mit allen CLI-Funktionen bei und bietet gleichzeitig eine verbesserte Benutzererfahrung mit leistungsstarken Multi-Session-Funktionen.
+Die GUI behält vollständige Kompatibilität mit allen CLI-Funktionen bei und bietet gleichzeitig eine verbesserte Benutzererfahrung mit leistungsstarken Multi-Session-Funktionen und **vollständiger Internationalisierungsunterstützung (Deutsch/Englisch)** mit dynamischem Sprachwechsel.
 
 <details>
 <summary>GUI-Konfiguration & Verwendung:</summary>

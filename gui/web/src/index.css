@@ -32,8 +32,8 @@ code {
 .header-content {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 22px;
+  justify-content: space-between;
+  width: 100%;
 }
 
 .header h1 {
