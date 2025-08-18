@@ -349,8 +349,8 @@ backup_menu() {
         lh_print_menu_item 2 "$(lh_msg "MENU_TAR_BACKUP")"
         lh_print_menu_item 3 "$(lh_msg "MENU_RSYNC_BACKUP")"
         lh_print_menu_item 4 "$(lh_msg "MENU_RESTORE")"
-        lh_print_menu_item 6 "$(lh_msg "MENU_BACKUP_STATUS")"
-        lh_print_menu_item 7 "$(lh_msg "MENU_BACKUP_CONFIG")"
+        lh_print_menu_item 5 "$(lh_msg "MENU_BACKUP_STATUS")"
+        lh_print_menu_item 6 "$(lh_msg "MENU_BACKUP_CONFIG")"
         lh_print_menu_item 0 "$(lh_msg "BACK_TO_MAIN_MENU")"
         echo ""
         
@@ -374,11 +374,11 @@ backup_menu() {
                 lh_log_msg "DEBUG" "Taking path: Restore menu"
                 restore_menu
                 ;;
-            6)
+            5)
                 lh_log_msg "DEBUG" "Taking path: Backup status"
                 show_backup_status
                 ;;
-            7)
+            6)
                 lh_log_msg "DEBUG" "Taking path: Backup configuration"
                 configure_backup
                 ;;

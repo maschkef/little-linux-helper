@@ -13,7 +13,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 This module serves as a central hub for Docker operations within the little-linux-helper system. It provides essential Docker management functions and acts as a gateway to specialized Docker modules for setup and security. The module is designed as an overarching coordinator that combines basic Docker functionality with access to specialized sub-modules.
 
 **2. Initialization & Dependencies:**
-*   **Library Source:** The module begins by sourcing the common library: `source "$(dirname "$0")/../lib/lib_common.sh"`.
+*   **Library Source:** The module begins by sourcing the common library: `source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"`.
 *   **Package Manager Detection:** It calls `lh_detect_package_manager()` to ensure the `LH_PKG_MANAGER` variable is populated, primarily for `lh_check_command` to function correctly when offering to install missing dependencies.
 *   **Configuration Management:** Manages Docker-specific configuration through `$LH_CONFIG_DIR/docker.conf` using configuration functions.
 *   **Core Library Functions Used:**

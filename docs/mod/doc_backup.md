@@ -13,9 +13,10 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 This module serves as a central dispatcher and coordinator for all backup and restore operations in the Little Linux Helper system. It provides a unified menu interface that launches specialized backup modules for different backup types (BTRFS, TAR, RSYNC) while maintaining shared configuration and status reporting functionality. The module acts as the main entry point for backup operations while delegating actual backup tasks to specialized sub-modules.
 
 **2. Initialization & Dependencies:**
-*   **Library Source:** The module begins by sourcing the common library: `source "$(dirname "$0")/../lib/lib_common.sh"`.
-*   **Package Manager Detection:** It calls `lh_detect_package_manager()` to set up `LH_PKG_MANAGER` for potential package installations (e.g., `rsync`).
-*   **Backup Configuration:** It loads backup-specific configurations by calling `lh_load_backup_config`. This function is expected to populate variables like `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_RETENTION_BACKUP`, and `LH_BACKUP_LOG`.
+*   **Library Source:** The module begins by sourcing the common library: `source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"`.
+*   **Conditional Initialization:** When run directly, it performs complete initialization including general config loading, logging setup, package manager detection, and backup config loading. When sourced from main script, it only loads backup config if needed.
+*   **Language Module Loading:** Loads backup, common, and lib language modules for internationalization support.
+*   **Backup Configuration:** It loads backup-specific configurations by calling `lh_load_backup_config`. This function populates variables like `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_RETENTION_BACKUP`, `LH_TAR_EXCLUDES`, and `LH_BACKUP_LOG`.
 *   **Core Library Functions Used:**
     *   `lh_log_msg`: For general logging to the main log file.
     *   `lh_print_header`: For displaying section titles.
@@ -38,7 +39,7 @@ This is the entry point and main interactive loop for the backup dispatcher. It 
 4. **Restore Operations:** Presents the restore menu with TAR and RSYNC restore options
 5. **Backup Status:** Displays comprehensive status information for all backup types
 6. **Configure Backup:** Manages shared backup configuration settings
-7. **Exit:** Returns to main system menu
+0. **Exit:** Returns to main system menu
 
 The menu provides a centralized access point while maintaining clean separation between different backup methodologies.
 
@@ -61,9 +62,9 @@ The menu provides a centralized access point while maintaining clean separation 
 *   **`configure_backup()`**
     *   **Purpose:** Centralized configuration management for shared backup settings used across all backup modules.
     *   **Interaction:**
-        *   Displays current values of `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_RETENTION_BACKUP`, `LH_BACKUP_LOG`
+        *   Displays current values of `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_RETENTION_BACKUP`, `LH_BACKUP_LOG`
         *   Prompts if user wants to change configuration
-        *   Individually prompts for new values for core backup parameters
+        *   Individually prompts for new values for core backup parameters including TAR exclusion patterns (`LH_TAR_EXCLUDES`)
         *   Displays updated configuration and asks for permanent save confirmation
         *   Uses `lh_save_backup_config` to persist changes to `$LH_BACKUP_CONFIG_FILE`
     *   **Scope:** Manages shared configuration that affects all backup modules (BTRFS, TAR, RSYNC)
