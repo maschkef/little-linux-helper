@@ -267,11 +267,11 @@ func main() {
 
 	// Configuration file management
 	api.Get("/config/files", getConfigFiles)
+	api.Get("/config/backups", getConfigBackups)
+	api.Delete("/config/backups/:backupId", deleteConfigBackup)
 	api.Get("/config/:filename", getConfigFile)
 	api.Put("/config/:filename", saveConfigFile)
 	api.Get("/config/:filename/example", getConfigExample)
-	api.Get("/config/backups", getConfigBackups)
-	api.Delete("/config/backups/:backupId", deleteConfigBackup)
 
 	// Start a module session
 	api.Post("/modules/:id/start", startModule)
@@ -1275,11 +1275,11 @@ func saveConfigFile(c *fiber.Ctx) error {
 	cmd := exec.Command("bash", "-c", fmt.Sprintf(`
 		source "%s/lib/lib_common.sh"
 		source "%s/lib/lib_gui.sh"
-		echo %s | lh_gui_write_config_file "%s" "$(cat)" "%t" "%s" 2>&1
+		lh_gui_write_config_file "%s" %s %s "%s" 2>&1
 	`, lhRootDir, lhRootDir,
-		shellescape(request.Content),
 		configPath,
-		request.CreateBackup,
+		shellescape(request.Content),
+		fmt.Sprintf("%t", request.CreateBackup),
 		configType))
 
 	cmd.Env = append(os.Environ(), "LH_ROOT_DIR="+lhRootDir)
@@ -1403,13 +1403,14 @@ func deleteConfigBackup(c *fiber.Ctx) error {
 
 	// Parse backup ID to get file path
 	parts := strings.Split(backupId, "_")
-	if len(parts) < 2 {
+	if len(parts) < 3 {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid backup ID"})
 	}
 
 	// Reconstruct filename and timestamp
-	timestamp := parts[len(parts)-1]
-	filename := strings.Join(parts[:len(parts)-1], "_")
+	// For ID like "general.conf_20250824_175158", we need last 2 parts as timestamp
+	timestamp := strings.Join(parts[len(parts)-2:], "_")
+	filename := strings.Join(parts[:len(parts)-2], "_")
 
 	backupFile := fmt.Sprintf("%s.gui_backup_%s", filename, timestamp)
 	backupPath := filepath.Join(lhRootDir, "config", backupFile)

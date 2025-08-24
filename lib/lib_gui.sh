@@ -27,7 +27,7 @@ function lh_gui_create_config_backup() {
     local config_dir="$(dirname "$config_file")"
     local expected_config_dir="$LH_ROOT_DIR/config"
     if [ "$(realpath "$config_dir" 2>/dev/null)" != "$(realpath "$expected_config_dir" 2>/dev/null)" ]; then
-        local msg="${MSG[LIB_GUI_CONFIG_INVALID_PATH]:-Invalid configuration file path: %s (must be in %s)"
+        local msg="${MSG[LIB_GUI_CONFIG_INVALID_PATH]:-Invalid configuration file path: %s (must be in %s)}"
         lh_log_msg "ERROR" "$(printf "$msg" "$config_file" "$expected_config_dir")"
         return 1
     fi
@@ -65,7 +65,7 @@ function lh_gui_remove_config_backup() {
     local backup_dir="$(dirname "$backup_file")"
     local expected_config_dir="$LH_ROOT_DIR/config"
     if [ "$(realpath "$backup_dir" 2>/dev/null)" != "$(realpath "$expected_config_dir" 2>/dev/null)" ]; then
-        local msg="${MSG[LIB_GUI_CONFIG_BACKUP_INVALID_PATH]:-Invalid backup file path: %s (must be in %s)"
+        local msg="${MSG[LIB_GUI_CONFIG_BACKUP_INVALID_PATH]:-Invalid backup file path: %s (must be in %s)}"
         lh_log_msg "ERROR" "$(printf "$msg" "$backup_file" "$expected_config_dir")"
         return 1
     fi
@@ -90,7 +90,7 @@ function lh_gui_list_config_backups() {
     # Security check - ensure we're only looking in the config directory
     local expected_config_dir="$LH_ROOT_DIR/config"
     if [ "$(realpath "$config_dir" 2>/dev/null)" != "$(realpath "$expected_config_dir" 2>/dev/null)" ]; then
-        local msg="${MSG[LIB_GUI_CONFIG_LIST_INVALID_PATH]:-Invalid configuration file path: %s (must be in %s)"
+        local msg="${MSG[LIB_GUI_CONFIG_LIST_INVALID_PATH]:-Invalid configuration file path: %s (must be in %s)}"
         lh_log_msg "ERROR" "$(printf "$msg" "$config_file" "$expected_config_dir")"
         return 1
     fi
@@ -132,7 +132,7 @@ function lh_gui_restore_config_backup() {
     
     if [ "$(realpath "$backup_dir" 2>/dev/null)" != "$(realpath "$expected_config_dir" 2>/dev/null)" ] || \
        [ "$(realpath "$config_dir" 2>/dev/null)" != "$(realpath "$expected_config_dir" 2>/dev/null)" ]; then
-        local msg="${MSG[LIB_GUI_CONFIG_RESTORE_INVALID_PATH]:-Invalid file paths for restore operation (must be in %s)"
+        local msg="${MSG[LIB_GUI_CONFIG_RESTORE_INVALID_PATH]:-Invalid file paths for restore operation (must be in %s)}"
         lh_log_msg "ERROR" "$(printf "$msg" "$expected_config_dir")"
         return 1
     fi
@@ -156,12 +156,32 @@ function lh_gui_validate_config_content() {
     # Basic syntax validation - check for common shell variable patterns
     # This is a simple validation - more sophisticated validation could be added
     
-    # Check for unbalanced quotes
-    if echo "$config_content" | grep -q '[^\\]"[^"]*$'; then
-        local msg="${MSG[LIB_GUI_CONFIG_UNBALANCED_QUOTES]:-Configuration contains unbalanced quotes}"
-        lh_log_msg "ERROR" "$msg"
-        return 1
-    fi
+    # Check for unbalanced quotes - count quotes on each line
+    while IFS= read -r line; do
+        # Skip empty lines and comments
+        [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+        
+        # Count unescaped quotes on this line
+        local quote_count=0
+        local i=0
+        while [ $i -lt ${#line} ]; do
+            char="${line:$i:1}"
+            if [ "$char" = '"' ]; then
+                # Check if quote is escaped
+                if [ $i -eq 0 ] || [ "${line:$((i-1)):1}" != '\' ]; then
+                    quote_count=$((quote_count + 1))
+                fi
+            fi
+            i=$((i + 1))
+        done
+        
+        # Each line should have an even number of unescaped quotes
+        if [ $((quote_count % 2)) -ne 0 ]; then
+            local msg="${MSG[LIB_GUI_CONFIG_UNBALANCED_QUOTES]:-Configuration contains unbalanced quotes on line: $line}"
+            lh_log_msg "ERROR" "$msg"
+            return 1
+        fi
+    done <<< "$config_content"
     
     # Check for basic variable assignment syntax
     if echo "$config_content" | grep -E '^[[:space:]]*[^#][^=]*=' | grep -v -E '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*='; then
