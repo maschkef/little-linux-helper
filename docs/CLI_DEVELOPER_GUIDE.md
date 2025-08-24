@@ -344,6 +344,11 @@ The main configuration file that replaces the previous `language.conf` and inclu
 - `CFG_LH_LOG_LEVEL`: Log level setting ('ERROR', 'WARN', 'INFO', 'DEBUG')  
 - `CFG_LH_LOG_TO_CONSOLE`: Enable/disable console output ('true'/'false')
 - `CFG_LH_LOG_TO_FILE`: Enable/disable file logging ('true'/'false')
+- `CFG_LH_LOG_SHOW_FILE_ERROR`: Show source file name in ERROR messages ('true'/'false')
+- `CFG_LH_LOG_SHOW_FILE_WARN`: Show source file name in WARN messages ('true'/'false')
+- `CFG_LH_LOG_SHOW_FILE_INFO`: Show source file name in INFO messages ('true'/'false')
+- `CFG_LH_LOG_SHOW_FILE_DEBUG`: Show source file name in DEBUG messages ('true'/'false')
+- `CFG_LH_LOG_TIMESTAMP_FORMAT`: Timestamp format for all messages ('full', 'time', 'none')
 
 **Example Configuration:**
 ```bash
@@ -354,6 +359,18 @@ CFG_LH_LANG="en"
 CFG_LH_LOG_LEVEL="INFO"
 CFG_LH_LOG_TO_CONSOLE="true"
 CFG_LH_LOG_TO_FILE="true"
+
+# File info display configuration
+CFG_LH_LOG_SHOW_FILE_ERROR="true"   # Show [script.sh] for ERROR messages
+CFG_LH_LOG_SHOW_FILE_WARN="true"    # Show [script.sh] for WARN messages
+CFG_LH_LOG_SHOW_FILE_INFO="false"   # Don't show file info for INFO messages
+CFG_LH_LOG_SHOW_FILE_DEBUG="true"   # Show [script.sh] for DEBUG messages
+
+# Timestamp format configuration
+CFG_LH_LOG_TIMESTAMP_FORMAT="time"  # Options: "full", "time", "none"
+                                   # full: 2025-08-24 13:44:23
+                                   # time: 13:44:23  
+                                   # none: (no timestamps)
 ```
 
 **Log Level Hierarchy:**
@@ -363,6 +380,39 @@ CFG_LH_LOG_TO_FILE="true"
 - **DEBUG**: All messages including debug information (verbose)
 
 Each level includes all levels above it in severity.
+
+**Log Message Formatting:**
+The logging system supports flexible formatting options:
+
+- **File Info Display**: Controlled individually per log level, shows the source file name in brackets (e.g., `[mod_backup.sh]`)
+- **Timestamp Formats**: Global setting with multiple format options for all log messages
+
+**Example Log Output:**
+```bash
+# Full timestamps (default)
+2025-08-24 13:44:23 - [ERROR] [mod_backup.sh] Backup failed: insufficient space
+2025-08-24 13:44:23 - [WARN] [mod_backup.sh] Some files were skipped
+2025-08-24 13:44:23 - [INFO] Backup completed successfully
+2025-08-24 13:44:23 - [DEBUG] [mod_backup.sh] Processing file: /home/user/document.txt
+
+# Time only timestamps
+13:44:23 - [ERROR] [mod_backup.sh] Backup failed: insufficient space
+13:44:23 - [WARN] [mod_backup.sh] Some files were skipped
+13:44:23 - [INFO] Backup completed successfully
+13:44:23 - [DEBUG] [mod_backup.sh] Processing file: /home/user/document.txt
+
+# No timestamps (clean output)
+[ERROR] [mod_backup.sh] Backup failed: insufficient space
+[WARN] [mod_backup.sh] Some files were skipped
+[INFO] Backup completed successfully
+[DEBUG] [mod_backup.sh] Processing file: /home/user/document.txt
+
+# Minimal configuration (no file info, no timestamps)
+[ERROR] Backup failed: insufficient space
+[WARN] Some files were skipped
+[INFO] Backup completed successfully
+[DEBUG] Processing file: /home/user/document.txt
+```
 
 **Developer Note:** The DEBUG level is designed to be used extensively throughout modules since it's hidden by default. See the "Debugging and Logging Best Practices" section for comprehensive guidelines on implementing debug logging in your modules.
 
@@ -700,5 +750,78 @@ function main_module_function() {
 # Execute main function
 main_module_function "$@"
 ```
+
+#### Flexible Logging Configuration for Development
+
+The Little Linux Helper supports flexible logging configuration that developers can customize for their specific debugging and development needs.
+
+**File Info Display Configuration:**
+Configure which log levels show the source file name to help with debugging:
+
+```bash
+# In config/general.conf - customize per log level
+CFG_LH_LOG_SHOW_FILE_ERROR="true"    # [script.sh] shown for ERROR messages
+CFG_LH_LOG_SHOW_FILE_WARN="true"     # [script.sh] shown for WARN messages  
+CFG_LH_LOG_SHOW_FILE_INFO="false"    # No file info for INFO messages (default)
+CFG_LH_LOG_SHOW_FILE_DEBUG="true"    # [script.sh] shown for DEBUG messages
+```
+
+**Extended Timestamp Configuration:**
+Enable different timestamp formats for different use cases:
+
+```bash
+# In config/general.conf - applies to all log levels
+CFG_LH_LOG_TIMESTAMP_FORMAT="full"  # Full date and time: 2025-08-24 13:44:23
+CFG_LH_LOG_TIMESTAMP_FORMAT="time"  # Time only: 13:44:23
+CFG_LH_LOG_TIMESTAMP_FORMAT="none"  # No timestamps (clean output)
+```
+
+**Development Scenarios:**
+
+1. **General Development**: Default configuration works well for most development (full timestamps, selective file info)
+2. **Module Debugging**: Enable file info for INFO messages to track module flow
+3. **Performance Analysis**: Use time-only timestamps to focus on timing without dates
+4. **Presentation/Demo**: Use "none" timestamps for clean output in presentations
+5. **Error Investigation**: File info for ERROR/WARN helps identify problematic modules
+6. **Clean Production**: Disable file info and timestamps entirely for minimal output
+
+**Configuration Examples:**
+
+```bash
+# For detailed debugging (show everything)
+CFG_LH_LOG_SHOW_FILE_ERROR="true"
+CFG_LH_LOG_SHOW_FILE_WARN="true"
+CFG_LH_LOG_SHOW_FILE_INFO="true"
+CFG_LH_LOG_SHOW_FILE_DEBUG="true"
+CFG_LH_LOG_TIMESTAMP_FORMAT="full"
+
+# For performance testing (time focus)
+CFG_LH_LOG_SHOW_FILE_ERROR="true"
+CFG_LH_LOG_SHOW_FILE_WARN="false"
+CFG_LH_LOG_SHOW_FILE_INFO="false"
+CFG_LH_LOG_SHOW_FILE_DEBUG="false"
+CFG_LH_LOG_TIMESTAMP_FORMAT="time"
+
+# For presentations/demos (clean output)
+CFG_LH_LOG_SHOW_FILE_ERROR="false"
+CFG_LH_LOG_SHOW_FILE_WARN="false"
+CFG_LH_LOG_SHOW_FILE_INFO="false"
+CFG_LH_LOG_SHOW_FILE_DEBUG="false"
+CFG_LH_LOG_TIMESTAMP_FORMAT="none"
+```
+
+**Runtime Testing:**
+```bash
+# Test different configurations without editing files
+export LH_LOG_SHOW_FILE_INFO="true"
+export LH_LOG_SHOW_EXTENDED_TIMESTAMP="true"
+./modules/mod_your_module.sh
+```
+
+**Benefits:**
+- **Targeted debugging**: Show file info only where needed
+- **Performance analysis**: Millisecond timestamps for timing measurements
+- **Clean output**: Customize for presentation or production environments
+- **Development workflow**: Quick configuration changes for different development phases
 
 **Remember:** The goal is to make debugging easy and comprehensive. Since debug messages are hidden by default (INFO level), there's no reason to be sparing with debug output. Good debug logging dramatically reduces development and troubleshooting time.

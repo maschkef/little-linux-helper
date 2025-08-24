@@ -11,13 +11,15 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 
 ## Overview
 
-This library provides a comprehensive logging system for the Little Linux Helper, supporting configurable log levels, multiple output destinations, and integration with the internationalization system.
+This library provides a comprehensive logging system for the Little Linux Helper, supporting configurable log levels, multiple output destinations, flexible message formatting, and integration with the internationalization system.
 
 ## Purpose
 
 - Provide centralized logging functionality across the entire system
 - Support configurable log levels with hierarchical filtering
 - Enable both console and file logging with independent control
+- Provide flexible file info display configuration per log level
+- Support configurable timestamp precision for all messages
 - Integrate with the internationalization system for localized log messages
 - Support both general logging and specialized backup logging
 
@@ -29,6 +31,69 @@ The logging system uses a hierarchical level structure where each level includes
 - **WARN**: Warnings and errors (recommended for normal use)
 - **INFO**: Informational messages, warnings and errors (default)
 - **DEBUG**: All messages including debug information (verbose)
+
+## Configuration Options
+
+The logging system supports extensive configuration through the general configuration file:
+
+### Basic Logging Configuration
+- `LH_LOG_LEVEL`: Controls which messages are shown/logged
+- `LH_LOG_TO_CONSOLE`: Enable/disable console output
+- `LH_LOG_TO_FILE`: Enable/disable file logging
+
+### File Info Display Configuration (Per Level)
+- `LH_LOG_SHOW_FILE_ERROR`: Show source file name for ERROR messages
+- `LH_LOG_SHOW_FILE_WARN`: Show source file name for WARN messages
+- `LH_LOG_SHOW_FILE_INFO`: Show source file name for INFO messages
+- `LH_LOG_SHOW_FILE_DEBUG`: Show source file name for DEBUG messages
+
+### Timestamp Configuration (Global)
+- `LH_LOG_TIMESTAMP_FORMAT`: Controls timestamp display format
+  - **"full"**: Complete date and time (e.g., `2025-01-10 14:02:26`)
+  - **"time"**: Time only (e.g., `14:02:26`)
+  - **"none"**: No timestamps displayed
+
+**Default Configuration:**
+```bash
+LH_LOG_SHOW_FILE_ERROR="true"    # [script.sh] shown for ERROR
+LH_LOG_SHOW_FILE_WARN="true"     # [script.sh] shown for WARN
+LH_LOG_SHOW_FILE_INFO="false"    # No file info for INFO
+LH_LOG_SHOW_FILE_DEBUG="true"    # [script.sh] shown for DEBUG
+LH_LOG_TIMESTAMP_FORMAT="time"   # Full date and time timestamps
+```
+
+**Example Output Formats:**
+```bash
+# Full timestamp format (default configuration)
+2025-08-24 13:44:23 - [ERROR] [mod_backup.sh] Backup failed
+2025-08-24 13:44:23 - [WARN] [mod_backup.sh] Some files skipped
+2025-08-24 13:44:23 - [INFO] Backup completed successfully
+2025-08-24 13:44:23 - [DEBUG] [mod_backup.sh] Processing file: example.txt
+
+# Time-only timestamp format
+13:44:23 - [ERROR] [mod_backup.sh] Backup failed
+13:44:23 - [WARN] [mod_backup.sh] Some files skipped
+13:44:23 - [INFO] Backup completed successfully
+13:44:23 - [DEBUG] [mod_backup.sh] Processing file: example.txt
+
+# No timestamps format
+[ERROR] [mod_backup.sh] Backup failed
+[WARN] [mod_backup.sh] Some files skipped
+[INFO] Backup completed successfully
+[DEBUG] [mod_backup.sh] Processing file: example.txt
+
+# File info enabled for all levels (with full timestamps)
+2025-08-24 13:44:23 - [ERROR] [mod_backup.sh] Backup failed
+2025-08-24 13:44:23 - [WARN] [mod_backup.sh] Some files skipped
+2025-08-24 13:44:23 - [INFO] [mod_backup.sh] Backup completed successfully
+2025-08-24 13:44:23 - [DEBUG] [mod_backup.sh] Processing file: example.txt
+
+# Minimal format (no file info, no timestamps)
+[ERROR] Backup failed
+[WARN] Some files skipped
+[INFO] Backup completed successfully
+[DEBUG] Processing file: example.txt
+```
 
 ## Key Functions
 
@@ -72,9 +137,21 @@ Main logging function that writes formatted log messages with filtering based on
 **Features:**
 - **Level filtering**: Uses `lh_should_log()` to filter messages based on current log level
 - **Dual output**: Supports both console and file output independently
-- **Timestamp formatting**: Adds consistent timestamp to all log entries
+- **Configurable file info**: Shows source file name based on per-level configuration
+- **Flexible timestamps**: Supports both standard and extended timestamp formats
 - **Color integration**: Uses appropriate colors for console output based on log level
 - **Early return**: Efficient filtering prevents processing of filtered-out messages
+
+**File Info Display:**
+The function automatically detects the calling script and includes the filename in brackets when enabled:
+- Controlled individually per log level via configuration variables
+- Format: `[script_name.sh] message content`
+- Helps with debugging by showing which module generated each message
+
+**Timestamp Formats:**
+- **Full**: `YYYY-MM-DD HH:MM:SS` (when `LH_LOG_TIMESTAMP_FORMAT="full"`)
+- **Time only**: `HH:MM:SS` (when `LH_LOG_TIMESTAMP_FORMAT="time"`)
+- **None**: No timestamps (when `LH_LOG_TIMESTAMP_FORMAT="none"`)
 
 **Color Mapping:**
 - ERROR: Red color
@@ -83,10 +160,10 @@ Main logging function that writes formatted log messages with filtering based on
 - DEBUG: Cyan color
 
 **Dependencies:**
-- `date`, `echo` commands
+- `date`, `echo`, `basename` commands
 - `lh_should_log()` function
 - Color variables from `lib_colors.sh`
-- Configuration variables: `LH_LOG_TO_CONSOLE`, `LH_LOG_TO_FILE`
+- Configuration variables: `LH_LOG_TO_CONSOLE`, `LH_LOG_TO_FILE`, `LH_LOG_SHOW_FILE_*`, `LH_LOG_TIMESTAMP_FORMAT`
 
 **Usage:**
 ```bash

@@ -116,9 +116,19 @@ Loads general configuration including language and logging settings.
 - `CFG_LH_LOG_LEVEL`: Log level ('ERROR', 'WARN', 'INFO', 'DEBUG')
 - `CFG_LH_LOG_TO_CONSOLE`: Console output ('true'/'false')
 - `CFG_LH_LOG_TO_FILE`: File logging ('true'/'false')
+- `CFG_LH_LOG_SHOW_FILE_ERROR`: Show source file name in ERROR messages ('true'/'false')
+- `CFG_LH_LOG_SHOW_FILE_WARN`: Show source file name in WARN messages ('true'/'false')
+- `CFG_LH_LOG_SHOW_FILE_INFO`: Show source file name in INFO messages ('true'/'false')
+- `CFG_LH_LOG_SHOW_FILE_DEBUG`: Show source file name in DEBUG messages ('true'/'false')
+- `CFG_LH_LOG_TIMESTAMP_FORMAT`: Timestamp format ('full'/'time'/'none')
+  - **full**: Complete date and time (e.g., `2025-01-10 14:02:26`)
+  - **time**: Time only (e.g., `14:02:26`)
+  - **none**: No timestamps
 
 **Side Effects:**
 - Sets global variables: `LH_LOG_LEVEL`, `LH_LOG_TO_CONSOLE`, `LH_LOG_TO_FILE`, `LH_LANG`
+- Sets file info display variables: `LH_LOG_SHOW_FILE_ERROR`, `LH_LOG_SHOW_FILE_WARN`, `LH_LOG_SHOW_FILE_INFO`, `LH_LOG_SHOW_FILE_DEBUG`
+- Sets timestamp format variable: `LH_LOG_TIMESTAMP_FORMAT`
 - Logs configuration loading (using direct echo for early initialization)
 
 **Dependencies:**
@@ -199,6 +209,15 @@ LH_LOG_LEVEL="INFO"
 LH_LOG_TO_CONSOLE="true"
 LH_LOG_TO_FILE="true"
 LH_LANG="en"  # Can also be "auto" for system detection
+
+# File info display defaults (per log level)
+LH_LOG_SHOW_FILE_ERROR="true"
+LH_LOG_SHOW_FILE_WARN="true"
+LH_LOG_SHOW_FILE_INFO="false"
+LH_LOG_SHOW_FILE_DEBUG="true"
+
+# Timestamp format default
+LH_LOG_TIMESTAMP_FORMAT="time"
 ```
 
 ## Configuration File Integration
@@ -228,6 +247,11 @@ CFG_LH_LANG="en"
 CFG_LH_LOG_LEVEL="INFO"
 CFG_LH_LOG_TO_CONSOLE="true"
 CFG_LH_LOG_TO_FILE="true"
+CFG_LH_LOG_SHOW_FILE_ERROR="true"
+CFG_LH_LOG_SHOW_FILE_WARN="true"
+CFG_LH_LOG_SHOW_FILE_INFO="false"
+CFG_LH_LOG_SHOW_FILE_DEBUG="true"
+CFG_LH_LOG_TIMESTAMP_FORMAT="time"
 ```
 
 ## Error Handling and Fallbacks

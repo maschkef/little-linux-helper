@@ -52,6 +52,43 @@ CFG_LH_LOG_TO_CONSOLE="true"
 CFG_LH_LOG_TO_FILE="true"
 
 # =============================================================================
+# LOG MESSAGE FILE INFO SETTINGS
+# =============================================================================
+
+# Configure whether to show the source file name in log messages for each log level
+# This helps with debugging by showing which script/module generated each message
+# 
+# Format: [script_name.sh] message content
+# Example: [mod_backup.sh] Backup started successfully
+
+# Show file info for ERROR messages (true/false)
+CFG_LH_LOG_SHOW_FILE_ERROR="true"
+
+# Show file info for WARN messages (true/false)  
+CFG_LH_LOG_SHOW_FILE_WARN="true"
+
+# Show file info for INFO messages (true/false)
+CFG_LH_LOG_SHOW_FILE_INFO="false"
+
+# Show file info for DEBUG messages (true/false)
+CFG_LH_LOG_SHOW_FILE_DEBUG="true"
+
+# =============================================================================
+# LOG MESSAGE TIMESTAMP SETTINGS
+# =============================================================================
+
+# Configure whether to show timestamps in log messages
+# This controls timestamp display for ALL log messages globally
+# 
+# Available options:
+# - "full" - Full timestamp: 2025-08-24 13:44:23
+# - "time" - Time only: 13:44:23  
+# - "none" - No timestamps (clean output)
+
+# Timestamp format for all log messages
+CFG_LH_LOG_TIMESTAMP_FORMAT="time"
+
+# =============================================================================
 # GUI SETTINGS
 # =============================================================================
 #

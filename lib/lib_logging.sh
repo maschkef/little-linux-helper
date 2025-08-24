@@ -78,10 +78,67 @@ function lh_log_msg() {
         return 0
     fi
     
-    local timestamp
-    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    local plain_log_msg="$timestamp - [$level] $message"
+    local timestamp=""
+    case "${LH_LOG_TIMESTAMP_FORMAT:-full}" in
+        "full")
+            timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+            ;;
+        "time")
+            timestamp=$(date '+%H:%M:%S')
+            ;;
+        "none")
+            timestamp=""
+            ;;
+        *)
+            # Default to full format for unknown values
+            timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+            ;;
+    esac
+    
+    # Detect calling script based on configuration settings
+    local script_info=""
+    local show_file_info="false"
+    
+    case "$level" in
+        ERROR)
+            if [[ "${LH_LOG_SHOW_FILE_ERROR:-true}" == "true" ]]; then
+                show_file_info="true"
+            fi
+            ;;
+        WARN)
+            if [[ "${LH_LOG_SHOW_FILE_WARN:-true}" == "true" ]]; then
+                show_file_info="true"
+            fi
+            ;;
+        INFO)
+            if [[ "${LH_LOG_SHOW_FILE_INFO:-false}" == "true" ]]; then
+                show_file_info="true"
+            fi
+            ;;
+        DEBUG)
+            if [[ "${LH_LOG_SHOW_FILE_DEBUG:-true}" == "true" ]]; then
+                show_file_info="true"
+            fi
+            ;;
+    esac
+    
+    if [[ "$show_file_info" == "true" ]]; then
+        local calling_script="${BASH_SOURCE[1]:-unknown}"
+        local script_name=$(basename "$calling_script")
+        script_info="[$script_name] "
+    fi
+    
+    # Build log message format based on timestamp setting
+    local plain_log_msg=""
     local color_log_msg=""
+    
+    if [[ -n "$timestamp" ]]; then
+        # With timestamp
+        plain_log_msg="$timestamp - [$level] $script_info$message"
+    else
+        # Without timestamp
+        plain_log_msg="[$level] $script_info$message"
+    fi
 
     local color_code=""
     case "$level" in
@@ -94,7 +151,11 @@ function lh_log_msg() {
 
     if [ -n "$color_code" ]; then
         # Colored message for console
-        color_log_msg="$timestamp - [${color_code}$level${LH_COLOR_RESET}] $message"
+        if [[ -n "$timestamp" ]]; then
+            color_log_msg="$timestamp - [${color_code}$level${LH_COLOR_RESET}] $script_info$message"
+        else
+            color_log_msg="[${color_code}$level${LH_COLOR_RESET}] $script_info$message"
+        fi
     else
         # Unformatted message if no specific level or color is defined
         color_log_msg="$plain_log_msg"

@@ -105,6 +105,10 @@ function lh_finalize_initialization() {
     export LH_CONFIG_DIR LH_BACKUP_CONFIG_FILE LH_GENERAL_CONFIG_FILE LH_DOCKER_CONFIG_FILE
     # Export log configuration
     export LH_LOG_LEVEL LH_LOG_TO_CONSOLE LH_LOG_TO_FILE
+    # Export file info display configuration
+    export LH_LOG_SHOW_FILE_ERROR LH_LOG_SHOW_FILE_WARN LH_LOG_SHOW_FILE_INFO LH_LOG_SHOW_FILE_DEBUG
+    # Export timestamp format configuration
+    export LH_LOG_TIMESTAMP_FORMAT
     # Export backup configuration variables so they are available in sub-shells (modules)
     export LH_BACKUP_ROOT LH_BACKUP_DIR LH_TEMP_SNAPSHOT_DIR LH_RETENTION_BACKUP LH_BACKUP_LOG_BASENAME LH_BACKUP_LOG LH_TAR_EXCLUDES
     export LH_BACKUP_SUBVOLUMES LH_AUTO_DETECT_SUBVOLUMES

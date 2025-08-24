@@ -221,6 +221,15 @@ function lh_load_general_config() {
     LH_LOG_TO_CONSOLE="true"
     LH_LOG_TO_FILE="true"
     
+    # Set default values for file info display
+    LH_LOG_SHOW_FILE_ERROR="true"
+    LH_LOG_SHOW_FILE_WARN="true"
+    LH_LOG_SHOW_FILE_INFO="false"
+    LH_LOG_SHOW_FILE_DEBUG="true"
+    
+    # Set default value for timestamp format (applies to all levels)
+    LH_LOG_TIMESTAMP_FORMAT="time"
+    
     # Load general.conf
     if [ -f "$LH_GENERAL_CONFIG_FILE" ]; then
         # Use echo instead of lh_log_msg for early initialization
@@ -234,6 +243,15 @@ function lh_load_general_config() {
         LH_LOG_LEVEL="${CFG_LH_LOG_LEVEL:-$LH_LOG_LEVEL}"
         LH_LOG_TO_CONSOLE="${CFG_LH_LOG_TO_CONSOLE:-$LH_LOG_TO_CONSOLE}"
         LH_LOG_TO_FILE="${CFG_LH_LOG_TO_FILE:-$LH_LOG_TO_FILE}"
+        
+        # Assign file info display settings
+        LH_LOG_SHOW_FILE_ERROR="${CFG_LH_LOG_SHOW_FILE_ERROR:-$LH_LOG_SHOW_FILE_ERROR}"
+        LH_LOG_SHOW_FILE_WARN="${CFG_LH_LOG_SHOW_FILE_WARN:-$LH_LOG_SHOW_FILE_WARN}"
+        LH_LOG_SHOW_FILE_INFO="${CFG_LH_LOG_SHOW_FILE_INFO:-$LH_LOG_SHOW_FILE_INFO}"
+        LH_LOG_SHOW_FILE_DEBUG="${CFG_LH_LOG_SHOW_FILE_DEBUG:-$LH_LOG_SHOW_FILE_DEBUG}"
+        
+        # Assign timestamp format setting (global for all levels)
+        LH_LOG_TIMESTAMP_FORMAT="${CFG_LH_LOG_TIMESTAMP_FORMAT:-$LH_LOG_TIMESTAMP_FORMAT}"
         
         # Set language variable as well, but only if not already set (preserves GUI language setting)
         if [ -n "${CFG_LH_LANG:-}" ] && [ -z "${LH_LANG:-}" ]; then
@@ -279,6 +297,15 @@ function lh_save_general_config() {
         sed -i "s/^CFG_LH_LOG_LEVEL=.*/CFG_LH_LOG_LEVEL=\"$LH_LOG_LEVEL\"/" "$LH_GENERAL_CONFIG_FILE"
         sed -i "s/^CFG_LH_LOG_TO_CONSOLE=.*/CFG_LH_LOG_TO_CONSOLE=\"$LH_LOG_TO_CONSOLE\"/" "$LH_GENERAL_CONFIG_FILE"
         sed -i "s/^CFG_LH_LOG_TO_FILE=.*/CFG_LH_LOG_TO_FILE=\"$LH_LOG_TO_FILE\"/" "$LH_GENERAL_CONFIG_FILE"
+        
+        # Replace file info display settings
+        sed -i "s/^CFG_LH_LOG_SHOW_FILE_ERROR=.*/CFG_LH_LOG_SHOW_FILE_ERROR=\"$LH_LOG_SHOW_FILE_ERROR\"/" "$LH_GENERAL_CONFIG_FILE"
+        sed -i "s/^CFG_LH_LOG_SHOW_FILE_WARN=.*/CFG_LH_LOG_SHOW_FILE_WARN=\"$LH_LOG_SHOW_FILE_WARN\"/" "$LH_GENERAL_CONFIG_FILE"
+        sed -i "s/^CFG_LH_LOG_SHOW_FILE_INFO=.*/CFG_LH_LOG_SHOW_FILE_INFO=\"$LH_LOG_SHOW_FILE_INFO\"/" "$LH_GENERAL_CONFIG_FILE"
+        sed -i "s/^CFG_LH_LOG_SHOW_FILE_DEBUG=.*/CFG_LH_LOG_SHOW_FILE_DEBUG=\"$LH_LOG_SHOW_FILE_DEBUG\"/" "$LH_GENERAL_CONFIG_FILE"
+        
+        # Replace timestamp format setting
+        sed -i "s/^CFG_LH_LOG_TIMESTAMP_FORMAT=.*/CFG_LH_LOG_TIMESTAMP_FORMAT=\"$LH_LOG_TIMESTAMP_FORMAT\"/" "$LH_GENERAL_CONFIG_FILE"
     else
         # Fallback: create simple configuration file
         {
@@ -287,6 +314,11 @@ function lh_save_general_config() {
             echo "CFG_LH_LOG_LEVEL=\"$LH_LOG_LEVEL\""
             echo "CFG_LH_LOG_TO_CONSOLE=\"$LH_LOG_TO_CONSOLE\""
             echo "CFG_LH_LOG_TO_FILE=\"$LH_LOG_TO_FILE\""
+            echo "CFG_LH_LOG_SHOW_FILE_ERROR=\"$LH_LOG_SHOW_FILE_ERROR\""
+            echo "CFG_LH_LOG_SHOW_FILE_WARN=\"$LH_LOG_SHOW_FILE_WARN\""
+            echo "CFG_LH_LOG_SHOW_FILE_INFO=\"$LH_LOG_SHOW_FILE_INFO\""
+            echo "CFG_LH_LOG_SHOW_FILE_DEBUG=\"$LH_LOG_SHOW_FILE_DEBUG\""
+            echo "CFG_LH_LOG_TIMESTAMP_FORMAT=\"$LH_LOG_TIMESTAMP_FORMAT\""
         } > "$LH_GENERAL_CONFIG_FILE"
     fi
     
