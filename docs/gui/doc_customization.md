@@ -49,14 +49,29 @@ body {
 **What can currently be customized:**
 1. **Language Selection** - EN/DE language switching via LanguageSelector component
 2. **Panel Layout** - Resizable panels for terminal, help, and documentation
-3. **CSS Overrides** - Direct CSS file modifications (requires rebuild)
+3. **Developer Controls** - 🔧 Dev Mode toggle to show/hide advanced documentation features
+4. **CSS Overrides** - Direct CSS file modifications (requires rebuild)
+
+### User Preference Storage (localStorage)
+
+**Current persistent settings:**
+- **Language Preference** - Saved as `'lh-gui-language'` (inherited from i18next)
+- **Developer Mode** - Saved as `'lh-gui-dev-controls'` (boolean, default: false)
+
+**Storage Implementation:**
+```javascript
+// Language persistence (handled by i18next)
+localStorage.setItem('lh-gui-language', languageCode);
+
+// Developer controls persistence
+localStorage.setItem('lh-gui-dev-controls', 'true'|'false');
+```
 
 **What is NOT currently customizable:**
 - Theme switching (light/dark/custom themes)
 - Color scheme changes via UI
 - Font size adjustments
 - Panel layout persistence
-- User preference storage
 
 ## Planned Theme System (Future Development)
 

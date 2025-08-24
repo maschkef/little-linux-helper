@@ -5,6 +5,9 @@
   },
   "session": {
     "currentModule": "Current Module:",
+    "activeModule": "Active Module:",
+    "selectedModule": "Selected Module:",
+    "selectedDifferent": "Selected",
     "selectModule": "Select a module from the sidebar to get started",
     "newSession": "+ New Session", 
     "selectModuleFirst": "Please select a module first",
@@ -16,6 +19,10 @@
     "startedAt": "Started at {{time}}",
     "closeTooltip": "Close session"
   },
+  "dev": {
+    "toggle": "Dev Mode",
+    "toggleTooltip": "Show/hide developer documentation controls"
+  },
   "panels": {
     "hideModules": "Hide Modules",
     "showModules": "Show Modules",
@@ -23,9 +30,13 @@
     "showTerminal": "Show Terminal",
     "hideHelp": "Hide Help",
     "showHelp": "Show Help",
-    "hideDocs": "Hide Docs",
-    "showDocs": "Show Docs",
-    "docBrowser": "Doc Browser:"
+    "hideDeveloperDocs": "Hide Module Docs",
+    "showDeveloperDocs": "📖 Module Docs",
+    "hideConfig": "Hide Config",
+    "showConfig": "Show Config",
+    "comprehensiveDocumentation": "📚 All Documentation",
+    "developerDocsTooltip": "View technical documentation and developer guides for the currently selected or active module",
+    "comprehensiveDocsTooltip": "Open a full browser with all project documentation, including developer guides, library references, and module documentation"
   },
   "modules": {
     "availableModules": "Available Modules",
@@ -76,7 +87,8 @@
   },
   "docs": {
     "notAvailable": "Documentation not available for this module.",
-    "errorLoading": "Error loading documentation."
+    "errorLoading": "Error loading documentation.",
+    "documentBrowser": "Docs"
   },
   "terminal": {
     "noActiveSession": "No active session. Select a module to start.",
@@ -94,5 +106,55 @@
     "ok": "OK",
     "yes": "Yes",
     "no": "No"
+  },
+  "common": {
+    "loading": "Loading...",
+    "saving": "Saving...",
+    "save": "Save",
+    "close": "Close",
+    "retry": "Retry",
+    "refresh": "Refresh",
+    "deleting": "Deleting..."
+  },
+  "config": {
+    "title": "Configuration Manager",
+    "editor": "Editor",
+    "backups": "Backups",
+    "configFiles": "Configuration Files",
+    "selectFileHelp": "Select a configuration file to edit",
+    "lastModified": "Last modified",
+    "never": "Never",
+    "hasExample": "Has example file",
+    "generalConfig": "General Configuration",
+    "backupConfig": "Backup Configuration", 
+    "dockerConfig": "Docker Configuration",
+    "currentConfig": "Current Configuration",
+    "exampleConfig": "Example Configuration",
+    "readOnly": "Read Only",
+    "showExample": "Show Example",
+    "hideExample": "Hide Example",
+    "createBackup": "Create backup before saving",
+    "reset": "Reset",
+    "editingFile": "Editing file",
+    "unsavedChanges": "Unsaved changes",
+    "configPlaceholder": "Enter your configuration here...",
+    "errorLoadingFiles": "Error loading configuration files",
+    "errorLoadingFile": "Error loading configuration file",
+    "errorSaving": "Error saving configuration file",
+    "savedSuccess": "Configuration saved successfully",
+    "savedWithBackup": "Configuration saved with backup: {{backup}}",
+    "confirmReset": "Are you sure you want to reset all changes?",
+    "backupManager": "Backup Manager",
+    "errorLoadingBackups": "Error loading backups",
+    "noBackups": "No backups found",
+    "backupCount": "{{count}} backup",
+    "backupCount_other": "{{count}} backups",
+    "created": "Created",
+    "deleteBackup": "Delete backup",
+    "confirmDeleteBackup": "Are you sure you want to delete this backup?",
+    "errorDeletingBackup": "Error deleting backup",
+    "backupSize": "Size unknown",
+    "backupInfo": "Backups are automatically created before saving configuration files when the backup option is enabled.",
+    "backupWarning": "⚠️ Deleting backups is permanent and cannot be undone."
   }
 }

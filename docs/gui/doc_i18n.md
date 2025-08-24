@@ -123,6 +123,12 @@ src/i18n/locales/
   },
   "session": {
     "currentModule": "Current Module:",
+    "activeModule": "Active Module:",
+    "selectedModule": "Selected Module:",
+    "selectedDifferent": "Selected",
+    "showingDocsFor": "Showing docs for:",
+    "fromActiveSession": "from active session",
+    "fromSelectedModule": "from selected module",
     "selectModule": "Select a module from the sidebar to get started",
     "newSession": "+ New Session", 
     "selectModuleFirst": "Please select a module first",
@@ -141,9 +147,13 @@ src/i18n/locales/
     "showTerminal": "Show Terminal",
     "hideHelp": "Hide Help",
     "showHelp": "Show Help",
-    "hideDocs": "Hide Docs",
-    "showDocs": "Show Docs",
-    "docBrowser": "Doc Browser:"
+    "hideDeveloperDocs": "Hide Developer Docs",
+    "showDeveloperDocs": "Developer Docs",
+    "hideConfig": "Hide Config",
+    "showConfig": "Show Config",
+    "comprehensiveDocumentation": "Comprehensive Documentation",
+    "developerDocsTooltip": "Show/hide developer documentation for the active module",
+    "comprehensiveDocsTooltip": "Browse all project documentation and developer guides"
   },
   "modules": {
     "availableModules": "Available Modules",
@@ -447,6 +457,25 @@ echo "$(lh_msg 'WELCOME_MESSAGE')"  # Uses LH_LANG from GUI
 ```
 
 ## Translation Management
+
+### Recent Updates (v0.3.0-beta)
+
+**Enhanced Documentation & UI Translation Keys:**
+
+*Added to `panels` section:*
+- `hideDeveloperDocs` / `showDeveloperDocs` - Clearer labeling for module-specific documentation
+- `comprehensiveDocumentation` - Descriptive label for full project documentation browser
+- `developerDocsTooltip` - Tooltip explaining module-specific documentation
+- `comprehensiveDocsTooltip` - Tooltip explaining comprehensive documentation browser
+
+*Added to `session` section:*
+- `activeModule` - Label for currently running session's module
+- `selectedModule` - Label for user-selected module
+- `showingDocsFor` - Generic label for documentation source indication
+- `fromActiveSession` - Status indicator for session-based documentation
+- `fromSelectedModule` - Status indicator for user-selected documentation
+
+These additions support the enhanced documentation system with intelligent source tracking and improved user feedback.
 
 ### Adding New Translation Keys
 

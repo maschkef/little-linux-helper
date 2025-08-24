@@ -265,6 +265,14 @@ func main() {
 	// Get all available documentation
 	api.Get("/docs", getAllDocs)
 
+	// Configuration file management
+	api.Get("/config/files", getConfigFiles)
+	api.Get("/config/:filename", getConfigFile)
+	api.Put("/config/:filename", saveConfigFile)
+	api.Get("/config/:filename/example", getConfigExample)
+	api.Get("/config/backups", getConfigBackups)
+	api.Delete("/config/backups/:backupId", deleteConfigBackup)
+
 	// Start a module session
 	api.Post("/modules/:id/start", startModule)
 
@@ -1092,4 +1100,340 @@ func handleWebSocket(c *websocket.Conn) {
 			}
 		}
 	}
+}
+
+// ConfigFile represents a configuration file
+type ConfigFile struct {
+	Filename     string    `json:"filename"`
+	Content      string    `json:"content"`
+	HasExample   bool      `json:"has_example"`
+	LastModified time.Time `json:"last_modified"`
+}
+
+// ConfigFileInfo represents basic config file information
+type ConfigFileInfo struct {
+	Filename     string    `json:"filename"`
+	DisplayName  string    `json:"display_name"`
+	HasExample   bool      `json:"has_example"`
+	LastModified time.Time `json:"last_modified"`
+}
+
+// ConfigBackup represents a backup file
+type ConfigBackup struct {
+	ID         string    `json:"id"`
+	Filename   string    `json:"filename"`
+	BackupFile string    `json:"backup_file"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// getConfigFiles returns a list of available configuration files
+func getConfigFiles(c *fiber.Ctx) error {
+	configDir := filepath.Join(lhRootDir, "config")
+
+	// List of config files we want to expose
+	configFiles := []string{"general.conf", "backup.conf", "docker.conf"}
+	var files []ConfigFileInfo
+
+	for _, filename := range configFiles {
+		configPath := filepath.Join(configDir, filename)
+		examplePath := filepath.Join(configDir, filename+".example")
+
+		// Check if config file exists
+		var lastModified time.Time
+		if info, err := os.Stat(configPath); err == nil {
+			lastModified = info.ModTime()
+		}
+
+		// Check if example file exists
+		hasExample := false
+		if _, err := os.Stat(examplePath); err == nil {
+			hasExample = true
+		}
+
+		// Create display name
+		displayName := filename
+		switch filename {
+		case "general.conf":
+			displayName = "General Configuration"
+		case "backup.conf":
+			displayName = "Backup Configuration"
+		case "docker.conf":
+			displayName = "Docker Configuration"
+		}
+
+		files = append(files, ConfigFileInfo{
+			Filename:     filename,
+			DisplayName:  displayName,
+			HasExample:   hasExample,
+			LastModified: lastModified,
+		})
+	}
+
+	return c.JSON(files)
+}
+
+// getConfigFile returns the content of a specific configuration file
+func getConfigFile(c *fiber.Ctx) error {
+	filename := c.Params("filename")
+
+	// Security check - only allow specific config files
+	allowedFiles := map[string]bool{
+		"general.conf": true,
+		"backup.conf":  true,
+		"docker.conf":  true,
+	}
+
+	if !allowedFiles[filename] {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid configuration file"})
+	}
+
+	configPath := filepath.Join(lhRootDir, "config", filename)
+	examplePath := filepath.Join(lhRootDir, "config", filename+".example")
+
+	// Check if example file exists
+	hasExample := false
+	if _, err := os.Stat(examplePath); err == nil {
+		hasExample = true
+	}
+
+	// Read config file content
+	var content string
+	var lastModified time.Time
+
+	if data, err := os.ReadFile(configPath); err == nil {
+		content = string(data)
+		if info, err := os.Stat(configPath); err == nil {
+			lastModified = info.ModTime()
+		}
+	} else {
+		// If config file doesn't exist, use empty content
+		content = ""
+	}
+
+	return c.JSON(ConfigFile{
+		Filename:     filename,
+		Content:      content,
+		HasExample:   hasExample,
+		LastModified: lastModified,
+	})
+}
+
+// saveConfigFile saves configuration file content with backup
+func saveConfigFile(c *fiber.Ctx) error {
+	filename := c.Params("filename")
+
+	// Security check - only allow specific config files
+	allowedFiles := map[string]bool{
+		"general.conf": true,
+		"backup.conf":  true,
+		"docker.conf":  true,
+	}
+
+	if !allowedFiles[filename] {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid configuration file"})
+	}
+
+	var request struct {
+		Content      string `json:"content"`
+		CreateBackup bool   `json:"create_backup"`
+	}
+
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	configPath := filepath.Join(lhRootDir, "config", filename)
+
+	// Determine config type for validation
+	configType := "general"
+	switch filename {
+	case "backup.conf":
+		configType = "backup"
+	case "docker.conf":
+		configType = "docker"
+	}
+
+	// Use shell script to safely write the config with backup
+	var backupFile string
+	if request.CreateBackup {
+		// Create backup using our GUI library
+		cmd := exec.Command("bash", "-c", fmt.Sprintf(`
+			source "%s/lib/lib_common.sh"
+			source "%s/lib/lib_gui.sh"
+			backup_file=$(lh_gui_create_config_backup "%s")
+			echo "$backup_file"
+		`, lhRootDir, lhRootDir, configPath))
+
+		cmd.Env = append(os.Environ(), "LH_ROOT_DIR="+lhRootDir)
+
+		if output, err := cmd.Output(); err == nil {
+			backupFile = strings.TrimSpace(string(output))
+		}
+	}
+
+	// Write config file using GUI library for validation and safety
+	cmd := exec.Command("bash", "-c", fmt.Sprintf(`
+		source "%s/lib/lib_common.sh"
+		source "%s/lib/lib_gui.sh"
+		echo %s | lh_gui_write_config_file "%s" "$(cat)" "%t" "%s" 2>&1
+	`, lhRootDir, lhRootDir,
+		shellescape(request.Content),
+		configPath,
+		request.CreateBackup,
+		configType))
+
+	cmd.Env = append(os.Environ(), "LH_ROOT_DIR="+lhRootDir)
+
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error":   "Failed to save configuration file",
+			"details": string(output),
+		})
+	}
+
+	result := fiber.Map{"status": "saved", "filename": filename}
+	if backupFile != "" {
+		result["backup_created"] = backupFile
+	}
+
+	return c.JSON(result)
+}
+
+// getConfigExample returns the content of a configuration example file
+func getConfigExample(c *fiber.Ctx) error {
+	filename := c.Params("filename")
+
+	// Security check - only allow specific config files
+	allowedFiles := map[string]bool{
+		"general.conf": true,
+		"backup.conf":  true,
+		"docker.conf":  true,
+	}
+
+	if !allowedFiles[filename] {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid configuration file"})
+	}
+
+	examplePath := filepath.Join(lhRootDir, "config", filename+".example")
+
+	// Read example file content
+	data, err := os.ReadFile(examplePath)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Example file not found"})
+	}
+
+	var lastModified time.Time
+	if info, err := os.Stat(examplePath); err == nil {
+		lastModified = info.ModTime()
+	}
+
+	return c.JSON(ConfigFile{
+		Filename:     filename + ".example",
+		Content:      string(data),
+		HasExample:   false, // Example files don't have examples
+		LastModified: lastModified,
+	})
+}
+
+// getConfigBackups returns a list of configuration backups
+func getConfigBackups(c *fiber.Ctx) error {
+	// Use shell script to list all GUI backups
+	cmd := exec.Command("bash", "-c", fmt.Sprintf(`
+		source "%s/lib/lib_common.sh"
+		source "%s/lib/lib_gui.sh"
+		lh_gui_list_all_config_backups
+	`, lhRootDir, lhRootDir))
+
+	cmd.Env = append(os.Environ(), "LH_ROOT_DIR="+lhRootDir)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to list backups"})
+	}
+
+	backupPaths := strings.Split(strings.TrimSpace(string(output)), "\n")
+	var backups []ConfigBackup
+
+	for _, backupPath := range backupPaths {
+		backupPath = strings.TrimSpace(backupPath)
+		if backupPath == "" {
+			continue
+		}
+
+		// Parse backup file name to extract info
+		backupFile := filepath.Base(backupPath)
+		if !strings.Contains(backupFile, ".gui_backup_") {
+			continue
+		}
+
+		// Extract original filename
+		parts := strings.Split(backupFile, ".gui_backup_")
+		if len(parts) != 2 {
+			continue
+		}
+
+		originalFile := parts[0]
+		timestamp := parts[1]
+
+		// Parse timestamp
+		var createdAt time.Time
+		if t, err := time.Parse("20060102_150405", timestamp); err == nil {
+			createdAt = t
+		}
+
+		// Get file info
+		if info, err := os.Stat(backupPath); err == nil {
+			createdAt = info.ModTime() // Use actual file modification time
+		}
+
+		backups = append(backups, ConfigBackup{
+			ID:         fmt.Sprintf("%s_%s", originalFile, timestamp),
+			Filename:   originalFile,
+			BackupFile: backupFile,
+			CreatedAt:  createdAt,
+		})
+	}
+
+	return c.JSON(backups)
+}
+
+// deleteConfigBackup removes a configuration backup
+func deleteConfigBackup(c *fiber.Ctx) error {
+	backupId := c.Params("backupId")
+
+	// Parse backup ID to get file path
+	parts := strings.Split(backupId, "_")
+	if len(parts) < 2 {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid backup ID"})
+	}
+
+	// Reconstruct filename and timestamp
+	timestamp := parts[len(parts)-1]
+	filename := strings.Join(parts[:len(parts)-1], "_")
+
+	backupFile := fmt.Sprintf("%s.gui_backup_%s", filename, timestamp)
+	backupPath := filepath.Join(lhRootDir, "config", backupFile)
+
+	// Use shell script to safely remove backup
+	cmd := exec.Command("bash", "-c", fmt.Sprintf(`
+		source "%s/lib/lib_common.sh"
+		source "%s/lib/lib_gui.sh"
+		lh_gui_remove_config_backup "%s"
+	`, lhRootDir, lhRootDir, backupPath))
+
+	cmd.Env = append(os.Environ(), "LH_ROOT_DIR="+lhRootDir)
+
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error":   "Failed to remove backup",
+			"details": string(output),
+		})
+	}
+
+	return c.JSON(fiber.Map{"status": "deleted", "backup_id": backupId})
+}
+
+// shellescape escapes a string for safe use in shell commands
+func shellescape(s string) string {
+	return fmt.Sprintf("'%s'", strings.ReplaceAll(s, "'", "'\"'\"'"))
 }

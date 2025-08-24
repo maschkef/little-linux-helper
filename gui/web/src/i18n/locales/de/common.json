@@ -5,6 +5,9 @@
   },
   "session": {
     "currentModule": "Aktuelles Modul:",
+    "activeModule": "Aktives Modul:",
+    "selectedModule": "Ausgewähltes Modul:",
+    "selectedDifferent": "Ausgewählt",
     "selectModule": "Wählen Sie ein Modul aus der Seitenleiste aus, um zu beginnen",
     "newSession": "+ Neue Sitzung",
     "selectModuleFirst": "Bitte wählen Sie zuerst ein Modul aus",
@@ -16,6 +19,10 @@
     "startedAt": "Gestartet um {{time}}",
     "closeTooltip": "Sitzung schließen"
   },
+  "dev": {
+    "toggle": "Dev-Modus",
+    "toggleTooltip": "Entwickler-Dokumentations-Steuerelemente ein-/ausblenden"
+  },
   "panels": {
     "hideModules": "Module ausblenden",
     "showModules": "Module anzeigen", 
@@ -23,9 +30,13 @@
     "showTerminal": "Terminal anzeigen",
     "hideHelp": "Hilfe ausblenden",
     "showHelp": "Hilfe anzeigen",
-    "hideDocs": "Docs ausblenden",
-    "showDocs": "Docs anzeigen",
-    "docBrowser": "Doc Browser:"
+    "hideDeveloperDocs": "Modul-Docs ausblenden",
+    "showDeveloperDocs": "📖 Modul-Docs",
+    "hideConfig": "Konfiguration ausblenden",
+    "showConfig": "Konfiguration anzeigen",
+    "comprehensiveDocumentation": "📚 Alle Dokumentation",
+    "developerDocsTooltip": "Technische Dokumentation und Entwicklerleitfäden für das aktuell ausgewählte oder aktive Modul anzeigen",
+    "comprehensiveDocsTooltip": "Vollständigen Browser mit der gesamten Projektdokumentation öffnen, einschließlich Entwicklerleitfäden, Bibliotheksreferenzen und Moduldokumentation"
   },
   "modules": {
     "availableModules": "Verfügbare Module",
@@ -76,7 +87,8 @@
   },
   "docs": {
     "notAvailable": "Dokumentation für dieses Modul nicht verfügbar.",
-    "errorLoading": "Fehler beim Laden der Dokumentation."
+    "errorLoading": "Fehler beim Laden der Dokumentation.",
+    "documentBrowser": "Docs"
   },
   "terminal": {
     "noActiveSession": "Keine aktive Sitzung. Wählen Sie ein Modul zum Starten aus.",
@@ -94,5 +106,55 @@
     "ok": "OK",
     "yes": "Ja",
     "no": "Nein"
+  },
+  "common": {
+    "loading": "Lade...",
+    "saving": "Speichere...",
+    "save": "Speichern",
+    "close": "Schließen",
+    "retry": "Wiederholen",
+    "refresh": "Aktualisieren",
+    "deleting": "Lösche..."
+  },
+  "config": {
+    "title": "Konfigurationsmanager",
+    "editor": "Editor",
+    "backups": "Backups",
+    "configFiles": "Konfigurationsdateien",
+    "selectFileHelp": "Wählen Sie eine Konfigurationsdatei zum Bearbeiten",
+    "lastModified": "Zuletzt geändert",
+    "never": "Nie",
+    "hasExample": "Hat Beispieldatei",
+    "generalConfig": "Allgemeine Konfiguration",
+    "backupConfig": "Backup-Konfiguration", 
+    "dockerConfig": "Docker-Konfiguration",
+    "currentConfig": "Aktuelle Konfiguration",
+    "exampleConfig": "Beispiel-Konfiguration",
+    "readOnly": "Nur lesen",
+    "showExample": "Beispiel anzeigen",
+    "hideExample": "Beispiel ausblenden",
+    "createBackup": "Backup vor Speichern erstellen",
+    "reset": "Zurücksetzen",
+    "editingFile": "Datei bearbeiten",
+    "unsavedChanges": "Ungespeicherte Änderungen",
+    "configPlaceholder": "Geben Sie hier Ihre Konfiguration ein...",
+    "errorLoadingFiles": "Fehler beim Laden der Konfigurationsdateien",
+    "errorLoadingFile": "Fehler beim Laden der Konfigurationsdatei",
+    "errorSaving": "Fehler beim Speichern der Konfigurationsdatei",
+    "savedSuccess": "Konfiguration erfolgreich gespeichert",
+    "savedWithBackup": "Konfiguration mit Backup gespeichert: {{backup}}",
+    "confirmReset": "Sind Sie sicher, dass Sie alle Änderungen zurücksetzen möchten?",
+    "backupManager": "Backup-Manager",
+    "errorLoadingBackups": "Fehler beim Laden der Backups",
+    "noBackups": "Keine Backups gefunden",
+    "backupCount": "{{count}} Backup",
+    "backupCount_other": "{{count}} Backups",
+    "created": "Erstellt",
+    "deleteBackup": "Backup löschen",
+    "confirmDeleteBackup": "Sind Sie sicher, dass Sie dieses Backup löschen möchten?",
+    "errorDeletingBackup": "Fehler beim Löschen des Backups",
+    "backupSize": "Größe unbekannt",
+    "backupInfo": "Backups werden automatisch vor dem Speichern von Konfigurationsdateien erstellt, wenn die Backup-Option aktiviert ist.",
+    "backupWarning": "⚠️ Das Löschen von Backups ist dauerhaft und kann nicht rückgängig gemacht werden."
   }
 }

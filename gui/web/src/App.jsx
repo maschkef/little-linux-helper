@@ -13,6 +13,7 @@ import Terminal from './components/Terminal.jsx';
 import HelpPanel from './components/HelpPanel.jsx';
 import DocsPanel from './components/DocsPanel.jsx';
 import DocumentBrowser from './components/DocumentBrowser.jsx';
+import ConfigPanel from './components/ConfigPanel.jsx';
 import ResizablePanels from './components/ResizablePanels.jsx';
 import SessionDropdown from './components/SessionDropdown.jsx';
 import LanguageSelector from './components/LanguageSelector.jsx';
@@ -28,11 +29,25 @@ function AppContent() {
   const [panelWidths, setPanelWidths] = useState({ terminal: 50, help: 25, docs: 25 });
   const [showHelpPanel, setShowHelpPanel] = useState(true);
   const [showDocsPanel, setShowDocsPanel] = useState(false);
+  const [showConfigPanel, setShowConfigPanel] = useState(false);
   const [docBrowserMode, setDocBrowserMode] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
   const [showTerminalPanels, setShowTerminalPanels] = useState(true);
+  const [lastDocumentationSource, setLastDocumentationSource] = useState('module'); // 'module' or 'session'
+  const [showDevControls, setShowDevControls] = useState(() => {
+    // Load from localStorage, default to false (hidden)
+    const saved = localStorage.getItem('lh-gui-dev-controls');
+    return saved === 'true';
+  });
   
-  const { startNewSession, sessions } = useSession();
+  const { startNewSession, sessions, getActiveSession, activeSessionId } = useSession();
+
+  // Track when active session changes (user switched sessions)
+  useEffect(() => {
+    if (activeSessionId) {
+      setLastDocumentationSource('session');
+    }
+  }, [activeSessionId]);
 
   useEffect(() => {
     // Load modules on component mount
@@ -40,11 +55,28 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    // Load documentation when module is selected
-    if (selectedModule) {
-      fetchModuleDocs(selectedModule.id);
+    // Load documentation based on last user action
+    const activeSession = getActiveSession();
+    let moduleToShowDocs = null;
+    
+    if (lastDocumentationSource === 'session' && activeSession) {
+      // User last interacted with session - show active session's module
+      moduleToShowDocs = modules.find(m => m.id === activeSession.module);
+    } else if (lastDocumentationSource === 'module' && selectedModule) {
+      // User last clicked on a module - show selected module
+      moduleToShowDocs = selectedModule;
+    } else if (selectedModule) {
+      // Fallback to selected module
+      moduleToShowDocs = selectedModule;
+    } else if (activeSession) {
+      // Fallback to active session if no module selected
+      moduleToShowDocs = modules.find(m => m.id === activeSession.module);
     }
-  }, [selectedModule]);
+    
+    if (moduleToShowDocs) {
+      fetchModuleDocs(moduleToShowDocs.id);
+    }
+  }, [selectedModule, sessions, getActiveSession, modules, lastDocumentationSource]);
 
   const fetchModules = async () => {
     try {
@@ -82,6 +114,7 @@ function AppContent() {
     try {
       console.log('Setting selected module:', module.id, module.name);
       setSelectedModule(module);
+      setLastDocumentationSource('module'); // User clicked on module
       console.log('Successfully set selected module');
     } catch (error) {
       console.error('Error selecting module:', error);
@@ -91,8 +124,20 @@ function AppContent() {
   const startModule = async (module) => {
     try {
       await startNewSession(module);
+      setLastDocumentationSource('session'); // User started a new session
     } catch (error) {
       console.error('Error starting module:', error);
+    }
+  };
+
+  const toggleDevControls = (newValue) => {
+    setShowDevControls(newValue);
+    localStorage.setItem('lh-gui-dev-controls', newValue.toString());
+    
+    // If disabling dev controls, also close any open documentation panels
+    if (!newValue) {
+      setShowDocsPanel(false);
+      setDocBrowserMode(false);
     }
   };
 
@@ -112,12 +157,44 @@ function AppContent() {
     <div className="app">
       <header className="header">
         <div className="header-content">
-          <div style={{ flex: 1 }}></div>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+            {/* Developer Controls Toggle - moved to top left */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              opacity: '0.7',
+              fontSize: '12px'
+            }}>
+              <input
+                type="checkbox"
+                id="dev-controls-toggle"
+                checked={showDevControls}
+                onChange={(e) => toggleDevControls(e.target.checked)}
+                style={{
+                  cursor: 'pointer',
+                  transform: 'scale(0.9)'
+                }}
+              />
+              <label 
+                htmlFor="dev-controls-toggle" 
+                style={{ 
+                  cursor: 'pointer', 
+                  color: '#bbb',
+                  userSelect: 'none',
+                  fontSize: '11px'
+                }}
+                title={t('dev.toggleTooltip')}
+              >
+                🔧 {t('dev.toggle')}
+              </label>
+            </div>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             <h1>{t('app.title')}</h1>
             <img src="/header-logo.svg" alt="Little Linux Helper" className="header-logo" />
           </div>
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
             <LanguageSelector />
           </div>
         </div>
@@ -137,15 +214,6 @@ function AppContent() {
         
         <div className="content-area" style={{ flex: 1 }}>
           <div className="session-controls">
-            <div className="session-info-section">
-              {selectedModule && (
-                <span>{t('session.currentModule')} <strong>{t(`modules.names.${selectedModule.id}`, { defaultValue: selectedModule.name })}</strong></span>
-              )}
-              {!selectedModule && (
-                <span>{t('session.selectModule')}</span>
-              )}
-            </div>
-            
             <div className="session-management">
               {sessions.size > 0 && (
                 <SessionDropdown />
@@ -170,90 +238,147 @@ function AppContent() {
             
             {/* Panel toggle buttons */}
             <div className="panel-toggles">
+              {/* Documentation Controls Group - only show when dev controls enabled */}
+              {showDevControls && (
+                <>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginRight: '15px',
+                    padding: '2px 8px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
+                    <span style={{ 
+                      fontSize: '11px', 
+                      color: '#aaa', 
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginRight: '4px'
+                    }}>
+                      Docs:
+                    </span>
+                    
+                    <button 
+                      className={showDocsPanel ? 'active' : ''}
+                      onClick={() => setShowDocsPanel(!showDocsPanel)}
+                      title={t('panels.developerDocsTooltip')}
+                      style={{ 
+                        padding: '4px 10px',
+                        fontSize: '12px',
+                        backgroundColor: showDocsPanel ? '#007acc' : '#4a4a4a',
+                        color: 'white',
+                        border: '1px solid ' + (showDocsPanel ? '#007acc' : '#666'),
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        position: 'relative'
+                      }}
+                    >
+                      {showDocsPanel ? t('panels.hideDeveloperDocs') : t('panels.showDeveloperDocs')}
+                      {/* Show which module's docs are loaded */}
+                      {(selectedModule || getActiveSession()) && (
+                        <span style={{
+                          position: 'absolute',
+                          top: '-2px',
+                          right: '-2px',
+                          width: '6px',
+                          height: '6px',
+                          backgroundColor: lastDocumentationSource === 'session' ? '#4caf50' : '#80ccff',
+                          borderRadius: '50%',
+                          fontSize: '8px'
+                        }} title={`Showing docs for ${
+                          lastDocumentationSource === 'session' && getActiveSession() 
+                            ? getActiveSession().module 
+                            : selectedModule?.id || 'none'
+                        }`}></span>
+                      )}
+                    </button>
+                    
+                    <button 
+                      className={docBrowserMode ? 'active' : ''}
+                      onClick={() => setDocBrowserMode(!docBrowserMode)}
+                      title={t('panels.comprehensiveDocsTooltip')}
+                      style={{ 
+                        padding: '4px 10px',
+                        fontSize: '12px',
+                        backgroundColor: docBrowserMode ? '#007acc' : '#4a4a4a',
+                        color: 'white',
+                        border: '1px solid ' + (docBrowserMode ? '#007acc' : '#666'),
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {t('panels.comprehensiveDocumentation')}
+                    </button>
+                  </div>
+                </>
+              )}
+              
+              {/* Layout Controls Group */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                gap: '8px',
+                marginRight: '15px'
+              }}>
+                <span style={{ 
+                  fontSize: '11px', 
+                  color: '#aaa', 
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginRight: '4px'
+                }}>
+                  Layout:
+                </span>
+              
               <button 
                 className={showSidebar ? 'active' : ''}
                 onClick={() => setShowSidebar(!showSidebar)}
                 style={{ marginRight: '8px' }}
               >
-{showSidebar ? t('panels.hideModules') : t('panels.showModules')}
+                {showSidebar ? t('panels.hideModules') : t('panels.showModules')}
               </button>
               <button 
                 className={showTerminalPanels ? 'active' : ''}
                 onClick={() => setShowTerminalPanels(!showTerminalPanels)}
                 style={{ marginRight: '8px' }}
               >
-{showTerminalPanels ? t('panels.hideTerminal') : t('panels.showTerminal')}
+                {showTerminalPanels ? t('panels.hideTerminal') : t('panels.showTerminal')}
               </button>
-              <button 
-                className={showHelpPanel ? 'active' : ''}
-                onClick={() => setShowHelpPanel(!showHelpPanel)}
-              >
-{showHelpPanel ? t('panels.hideHelp') : t('panels.showHelp')}
-              </button>
-              <button 
-                className={showDocsPanel ? 'active' : ''}
-                onClick={() => setShowDocsPanel(!showDocsPanel)}
-              >
-{showDocsPanel ? t('panels.hideDocs') : t('panels.showDocs')}
-              </button>
-              {showDocsPanel && (
-                <div className="doc-mode-toggle" style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  marginLeft: '10px',
-                  fontSize: '12px',
-                  color: '#ecf0f1'
-                }}>
-                  <span style={{ marginRight: '8px' }}>{t('panels.docBrowser')}</span>
-                  <label className="toggle-switch" style={{
-                    position: 'relative',
-                    display: 'inline-block',
-                    width: '40px',
-                    height: '20px'
-                  }}>
-                    <input
-                      type="checkbox"
-                      checked={docBrowserMode}
-                      onChange={(e) => setDocBrowserMode(e.target.checked)}
-                      style={{ opacity: 0, width: 0, height: 0 }}
-                    />
-                    <span style={{
-                      position: 'absolute',
-                      cursor: 'pointer',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      backgroundColor: docBrowserMode ? '#007bff' : '#ccc',
-                      borderRadius: '20px',
-                      transition: 'background-color 0.2s',
-                      '&:before': {
-                        content: '""',
-                        position: 'absolute',
-                        height: '16px',
-                        width: '16px',
-                        left: docBrowserMode ? '22px' : '2px',
-                        bottom: '2px',
-                        backgroundColor: 'white',
-                        borderRadius: '50%',
-                        transition: 'left 0.2s'
-                      }
-                    }} className="slider">
-                      <span style={{
-                        content: '""',
-                        position: 'absolute',
-                        height: '16px',
-                        width: '16px',
-                        left: docBrowserMode ? '22px' : '2px',
-                        bottom: '2px',
-                        backgroundColor: 'white',
-                        borderRadius: '50%',
-                        transition: 'left 0.2s'
-                      }}></span>
-                    </span>
-                  </label>
-                </div>
+              
+              {/* Help button only shown when terminal panels are visible */}
+              {showTerminalPanels && (
+                <button 
+                  className={showHelpPanel ? 'active' : ''}
+                  onClick={() => setShowHelpPanel(!showHelpPanel)}
+                  style={{ marginRight: '8px' }}
+                >
+                  {showHelpPanel ? t('panels.hideHelp') : t('panels.showHelp')}
+                </button>
               )}
+              </div>
+              
+              {/* Configuration Panel Button */}
+              <button 
+                className={showConfigPanel ? 'active' : ''}
+                onClick={() => setShowConfigPanel(!showConfigPanel)}
+                style={{ 
+                  padding: '4px 12px',
+                  fontSize: '12px',
+                  backgroundColor: showConfigPanel ? '#007acc' : '#4a4a4a',
+                  color: 'white',
+                  border: '1px solid ' + (showConfigPanel ? '#007acc' : '#666'),
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                ⚙️ {showConfigPanel ? t('panels.hideConfig') : t('panels.showConfig')}
+              </button>
             </div>
           </div>
           
@@ -270,15 +395,11 @@ function AppContent() {
                 module={selectedModule}
               />
               
-              {docBrowserMode ? (
-                <DocumentBrowser />
-              ) : (
-                <DocsPanel 
-                  content={moduleDocs}
-                  selectedModule={selectedModule}
-                  onModuleSelect={handleModuleSelect}
-                />
-              )}
+              <DocsPanel 
+                content={moduleDocs}
+                selectedModule={selectedModule}
+                onModuleSelect={handleModuleSelect}
+              />
             </ResizablePanels>
           ) : (
             // Full-width documentation view when terminal panels are hidden
@@ -289,20 +410,54 @@ function AppContent() {
                 backgroundColor: '#2c3e50',
                 borderRadius: '5px'
               }}>
-                {docBrowserMode ? (
-                  <DocumentBrowser />
-                ) : (
-                  <DocsPanel 
-                    content={moduleDocs}
-                    selectedModule={selectedModule}
-                    onModuleSelect={handleModuleSelect}
-                  />
-                )}
+                <DocsPanel 
+                  content={moduleDocs}
+                  selectedModule={selectedModule}
+                  onModuleSelect={handleModuleSelect}
+                />
               </div>
             )
           )}
         </div>
       </div>
+
+      {/* Configuration Panel Overlay */}
+      {showConfigPanel && (
+        <div className="config-panel-overlay">
+          <div className="config-panel-modal">
+            <div className="config-panel-header">
+              <h2>{t('config.title')}</h2>
+              <button 
+                className="close-config-button"
+                onClick={() => setShowConfigPanel(false)}
+                title={t('common.close')}
+              >
+                ×
+              </button>
+            </div>
+            <ConfigPanel />
+          </div>
+        </div>
+      )}
+
+      {/* Document Browser Overlay */}
+      {docBrowserMode && (
+        <div className="doc-browser-overlay">
+          <div className="doc-browser-modal">
+            <div className="doc-browser-header">
+              <h2>{t('panels.comprehensiveDocumentation')}</h2>
+              <button 
+                className="close-doc-browser-button"
+                onClick={() => setDocBrowserMode(false)}
+                title={t('common.close')}
+              >
+                ×
+              </button>
+            </div>
+            <DocumentBrowser />
+          </div>
+        </div>
+      )}
     </div>
     </ErrorBoundary>
   );

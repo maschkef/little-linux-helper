@@ -130,9 +130,10 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   Sidebar module navigation with individual "Start" buttons (hideable for reading mode)
     *   Session dropdown for switching between multiple active sessions
     *   Main terminal area with real-time output display (hideable for documentation focus)
-    *   Integrated help panel with user-friendly, context-sensitive guidance
+    *   Integrated help panel with user-friendly, context-sensitive guidance (only visible when terminal panels are shown)
     *   Advanced documentation system with both module-bound and independent browser modes
-    *   **Panel Toggle Controls:** Hide/show modules sidebar, terminal panels, help, and docs for optimal screen usage
+    *   **Optimized Panel Toggle Controls:** Documentation buttons positioned on the left for better accessibility, layout controls on the right
+    *   **Smart Help Button Display:** Help button only appears when terminal panels are visible, reducing UI clutter in documentation-only mode
     *   **Full-Screen Reading Mode:** Hide all panels except documentation for maximum reading space
     *   **Language Selection:** Integrated language selector with flag emojis for immediate language switching
 
@@ -153,16 +154,20 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   Click-to-focus: clicking anywhere in terminal automatically focuses input field
     *   Automatic "Any Key" prompt handling - modules continue without user intervention
     *   Direct session control with integrated "Stop" button
+    *   **Smart Documentation Tracking:** Documentation panel intelligently follows user's last action (module selection vs. session switching)
 
 *   **Advanced Documentation System:**
-    *   **Module-Bound Mode:** Traditional documentation tied to selected modules with related doc links
-    *   **Independent Document Browser:** Browse all documentation regardless of current module selection
+    *   **Module-Bound Developer Docs:** Context-sensitive documentation tied to active modules with intelligent source tracking
+    *   **Comprehensive Documentation Browser:** Browse all project documentation regardless of current module selection
+    *   **Smart Documentation Logic:** Prioritizes user's last interaction - respects manual module selection over automatic session switching
+    *   **Visual Source Indicators:** Clear feedback showing whether docs are from "selected module" or "active session"
     *   **Categorized Navigation:** Documents organized by logical groups (System Admin, Backup, Docker, etc.)
     *   **Collapsible Categories:** Expandable/collapsible document groups for better organization
     *   **Hideable Sidebar:** Document browser navigation can be hidden to maximize reading space
     *   **Scrollable Interface:** Long document lists scroll smoothly within navigation panel
-    *   **Dual View Toggle:** Switch between module-bound and browser modes with on/off slider
+    *   **Dual View Toggle:** Switch between module-bound and browser modes with intuitive button labels
     *   **Full Documentation Coverage:** Access to all project documentation from single interface
+    *   **Improved Button Labels:** "Developer Docs" for module-specific docs, "📚 Comprehensive Documentation" for full project browser
 
 *   **Internationalization (i18n) Features:**
     *   **Multi-Language Support:** English and German translations with framework for additional languages
@@ -298,6 +303,11 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   **Session Persistence:** Sessions remain accessible in new browser windows
 
 *   **Panel Control & Reading Modes:**
+    *   **Optimized Button Layout:** Documentation controls positioned on left for accessibility, layout controls on right
+    *   **Smart Help Button:** Help panel toggle only visible when terminal panels are active, reducing UI clutter
+    *   **Developer Docs Button:** Shows module-specific documentation with intelligent source tracking and clear tooltips
+    *   **Comprehensive Documentation Button:** Opens full project documentation browser with 📚 icon for clarity
+    *   **Visual Feedback:** Clear indicators showing documentation source ("from selected module" vs "from active session")
     *   **Hide Modules:** Click "Hide Modules" to hide sidebar and expand content area to full width
     *   **Hide Terminal:** Click "Hide Terminal" to hide all terminal panels for documentation focus
     *   **Full-Screen Reading:** Hide both modules and terminal panels for maximum documentation space
@@ -339,10 +349,56 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   **Docker Integration:** Container management, security analysis, and setup procedures
     *   **Usage Guidelines:** Best practices, prerequisites, and safety considerations for each tool
 
-**12. Version Management:**
+**12. Enhanced Documentation & User Interface System:**
+
+*   **Intelligent Documentation Source Tracking:**
+    *   **Last Action Memory:** System remembers whether user last clicked a module or switched terminal sessions
+    *   **Priority Logic:** Respects user's explicit choices over automatic session switching
+    *   **Visual Feedback:** Clear status indicators showing documentation source with color coding
+    *   **Persistent Choices:** Documentation selection remains stable until user makes a different choice
+
+*   **Two-Tiered Documentation System:**
+    *   **Developer Docs (Module-Specific):**
+        *   Shows documentation for currently active or selected module
+        *   Follows user's last interaction (module click vs. session switch)
+        *   Clear tooltip: "Show/hide developer documentation for the active module"
+        *   Contextual help tied to actual workflow
+    *   **Comprehensive Documentation (Project-Wide):**
+        *   Independent browser for all project documentation
+        *   Clear 📚 icon and descriptive label
+        *   Tooltip: "Browse all project documentation and developer guides"
+        *   Not tied to current module selection
+
+*   **Optimized Button Layout & UX:**
+    *   **Left-Side Positioning:** Documentation buttons moved to top-left for better accessibility
+    *   **Right-Side Controls:** Layout and panel toggles positioned on right side
+    *   **Visual Separation:** Clear divider between documentation and layout controls
+    *   **Conditional Display:** Help button only shown when terminal panels are visible
+    *   **Intuitive Labeling:** "Developer Docs" and "Comprehensive Documentation" replace ambiguous "Docs" labels
+
+*   **Status Display Enhancements:**
+    *   **Source Indicators:** Shows whether docs are "from selected module" or "from active session"
+    *   **Color Coding:** Blue for module selection, green for session-based docs
+    *   **Real-Time Updates:** Status updates immediately when source changes
+    *   **Clear Messaging:** Eliminates confusion about which module's documentation is displayed
+
+*   **User Interaction Scenarios:**
+    *   **Module-First Workflow:** Click module → documentation stays on that module regardless of session switches
+    *   **Session-First Workflow:** Switch session → documentation follows active session until module clicked
+    *   **Mixed Workflow:** System intelligently maintains last explicit user choice
+    *   **Visual Confirmation:** Always clear which source is providing current documentation
+
+**13. Version Management:**
 
 *   **Version Tracking:** The GUI component version (`gui/web/package.json`) reflects significant GUI changes and improvements
 *   **Current Version:** `0.3.0-beta`
+*   **Recent Improvements (v0.3.0-beta):**
+    *   Smart documentation source tracking with last-action memory
+    *   Optimized button layout with left-positioned documentation controls
+    *   Conditional Help button display for reduced UI clutter
+    *   Enhanced status indicators with visual source feedback
+    *   Improved button labeling for better user clarity
+    *   Intelligent documentation persistence across user interactions
 *   **Version Policy:** GUI version should be updated when:
     *   Main project version changes (major/minor releases)
     *   Significant GUI features are added or changed
@@ -353,7 +409,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   `gui/web/package.json` - Primary version declaration
     *   `gui/web/package-lock.json` - Lock file version (should match package.json)
 
-**13. Future Extensibility:**
+**14. Future Extensibility:**
 
 *   **Module Compatibility:** Automatically supports new modules added to the system
 *   **Documentation Integration:** New documentation files are automatically discovered and integrated
