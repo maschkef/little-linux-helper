@@ -6,20 +6,22 @@ This project is part of the 'little-linux-helper' collection.
 Licensed under the MIT License. See the LICENSE file in the project root for more information.
 */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { useTranslation } from 'react-i18next';
 import ModuleList from './components/ModuleList.jsx';
 import Terminal from './components/Terminal.jsx';
 import HelpPanel from './components/HelpPanel.jsx';
-import DocsPanel from './components/DocsPanel.jsx';
-import DocumentBrowser from './components/DocumentBrowser.jsx';
-import ConfigPanel from './components/ConfigPanel.jsx';
 import ResizablePanels from './components/ResizablePanels.jsx';
 import SessionDropdown from './components/SessionDropdown.jsx';
 import LanguageSelector from './components/LanguageSelector.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { SessionProvider, useSession } from './contexts/SessionContext.jsx';
 import './i18n'; // Initialize i18n
+
+// Lazy load heavy components that are only used conditionally
+const DocsPanel = lazy(() => import('./components/DocsPanel.jsx'));
+const DocumentBrowser = lazy(() => import('./components/DocumentBrowser.jsx'));
+const ConfigPanel = lazy(() => import('./components/ConfigPanel.jsx'));
 
 function AppContent() {
   const { t } = useTranslation('common');
@@ -395,11 +397,13 @@ function AppContent() {
                 module={selectedModule}
               />
               
-              <DocsPanel 
-                content={moduleDocs}
-                selectedModule={selectedModule}
-                onModuleSelect={handleModuleSelect}
-              />
+              <Suspense fallback={<div className="loading-panel">Loading documentation...</div>}>
+                <DocsPanel 
+                  content={moduleDocs}
+                  selectedModule={selectedModule}
+                  onModuleSelect={handleModuleSelect}
+                />
+              </Suspense>
             </ResizablePanels>
           ) : (
             // Full-width documentation view when terminal panels are hidden
@@ -410,11 +414,13 @@ function AppContent() {
                 backgroundColor: '#2c3e50',
                 borderRadius: '5px'
               }}>
-                <DocsPanel 
-                  content={moduleDocs}
-                  selectedModule={selectedModule}
-                  onModuleSelect={handleModuleSelect}
-                />
+                <Suspense fallback={<div className="loading-panel">Loading documentation...</div>}>
+                  <DocsPanel 
+                    content={moduleDocs}
+                    selectedModule={selectedModule}
+                    onModuleSelect={handleModuleSelect}
+                  />
+                </Suspense>
               </div>
             )
           )}
@@ -435,7 +441,9 @@ function AppContent() {
                 ×
               </button>
             </div>
-            <ConfigPanel />
+            <Suspense fallback={<div className="loading-panel">Loading configuration...</div>}>
+              <ConfigPanel />
+            </Suspense>
           </div>
         </div>
       )}
@@ -454,7 +462,9 @@ function AppContent() {
                 ×
               </button>
             </div>
-            <DocumentBrowser />
+            <Suspense fallback={<div className="loading-panel">Loading document browser...</div>}>
+              <DocumentBrowser />
+            </Suspense>
           </div>
         </div>
       )}
