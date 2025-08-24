@@ -104,6 +104,7 @@ A modern web-based GUI is available through `gui_launcher.sh`, providing:
 # Custom configuration via config/general.conf:
 CFG_LH_GUI_PORT="3000"        # Set default port
 CFG_LH_GUI_HOST="localhost"   # Set binding (localhost/0.0.0.0)
+CFG_LH_GUI_FIREWALL_RESTRICTION="local"  # IP restrictions for firewall opening
 
 # Direct binary execution:
 ./little-linux-helper-gui -p 8080             # Custom port (short form)
@@ -419,6 +420,10 @@ CFG_LH_GUI_PORT="3000"
 # GUI server host binding (default: localhost for security)
 # Options: "localhost" (secure) or "0.0.0.0" (network access)
 CFG_LH_GUI_HOST="localhost"
+
+# Firewall IP restriction for -f flag (default: "local")
+# Options: "all" (any IP), "local" (detected networks), specific IP/CIDR
+CFG_LH_GUI_FIREWALL_RESTRICTION="local"
 ```
 
 Command line arguments (both short -x and long --word forms) override configuration file settings for temporary changes.

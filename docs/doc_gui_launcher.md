@@ -99,36 +99,79 @@ The GUI Launcher Script (`gui_launcher.sh`) is a specialized launcher that provi
 - **Security Warning:** Displayed automatically
 - Requires careful consideration of network security
 
-### Firewall Management
+### Enhanced Firewall Management
 
-**Automatic Port Management (`-f/--open-firewall`):**
+**Intelligent Port Management (`-f/--open-firewall`):**
 - **Supported Firewalls:** firewalld, ufw, iptables
 - **Automatic Detection:** Detects available firewall tools
-- **Port Opening:** Opens specified port automatically
+- **Smart IP Restrictions:** Configurable access control with network detection
+- **Port Opening:** Opens specified port with IP-based restrictions
 - **Cleanup on Exit:** Automatically closes port when GUI stops
 - **Signal Handling:** Handles Ctrl+C, termination signals
 - **Multi-Tool Support:** Works with different Linux distributions
 
+**IP Restriction Options:**
+1. **All IPs (0.0.0.0/0)** - Global internet access (high risk)
+2. **Detected Local Networks** - Automatically detected current networks (recommended)
+3. **Specific IP Address** - Single machine access (most secure)
+4. **Custom CIDR Range** - Custom network segment
+
+**Configuration Support (`config/general.conf`):**
+```bash
+# Firewall IP restriction configuration
+CFG_LH_GUI_FIREWALL_RESTRICTION="local"     # Auto-detect local networks
+CFG_LH_GUI_FIREWALL_RESTRICTION="all"       # Allow all IPs (not recommended)
+CFG_LH_GUI_FIREWALL_RESTRICTION="192.168.1.100"  # Specific IP
+CFG_LH_GUI_FIREWALL_RESTRICTION=""          # Prompt user each time
+```
+
+**Network Detection:**
+- **Automatic Discovery:** Detects actual local network ranges (not hardcoded)
+- **Interface Analysis:** Scans all network interfaces
+- **CIDR Calculation:** Calculates proper network addresses from detected IPs
+- **Security Focus:** Only allows access from networks the system is actually connected to
+
 **Firewall Tool Priority:**
-1. **firewalld** - Enterprise/Red Hat systems
-2. **ufw** - Ubuntu/Debian systems  
-3. **iptables** - Direct iptables management (non-persistent)
+1. **firewalld** - Enterprise/Red Hat systems (supports rich rules with IP restrictions)
+2. **ufw** - Ubuntu/Debian systems (supports source IP filtering)
+3. **iptables** - Direct iptables management (supports source filtering, non-persistent)
 
 **Cleanup Mechanism:**
 ```bash
 # Automatic cleanup on:
 # - Normal exit
-# - Ctrl+C (SIGINT)
+# - Ctrl+C (SIGINT)  
 # - Termination (SIGTERM)
 # - Script exit
+# Removes all created firewall rules
 ```
 
-### Security Warnings
+### Enhanced Security Warnings
 
-The launcher provides clear warnings when network mode is enabled:
-- **Risk notification** about network accessibility
-- **Security reminder** about proper network configuration
-- **Access information** showing how the GUI can be reached
+**Elevated Privilege Detection:**
+When running with sudo and network mode (`-n`), displays comprehensive security assessment:
+
+**Real-time Security Status:**
+- **Port Detection:** Shows actual port being used
+- **Firewall Status:** Active/inactive with firewall type (firewalld/ufw/iptables)
+- **Port Accessibility:** Whether port is already open or blocked
+- **Configuration Status:** Shows firewall restriction settings from config
+- **Risk Assessment:** Categorizes security risk level
+
+**Dynamic Risk Categories:**
+- **🚨 HIGH RISK:** No firewall active or port already open without protection
+- **⚠️ MODERATE RISK:** Configured for global internet access ("all" setting)
+- **✅ LOWER RISK:** Active firewall with proper IP restrictions
+
+**Contextual Recommendations:**
+- **Smart suggestions** based on current system state
+- **Specific guidance** like using `-f` flag when firewall is available
+- **Security best practices** tailored to detected configuration
+
+**Interactive Confirmation:**
+- **Required confirmation** for elevated privilege network access
+- **User education** about risks and mitigation strategies
+- **Cancellation option** to abort launch for security reasons
 
 ## 4. Configuration Integration
 
@@ -141,6 +184,12 @@ CFG_LH_GUI_PORT="3000"
 
 # Default host binding
 CFG_LH_GUI_HOST="localhost"
+
+# Firewall IP restriction configuration (new feature)
+CFG_LH_GUI_FIREWALL_RESTRICTION="local"    # Auto-detect local networks
+# CFG_LH_GUI_FIREWALL_RESTRICTION="all"    # Allow all IPs (not recommended)
+# CFG_LH_GUI_FIREWALL_RESTRICTION="192.168.1.100"  # Specific IP
+# CFG_LH_GUI_FIREWALL_RESTRICTION=""       # Prompt user each time
 ```
 
 **Configuration Priority:**

@@ -93,6 +93,18 @@ CFG_LH_GUI_PORT="3000"
 # Priority: Command line arguments > config file > built-in defaults
 CFG_LH_GUI_HOST="localhost"
 
+# Firewall port opening configuration
+# Controls IP restrictions when using the -f/--open-firewall option
+#
+# Available options:
+# - "all" - Allow access from any IP address (0.0.0.0/0)
+# - "local" - Allow access from detected local networks only (recommended)
+# - Specific IP or CIDR - e.g., "192.168.1.100" or "192.168.1.0/24"
+#
+# If not configured, the user will be prompted when using -f flag
+# Leave empty to always prompt: CFG_LH_GUI_FIREWALL_RESTRICTION=""
+CFG_LH_GUI_FIREWALL_RESTRICTION="local"
+
 # =============================================================================
 # FUTURE SETTINGS
 # =============================================================================

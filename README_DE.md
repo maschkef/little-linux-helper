@@ -104,6 +104,7 @@ Die GUI behält vollständige Kompatibilität mit allen CLI-Funktionen bei und b
 # Benutzerdefinierte Konfiguration via config/general.conf:
 CFG_LH_GUI_PORT="3000"        # Standard-Port setzen
 CFG_LH_GUI_HOST="localhost"   # Bindung setzen (localhost/0.0.0.0)
+CFG_LH_GUI_FIREWALL_RESTRICTION="local"  # IP-Beschränkungen für Firewall-Öffnung
 
 # Direkte Binary-Ausführung:
 ./little-linux-helper-gui -p 8080             # Benutzerdefinierten Port (Kurzform)

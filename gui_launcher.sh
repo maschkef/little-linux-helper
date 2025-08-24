@@ -23,14 +23,14 @@ OPEN_FIREWALL_FLAG=false
 GUI_ARGS=()
 LAUNCH_PORT=""
 
-# Command line argument parsing with debug support
-echo "DEBUG: Starting CLI argument parsing with $# arguments: $*" >&2
+# Command line argument parsing
+# Store arguments for later debug logging
+ORIGINAL_ARGS="$*"
+ORIGINAL_ARG_COUNT="$#"
 
 while [[ $# -gt 0 ]]; do
-    echo "DEBUG: Processing argument: $1" >&2
     case $1 in
         -h|--help)
-            echo "DEBUG: Help requested, displaying usage" >&2
             echo "Usage: $0 [-b|--build] [-n|--network] [-f|--open-firewall] [-p|--port PORT] [-h|--help]"
             echo ""
             echo "Options:"
@@ -61,28 +61,23 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         -b|--build)
-            echo "DEBUG: Build flag set" >&2
             BUILD_FLAG=true
             shift
             ;;
         -n|--network)
-            echo "DEBUG: Network mode enabled" >&2
             GUI_ARGS+=("-network")
             shift
             ;;
         -p|--port)
-            echo "DEBUG: Custom port specified: $2" >&2
             LAUNCH_PORT="$2"
             GUI_ARGS+=("-port" "$2")
             shift 2
             ;;
         -f|--open-firewall)
-            echo "DEBUG: Firewall opening requested" >&2
             OPEN_FIREWALL_FLAG=true
             shift
             ;;
         *)
-            echo "DEBUG: Unknown argument encountered: $1" >&2
             echo "Unknown option: $1"
             echo "Use -h or --help for usage information."
             exit 1
@@ -90,7 +85,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "DEBUG: CLI parsing completed. BUILD_FLAG=$BUILD_FLAG, OPEN_FIREWALL_FLAG=$OPEN_FIREWALL_FLAG, LAUNCH_PORT='$LAUNCH_PORT', GUI_ARGS=(${GUI_ARGS[*]})" >&2
+# CLI parsing completed - debug logging will be done after initialization
 
 # Load library system
 source "$LH_ROOT_DIR/lib/lib_common.sh"
@@ -108,6 +103,10 @@ lh_initialize_logging
 # Log the custom log file location
 lh_log_msg "INFO" "GUI Launcher logging initialized. Log file: $LH_LOG_FILE"
 
+# Now that logging is initialized, log CLI argument parsing details (respects log level)
+lh_log_msg "DEBUG" "Starting CLI argument parsing with $ORIGINAL_ARG_COUNT arguments: $ORIGINAL_ARGS"
+lh_log_msg "DEBUG" "CLI parsing completed. BUILD_FLAG=$BUILD_FLAG, OPEN_FIREWALL_FLAG=$OPEN_FIREWALL_FLAG, LAUNCH_PORT='$LAUNCH_PORT', GUI_ARGS=(${GUI_ARGS[*]})"
+
 lh_check_root_privileges
 lh_detect_package_manager
 lh_detect_alternative_managers
@@ -117,6 +116,344 @@ lh_finalize_initialization
 lh_load_language_module "gui_launcher"
 lh_load_language_module "common"
 lh_load_language_module "lib"
+
+# Function to determine GUI port from CLI or config (default 3000)
+_determine_gui_port() {
+    lh_log_msg "DEBUG" "Entering _determine_gui_port with LAUNCH_PORT='$LAUNCH_PORT'" >&2
+    local port
+    if [ -n "$LAUNCH_PORT" ]; then
+        port="$LAUNCH_PORT"
+    else
+        # Read from config if available
+        if [ -f "$LH_ROOT_DIR/config/general.conf" ]; then
+            # shellcheck source=/dev/null
+            source "$LH_ROOT_DIR/config/general.conf"
+            if [ -n "${CFG_LH_GUI_PORT:-}" ]; then
+                port="$CFG_LH_GUI_PORT"
+            fi
+        fi
+        port="${port:-3000}"
+    fi
+    lh_log_msg "DEBUG" "Exiting _determine_gui_port with port='$port'" >&2
+    echo "$port"
+}
+
+# Function to check firewall status and port availability
+_check_security_status() {
+    local port="${1:-3000}"
+    local firewall_active=false
+    local port_open=false
+    local firewall_type=""
+    
+    # Check firewall status
+    if command -v firewall-cmd >/dev/null 2>&1 && $LH_SUDO_CMD firewall-cmd --state 2>/dev/null | grep -q running; then
+        firewall_active=true
+        firewall_type="firewalld"
+        # Check if port is already open
+        if $LH_SUDO_CMD firewall-cmd --list-ports 2>/dev/null | grep -q "${port}/tcp"; then
+            port_open=true
+        fi
+    elif command -v ufw >/dev/null 2>&1 && $LH_SUDO_CMD ufw status 2>/dev/null | grep -q "Status: active"; then
+        firewall_active=true
+        firewall_type="ufw"
+        # Check if port is already open
+        if $LH_SUDO_CMD ufw status 2>/dev/null | grep -q "${port}/tcp"; then
+            port_open=true
+        fi
+    elif command -v iptables >/dev/null 2>&1; then
+        firewall_active=true
+        firewall_type="iptables"
+        # Check if port is already open
+        if $LH_SUDO_CMD iptables -C INPUT -p tcp --dport ${port} -j ACCEPT 2>/dev/null; then
+            port_open=true
+        fi
+    fi
+    
+    echo "${firewall_active}|${port_open}|${firewall_type}"
+}
+
+_show_sudo_network_warning() {
+    local port=$(_determine_gui_port)
+    local security_status=$(_check_security_status "$port")
+    local firewall_active=$(echo "$security_status" | cut -d'|' -f1)
+    local port_open=$(echo "$security_status" | cut -d'|' -f2)
+    local firewall_type=$(echo "$security_status" | cut -d'|' -f3)
+    local has_firewall_flag="$OPEN_FIREWALL_FLAG"
+    local restriction="${CFG_LH_GUI_FIREWALL_RESTRICTION:-}"
+    
+    lh_log_msg "WARN" "GUI launcher running with network access and elevated privileges" >&2
+    echo -e "${LH_COLOR_WARNING}🚨 SECURITY WARNING 🚨${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_WARNING}⚠️  You are launching the GUI with network access AND elevated privileges (sudo).${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_WARNING}⚠️  This allows remote users to perform ROOT ACTIONS on your system!${LH_COLOR_RESET}"
+    echo ""
+    
+    # System status information
+    echo -e "${LH_COLOR_INFO}📊 Current Security Status:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}   • Port: $port${LH_COLOR_RESET}"
+    
+    if [ "$firewall_active" = "true" ]; then
+        echo -e "${LH_COLOR_SUCCESS}   • Firewall: Active ($firewall_type)${LH_COLOR_RESET}"
+        if [ "$port_open" = "true" ]; then
+            echo -e "${LH_COLOR_WARNING}   • Port Status: Already open in firewall${LH_COLOR_RESET}"
+        else
+            echo -e "${LH_COLOR_SUCCESS}   • Port Status: Blocked by firewall${LH_COLOR_RESET}"
+        fi
+    else
+        echo -e "${LH_COLOR_ERROR}   • Firewall: Not active or not detected${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}   • Port Status: Potentially accessible from anywhere${LH_COLOR_RESET}"
+    fi
+    
+    # Firewall flag and configuration status
+    if [ "$has_firewall_flag" = true ]; then
+        echo -e "${LH_COLOR_INFO}   • Firewall Rule: Will be configured automatically (-f flag)${LH_COLOR_RESET}"
+        if [ -n "$restriction" ]; then
+            case "$restriction" in
+                "all")
+                    echo -e "${LH_COLOR_WARNING}   • Access Restriction: All IPs (configured: $restriction)${LH_COLOR_RESET}"
+                    ;;
+                "local")
+                    echo -e "${LH_COLOR_SUCCESS}   • Access Restriction: Local networks only (configured: $restriction)${LH_COLOR_RESET}"
+                    ;;
+                *)
+                    echo -e "${LH_COLOR_SUCCESS}   • Access Restriction: Specific IP/range (configured: $restriction)${LH_COLOR_RESET}"
+                    ;;
+            esac
+        else
+            echo -e "${LH_COLOR_INFO}   • Access Restriction: Will be prompted for configuration${LH_COLOR_RESET}"
+        fi
+    else
+        echo -e "${LH_COLOR_WARNING}   • Firewall Rule: No automatic firewall configuration${LH_COLOR_RESET}"
+    fi
+    echo ""
+    
+    # Contextual warnings based on security status
+    if [ "$firewall_active" = "false" ] || ([ "$port_open" = "true" ] && [ "$has_firewall_flag" = false ]); then
+        echo -e "${LH_COLOR_ERROR}🚨 HIGH RISK DETECTED:${LH_COLOR_RESET}"
+        if [ "$firewall_active" = "false" ]; then
+            echo -e "${LH_COLOR_ERROR}   • No active firewall detected - GUI will be exposed to all networks${LH_COLOR_RESET}"
+        fi
+        if [ "$port_open" = "true" ] && [ "$has_firewall_flag" = false ]; then
+            echo -e "${LH_COLOR_ERROR}   • Port $port is already open and won't be restricted${LH_COLOR_RESET}"
+        fi
+        echo -e "${LH_COLOR_ERROR}   • Consider using -f flag to configure firewall restrictions${LH_COLOR_RESET}"
+        echo ""
+    elif [ "$restriction" = "all" ]; then
+        echo -e "${LH_COLOR_WARNING}⚠️  MODERATE RISK:${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}   • Configured to allow access from ANY IP address${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}   • GUI will be accessible from the entire internet${LH_COLOR_RESET}"
+        echo ""
+    fi
+    
+    echo -e "${LH_COLOR_INFO}ℹ️  To proceed safely:${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}   • Only use this in SECURE, TRUSTED environments${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}   • Ensure you trust all network users who can access the GUI${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}   • Monitor system activity during the session${LH_COLOR_RESET}"
+    if [ "$has_firewall_flag" = false ] && [ "$firewall_active" = "true" ]; then
+        echo -e "${LH_COLOR_INFO}   • Consider restarting with -f flag for firewall protection${LH_COLOR_RESET}"
+    fi
+    echo ""
+    
+    if ! lh_confirm_action "Do you want to continue with network access and elevated privileges?"; then
+        lh_log_msg "INFO" "User cancelled GUI launch due to security concerns" >&2
+        echo -e "${LH_COLOR_INFO}GUI launch cancelled for security reasons.${LH_COLOR_RESET}"
+        exit 0
+    fi
+    lh_log_msg "INFO" "User confirmed network access with elevated privileges after security briefing" >&2
+    echo ""
+}
+
+# Function to detect current local network ranges
+_detect_local_networks() {
+    local networks=()
+    
+    # Get all network interfaces with their IP addresses and subnet masks
+    if command -v ip >/dev/null 2>&1; then
+        # Use 'ip' command (modern Linux)
+        while IFS= read -r line; do
+            if [[ $line =~ inet[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+) ]]; then
+                local cidr="${BASH_REMATCH[1]}"
+                # Skip localhost
+                if [[ ! $cidr =~ ^127\. ]]; then
+                    networks+=("$cidr")
+                fi
+            fi
+        done < <(ip addr show 2>/dev/null)
+    elif command -v ifconfig >/dev/null 2>&1; then
+        # Fallback to ifconfig (older systems)
+        while IFS= read -r line; do
+            if [[ $line =~ inet[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)[[:space:]]+netmask[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+) ]]; then
+                local ip="${BASH_REMATCH[1]}"
+                local netmask="${BASH_REMATCH[2]}"
+                # Skip localhost
+                if [[ ! $ip =~ ^127\. ]]; then
+                    # Convert netmask to CIDR
+                    local cidr_bits
+                    case "$netmask" in
+                        "255.255.255.0") cidr_bits="24" ;;
+                        "255.255.0.0") cidr_bits="16" ;;
+                        "255.0.0.0") cidr_bits="8" ;;
+                        "255.255.255.128") cidr_bits="25" ;;
+                        "255.255.255.192") cidr_bits="26" ;;
+                        "255.255.255.224") cidr_bits="27" ;;
+                        "255.255.255.240") cidr_bits="28" ;;
+                        "255.255.255.248") cidr_bits="29" ;;
+                        "255.255.255.252") cidr_bits="30" ;;
+                        *) cidr_bits="24" ;; # Default fallback
+                    esac
+                    networks+=("$ip/$cidr_bits")
+                fi
+            fi
+        done < <(ifconfig 2>/dev/null)
+    fi
+    
+    printf '%s\n' "${networks[@]}"
+}
+
+# Function to calculate network address from IP/CIDR
+_get_network_address() {
+    local cidr="$1"
+    local ip="${cidr%/*}"
+    local prefix="${cidr#*/}"
+    
+    # Convert IP to integer
+    IFS='.' read -r i1 i2 i3 i4 <<< "$ip"
+    local ip_int=$((i1 * 256**3 + i2 * 256**2 + i3 * 256 + i4))
+    
+    # Create subnet mask
+    local mask_int=$(( (0xFFFFFFFF << (32 - prefix)) & 0xFFFFFFFF ))
+
+    # Calculate network address
+    local net_int=$((ip_int & mask_int))
+    
+    # Convert back to dotted decimal
+    local n1=$((net_int >> 24))
+    local n2=$(((net_int >> 16) & 255))
+    local n3=$(((net_int >> 8) & 255))
+    local n4=$((net_int & 255))
+    
+    echo "$n1.$n2.$n3.$n4/$prefix"
+}
+
+# Function to get firewall IP restriction configuration
+_get_firewall_restriction() {
+    local restriction="${CFG_LH_GUI_FIREWALL_RESTRICTION:-}"
+    
+    lh_log_msg "DEBUG" "Checking firewall restriction configuration: '$restriction'" >&2
+    
+    # If configured, use the setting and inform user
+    if [ -n "$restriction" ]; then
+        lh_log_msg "INFO" "Using configured firewall restriction: $restriction (from config/general.conf)" >&2
+        echo -e "${LH_COLOR_INFO}ℹ️  Using firewall restriction: $restriction (from config/general.conf)${LH_COLOR_RESET}" >&2
+        
+        # Handle special case: "local" should detect actual networks
+        if [ "$restriction" = "local" ]; then
+            # Detect current local networks
+            local detected_networks=()
+            while IFS= read -r network; do
+                if [ -n "$network" ]; then
+                    detected_networks+=("$(_get_network_address "$network")")
+                fi
+            done < <(_detect_local_networks)
+            
+            # Remove duplicates
+            local unique_networks=($(printf '%s\n' "${detected_networks[@]}" | sort -u))
+            
+            if [ ${#unique_networks[@]} -gt 0 ]; then
+                lh_log_msg "DEBUG" "Detected local networks for 'local' setting: ${unique_networks[*]}" >&2
+                # Return the networks as a comma-separated list
+                local IFS=','
+                echo "detected:${unique_networks[*]}"
+                return 0
+            else
+                lh_log_msg "WARN" "No local networks detected for 'local' setting, prompting user" >&2
+                # Fall through to user prompt
+            fi
+        else
+            echo "$restriction"
+            return 0
+        fi
+    fi
+    
+    # Detect current local networks
+    local detected_networks=()
+    while IFS= read -r network; do
+        if [ -n "$network" ]; then
+            detected_networks+=("$(_get_network_address "$network")")
+        fi
+    done < <(_detect_local_networks)
+    
+    # Remove duplicates
+    local unique_networks=($(printf '%s\n' "${detected_networks[@]}" | sort -u))
+    
+    lh_log_msg "DEBUG" "Detected local networks: ${unique_networks[*]}" >&2
+    
+    # If not configured, prompt user
+    lh_log_msg "DEBUG" "No firewall restriction configured, prompting user" >&2
+    echo -e "${LH_COLOR_WARNING}🔐 Firewall IP Restriction Configuration${LH_COLOR_RESET}" >&2
+    echo "The firewall port will be opened for GUI access. Choose the IP restriction level:" >&2
+    echo "" >&2
+    echo "1) All IPs (0.0.0.0/0) - Allow access from anywhere on the internet" >&2
+    echo "   ${LH_COLOR_WARNING}⚠️  WARNING: This exposes your GUI to the entire internet!${LH_COLOR_RESET}" >&2
+    echo "" >&2
+    
+    if [ ${#unique_networks[@]} -gt 0 ]; then
+        echo "2) Current local network(s) only - Detected networks:" >&2
+        for network in "${unique_networks[@]}"; do
+            echo "   ${LH_COLOR_INFO}   • $network${LH_COLOR_RESET}" >&2
+        done
+        echo "   ${LH_COLOR_SUCCESS}✅ Recommended - secure and convenient${LH_COLOR_RESET}" >&2
+    else
+        echo "2) Local networks - Unable to detect current networks" >&2
+        echo "   ${LH_COLOR_WARNING}⚠️  Network detection failed${LH_COLOR_RESET}" >&2
+    fi
+    echo "" >&2
+    echo "3) Specific IP address - e.g., 192.168.1.100" >&2
+    echo "   ${LH_COLOR_SUCCESS}✅ Most secure - only one specific machine${LH_COLOR_RESET}" >&2
+    echo "" >&2
+    echo "4) Custom CIDR range - e.g., 192.168.1.0/24" >&2
+    echo "   ${LH_COLOR_INFO}ℹ️  For specific network segments${LH_COLOR_RESET}" >&2
+    echo "" >&2
+    
+    local choice
+    choice=$(lh_ask_for_input "Select option (1-4): " "^[1-4]$" "Invalid choice. Please select 1-4.")
+    lh_log_msg "DEBUG" "User selected firewall option: $choice" >&2
+    
+    case $choice in
+        1)
+            lh_log_msg "INFO" "User selected: Allow all IPs" >&2
+            echo "all"
+            return 0
+            ;;
+        2)
+            if [ ${#unique_networks[@]} -gt 0 ]; then
+                lh_log_msg "INFO" "User selected: Current local networks: ${unique_networks[*]}" >&2
+                # Return the networks as a comma-separated list
+                local IFS=','
+                echo "detected:${unique_networks[*]}"
+                return 0
+            else
+                echo -e "${LH_COLOR_ERROR}No local networks detected. Please choose another option.${LH_COLOR_RESET}" >&2
+                # Recursively call to try again
+                _get_firewall_restriction
+                return $?
+            fi
+            ;;
+        3)
+            local ip
+            ip=$(lh_ask_for_input "Enter specific IP address (e.g., 192.168.1.100): " "^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$" "Invalid IP address format. Please enter a valid IP address.")
+            lh_log_msg "INFO" "User specified IP: $ip" >&2
+            echo "$ip"
+            return 0
+            ;;
+        4)
+            local cidr
+            cidr=$(lh_ask_for_input "Enter CIDR range (e.g., 192.168.1.0/24): " "^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$" "Invalid CIDR format. Please enter a valid CIDR range.")
+            lh_log_msg "INFO" "User specified CIDR: $cidr" >&2
+            echo "$cidr"
+            return 0
+            ;;
+    esac
+}
 
 # Initialize module-specific variables
 GUI_DIR="$LH_ROOT_DIR/gui"
@@ -220,6 +557,13 @@ if [ "$BUILD_FLAG" = true ] || [ ! -f "$GUI_DIR/little-linux-helper-gui" ]; then
     lh_log_msg "DEBUG" "Build process completed successfully"
 fi
 
+# Check for security warning - network mode with elevated privileges
+lh_log_msg "DEBUG" "Checking if security warning needed: EUID=$EUID, network mode in args=${GUI_ARGS[*]}"
+if [[ " ${GUI_ARGS[*]} " =~ " -network " ]] && [ "$EUID" -eq 0 ]; then
+    lh_log_msg "DEBUG" "Security warning required: network mode with root privileges"
+    _show_sudo_network_warning
+fi
+
 # Start the GUI
 lh_log_msg "INFO" "$(lh_msg 'GUI_LAUNCHER_STARTING')"
 echo -e "${LH_COLOR_HEADER}🚀 $(lh_msg 'GUI_LAUNCHER_STARTING')${LH_COLOR_RESET}"
@@ -246,10 +590,44 @@ cd "$GUI_DIR"
 _open_firewall_port() {
     local port="$1"
     local proto="tcp"
+    local ip_restriction="$2"
     
-    lh_log_msg "DEBUG" "Entering _open_firewall_port with port='$port', proto='$proto'"
+    lh_log_msg "DEBUG" "Entering _open_firewall_port with port='$port', proto='$proto', ip_restriction='$ip_restriction'"
+    
+    # Verify IP restriction is provided
+    if [ -z "$ip_restriction" ]; then
+        lh_log_msg "ERROR" "No IP restriction provided to _open_firewall_port"
+        return 1
+    fi
+    
     lh_log_msg "INFO" "$(lh_msg 'GUI_LAUNCHER_FW_OPENING' "$port" "$proto")"
     echo -e "${LH_COLOR_INFO}🔐 $(lh_msg 'GUI_LAUNCHER_FW_OPENING' "$port" "$proto")${LH_COLOR_RESET}"
+    
+    # Convert restriction to firewall rules
+    local source_spec=""
+    local local_networks=()
+    
+    case "$ip_restriction" in
+        "all")
+            source_spec=""  # No restriction
+            lh_log_msg "INFO" "Opening port for all IP addresses (0.0.0.0/0)"
+            echo -e "${LH_COLOR_WARNING}⚠️  Port will be accessible from any IP address${LH_COLOR_RESET}"
+            ;;
+        detected:*)
+            # Parse detected networks
+            IFS=',' read -ra local_networks <<< "${ip_restriction#detected:}"
+            lh_log_msg "INFO" "Opening port for detected local networks: ${local_networks[*]}"
+            echo -e "${LH_COLOR_INFO}ℹ️  Port will be accessible from detected local networks:${LH_COLOR_RESET}"
+            for network in "${local_networks[@]}"; do
+                echo -e "${LH_COLOR_INFO}   • $network${LH_COLOR_RESET}"
+            done
+            ;;
+        *)
+            source_spec="$ip_restriction"
+            lh_log_msg "INFO" "Opening port for specific IP/range: $ip_restriction"
+            echo -e "${LH_COLOR_SUCCESS}✅ Port will be accessible from: $ip_restriction${LH_COLOR_RESET}"
+            ;;
+    esac
 
     # firewalld
     lh_log_msg "DEBUG" "Checking for firewalld availability"
@@ -257,8 +635,31 @@ _open_firewall_port() {
         lh_log_msg "DEBUG" "firewalld detected, checking state"
         if $LH_SUDO_CMD firewall-cmd --state 2>/dev/null | grep -q running; then
             lh_log_msg "DEBUG" "firewalld is running, attempting to add port rule"
-            if $LH_SUDO_CMD firewall-cmd --permanent --add-port=${port}/${proto}; then
-                lh_log_msg "DEBUG" "Port rule added, reloading firewalld"
+            
+            # Handle IP restrictions for firewalld
+            local firewalld_success=false
+            if [[ "$ip_restriction" = detected:* ]]; then
+                # Add rules for detected local networks
+                for range in "${local_networks[@]}"; do
+                    if $LH_SUDO_CMD firewall-cmd --permanent --add-rich-rule="rule family=ipv4 source address=$range port port=$port protocol=$proto accept"; then
+                        lh_log_msg "DEBUG" "Added firewalld rule for detected network: $range"
+                        firewalld_success=true
+                    fi
+                done
+            elif [ "$ip_restriction" = "all" ]; then
+                # Standard port opening (no IP restriction)
+                if $LH_SUDO_CMD firewall-cmd --permanent --add-port=${port}/${proto}; then
+                    firewalld_success=true
+                fi
+            else
+                # Specific IP or CIDR
+                if $LH_SUDO_CMD firewall-cmd --permanent --add-rich-rule="rule family=ipv4 source address=$source_spec port port=$port protocol=$proto accept"; then
+                    firewalld_success=true
+                fi
+            fi
+            
+            if [ "$firewalld_success" = true ]; then
+                lh_log_msg "DEBUG" "Port rules added, reloading firewalld"
                 $LH_SUDO_CMD firewall-cmd --reload || true
                 lh_log_msg "INFO" "$(lh_msg 'GUI_LAUNCHER_FW_FIREWALLD_SUCCESS' "$port" "$proto")"
                 echo -e "${LH_COLOR_SUCCESS}✅ $(lh_msg 'GUI_LAUNCHER_FW_FIREWALLD_SUCCESS' "$port" "$proto")${LH_COLOR_RESET}"
@@ -280,7 +681,30 @@ _open_firewall_port() {
     lh_log_msg "DEBUG" "Checking for ufw availability"
     if command -v ufw >/dev/null 2>&1; then
         lh_log_msg "DEBUG" "ufw detected, attempting to add allow rule"
-        if $LH_SUDO_CMD ufw allow ${port}/${proto}; then
+        
+        # Handle IP restrictions for UFW
+        local ufw_success=false
+        if [[ "$ip_restriction" = detected:* ]]; then
+            # Add rules for detected local networks
+            for range in "${local_networks[@]}"; do
+                if $LH_SUDO_CMD ufw allow from "$range" to any port "$port" proto "$proto"; then
+                    lh_log_msg "DEBUG" "Added UFW rule for detected network: $range"
+                    ufw_success=true
+                fi
+            done
+        elif [ "$ip_restriction" = "all" ]; then
+            # Standard port opening (no IP restriction)
+            if $LH_SUDO_CMD ufw allow ${port}/${proto}; then
+                ufw_success=true
+            fi
+        else
+            # Specific IP or CIDR
+            if $LH_SUDO_CMD ufw allow from "$source_spec" to any port "$port" proto "$proto"; then
+                ufw_success=true
+            fi
+        fi
+        
+        if [ "$ufw_success" = true ]; then
             lh_log_msg "INFO" "$(lh_msg 'GUI_LAUNCHER_FW_UFW_SUCCESS' "$port" "$proto")"
             echo -e "${LH_COLOR_SUCCESS}✅ $(lh_msg 'GUI_LAUNCHER_FW_UFW_SUCCESS' "$port" "$proto")${LH_COLOR_RESET}"
             lh_log_msg "DEBUG" "Exiting _open_firewall_port with success (ufw)"
@@ -296,15 +720,46 @@ _open_firewall_port() {
     # iptables (non-persistent)
     lh_log_msg "DEBUG" "Checking for iptables availability"
     if command -v iptables >/dev/null 2>&1; then
-        lh_log_msg "DEBUG" "iptables detected, checking if rule already exists"
-        if $LH_SUDO_CMD iptables -C INPUT -p ${proto} --dport ${port} -j ACCEPT 2>/dev/null; then
-            lh_log_msg "INFO" "$(lh_msg 'GUI_LAUNCHER_FW_IPTABLES_EXISTS' "$port" "$proto")"
-            echo -e "${LH_COLOR_SUCCESS}✅ $(lh_msg 'GUI_LAUNCHER_FW_IPTABLES_EXISTS' "$port" "$proto")${LH_COLOR_RESET}"
-            lh_log_msg "DEBUG" "Exiting _open_firewall_port with success (iptables rule exists)"
-            return 0
+        lh_log_msg "DEBUG" "iptables detected, attempting to add rules with IP restrictions"
+        
+        # Handle IP restrictions for iptables
+        local iptables_success=false
+        if [[ "$ip_restriction" = detected:* ]]; then
+            # Add rules for detected local networks
+            for range in "${local_networks[@]}"; do
+                # Check if rule already exists for this range
+                if ! $LH_SUDO_CMD iptables -C INPUT -p ${proto} -s "$range" --dport ${port} -j ACCEPT 2>/dev/null; then
+                    if $LH_SUDO_CMD iptables -A INPUT -p ${proto} -s "$range" --dport ${port} -j ACCEPT; then
+                        lh_log_msg "DEBUG" "Added iptables rule for detected network: $range"
+                        iptables_success=true
+                    fi
+                else
+                    lh_log_msg "DEBUG" "iptables rule already exists for network: $range"
+                    iptables_success=true
+                fi
+            done
+        elif [ "$ip_restriction" = "all" ]; then
+            # Standard port opening (no IP restriction)
+            if $LH_SUDO_CMD iptables -C INPUT -p ${proto} --dport ${port} -j ACCEPT 2>/dev/null; then
+                lh_log_msg "INFO" "$(lh_msg 'GUI_LAUNCHER_FW_IPTABLES_EXISTS' "$port" "$proto")"
+                echo -e "${LH_COLOR_SUCCESS}✅ $(lh_msg 'GUI_LAUNCHER_FW_IPTABLES_EXISTS' "$port" "$proto")${LH_COLOR_RESET}"
+                iptables_success=true
+            elif $LH_SUDO_CMD iptables -A INPUT -p ${proto} --dport ${port} -j ACCEPT; then
+                iptables_success=true
+            fi
+        else
+            # Specific IP or CIDR
+            if ! $LH_SUDO_CMD iptables -C INPUT -p ${proto} -s "$source_spec" --dport ${port} -j ACCEPT 2>/dev/null; then
+                if $LH_SUDO_CMD iptables -A INPUT -p ${proto} -s "$source_spec" --dport ${port} -j ACCEPT; then
+                    iptables_success=true
+                fi
+            else
+                lh_log_msg "DEBUG" "iptables rule already exists for: $source_spec"
+                iptables_success=true
+            fi
         fi
-        lh_log_msg "DEBUG" "iptables rule does not exist, attempting to add"
-        if $LH_SUDO_CMD iptables -A INPUT -p ${proto} --dport ${port} -j ACCEPT; then
+        
+        if [ "$iptables_success" = true ]; then
             lh_log_msg "INFO" "$(lh_msg 'GUI_LAUNCHER_FW_IPTABLES_SUCCESS' "$port" "$proto")"
             echo -e "${LH_COLOR_SUCCESS}✅ $(lh_msg 'GUI_LAUNCHER_FW_IPTABLES_SUCCESS' "$port" "$proto")${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_INFO}ℹ️  $(lh_msg 'GUI_LAUNCHER_FW_IPTABLES_PERSISTENT')${LH_COLOR_RESET}"
@@ -415,26 +870,6 @@ cleanup_firewall() {
     lh_log_msg "DEBUG" "Exiting cleanup_firewall"
 }
 
-# Determine port from CLI or config (default 3000)
-_determine_gui_port() {
-    lh_log_msg "DEBUG" "Entering _determine_gui_port with LAUNCH_PORT='$LAUNCH_PORT'"
-    local port
-    if [ -n "$LAUNCH_PORT" ]; then
-        port="$LAUNCH_PORT"
-    else
-        # Read from config if available
-        if [ -f "$LH_ROOT_DIR/config/general.conf" ]; then
-            # shellcheck source=/dev/null
-            source "$LH_ROOT_DIR/config/general.conf"
-            if [ -n "${CFG_LH_GUI_PORT:-}" ]; then
-                port="$CFG_LH_GUI_PORT"
-            fi
-        fi
-        port="${port:-3000}"
-    fi
-    lh_log_msg "DEBUG" "Exiting _determine_gui_port with port='$port'"
-    echo "$port"
-}
 
 # If requested and in network mode, open the firewall for the chosen port
 OPENED_PORT=""
@@ -442,7 +877,12 @@ lh_log_msg "DEBUG" "Checking firewall requirements: network mode in args=${GUI_A
 if [[ " ${GUI_ARGS[*]} " =~ " -network " ]] && [ "$OPEN_FIREWALL_FLAG" = true ]; then
     PORT_TO_OPEN=$(_determine_gui_port)
     lh_log_msg "DEBUG" "Attempting to open firewall for port: $PORT_TO_OPEN"
-    if _open_firewall_port "$PORT_TO_OPEN"; then
+    
+    # Get IP restriction once to avoid multiple calls
+    IP_RESTRICTION=$(_get_firewall_restriction)
+    lh_log_msg "DEBUG" "Retrieved IP restriction: $IP_RESTRICTION"
+    
+    if _open_firewall_port "$PORT_TO_OPEN" "$IP_RESTRICTION"; then
         OPENED_PORT="$PORT_TO_OPEN"
         lh_log_msg "DEBUG" "Firewall opened successfully, cleanup trap set for port: $OPENED_PORT"
         # Set up cleanup trap
