@@ -12,3 +12,5 @@ gui/little-linux-helper-gui
 CLAUDE.md
 # VS Code personal settings
 .vscode/
+# Backup configuration files
+config/backup.conf.gui_*
