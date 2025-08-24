@@ -2219,7 +2219,14 @@ delete_btrfs_backups() {
     
     # List available subvolumes
     echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_AVAILABLE_SUBVOLUMES')${LH_COLOR_RESET}"
-    local subvols=($(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | grep -E '^(@|@home)$'))
+    readarray -t configured_subvols < <(get_backup_subvolumes)
+    local subvols=()
+    # Filter to only include subvolumes that actually have backups
+    for subvol in "${configured_subvols[@]}"; do
+        if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" ]; then
+            subvols+=("$subvol")
+        fi
+    done
     
     if [ ${#subvols[@]} -eq 0 ]; then
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_SNAPSHOT_DELETE_NONE_FOUND')${LH_COLOR_RESET}"
@@ -3472,7 +3479,14 @@ cleanup_problematic_backups() {
     fi
     
     # Check available subvolumes
-    local subvols=($(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | grep -E '^(@|@home)$'))
+    readarray -t configured_subvols < <(get_backup_subvolumes)
+    local subvols=()
+    # Filter to only include subvolumes that actually have backups
+    for subvol in "${configured_subvols[@]}"; do
+        if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" ]; then
+            subvols+=("$subvol")
+        fi
+    done
     
     if [ ${#subvols[@]} -eq 0 ]; then
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_NO_BACKUPS_FOUND' "$LH_BACKUP_ROOT$LH_BACKUP_DIR")${LH_COLOR_RESET}"
