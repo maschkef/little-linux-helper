@@ -126,9 +126,6 @@ src/i18n/locales/
     "activeModule": "Active Module:",
     "selectedModule": "Selected Module:",
     "selectedDifferent": "Selected",
-    "showingDocsFor": "Showing docs for:",
-    "fromActiveSession": "from active session",
-    "fromSelectedModule": "from selected module",
     "selectModule": "Select a module from the sidebar to get started",
     "newSession": "+ New Session", 
     "selectModuleFirst": "Please select a module first",
@@ -140,6 +137,10 @@ src/i18n/locales/
     "startedAt": "Started at {{time}}",
     "closeTooltip": "Close session"
   },
+  "dev": {
+    "toggle": "Dev Mode",
+    "toggleTooltip": "Show/hide developer documentation controls"
+  },
   "panels": {
     "hideModules": "Hide Modules",
     "showModules": "Show Modules",
@@ -147,13 +148,13 @@ src/i18n/locales/
     "showTerminal": "Show Terminal",
     "hideHelp": "Hide Help",
     "showHelp": "Show Help",
-    "hideDeveloperDocs": "Hide Developer Docs",
-    "showDeveloperDocs": "Developer Docs",
+    "hideDeveloperDocs": "Hide Module Docs",
+    "showDeveloperDocs": "📖 Module Docs",
     "hideConfig": "Hide Config",
     "showConfig": "Show Config",
-    "comprehensiveDocumentation": "Comprehensive Documentation",
-    "developerDocsTooltip": "Show/hide developer documentation for the active module",
-    "comprehensiveDocsTooltip": "Browse all project documentation and developer guides"
+    "comprehensiveDocumentation": "📚 All Documentation",
+    "developerDocsTooltip": "View technical documentation and developer guides for the currently selected or active module",
+    "comprehensiveDocsTooltip": "Open a full browser with all project documentation, including developer guides, library references, and module documentation"
   },
   "modules": {
     "availableModules": "Available Modules",

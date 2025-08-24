@@ -126,13 +126,15 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 **6. User Interface Features:**
 
 *   **Multi-Panel Layout:**
+    *   **Header Layout:** Three-section design with dev controls (left), app title/logo (center), and language selector (right)
+    *   **Developer Controls:** 🔧 Dev Mode toggle in top-left for showing/hiding advanced documentation features
     *   Resizable panels for optimal screen space utilization
     *   Sidebar module navigation with individual "Start" buttons (hideable for reading mode)
     *   Session dropdown for switching between multiple active sessions
     *   Main terminal area with real-time output display (hideable for documentation focus)
     *   Integrated help panel with user-friendly, context-sensitive guidance (only visible when terminal panels are shown)
-    *   Advanced documentation system with both module-bound and independent browser modes
-    *   **Optimized Panel Toggle Controls:** Documentation buttons positioned on the left for better accessibility, layout controls on the right
+    *   Advanced documentation system with both module-bound and independent browser modes (hidden by default)
+    *   **Grouped Control Layout:** Documentation controls grouped together when dev mode is enabled, separated from layout controls
     *   **Smart Help Button Display:** Help button only appears when terminal panels are visible, reducing UI clutter in documentation-only mode
     *   **Full-Screen Reading Mode:** Hide all panels except documentation for maximum reading space
     *   **Language Selection:** Integrated language selector with flag emojis for immediate language switching
@@ -157,17 +159,19 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   **Smart Documentation Tracking:** Documentation panel intelligently follows user's last action (module selection vs. session switching)
 
 *   **Advanced Documentation System:**
-    *   **Module-Bound Developer Docs:** Context-sensitive documentation tied to active modules with intelligent source tracking
-    *   **Comprehensive Documentation Browser:** Browse all project documentation regardless of current module selection
+    *   **📖 Module Docs:** Context-sensitive documentation tied to the currently selected or active module with intelligent source tracking
+    *   **📚 All Documentation:** Browse all project documentation regardless of current module selection
+    *   **Developer Controls Toggle:** 🔧 Dev Mode checkbox in top-left header to show/hide documentation controls (hidden by default)
     *   **Smart Documentation Logic:** Prioritizes user's last interaction - respects manual module selection over automatic session switching
-    *   **Visual Source Indicators:** Clear feedback showing whether docs are from "selected module" or "active session"
+    *   **Visual Status Indicators:** Colored dot on Module Docs button shows documentation source (green for active session, blue for selected module)
+    *   **Persistent Settings:** Dev mode preference saved in browser localStorage for consistency across sessions
+    *   **Auto-cleanup:** Documentation panels automatically close when dev mode is disabled
     *   **Categorized Navigation:** Documents organized by logical groups (System Admin, Backup, Docker, etc.)
     *   **Collapsible Categories:** Expandable/collapsible document groups for better organization
     *   **Hideable Sidebar:** Document browser navigation can be hidden to maximize reading space
     *   **Scrollable Interface:** Long document lists scroll smoothly within navigation panel
-    *   **Dual View Toggle:** Switch between module-bound and browser modes with intuitive button labels
+    *   **Clean User Experience:** Debug information removed from interface for cleaner presentation
     *   **Full Documentation Coverage:** Access to all project documentation from single interface
-    *   **Improved Button Labels:** "Developer Docs" for module-specific docs, "📚 Comprehensive Documentation" for full project browser
 
 *   **Internationalization (i18n) Features:**
     *   **Multi-Language Support:** English and German translations with framework for additional languages

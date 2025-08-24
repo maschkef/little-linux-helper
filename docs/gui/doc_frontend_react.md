@@ -68,6 +68,11 @@ const [showDocsPanel, setShowDocsPanel] = useState(false);    // Documentation p
 const [docBrowserMode, setDocBrowserMode] = useState(false);  // Document browser vs module docs
 const [showSidebar, setShowSidebar] = useState(true);         // Module sidebar visibility
 const [showTerminalPanels, setShowTerminalPanels] = useState(true); // Terminal area visibility
+const [showDevControls, setShowDevControls] = useState(() => {       // Developer controls visibility
+  const saved = localStorage.getItem('lh-gui-dev-controls');
+  return saved === 'true'; // Default: false (hidden)
+});
+const [lastDocumentationSource, setLastDocumentationSource] = useState('module'); // Tracks doc source
 ```
 
 **Key Functions:**
@@ -102,6 +107,18 @@ const fetchModuleDocs = async (moduleId) => {
   } catch (error) {
     console.error('Failed to fetch module docs:', error);
     setModuleDocs(t('docs.errorLoading'));
+  }
+};
+
+// Toggle developer controls with persistence and auto-cleanup
+const toggleDevControls = (newValue) => {
+  setShowDevControls(newValue);
+  localStorage.setItem('lh-gui-dev-controls', newValue.toString());
+  
+  // Auto-close documentation panels when disabling dev mode
+  if (!newValue) {
+    setShowDocsPanel(false);
+    setDocBrowserMode(false);
   }
 };
 
@@ -140,12 +157,29 @@ function AppContent() {
   return (
     <ErrorBoundary>
       <div className="app">
-        {/* Header with title, logo, and language selector */}
+        {/* Header with three-section layout */}
         <header className="header">
           <div className="header-content">
-            <LanguageSelector />
-            <h1>{t('app.title')}</h1>
-            <img src="/header-logo.svg" className="header-logo" />
+            {/* Left: Developer controls toggle */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+              <div className="dev-controls-toggle">
+                <input type="checkbox" id="dev-controls-toggle" 
+                       checked={showDevControls} 
+                       onChange={(e) => toggleDevControls(e.target.checked)} />
+                <label htmlFor="dev-controls-toggle">🔧 {t('dev.toggle')}</label>
+              </div>
+            </div>
+            
+            {/* Center: App title and logo */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <h1>{t('app.title')}</h1>
+              <img src="/header-logo.svg" className="header-logo" />
+            </div>
+            
+            {/* Right: Language selector */}
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+              <LanguageSelector />
+            </div>
           </div>
         </header>
         
@@ -158,9 +192,9 @@ function AppContent() {
           )}
           
           <div className="content-area">
-            {/* Session controls with toggles */}
+            {/* Session controls with grouped toggles */}
             <div className="session-controls">
-              {/* Module info, session dropdown, new session button */}
+              {/* Session dropdown, new session button, panel toggles */}
               {/* Panel visibility toggles */}
             </div>
             
