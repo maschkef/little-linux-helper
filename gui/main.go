@@ -165,8 +165,17 @@ func init() {
 			lhRootDir = wd
 		}
 	} else {
-		// Assume GUI is in gui/ subdirectory of the main project (for production builds)
-		lhRootDir = filepath.Dir(filepath.Dir(executable))
+		// For production builds, check if we're in a release package or development environment
+		executableDir := filepath.Dir(executable)
+		
+		// If there's a modules/ directory in the same directory as the executable,
+		// we're in a release package - use the executable's directory as root
+		if _, err := os.Stat(filepath.Join(executableDir, "modules")); err == nil {
+			lhRootDir = executableDir
+		} else {
+			// Otherwise, assume GUI is in gui/ subdirectory (development build)
+			lhRootDir = filepath.Dir(executableDir)
+		}
 	}
 
 	// Set environment variable for the scripts
