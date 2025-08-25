@@ -121,7 +121,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
         *   **Pre-Build Validation:** Ensures all required tools (Go, Node.js, npm) are available before building
         *   Builds React application with production optimizations
         *   Compiles Go binary with embedded frontend assets
-        *   Results in single executable `little-linux-helper-gui`
+        *   Results in single executable `gui/little-linux-helper-gui`
 
 **6. User Interface Features:**
 
@@ -282,15 +282,15 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   `./gui_launcher.sh -b -n` - Build and run with network access
     *   `./gui_launcher.sh -h` - Show comprehensive help information
 
-    **Direct Binary Execution:**
-    *   `./little-linux-helper-gui` - Start with default settings (localhost:3000)
-    *   `./little-linux-helper-gui -p 8080` - Use custom port (short form)
-    *   `./little-linux-helper-gui --port 8080` - Use custom port (long form)
-    *   `./little-linux-helper-gui -n` - Enable network access (short form)
-    *   `./little-linux-helper-gui --network` - Enable network access (long form)
-    *   `./little-linux-helper-gui -n -p 80` - Network access on port 80
-    *   `./little-linux-helper-gui -h` - Show usage information (short form)
-    *   `./little-linux-helper-gui --help` - Show usage information (long form)
+    **Direct Binary Execution (Advanced Users):**
+    *   `./gui/little-linux-helper-gui` - Start with default settings (localhost:3000)
+    *   `./gui/little-linux-helper-gui -p 8080` - Use custom port (short form)
+    *   `./gui/little-linux-helper-gui --port 8080` - Use custom port (long form)
+    *   `./gui/little-linux-helper-gui -n` - Enable network access (short form)
+    *   `./gui/little-linux-helper-gui --network` - Enable network access (long form)
+    *   `./gui/little-linux-helper-gui -n -p 80` - Network access on port 80
+    *   `./gui/little-linux-helper-gui -h` - Show usage information (short form)
+    *   `./gui/little-linux-helper-gui --help` - Show usage information (long form)
 
     **CLI GUI Mode Testing:**
     *   `./help_master.sh` - Normal CLI mode with "Any Key" prompts

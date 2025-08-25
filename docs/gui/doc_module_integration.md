@@ -252,7 +252,9 @@ EOF
 **5. Test New Category:**
 ```bash
 # Restart GUI to discover new modules
-./little-linux-helper-gui
+./gui_launcher.sh
+# OR (direct binary):
+./gui/little-linux-helper-gui
 
 # Verify in browser:
 # - New category appears in sidebar

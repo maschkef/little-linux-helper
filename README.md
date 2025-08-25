@@ -106,13 +106,13 @@ CFG_LH_GUI_PORT="3000"        # Set default port
 CFG_LH_GUI_HOST="localhost"   # Set binding (localhost/0.0.0.0)
 CFG_LH_GUI_FIREWALL_RESTRICTION="local"  # IP restrictions for firewall opening
 
-# Direct binary execution:
-./little-linux-helper-gui -p 8080             # Custom port (short form)
-./little-linux-helper-gui --port 8080         # Custom port (long form)
-./little-linux-helper-gui -n                  # Enable network access (-n shorthand)
-./little-linux-helper-gui --network -p 80     # Network access on port 80
-./little-linux-helper-gui -h                  # Show usage information (short form)
-./little-linux-helper-gui --help              # Show usage information (long form)
+# Direct binary execution (advanced users):
+./gui/little-linux-helper-gui -p 8080         # Custom port (short form)
+./gui/little-linux-helper-gui --port 8080     # Custom port (long form)
+./gui/little-linux-helper-gui -n              # Enable network access (-n shorthand)
+./gui/little-linux-helper-gui --network -p 80 # Network access on port 80
+./gui/little-linux-helper-gui -h              # Show usage information (short form)
+./gui/little-linux-helper-gui --help          # Show usage information (long form)
 ```
 
 The GUI maintains full compatibility with all CLI functionality while providing an enhanced user experience with powerful multi-session capabilities and **full internationalization support (English/German)** with dynamic language switching.
@@ -378,13 +378,28 @@ curl -L https://raw.githubusercontent.com/maschkef/little-linux-helper/main/inst
    ```bash
    tar -xzf little-linux-helper-gui-<arch>.tar.gz
    cd little-linux-helper-gui-<arch>
-   ./little-linux-helper-gui
+   ./gui_launcher.sh
    ```
 
 **System Requirements (Pre-built):**
 - Any Linux distribution
 - No Node.js, npm, or Go required!
 - Ready to run out of the box
+
+#### 📋 **GUI Launcher vs Direct Binary**
+
+**Recommended: Use `./gui_launcher.sh`**
+- ✅ **Full feature set**: Build management, advanced firewall configuration, security warnings
+- ✅ **Library integration**: Colors, i18n, logging, configuration management  
+- ✅ **Interactive firewall setup**: Automatic network detection, IP restrictions
+- ✅ **Security features**: Comprehensive warnings for network + elevated privileges
+- ✅ **Build automation**: Automatic dependency checking and GUI building when needed
+
+**Advanced: Direct `./gui/little-linux-helper-gui`**
+- ⚠️  **Basic functionality only**: Simple server startup with minimal features
+- ⚠️  **No build management**: Manual building required if needed
+- ⚠️  **No firewall integration**: Manual firewall configuration required
+- ✅ **Lightweight**: Faster startup for development/testing
 
 #### Why Pre-built Releases?
 

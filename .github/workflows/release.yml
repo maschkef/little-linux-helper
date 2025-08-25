@@ -97,13 +97,14 @@ jobs:
           # Create package directory
           mkdir -p "little-linux-helper-gui-$arch"
           
-          # Copy binary
-          cp "$binary" "little-linux-helper-gui-$arch/little-linux-helper-gui"
-          chmod +x "little-linux-helper-gui-$arch/little-linux-helper-gui"
+          # Copy binary to gui/ folder (matching local development structure)
+          mkdir -p "little-linux-helper-gui-$arch/gui"
+          cp "$binary" "little-linux-helper-gui-$arch/gui/little-linux-helper-gui"
+          chmod +x "little-linux-helper-gui-$arch/gui/little-linux-helper-gui"
           
-          # Copy built frontend (preserve build folder structure)
-          mkdir -p "little-linux-helper-gui-$arch/web"
-          cp -r ../gui/web/build "little-linux-helper-gui-$arch/web/"
+          # Copy built frontend (preserve build folder structure in gui/web/)
+          mkdir -p "little-linux-helper-gui-$arch/gui/web"
+          cp -r ../gui/web/build "little-linux-helper-gui-$arch/gui/web/"
           
           # Copy complete CLI system and dependencies
           cp -r ../lib "little-linux-helper-gui-$arch/"
@@ -112,7 +113,20 @@ jobs:
           cp -r ../config "little-linux-helper-gui-$arch/"
           cp -r ../docs "little-linux-helper-gui-$arch/"
           cp -r ../scripts "little-linux-helper-gui-$arch/"
-          cp -r ../gui "little-linux-helper-gui-$arch/"
+          
+          # Copy gui/ development files (Go source, configs, etc.) - excluding build artifacts
+          find ../gui -type f -name "*.go" -exec cp --parents {} "little-linux-helper-gui-$arch/" \;
+          find ../gui -type f -name "go.*" -exec cp --parents {} "little-linux-helper-gui-$arch/" \;
+          find ../gui -type f -name "*.sh" -exec cp --parents {} "little-linux-helper-gui-$arch/" \;
+          find ../gui -type f -name "README.md" -exec cp --parents {} "little-linux-helper-gui-$arch/" \;
+          
+          # Copy gui/web source files (but not node_modules or build)
+          mkdir -p "little-linux-helper-gui-$arch/gui/web"
+          cp ../gui/web/package*.json "little-linux-helper-gui-$arch/gui/web/" 2>/dev/null || true
+          cp ../gui/web/vite.config.js "little-linux-helper-gui-$arch/gui/web/" 2>/dev/null || true
+          cp ../gui/web/index.html "little-linux-helper-gui-$arch/gui/web/" 2>/dev/null || true
+          [ -d ../gui/web/src ] && cp -r ../gui/web/src "little-linux-helper-gui-$arch/gui/web/" || true
+          [ -d ../gui/web/public ] && cp -r ../gui/web/public "little-linux-helper-gui-$arch/gui/web/" || true
           
           # Copy root shell scripts
           cp ../help_master.sh "little-linux-helper-gui-$arch/"
@@ -186,8 +200,15 @@ jobs:
           ### How to use:
           1. Download the package for your architecture
           2. Extract: `tar -xzf little-linux-helper-gui-<arch>.tar.gz`
-          3. Run: `cd little-linux-helper-gui-<arch> && ./little-linux-helper-gui`
+          3. Run: `cd little-linux-helper-gui-<arch> && ./gui_launcher.sh`
           4. Open browser: http://localhost:3000
+          
+          ### Advanced usage:
+          - **Recommended**: `./gui_launcher.sh` (full feature set with build management, firewall, security)
+          - **Network access**: `./gui_launcher.sh -n` (accessible from other machines)
+          - **Firewall management**: `./gui_launcher.sh -n -f` (automatically configure firewall)
+          - **Custom port**: `./gui_launcher.sh -p 8080` (run on different port)
+          - **Direct binary**: `./gui/little-linux-helper-gui` (minimal, for advanced users)
           
           ### System Requirements:
           - Any Linux distribution

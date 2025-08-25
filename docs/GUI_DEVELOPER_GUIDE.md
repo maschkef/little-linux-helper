@@ -270,7 +270,12 @@ func handleApiEndpoint(c *fiber.Ctx) error {
 ./build.sh
 
 # Single executable created:
-./little-linux-helper-gui
+./gui/little-linux-helper-gui
+
+# Launch options:
+./gui_launcher.sh                    # Recommended: Full feature set
+./gui_launcher.sh -n -f              # Network access with firewall
+./gui/little-linux-helper-gui        # Direct binary (development)
 ```
 
 ### Testing Checklist
