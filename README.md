@@ -358,7 +358,47 @@ The script attempts to automatically detect the package manager in use (pacman, 
 <details>
 <summary>🚀 Installation & Setup</summary>
 
-### CLI Installation:
+### 📦 **Pre-built Releases (Recommended)**
+
+**Starting with v0.4.0, pre-built GUI releases are available** that eliminate the need for Node.js/npm on user systems:
+
+#### Quick Install:
+```bash
+# Download and run the automatic installer
+curl -L https://raw.githubusercontent.com/maschkef/little-linux-helper/main/install-prebuilt.sh | sudo bash
+```
+
+#### Manual Download:
+1. Go to [GitHub Releases](https://github.com/maschkef/little-linux-helper/releases)
+2. Download the package for your architecture:
+   - **AMD64** - Most modern 64-bit systems (Intel/AMD processors)
+   - **ARM64** - Raspberry Pi 4, modern ARM servers
+   - **ARMv7** - Raspberry Pi 2/3, older ARM devices
+3. Extract and run:
+   ```bash
+   tar -xzf little-linux-helper-gui-<arch>.tar.gz
+   cd little-linux-helper-gui-<arch>
+   ./start-gui.sh
+   ```
+
+**System Requirements (Pre-built):**
+- Any Linux distribution
+- No Node.js, npm, or Go required!
+- Ready to run out of the box
+
+#### Why Pre-built Releases?
+
+**The switch to automated pre-built releases was made to solve compatibility issues:**
+- **Problem**: Previous versions required users to build the GUI on their systems using `npm install` and `npm run build`
+- **Issue**: Modern build tools (like Vite 7.x) require newer Node.js versions than available in stable Linux distributions
+- **Solution**: GitHub Actions now build the GUI with the latest tools and provide ready-to-run packages
+- **Benefit**: Maximum Linux distribution compatibility without compromising on modern development tools
+
+---
+
+### 🛠️ **Build from Source (Advanced Users)**
+
+#### CLI Installation:
 1. Clone the repository or download the scripts.
 2. Make sure the main script `help_master.sh` is executable:
     ```bash
@@ -369,8 +409,16 @@ The script attempts to automatically detect the package manager in use (pacman, 
     ./help_master.sh
     ```
 
-### GUI Installation (optional):
-1. Ensure Go (1.18+) and Node.js (16+) are installed on your system.
+#### GUI Self-Build (Development/Advanced):
+**Note**: The GUI components are built automatically in pre-built releases. Self-building is only needed for development or customization.
+
+**Requirements:**
+* **Go** (1.18 or later) for backend server compilation
+* **Node.js** (18 or later) and **npm** for frontend development and building
+* **Web browser** for accessing the GUI interface
+
+**Build Process:**
+1. Ensure Go (1.18+) and Node.js (18+) are installed on your system.
 2. Make the GUI launcher executable:
     ```bash
     chmod +x gui_launcher.sh
@@ -392,6 +440,18 @@ cd gui/
 ./setup.sh    # One-time setup
 ./dev.sh      # Start development servers
 ```
+
+#### Which Version Should You Choose?
+
+| Use Case | Recommended Version | Why |
+|----------|-------------------|-----|
+| **General Usage** | Pre-built Release (latest) | Ready to run, no dependencies, maximum compatibility |
+| **Stable Production** | Wait for v1.0.0 | Currently all releases are pre-releases/beta |
+| **Development** | Build from Source | Access to latest changes, development tools |
+| **Customization** | Build from Source | Modify GUI, custom builds |
+| **Older Systems** | Pre-built Release | No need for modern Node.js/Go on target system |
+
+**Important**: The **CLI functionality is completely independent** and works on any system with Bash. The GUI is an optional enhancement that builds on top of the CLI system.
 
 </details>
 

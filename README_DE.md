@@ -325,10 +325,12 @@ CFG_LH_LANG="fr"      # Französisch (praktisch unbrauchbar, nur interne Meldung
 * Einige Funktionen erfordern möglicherweise Root-Rechte und werden ggf. `sudo` verwenden.
 
 ### GUI-Anforderungen (optional):
-* **Go** (1.18 oder neuer) für Backend-Server-Kompilierung
-* **Node.js** (16 oder neuer) und **npm** für Frontend-Entwicklung und -Erstellung
-* **Webbrowser** für den Zugriff auf die GUI-Oberfläche
-* Zusätzliche System-Abhängigkeiten: `github.com/gofiber/fiber/v2`, `github.com/gofiber/websocket/v2`, `github.com/creack/pty` (automatisch installiert)
+* **Vorkompilierte Releases**: Keine zusätzlichen Anforderungen - sofort einsatzbereit!
+* **Aus Quellcode erstellen**: 
+  * **Go** (1.18 oder neuer) für Backend-Server-Kompilierung
+  * **Node.js** (18 oder neuer) und **npm** für Frontend-Entwicklung und -Erstellung
+  * **Webbrowser** für den Zugriff auf die GUI-Oberfläche
+  * Zusätzliche System-Abhängigkeiten: `github.com/gofiber/fiber/v2`, `github.com/gofiber/websocket/v2`, `github.com/creack/pty` (automatisch installiert)
 
 ### Optionale Abhängigkeiten:
 Für spezifische Funktionen werden zusätzliche Pakete benötigt, die das Skript bei Bedarf zu installieren versucht:
@@ -358,7 +360,47 @@ Das Skript versucht, den verwendeten Paketmanager (pacman, yay, apt, dnf) automa
 <details>
 <summary>🚀 Installation & Setup</summary>
 
-### CLI-Installation:
+### 📦 **Vorkompilierte Releases (Empfohlen)**
+
+**Ab v0.4.0 sind vorkompilierte GUI-Releases verfügbar**, die die Notwendigkeit von Node.js/npm auf Benutzersystemen eliminieren:
+
+#### Schnell-Installation:
+```bash
+# Laden und Ausführen des automatischen Installers
+curl -L https://raw.githubusercontent.com/maschkef/little-linux-helper/main/install-prebuilt.sh | sudo bash
+```
+
+#### Manueller Download:
+1. Gehe zu [GitHub Releases](https://github.com/maschkef/little-linux-helper/releases)
+2. Lade das Paket für deine Architektur herunter:
+   - **AMD64** - Die meisten modernen 64-Bit-Systeme (Intel/AMD-Prozessoren)
+   - **ARM64** - Raspberry Pi 4, moderne ARM-Server
+   - **ARMv7** - Raspberry Pi 2/3, ältere ARM-Geräte
+3. Extrahiere und führe aus:
+   ```bash
+   tar -xzf little-linux-helper-gui-<arch>.tar.gz
+   cd little-linux-helper-gui-<arch>
+   ./start-gui.sh
+   ```
+
+**Systemanforderungen (Vorkompiliert):**
+- Jede Linux-Distribution
+- Kein Node.js, npm oder Go erforderlich!
+- Sofort einsatzbereit
+
+#### Warum vorkompilierte Releases?
+
+**Der Wechsel zu automatisierten vorkompilierten Releases wurde durchgeführt, um Kompatibilitätsprobleme zu lösen:**
+- **Problem**: Frühere Versionen erforderten, dass Nutzer die GUI auf ihren Systemen mit `npm install` und `npm run build` erstellen
+- **Problem**: Moderne Build-Tools (wie Vite 7.x) erfordern neuere Node.js-Versionen als in stabilen Linux-Distributionen verfügbar
+- **Lösung**: GitHub Actions erstellen jetzt die GUI mit den neuesten Tools und stellen gebrauchsfertige Pakete bereit
+- **Vorteil**: Maximale Linux-Distributions-Kompatibilität ohne Kompromisse bei modernen Entwicklungstools
+
+---
+
+### 🛠️ **Aus Quellcode erstellen (Fortgeschrittene Nutzer)**
+
+#### CLI-Installation:
 1. Klone das Repository oder lade die Skripte herunter.
 2. Stelle sicher, dass das Hauptskript `help_master.sh` ausführbar ist:
     ```bash
@@ -369,8 +411,16 @@ Das Skript versucht, den verwendeten Paketmanager (pacman, yay, apt, dnf) automa
     ./help_master.sh
     ```
 
-### GUI-Installation (optional):
-1. Stelle sicher, dass Go (1.18+) und Node.js (16+) auf deinem System installiert sind.
+#### GUI Selbst-Erstellen (Entwicklung/Erweitert):
+**Hinweis**: Die GUI-Komponenten werden automatisch in vorkompilierten Releases erstellt. Das Selbst-Erstellen ist nur für Entwicklung oder Anpassungen erforderlich.
+
+**Anforderungen:**
+* **Go** (1.18 oder neuer) für Backend-Server-Kompilierung
+* **Node.js** (18 oder neuer) und **npm** für Frontend-Entwicklung und -Erstellung
+* **Webbrowser** für den Zugriff auf die GUI-Oberfläche
+
+**Build-Prozess:**
+1. Stelle sicher, dass Go (1.18+) und Node.js (18+) auf deinem System installiert sind.
 2. Mache den GUI-Launcher ausführbar:
     ```bash
     chmod +x gui_launcher.sh
@@ -392,6 +442,18 @@ cd gui/
 ./setup.sh    # Einmalige Einrichtung
 ./dev.sh      # Entwicklungsserver starten
 ```
+
+#### Welche Version solltest du wählen?
+
+| Anwendungsfall | Empfohlene Version | Warum |
+|----------------|-------------------|-------|
+| **Allgemeine Nutzung** | Vorkompiliertes Release (neueste) | Sofort einsatzbereit, keine Abhängigkeiten, maximale Kompatibilität |
+| **Stabile Produktion** | Warte auf v1.0.0 | Aktuell sind alle Releases Pre-releases/Beta |
+| **Entwicklung** | Aus Quellcode erstellen | Zugriff auf neueste Änderungen, Entwicklungstools |
+| **Anpassung** | Aus Quellcode erstellen | GUI modifizieren, benutzerdefinierte Builds |
+| **Ältere Systeme** | Vorkompiliertes Release | Kein modernes Node.js/Go auf Zielsystem erforderlich |
+
+**Wichtig**: Die **CLI-Funktionalität ist völlig unabhängig** und funktioniert auf jedem System mit Bash. Die GUI ist eine optionale Erweiterung, die auf dem CLI-System aufbaut.
 
 </details>
 

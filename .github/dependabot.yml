@@ -46,15 +46,12 @@ updates:
           - "patch"
     # Selectively ignore major updates only for packages known to have frequent breaking changes
     ignore:
-      # Testing libraries often have breaking API changes
+      # Testing libraries often have breaking API changes - keep stable for development workflow
       - dependency-name: "@testing-library/react"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@testing-library/user-event"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@testing-library/jest-dom"
-        update-types: ["version-update:semver-major"]
-      # Keep react-scripts stable as it's the core build toolchain
-      - dependency-name: "react-scripts"
         update-types: ["version-update:semver-major"]
 
   # GitHub Actions workflows

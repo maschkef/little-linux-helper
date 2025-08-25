@@ -1,0 +1,215 @@
+# GitHub Action for building and releasing Little Linux Helper
+# Triggers on new tags and creates pre-built releases for maximum Linux compatibility
+# This eliminates the need for end-users to have Node.js/npm installed
+
+name: Build and Release
+
+# Trigger: Runs when you create a new tag (e.g., git tag v1.0.0 && git push origin v1.0.0)
+on:
+  push:
+    tags:
+      - 'v*'  # Matches tags like v1.0.0, v2.1.3, etc.
+
+# Define what the workflow can do (needed for uploading release assets)
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build GUI and Create Release
+    runs-on: ubuntu-latest  # Use Ubuntu for maximum Linux compatibility
+    
+    steps:
+    # Step 1: Download your code
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    # Step 2: Install Node.js (latest LTS for build process)
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'  # We can use latest Node.js for building
+        cache: 'npm'
+        cache-dependency-path: gui/web/package-lock.json
+        
+    # Step 3: Install Go (latest stable)  
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'  # Latest Go for optimal builds
+        cache-dependency-path: gui/go.sum
+        
+    # Step 4: Build the React frontend
+    - name: Install and build React frontend
+      working-directory: ./gui/web
+      run: |
+        echo "📦 Installing React dependencies..."
+        npm ci  # ci is faster and more reliable than install
+        echo "🔨 Building React app for production..."
+        npm run build
+        echo "✅ Frontend build completed"
+        
+    # Step 5: Build Go backend for multiple Linux architectures
+    - name: Build Go backend for Linux architectures
+      working-directory: ./gui
+      run: |
+        echo "🔨 Building Go backend for Linux architectures..."
+        
+        # Create output directory
+        mkdir -p ../releases
+        
+        # Build for AMD64 (most common - 64-bit Intel/AMD)
+        echo "Building for Linux AMD64..."
+        GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ../releases/little-linux-helper-gui-linux-amd64 main.go
+        
+        # Build for ARM64 (Raspberry Pi 4, modern ARM servers)
+        echo "Building for Linux ARM64..."
+        GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ../releases/little-linux-helper-gui-linux-arm64 main.go
+        
+        # Build for ARM v7 (Raspberry Pi 2/3, older ARM devices)
+        echo "Building for Linux ARMv7..."
+        GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="-s -w" -o ../releases/little-linux-helper-gui-linux-armv7 main.go
+        
+        # Build for 386 (very old 32-bit systems - optional, uncomment if needed)
+        # echo "Building for Linux i386..."
+        # GOOS=linux GOARCH=386 go build -ldflags="-s -w" -o ../releases/little-linux-helper-gui-linux-i386 main.go
+        
+        echo "✅ Backend builds completed"
+        
+    # Step 6: Create release packages
+    - name: Package releases
+      run: |
+        echo "📦 Creating release packages..."
+        cd releases
+        
+        # For each binary, create a complete package with frontend
+        for binary in little-linux-helper-gui-linux-*; do
+          echo "Packaging $binary..."
+          
+          # Extract architecture from filename
+          arch=$(echo $binary | sed 's/little-linux-helper-gui-linux-//')
+          
+          # Create package directory
+          mkdir -p "little-linux-helper-gui-$arch"
+          
+          # Copy binary
+          cp "$binary" "little-linux-helper-gui-$arch/little-linux-helper-gui"
+          chmod +x "little-linux-helper-gui-$arch/little-linux-helper-gui"
+          
+          # Copy built frontend
+          cp -r ../gui/web/build "little-linux-helper-gui-$arch/web"
+          
+          # Copy essential files
+          cp ../README.md "little-linux-helper-gui-$arch/"
+          cp ../LICENSE "little-linux-helper-gui-$arch/"
+          
+          # Create simple run script
+          cat > "little-linux-helper-gui-$arch/start-gui.sh" << 'EOF'
+          #!/bin/bash
+          # Simple starter script for Little Linux Helper GUI
+          echo "Starting Little Linux Helper GUI..."
+          echo "GUI will be available at: http://localhost:3000"
+          echo "Press Ctrl+C to stop"
+          ./little-linux-helper-gui
+          EOF
+          chmod +x "little-linux-helper-gui-$arch/start-gui.sh"
+          
+          # Create tar.gz package
+          tar -czf "little-linux-helper-gui-$arch.tar.gz" "little-linux-helper-gui-$arch"
+          
+          echo "✅ Created little-linux-helper-gui-$arch.tar.gz"
+        done
+        
+        echo "📋 Release packages created:"
+        ls -lh *.tar.gz
+        
+    # Step 7: Extract version from tag
+    - name: Get version from tag
+      id: version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+        
+        # Detect if this is a pre-release based on version string
+        if [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          # Stable version pattern (e.g., v1.0.0)
+          echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          echo "release_type=stable" >> $GITHUB_OUTPUT
+        else
+          # Pre-release pattern (e.g., v1.0.0-beta, v1.0.0-rc1, v1.0.0-alpha)
+          echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          echo "release_type=pre-release" >> $GITHUB_OUTPUT
+        fi
+        
+    # Step 8: Create GitHub Release
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Little Linux Helper ${{ steps.version.outputs.version }} (${{ steps.version.outputs.release_type }})
+        body: |
+          ## Little Linux Helper GUI ${{ steps.version.outputs.version }}
+          
+          **${{ steps.version.outputs.release_type == 'pre-release' && '🚧 Pre-release version' || '✅ Stable release' }} - Pre-built for maximum Linux compatibility!**
+          
+          ${{ steps.version.outputs.release_type == 'pre-release' && '⚠️ **Note**: This is a pre-release version and may contain bugs or incomplete features.' || '' }}
+          
+          ### What's included:
+          - ✅ **No Node.js/npm required** - everything is pre-built
+          - ✅ **Ready to run** - just download, extract, and start
+          - ✅ **Multiple architectures** supported
+          
+          ### Available packages:
+          - **AMD64** - For most modern 64-bit systems (Intel/AMD processors)
+          - **ARM64** - For Raspberry Pi 4, modern ARM servers  
+          - **ARMv7** - For Raspberry Pi 2/3, older ARM devices
+          
+          ### How to use:
+          1. Download the package for your architecture
+          2. Extract: `tar -xzf little-linux-helper-gui-<arch>.tar.gz`
+          3. Run: `cd little-linux-helper-gui-<arch> && ./start-gui.sh`
+          4. Open browser: http://localhost:3000
+          
+          ### System Requirements:
+          - Any Linux distribution
+          - No additional dependencies required!
+          
+          ---
+          *Built automatically with GitHub Actions*
+        draft: false
+        prerelease: ${{ steps.version.outputs.is_prerelease }}
+        
+    # Step 9: Upload release assets
+    - name: Upload AMD64 Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./releases/little-linux-helper-gui-amd64.tar.gz
+        asset_name: little-linux-helper-gui-amd64.tar.gz
+        asset_content_type: application/gzip
+        
+    - name: Upload ARM64 Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./releases/little-linux-helper-gui-arm64.tar.gz
+        asset_name: little-linux-helper-gui-arm64.tar.gz
+        asset_content_type: application/gzip
+        
+    - name: Upload ARMv7 Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./releases/little-linux-helper-gui-armv7.tar.gz
+        asset_name: little-linux-helper-gui-armv7.tar.gz
+        asset_content_type: application/gzip
