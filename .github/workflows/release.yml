@@ -131,12 +131,10 @@ jobs:
           # Copy root shell scripts
           cp ../help_master.sh "little-linux-helper-gui-$arch/"
           cp ../gui_launcher.sh "little-linux-helper-gui-$arch/"
-          cp ../install-prebuilt.sh "little-linux-helper-gui-$arch/"
           
           # Make shell scripts executable
           chmod +x "little-linux-helper-gui-$arch/help_master.sh"
           chmod +x "little-linux-helper-gui-$arch/gui_launcher.sh"
-          chmod +x "little-linux-helper-gui-$arch/install-prebuilt.sh"
           
           # Copy essential files
           cp ../README.md "little-linux-helper-gui-$arch/"
