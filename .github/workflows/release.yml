@@ -102,9 +102,9 @@ jobs:
           cp "$binary" "little-linux-helper-gui-$arch/gui/little-linux-helper-gui"
           chmod +x "little-linux-helper-gui-$arch/gui/little-linux-helper-gui"
           
-          # Copy built frontend (preserve build folder structure in gui/web/)
-          mkdir -p "little-linux-helper-gui-$arch/gui/web"
-          cp -r ../gui/web/build "little-linux-helper-gui-$arch/gui/web/"
+          # Copy built frontend to web/build (relative to project root, not gui/)
+          mkdir -p "little-linux-helper-gui-$arch/web"
+          cp -r ../gui/web/build "little-linux-helper-gui-$arch/web/"
           
           # Copy complete CLI system and dependencies
           cp -r ../lib "little-linux-helper-gui-$arch/"
