@@ -61,12 +61,12 @@ check_root() {
     fi
 }
 
-# Function to get latest release info
+# Function to get latest release info (including pre-releases)
 get_latest_release() {
-    local api_url="https://api.github.com/repos/$GITHUB_USER/$GITHUB_REPO/releases/latest"
+    local api_url="https://api.github.com/repos/$GITHUB_USER/$GITHUB_REPO/releases"
     local release_info
     
-    echo -e "${BLUE}🔍 Checking for latest release...${NC}"
+    echo -e "${BLUE}🔍 Checking for latest release (including pre-releases)...${NC}"
     
     if command -v curl >/dev/null 2>&1; then
         release_info=$(curl -s "$api_url")
@@ -77,9 +77,17 @@ get_latest_release() {
         exit 1
     fi
     
-    # Extract tag name and download URL
-    local tag_name=$(echo "$release_info" | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
-    local download_url=$(echo "$release_info" | grep -o '"browser_download_url": "[^"]*little-linux-helper-gui-'$1'.tar.gz"' | cut -d'"' -f4)
+    # Check if API request was successful
+    if echo "$release_info" | grep -q '"message": "Not Found"'; then
+        echo -e "${RED}❌ No releases found for this repository.${NC}" >&2
+        echo -e "${YELLOW}💡 Please check manually: https://github.com/$GITHUB_USER/$GITHUB_REPO/releases${NC}" >&2
+        echo -e "${YELLOW}💡 Make sure you have published at least one release.${NC}" >&2
+        exit 1
+    fi
+    
+    # Extract tag name and download URL from the first (most recent) release
+    local tag_name=$(echo "$release_info" | grep -m1 '"tag_name"' | cut -d'"' -f4)
+    local download_url=$(echo "$release_info" | grep -m1 '"browser_download_url".*little-linux-helper-gui-'$1'\.tar\.gz"' | cut -d'"' -f4)
     
     if [ -z "$tag_name" ] || [ -z "$download_url" ]; then
         echo -e "${RED}❌ Could not find release information for architecture: $1${NC}" >&2
