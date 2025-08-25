@@ -36,7 +36,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.21'  # Latest Go for optimal builds
+        go-version: '1.23'  # Latest Go for optimal builds
         cache-dependency-path: gui/go.sum
         
     # Step 4: Build the React frontend
