@@ -102,7 +102,8 @@ jobs:
           chmod +x "little-linux-helper-gui-$arch/little-linux-helper-gui"
           
           # Copy built frontend (preserve build folder structure)
-          cp -r ../gui/web/build "little-linux-helper-gui-$arch/web"
+          mkdir -p "little-linux-helper-gui-$arch/web"
+          cp -r ../gui/web/build "little-linux-helper-gui-$arch/web/"
           
           # Copy complete CLI system and dependencies
           cp -r ../lib "little-linux-helper-gui-$arch/"
@@ -111,6 +112,7 @@ jobs:
           cp -r ../config "little-linux-helper-gui-$arch/"
           cp -r ../docs "little-linux-helper-gui-$arch/"
           cp -r ../scripts "little-linux-helper-gui-$arch/"
+          cp -r ../gui "little-linux-helper-gui-$arch/"
           
           # Copy root shell scripts
           cp ../help_master.sh "little-linux-helper-gui-$arch/"
