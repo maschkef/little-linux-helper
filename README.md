@@ -378,7 +378,7 @@ curl -L https://raw.githubusercontent.com/maschkef/little-linux-helper/main/inst
    ```bash
    tar -xzf little-linux-helper-gui-<arch>.tar.gz
    cd little-linux-helper-gui-<arch>
-   ./start-gui.sh
+   ./little-linux-helper-gui
    ```
 
 **System Requirements (Pre-built):**

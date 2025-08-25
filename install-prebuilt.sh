@@ -136,7 +136,6 @@ download_and_install() {
     
     # Make binary executable
     chmod +x "$INSTALL_DIR/little-linux-helper-gui"
-    chmod +x "$INSTALL_DIR/start-gui.sh"
     
     # Clean up
     cd /
@@ -190,7 +189,7 @@ create_desktop_entry() {
 [Desktop Entry]
 Name=Little Linux Helper GUI
 Comment=System maintenance and management tool
-Exec=$INSTALL_DIR/start-gui.sh
+Exec=$INSTALL_DIR/little-linux-helper-gui
 Icon=utilities-system-monitor
 Terminal=false
 Type=Application
@@ -221,7 +220,7 @@ main() {
     echo -e "${GREEN}🎉 Installation completed successfully!${NC}"
     echo
     echo -e "${BLUE}How to use:${NC}"
-    echo -e "  • Manual start: ${YELLOW}cd $INSTALL_DIR && ./start-gui.sh${NC}"
+    echo -e "  • Manual start: ${YELLOW}cd $INSTALL_DIR && ./little-linux-helper-gui${NC}"
     echo -e "  • Open in browser: ${YELLOW}http://localhost:3000${NC}"
     echo
     echo -e "${BLUE}Files installed to: ${YELLOW}$INSTALL_DIR${NC}"

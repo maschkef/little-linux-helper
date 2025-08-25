@@ -108,16 +108,6 @@ jobs:
           cp ../README.md "little-linux-helper-gui-$arch/"
           cp ../LICENSE "little-linux-helper-gui-$arch/"
           
-          # Create simple run script
-          cat > "little-linux-helper-gui-$arch/start-gui.sh" << 'EOF'
-          #!/bin/bash
-          # Simple starter script for Little Linux Helper GUI
-          echo "Starting Little Linux Helper GUI..."
-          echo "GUI will be available at: http://localhost:3000"
-          echo "Press Ctrl+C to stop"
-          ./little-linux-helper-gui
-          EOF
-          chmod +x "little-linux-helper-gui-$arch/start-gui.sh"
           
           # Create tar.gz package
           tar -czf "little-linux-helper-gui-$arch.tar.gz" "little-linux-helper-gui-$arch"
@@ -176,7 +166,7 @@ jobs:
           ### How to use:
           1. Download the package for your architecture
           2. Extract: `tar -xzf little-linux-helper-gui-<arch>.tar.gz`
-          3. Run: `cd little-linux-helper-gui-<arch> && ./start-gui.sh`
+          3. Run: `cd little-linux-helper-gui-<arch> && ./little-linux-helper-gui`
           4. Open browser: http://localhost:3000
           
           ### System Requirements:
