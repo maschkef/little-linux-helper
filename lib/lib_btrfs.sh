@@ -1516,6 +1516,158 @@ validate_btrfs_implementation() {
 }
 
 # =============================================================================
+# SUBVOLUME DETECTION AND MANAGEMENT
+# =============================================================================
+
+#
+# detect_btrfs_subvolumes()
+#
+# Automatically detects BTRFS subvolumes from system configuration files and active mounts.
+# This function is used by both backup and restore operations.
+#
+# MECHANISM:
+# - Scans /etc/fstab for BTRFS entries with subvol= options
+# - Parses /proc/mounts for active BTRFS subvolumes
+# - Filters for @-prefixed subvolumes commonly used for system organization
+# - Removes duplicates and returns unique subvolume names
+#
+# RETURNS:
+# - Array of detected subvolume names (e.g., "@", "@home", "@var")
+#
+# USAGE:
+# readarray -t detected_subvolumes < <(detect_btrfs_subvolumes)
+#
+detect_btrfs_subvolumes() {
+    lh_log_msg "DEBUG" "Starting automatic BTRFS subvolume detection" >&2
+    local detected_subvolumes=()
+    declare -A seen_subvols
+    
+    # Parse /etc/fstab for subvol= entries
+    if [[ -r "/etc/fstab" ]]; then
+        lh_log_msg "DEBUG" "Scanning /etc/fstab for BTRFS subvolume entries" >&2
+        while IFS= read -r line; do
+            # Skip comments and empty lines
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line// }" ]] && continue
+            
+            # Look for BTRFS entries with subvol= option
+            if [[ "$line" =~ btrfs ]] && [[ "$line" =~ subvol= ]]; then
+                local subvol_name
+                subvol_name=$(echo "$line" | sed -n 's/.*subvol=\([^,[:space:]]*\).*/\1/p')
+                if [[ -n "$subvol_name" && "$subvol_name" =~ ^/@ ]]; then
+                    # Remove the leading / to get just the subvolume name
+                    subvol_name="${subvol_name#/}"
+                    lh_log_msg "DEBUG" "Found subvolume in /etc/fstab: $subvol_name" >&2
+                    detected_subvolumes+=("$subvol_name")
+                    seen_subvols["$subvol_name"]=1
+                fi
+            fi
+        done < "/etc/fstab"
+    fi
+    
+    # Parse /proc/mounts for active BTRFS subvolumes
+    if [[ -r "/proc/mounts" ]]; then
+        lh_log_msg "DEBUG" "Scanning /proc/mounts for active BTRFS subvolumes" >&2
+        while IFS= read -r line; do
+            # Look for BTRFS entries with subvol= option
+            if [[ "$line" =~ btrfs ]] && [[ "$line" =~ subvol= ]]; then
+                local subvol_name
+                subvol_name=$(echo "$line" | sed -n 's/.*subvol=\([^,[:space:]]*\).*/\1/p')
+                if [[ -n "$subvol_name" && "$subvol_name" =~ ^/@ ]]; then
+                    # Remove the leading / to get just the subvolume name
+                    subvol_name="${subvol_name#/}"
+                    if [[ -z "${seen_subvols[$subvol_name]}" ]]; then
+                        lh_log_msg "DEBUG" "Found active subvolume in /proc/mounts: $subvol_name" >&2
+                        detected_subvolumes+=("$subvol_name")
+                        seen_subvols["$subvol_name"]=1
+                    fi
+                fi
+            fi
+        done < "/proc/mounts"
+    fi
+    
+    # Sort and remove duplicates
+    if [[ ${#detected_subvolumes[@]} -gt 0 ]]; then
+        IFS=$'\n' detected_subvolumes=($(sort -u <<<"${detected_subvolumes[*]}"))
+        unset IFS
+        lh_log_msg "INFO" "Auto-detected subvolumes: ${detected_subvolumes[*]}" >&2
+        printf '%s\n' "${detected_subvolumes[@]}"
+    else
+        lh_log_msg "WARN" "No BTRFS subvolumes auto-detected" >&2
+    fi
+}
+
+#
+# get_btrfs_subvolumes()
+#
+# Determines the final list of BTRFS subvolumes by combining configured and auto-detected subvolumes.
+# This unified function replaces the separate get_backup_subvolumes() and get_restore_subvolumes() functions.
+#
+# MECHANISM:
+# - Parses manually configured subvolumes from LH_BACKUP_SUBVOLUMES variable
+# - If LH_AUTO_DETECT_SUBVOLUMES is enabled, calls detect_btrfs_subvolumes() and merges results
+# - Removes duplicates and sorts the final list alphabetically
+# - Falls back to default "@" and "@home" if no subvolumes are configured or detected
+#
+# PARAMETERS:
+# $1 (optional) - operation_type: "backup" or "restore" (used for logging context)
+#
+# RETURNS:
+# - Sorted array of unique subvolume names to process
+#
+# USAGE:
+# readarray -t subvolumes < <(get_btrfs_subvolumes "backup")
+# readarray -t subvolumes < <(get_btrfs_subvolumes "restore")
+#
+get_btrfs_subvolumes() {
+    local operation_type="${1:-general}"
+    lh_log_msg "DEBUG" "Determining final list of subvolumes for $operation_type operations" >&2
+    local configured_subvolumes=()
+    local final_subvolumes=()
+    declare -A seen_subvols
+    
+    # Parse configured subvolumes from LH_BACKUP_SUBVOLUMES
+    if [[ -n "$LH_BACKUP_SUBVOLUMES" ]]; then
+        lh_log_msg "DEBUG" "Configured subvolumes: $LH_BACKUP_SUBVOLUMES" >&2
+        read -ra configured_subvolumes <<<"$LH_BACKUP_SUBVOLUMES"
+        for subvol in "${configured_subvolumes[@]}"; do
+            if [[ -n "$subvol" ]]; then
+                final_subvolumes+=("$subvol")
+                seen_subvols["$subvol"]=1
+            fi
+        done
+    fi
+    
+    # Add auto-detected subvolumes if enabled
+    if [[ "$LH_AUTO_DETECT_SUBVOLUMES" == "true" ]]; then
+        lh_log_msg "DEBUG" "Auto-detection enabled, detecting additional subvolumes" >&2
+        local detected_subvolumes
+        readarray -t detected_subvolumes < <(detect_btrfs_subvolumes)
+        
+        for subvol in "${detected_subvolumes[@]}"; do
+            if [[ -n "$subvol" && -z "${seen_subvols[$subvol]}" ]]; then
+                lh_log_msg "DEBUG" "Adding auto-detected subvolume: $subvol" >&2
+                final_subvolumes+=("$subvol")
+                seen_subvols["$subvol"]=1
+            fi
+        done
+    fi
+    
+    # Sort the final list
+    if [[ ${#final_subvolumes[@]} -gt 0 ]]; then
+        IFS=$'\n' final_subvolumes=($(sort <<<"${final_subvolumes[*]}"))
+        unset IFS
+        lh_log_msg "INFO" "Final subvolumes for $operation_type: ${final_subvolumes[*]}" >&2
+        printf '%s\n' "${final_subvolumes[@]}"
+    else
+        # Fallback to default if nothing configured
+        lh_log_msg "WARN" "No subvolumes configured or detected, using default: @ @home" >&2
+        echo "@"
+        echo "@home"
+    fi
+}
+
+# =============================================================================
 # INITIALIZATION AND EXPORT
 # =============================================================================
 
@@ -1530,5 +1682,7 @@ export -f handle_btrfs_error
 export -f verify_received_uuid_integrity
 export -f protect_received_snapshots
 export -f validate_btrfs_implementation
+export -f detect_btrfs_subvolumes
+export -f get_btrfs_subvolumes
 
 lh_log_msg "DEBUG" "lib_btrfs.sh: BTRFS library loaded successfully"

@@ -397,7 +397,78 @@ fi
 **Dependencies (internal):** `lh_log_msg`
 **Dependencies (system):** `btrfs subvolume show`, `find`
 
-**10. Library Validation and Export System**
+**10. Subvolume Detection and Management Functions**
+
+### `detect_btrfs_subvolumes()`
+
+**Purpose:** Automatically detects BTRFS subvolumes from system configuration files and active mounts.
+
+**Detection Sources:**
+- Scans `/etc/fstab` for BTRFS entries with `subvol=` options
+- Parses `/proc/mounts` for active BTRFS subvolumes with `subvol=` options  
+- Filters for @-prefixed subvolumes commonly used for system organization
+- Removes duplicates and returns sorted unique subvolume names
+
+**Parameters:** None
+
+**Returns:** Array of detected subvolume names (e.g., "@", "@home", "@var", "@opt")
+
+**Dependencies:** 
+- Internal: `lh_log_msg` (from lib_common.sh)
+- System: `/etc/fstab`, `/proc/mounts` (read access)
+
+**Usage Example:**
+```bash
+readarray -t detected_subvolumes < <(detect_btrfs_subvolumes)
+echo "Found subvolumes: ${detected_subvolumes[*]}"
+```
+
+**Error Handling:**
+- Returns empty array if no @-prefixed BTRFS subvolumes are found
+- Logs warnings if configuration files are unreadable
+- Continues operation even if some detection sources fail
+
+### `get_btrfs_subvolumes(operation_type)`
+
+**Purpose:** Determines the final list of BTRFS subvolumes by combining configured and auto-detected subvolumes. This unified function consolidates the logic previously duplicated in separate `get_backup_subvolumes()` and `get_restore_subvolumes()` functions.
+
+**Combination Logic:**
+1. Parses manually configured subvolumes from `LH_BACKUP_SUBVOLUMES` variable
+2. If `LH_AUTO_DETECT_SUBVOLUMES="true"`, calls `detect_btrfs_subvolumes()` and merges results
+3. Removes duplicates and sorts the final list alphabetically
+4. Falls back to default "@" and "@home" if no subvolumes are configured or detected
+
+**Parameters:**
+- `$1` (optional): `operation_type` - "backup", "restore", or descriptive context string for logging
+
+**Returns:** Sorted array of unique subvolume names to process
+
+**Configuration Variables Used:**
+- `LH_BACKUP_SUBVOLUMES`: Space-separated list of configured subvolumes
+- `LH_AUTO_DETECT_SUBVOLUMES`: Enable/disable automatic detection ("true"/"false")
+
+**Dependencies:**
+- Internal: `detect_btrfs_subvolumes()`, `lh_log_msg` (from lib_common.sh)
+- Configuration: Global variables for subvolume settings
+
+**Usage Examples:**
+```bash
+# For backup operations
+readarray -t backup_subvolumes < <(get_btrfs_subvolumes "backup")
+
+# For restore operations  
+readarray -t restore_subvolumes < <(get_btrfs_subvolumes "restore")
+
+# Generic usage
+readarray -t subvolumes < <(get_btrfs_subvolumes)
+```
+
+**Fallback Behavior:**
+- Returns "@" and "@home" if no configured or detected subvolumes are available
+- Logs warnings when falling back to default subvolumes
+- Provides consistent behavior across backup and restore operations
+
+**11. Library Validation and Export System**
 
 ### `validate_btrfs_implementation()`
 
@@ -484,9 +555,11 @@ export -f handle_btrfs_error
 export -f verify_received_uuid_integrity
 export -f protect_received_snapshots
 export -f validate_btrfs_implementation
+export -f detect_btrfs_subvolumes
+export -f get_btrfs_subvolumes
 ```
 
-**13. Integration with Main System:**
+**12. Integration with Main System:**
 
 *   **Module Dependencies**: Used exclusively by BTRFS-specific modules (`mod_btrfs_backup.sh`, `mod_btrfs_restore.sh`)
 *   **Library Architecture**: Specialized library separate from the core library system - not loaded by `lib_common.sh`
@@ -496,7 +569,7 @@ export -f validate_btrfs_implementation
 *   **Error Propagation**: Provides detailed error codes for intelligent handling by calling BTRFS modules
 *   **Safety Integration**: Coordinates with main system safety mechanisms through common patterns
 
-**14. Critical Safety Features:**
+**13. Critical Safety Features:**
 
 *   **Pipeline Failure Detection**: `set -o pipefail` ensures pipe operation failures are caught
 *   **Atomic Operations**: True atomic patterns prevent partial states
@@ -505,14 +578,14 @@ export -f validate_btrfs_implementation
 *   **Error Recovery**: Cleanup mechanisms for failed operations
 *   **Chain Integrity**: Preserves backup chain dependencies in all operations
 
-**15. Performance Considerations:**
+**14. Performance Considerations:**
 
 *   **Space Efficiency**: Uses BTRFS-specific space calculation for accuracy
 *   **Chain Optimization**: Intelligent cleanup preserves necessary dependencies
 *   **Error Efficiency**: Quick error pattern recognition for fast failure handling
 *   **Validation Optimization**: Efficient validation checks without excessive overhead
 
-**16. Advanced BTRFS Concepts Handled:**
+**15. Advanced BTRFS Concepts Handled:**
 
 *   **Incremental Backup Chains**: Complete understanding and protection of BTRFS incremental mechanisms
 *   **received_uuid Semantics**: Deep understanding of received snapshot metadata

@@ -127,30 +127,21 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
         *   `detect_target_drives()`: Scans for BTRFS filesystems and uses dynamic subvolume detection
     *   **Dependencies (internal):** Multiple validation functions, `lh_ask_for_input`, `lh_confirm_action`
 
-**6. Dynamic Subvolume Detection:**
+**6. Dynamic Subvolume Detection (Consolidated Functions):**
 
-*   **`detect_btrfs_subvolumes()`**
-    *   **Purpose:** Automatically detects BTRFS subvolumes from system configuration files and active mounts.
-    *   **Mechanism:**
-        *   Scans `/etc/fstab` for BTRFS entries with `subvol=` options to find configured subvolumes
-        *   Parses `/proc/mounts` for active BTRFS subvolumes with `subvol=` options
-        *   Filters for @-prefixed subvolumes commonly used for system organization (e.g., `@`, `@home`, `@var`, `@opt`)
-        *   Removes duplicates and returns unique subvolume names without the leading `/`
-    *   **Returns:** Array of detected subvolume names (e.g., "@", "@home", "@var")
-    *   **Usage:** Called by `get_restore_subvolumes()` when `LH_AUTO_DETECT_SUBVOLUMES` is enabled for restore operations.
-    *   **Dependencies (internal):** `restore_log_msg`
-    *   **Dependencies (system):** `/etc/fstab`, `/proc/mounts`
-
-*   **`get_restore_subvolumes()`**
-    *   **Purpose:** Determines the final list of subvolumes available for restore by combining configured and auto-detected subvolumes.
-    *   **Mechanism:**
-        *   Parses manually configured subvolumes from `LH_BACKUP_SUBVOLUMES` variable
-        *   If `LH_AUTO_DETECT_SUBVOLUMES` is enabled, calls `detect_btrfs_subvolumes()` and merges results
-        *   Removes duplicates and sorts the final list alphabetically
-        *   Falls back to default "@" and "@home" if no subvolumes are configured or detected
+*   **`get_restore_subvolumes()` (Wrapper Function)**
+    *   **Purpose:** Backward-compatible wrapper function that provides subvolume list for restore operations.
+    *   **Mechanism:** Simple wrapper that calls `get_btrfs_subvolumes("restore")` from `lib_btrfs.sh`
     *   **Returns:** Sorted array of unique subvolume names available for restore operations
+    *   **Implementation Note:** The actual logic has been consolidated into `lib_btrfs.sh` for consistency between backup and restore operations. See `lib_btrfs.sh` documentation for detailed implementation.
+    *   **Functions Consolidated to lib_btrfs.sh:**
+        *   `detect_btrfs_subvolumes()`: Moved to shared library to eliminate code duplication
+        *   `get_btrfs_subvolumes()`: Unified function combining configured and auto-detected subvolumes
     *   **Usage:** Called during restore environment setup to determine which subvolumes can be restored.
-    *   **Dependencies (internal):** `detect_btrfs_subvolumes`, `restore_log_msg`
+    *   **Benefits of Consolidation:**
+        *   **Consistency**: Identical logic between backup and restore operations
+        *   **Maintainability**: Single source of truth for subvolume detection
+        *   **Code Deduplication**: Eliminates ~120 lines of duplicate code
 
 **7. Snapshot Validation and Selection:**
 

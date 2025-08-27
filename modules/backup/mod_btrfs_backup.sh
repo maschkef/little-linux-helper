@@ -640,112 +640,11 @@ CURRENT_TEMP_SNAPSHOT=""
 # Global variable for backup start time
 BACKUP_START_TIME=""
 
-# Function to detect BTRFS subvolumes automatically
-detect_btrfs_subvolumes() {
-    backup_log_msg "DEBUG" "Starting automatic BTRFS subvolume detection" >&2
-    local detected_subvolumes=()
-    declare -A seen_subvols
-    
-    # Parse /etc/fstab for subvol= entries
-    if [[ -r "/etc/fstab" ]]; then
-        backup_log_msg "DEBUG" "Scanning /etc/fstab for BTRFS subvolume entries" >&2
-        while IFS= read -r line; do
-            # Skip comments and empty lines
-            [[ "$line" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "${line// }" ]] && continue
-            
-            # Look for BTRFS entries with subvol= option
-            if [[ "$line" =~ btrfs ]] && [[ "$line" =~ subvol= ]]; then
-                local subvol_name
-                subvol_name=$(echo "$line" | sed -n 's/.*subvol=\([^,[:space:]]*\).*/\1/p')
-                if [[ -n "$subvol_name" && "$subvol_name" =~ ^/@ ]]; then
-                    # Remove the leading / to get just the subvolume name
-                    subvol_name="${subvol_name#/}"
-                    backup_log_msg "DEBUG" "Found subvolume in /etc/fstab: $subvol_name" >&2
-                    detected_subvolumes+=("$subvol_name")
-                    seen_subvols["$subvol_name"]=1
-                fi
-            fi
-        done < "/etc/fstab"
-    fi
-    
-    # Parse /proc/mounts for active BTRFS subvolumes
-    if [[ -r "/proc/mounts" ]]; then
-        backup_log_msg "DEBUG" "Scanning /proc/mounts for active BTRFS subvolumes" >&2
-        while IFS= read -r line; do
-            # Look for BTRFS entries with subvol= option
-            if [[ "$line" =~ btrfs ]] && [[ "$line" =~ subvol= ]]; then
-                local subvol_name
-                subvol_name=$(echo "$line" | sed -n 's/.*subvol=\([^[:space:]]*\).*/\1/p')
-                if [[ -n "$subvol_name" && "$subvol_name" =~ ^/@ && -z "${seen_subvols[${subvol_name#/}]}" ]]; then
-                    # Remove the leading / to get just the subvolume name
-                    subvol_name="${subvol_name#/}"
-                    backup_log_msg "DEBUG" "Found active subvolume in /proc/mounts: $subvol_name" >&2
-                    detected_subvolumes+=("$subvol_name")
-                    seen_subvols["$subvol_name"]=1
-                fi
-            fi
-        done < "/proc/mounts"
-    fi
-    
-    # Output detected subvolumes (sorted and deduplicated)
-    if [[ ${#detected_subvolumes[@]} -gt 0 ]]; then
-        # Sort the array
-        IFS=$'\n' detected_subvolumes=($(sort <<<"${detected_subvolumes[*]}"))
-        unset IFS
-        backup_log_msg "INFO" "Auto-detected BTRFS subvolumes: ${detected_subvolumes[*]}" >&2
-        printf '%s\n' "${detected_subvolumes[@]}"
-    else
-        backup_log_msg "DEBUG" "No BTRFS subvolumes auto-detected" >&2
-    fi
-}
 
 # Function to get the final list of subvolumes to backup
+# Wrapper function to maintain backward compatibility
 get_backup_subvolumes() {
-    backup_log_msg "DEBUG" "Determining final list of subvolumes to backup" >&2
-    local configured_subvolumes=()
-    local final_subvolumes=()
-    declare -A seen_subvols
-    
-    # Parse configured subvolumes from LH_BACKUP_SUBVOLUMES
-    if [[ -n "$LH_BACKUP_SUBVOLUMES" ]]; then
-        backup_log_msg "DEBUG" "Configured subvolumes: $LH_BACKUP_SUBVOLUMES" >&2
-        read -ra configured_subvolumes <<< "$LH_BACKUP_SUBVOLUMES"
-        for subvol in "${configured_subvolumes[@]}"; do
-            if [[ -n "$subvol" ]]; then
-                final_subvolumes+=("$subvol")
-                seen_subvols["$subvol"]=1
-            fi
-        done
-    fi
-    
-    # Add auto-detected subvolumes if enabled
-    if [[ "$LH_AUTO_DETECT_SUBVOLUMES" == "true" ]]; then
-        backup_log_msg "DEBUG" "Auto-detection enabled, detecting additional subvolumes" >&2
-        local detected_subvolumes
-        readarray -t detected_subvolumes < <(detect_btrfs_subvolumes)
-        
-        for subvol in "${detected_subvolumes[@]}"; do
-            if [[ -n "$subvol" && -z "${seen_subvols[$subvol]}" ]]; then
-                backup_log_msg "DEBUG" "Adding auto-detected subvolume: $subvol" >&2
-                final_subvolumes+=("$subvol")
-                seen_subvols["$subvol"]=1
-            fi
-        done
-    fi
-    
-    # Sort the final list
-    if [[ ${#final_subvolumes[@]} -gt 0 ]]; then
-        IFS=$'\n' final_subvolumes=($(sort <<<"${final_subvolumes[*]}"))
-        unset IFS
-        backup_log_msg "INFO" "Final subvolumes for backup: ${final_subvolumes[*]}" >&2
-        printf '%s\n' "${final_subvolumes[@]}"
-    else
-        # Fallback to default if nothing configured
-        backup_log_msg "WARN" "No subvolumes configured or detected, using default: @ @home" >&2
-        echo "@"
-        echo "@home"
-    fi
+    get_btrfs_subvolumes "backup"
 }
 
 # Function to validate subvolume exists

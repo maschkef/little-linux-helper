@@ -28,112 +28,11 @@
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_btrfs.sh"
 
-# Function to detect BTRFS subvolumes automatically (duplicate from backup module)
-detect_btrfs_subvolumes() {
-    restore_log_msg "DEBUG" "Starting automatic BTRFS subvolume detection" >&2
-    local detected_subvolumes=()
-    declare -A seen_subvols
-    
-    # Parse /etc/fstab for subvol= entries
-    if [[ -r "/etc/fstab" ]]; then
-        restore_log_msg "DEBUG" "Scanning /etc/fstab for BTRFS subvolume entries" >&2
-        while IFS= read -r line; do
-            # Skip comments and empty lines
-            [[ "$line" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "${line// }" ]] && continue
-            
-            # Look for BTRFS entries with subvol= option
-            if [[ "$line" =~ btrfs ]] && [[ "$line" =~ subvol= ]]; then
-                local subvol_name
-                subvol_name=$(echo "$line" | sed -n 's/.*subvol=\([^,[:space:]]*\).*/\1/p')
-                if [[ -n "$subvol_name" && "$subvol_name" =~ ^/@ ]]; then
-                    # Remove the leading / to get just the subvolume name
-                    subvol_name="${subvol_name#/}"
-                    restore_log_msg "DEBUG" "Found subvolume in /etc/fstab: $subvol_name" >&2
-                    detected_subvolumes+=("$subvol_name")
-                    seen_subvols["$subvol_name"]=1
-                fi
-            fi
-        done < "/etc/fstab"
-    fi
-    
-    # Parse /proc/mounts for active BTRFS subvolumes
-    if [[ -r "/proc/mounts" ]]; then
-        restore_log_msg "DEBUG" "Scanning /proc/mounts for active BTRFS subvolumes" >&2
-        while IFS= read -r line; do
-            # Look for BTRFS entries with subvol= option
-            if [[ "$line" =~ btrfs ]] && [[ "$line" =~ subvol= ]]; then
-                local subvol_name
-                subvol_name=$(echo "$line" | sed -n 's/.*subvol=\([^[:space:]]*\).*/\1/p')
-                if [[ -n "$subvol_name" && "$subvol_name" =~ ^/@ && -z "${seen_subvols[${subvol_name#/}]}" ]]; then
-                    # Remove the leading / to get just the subvolume name
-                    subvol_name="${subvol_name#/}"
-                    restore_log_msg "DEBUG" "Found active subvolume in /proc/mounts: $subvol_name" >&2
-                    detected_subvolumes+=("$subvol_name")
-                    seen_subvols["$subvol_name"]=1
-                fi
-            fi
-        done < "/proc/mounts"
-    fi
-    
-    # Output detected subvolumes (sorted and deduplicated)
-    if [[ ${#detected_subvolumes[@]} -gt 0 ]]; then
-        # Sort the array
-        IFS=$'\n' detected_subvolumes=($(sort <<<"${detected_subvolumes[*]}"))
-        unset IFS
-        restore_log_msg "INFO" "Auto-detected BTRFS subvolumes: ${detected_subvolumes[*]}" >&2
-        printf '%s\n' "${detected_subvolumes[@]}"
-    else
-        restore_log_msg "DEBUG" "No BTRFS subvolumes auto-detected" >&2
-    fi
-}
 
 # Function to get the final list of subvolumes for restore operations
+# Wrapper function to maintain backward compatibility
 get_restore_subvolumes() {
-    restore_log_msg "DEBUG" "Determining final list of subvolumes for restore operations" >&2
-    local configured_subvolumes=()
-    local final_subvolumes=()
-    declare -A seen_subvols
-    
-    # Parse configured subvolumes from LH_BACKUP_SUBVOLUMES
-    if [[ -n "$LH_BACKUP_SUBVOLUMES" ]]; then
-        restore_log_msg "DEBUG" "Configured subvolumes: $LH_BACKUP_SUBVOLUMES" >&2
-        read -ra configured_subvolumes <<< "$LH_BACKUP_SUBVOLUMES"
-        for subvol in "${configured_subvolumes[@]}"; do
-            if [[ -n "$subvol" ]]; then
-                final_subvolumes+=("$subvol")
-                seen_subvols["$subvol"]=1
-            fi
-        done
-    fi
-    
-    # Add auto-detected subvolumes if enabled
-    if [[ "$LH_AUTO_DETECT_SUBVOLUMES" == "true" ]]; then
-        restore_log_msg "DEBUG" "Auto-detection enabled, detecting additional subvolumes" >&2
-        local detected_subvolumes
-        readarray -t detected_subvolumes < <(detect_btrfs_subvolumes)
-        
-        for subvol in "${detected_subvolumes[@]}"; do
-            if [[ -n "$subvol" && -z "${seen_subvols[$subvol]}" ]]; then
-                restore_log_msg "DEBUG" "Adding auto-detected subvolume: $subvol" >&2
-                final_subvolumes+=("$subvol")
-                seen_subvols["$subvol"]=1
-            fi
-        done
-    fi
-    
-    # Sort the final list
-    if [[ ${#final_subvolumes[@]} -gt 0 ]]; then
-        IFS=$'\n' final_subvolumes=($(sort <<<"${final_subvolumes[*]}"))
-        unset IFS
-        restore_log_msg "INFO" "Final subvolumes for restore: ${final_subvolumes[*]}" >&2
-        printf '%s\n' "${final_subvolumes[@]}"
-    else
-        # Fallback to default if nothing configured
-        restore_log_msg "WARN" "No subvolumes configured or detected, using default: @ @home" >&2
-        echo "@"
-        echo "@home"
-    fi
+    get_btrfs_subvolumes "restore"
 }
 
 # Parse filesystem configuration from backup marker
@@ -1608,9 +1507,19 @@ select_restore_type_and_snapshot() {
     lh_print_header "$(lh_msg 'RESTORE_SELECT_TYPE_AND_SNAPSHOT')"
     
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_TYPE_OPTIONS'):${LH_COLOR_RESET}"
-    echo -e "1. $(lh_msg 'RESTORE_TYPE_COMPLETE_SYSTEM')"
-    echo -e "2. $(lh_msg 'RESTORE_TYPE_ROOT_ONLY')"
-    echo -e "3. $(lh_msg 'RESTORE_TYPE_HOME_ONLY')"
+    
+    # Get available subvolumes for dynamic menu
+    local available_subvols=()
+    readarray -t available_subvols < <(get_restore_subvolumes)
+    
+    echo -e "1. $(lh_msg 'RESTORE_TYPE_COMPLETE_SYSTEM') ($(IFS=', '; echo "${available_subvols[*]}"))"
+    
+    # Create individual subvolume options dynamically
+    local menu_counter=2
+    for subvol in "${available_subvols[@]}"; do
+        echo -e "$menu_counter. $(lh_msg 'RESTORE_TYPE_SINGLE_SUBVOLUME' "$subvol")"
+        ((menu_counter++))
+    done
     echo ""
     
     local restore_type
@@ -1623,84 +1532,126 @@ select_restore_type_and_snapshot() {
             readarray -t restore_subvols < <(get_restore_subvolumes)
             echo -e "${LH_COLOR_INFO}Complete system restore selected (subvolumes: ${restore_subvols[*]})${LH_COLOR_RESET}"
             
-            # List snapshots and try to find matching pairs
+            # List snapshots and try to find matching pairs for all subvolumes
             echo ""
             echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_FINDING_MATCHING_SNAPSHOTS')${LH_COLOR_RESET}"
             
-            local -a root_snapshots=($(list_available_snapshots "@"))
-            local -a home_snapshots=($(list_available_snapshots "@home"))
+            # Build arrays of snapshots for each subvolume dynamically
+            declare -A subvolume_snapshots
+            local missing_subvolumes=()
             
-            if [[ ${#root_snapshots[@]} -eq 0 ]] || [[ ${#home_snapshots[@]} -eq 0 ]]; then
-                echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_INCOMPLETE_SNAPSHOT_SET')${LH_COLOR_RESET}"
-                return 1
-            fi
-            
-            # Find matching snapshots by timestamp
-            local -a matching_pairs=()
-            for root_snap in "${root_snapshots[@]}"; do
-                local root_basename=$(basename "$root_snap")
-                # Extract timestamp from root snapshot name
-                local timestamp=""
-                if [[ "$root_basename" =~ ([0-9]{4}-[0-9]{2}-[0-9]{2}(_[0-9]{2}-[0-9]{2}-[0-9]{2})?) ]]; then
-                    timestamp="${BASH_REMATCH[1]}"
-                    
-                    # Look for matching home snapshot
-                    for home_snap in "${home_snapshots[@]}"; do
-                        local home_basename=$(basename "$home_snap")
-                        if [[ "$home_basename" =~ $timestamp ]]; then
-                            matching_pairs+=("$root_snap|$home_snap")
-                            break
-                        fi
-                    done
+            for subvol in "${restore_subvols[@]}"; do
+                local -a snapshots
+                readarray -t snapshots < <(list_available_snapshots "$subvol")
+                if [[ ${#snapshots[@]} -eq 0 ]]; then
+                    missing_subvolumes+=("$subvol")
+                else
+                    subvolume_snapshots["$subvol"]="${snapshots[*]}"
                 fi
             done
             
-            if [[ ${#matching_pairs[@]} -eq 0 ]]; then
+            if [[ ${#missing_subvolumes[@]} -gt 0 ]]; then
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_MISSING_SUBVOLUME_SNAPSHOTS' "${missing_subvolumes[*]}")${LH_COLOR_RESET}"
+                return 1
+            fi
+            
+            # Find matching snapshots by timestamp across all subvolumes
+            local -a matching_sets=()
+            local first_subvol="${restore_subvols[0]}"
+            read -ra first_snapshots <<< "${subvolume_snapshots[$first_subvol]}"
+            
+            for first_snap in "${first_snapshots[@]}"; do
+                local first_basename=$(basename "$first_snap")
+                # Extract timestamp from first snapshot name
+                local timestamp=""
+                if [[ "$first_basename" =~ ([0-9]{4}-[0-9]{2}-[0-9]{2}(_[0-9]{2}-[0-9]{2}-[0-9]{2})?) ]]; then
+                    timestamp="${BASH_REMATCH[1]}"
+                    
+                    # Try to find matching snapshots in all other subvolumes
+                    local matching_set="$first_subvol:$first_snap"
+                    local all_match=true
+                    
+                    for subvol in "${restore_subvols[@]:1}"; do
+                        read -ra subvol_snapshots <<< "${subvolume_snapshots[$subvol]}"
+                        local found_match=false
+                        
+                        for snap in "${subvol_snapshots[@]}"; do
+                            local snap_basename=$(basename "$snap")
+                            if [[ "$snap_basename" =~ $timestamp ]]; then
+                                matching_set="$matching_set|$subvol:$snap"
+                                found_match=true
+                                break
+                            fi
+                        done
+                        
+                        if [[ "$found_match" == false ]]; then
+                            all_match=false
+                            break
+                        fi
+                    done
+                    
+                    if [[ "$all_match" == true ]]; then
+                        matching_sets+=("$matching_set")
+                    fi
+                fi
+            done
+            
+            if [[ ${#matching_sets[@]} -eq 0 ]]; then
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_NO_MATCHING_PAIRS')${LH_COLOR_RESET}"
                 return 1
             fi
             
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_MATCHING_PAIRS_FOUND'):${LH_COLOR_RESET}"
-            for i in "${!matching_pairs[@]}"; do
-                IFS='|' read -r root_snap home_snap <<< "${matching_pairs[i]}"
-                echo -e "  $((i+1)). $(basename "$root_snap") + $(basename "$home_snap")"
+            for i in "${!matching_sets[@]}"; do
+                echo -n "  $((i+1)). "
+                IFS='|' read -ra subvol_snapshots <<< "${matching_sets[i]}"
+                local display_parts=()
+                for subvol_snap in "${subvol_snapshots[@]}"; do
+                    IFS=':' read -r subvol snap <<< "$subvol_snap"
+                    display_parts+=("$(basename "$snap")")
+                done
+                IFS='+' eval 'echo "${display_parts[*]}"'
             done
             
-            local pair_choice
-            pair_choice=$(lh_ask_for_input "$(lh_msg 'RESTORE_SELECT_SNAPSHOT_PAIR' "${#matching_pairs[@]}")")
+            local set_choice
+            set_choice=$(lh_ask_for_input "$(lh_msg 'RESTORE_SELECT_SNAPSHOT_PAIR' "${#matching_sets[@]}")")
             
-            if [[ ! "$pair_choice" =~ ^[0-9]+$ ]] || [[ "$pair_choice" -lt 1 ]] || [[ "$pair_choice" -gt ${#matching_pairs[@]} ]]; then
+            if [[ ! "$set_choice" =~ ^[0-9]+$ ]] || [[ "$set_choice" -lt 1 ]] || [[ "$set_choice" -gt ${#matching_sets[@]} ]]; then
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
                 return 1
             fi
             
-            IFS='|' read -r selected_root selected_home <<< "${matching_pairs[$((pair_choice-1))]}"
+            # Parse selected snapshot set
+            declare -A selected_snapshots
+            IFS='|' read -ra selected_subvol_snapshots <<< "${matching_sets[$((set_choice-1))]}"
+            for subvol_snap in "${selected_subvol_snapshots[@]}"; do
+                IFS=':' read -r subvol snap <<< "$subvol_snap"
+                selected_snapshots["$subvol"]="$snap"
+            done
             
-            # Enhanced validation of both snapshots before restore
+            # Enhanced validation of all snapshots before restore
             echo ""
             echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_VALIDATING_SNAPSHOT_PAIR')${LH_COLOR_RESET}"
             
-            if ! validate_restore_snapshot "$selected_root" "root snapshot validation"; then
-                echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ROOT_SNAPSHOT_VALIDATION_FAILED' "$(basename "$selected_root")")${LH_COLOR_RESET}"
-                return 1
-            fi
+            for subvol in "${restore_subvols[@]}"; do
+                local selected_snap="${selected_snapshots[$subvol]}"
+                if ! validate_restore_snapshot "$selected_snap" "$subvol snapshot validation"; then
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_SNAPSHOT_VALIDATION_FAILED' "$subvol" "$(basename "$selected_snap")")${LH_COLOR_RESET}"
+                    return 1
+                fi
+            done
             
-            if ! validate_restore_snapshot "$selected_home" "home snapshot validation"; then
-                echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_HOME_SNAPSHOT_VALIDATION_FAILED' "$(basename "$selected_home")")${LH_COLOR_RESET}"
-                return 1
-            fi
-            
-            # Validate parent chains for both snapshots if they are incremental
-            for snapshot_info in "$selected_root:@:root" "$selected_home:@home:home"; do
-                IFS=':' read -r snapshot_path subvol_name display_name <<< "$snapshot_info"
+            # Validate parent chains for all snapshots if they are incremental
+            for subvol in "${restore_subvols[@]}"; do
+                local snapshot_path="${selected_snapshots[$subvol]}"
                 
                 local received_uuid
                 received_uuid=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
                 
                 if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
-                    restore_log_msg "DEBUG" "Validating $display_name incremental snapshot parent chain"
+                    restore_log_msg "DEBUG" "Validating $subvol incremental snapshot parent chain"
                     
-                    local backup_base="${BACKUP_ROOT}${LH_BACKUP_DIR}/${subvol_name}"
+                    local backup_base="${BACKUP_ROOT}${LH_BACKUP_DIR}/${subvol}"
                     local found_parent=false
                     
                     while IFS= read -r -d '' potential_parent; do
@@ -1710,17 +1661,17 @@ select_restore_type_and_snapshot() {
                             
                             if [[ "$parent_uuid" == "$received_uuid" ]]; then
                                 if validate_parent_snapshot_chain "$potential_parent" "$snapshot_path" "$snapshot_path"; then
-                                    restore_log_msg "DEBUG" "$display_name parent chain validation passed"
+                                    restore_log_msg "DEBUG" "$subvol parent chain validation passed"
                                     found_parent=true
                                     break
                                 fi
                             fi
                         fi
-                    done < <(find "$backup_base" -maxdepth 1 -type d \( -name "${subvol_name}-20*" -o -name "${subvol_name}_20*" -o -name "*${subvol_name}*20*" \) -print0 2>/dev/null)
+                    done < <(find "$backup_base" -maxdepth 1 -type d \( -name "${subvol}-20*" -o -name "${subvol}_20*" -o -name "*${subvol}*20*" \) -print0 2>/dev/null)
                     
                     if [[ "$found_parent" == "false" ]]; then
-                        restore_log_msg "WARN" "Cannot validate parent chain for $display_name snapshot"
-                        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_PARENT_CHAIN_INCOMPLETE_FOR' "$display_name")${LH_COLOR_RESET}"
+                        restore_log_msg "WARN" "Cannot validate parent chain for $subvol snapshot"
+                        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_PARENT_CHAIN_INCOMPLETE_FOR' "$subvol")${LH_COLOR_RESET}"
                         
                         if ! lh_confirm_action "$(lh_msg 'RESTORE_CONTINUE_COMPLETE_WITHOUT_VALIDATION')" "n"; then
                             restore_log_msg "INFO" "User aborted complete system restore due to parent chain issues"
@@ -1735,8 +1686,9 @@ select_restore_type_and_snapshot() {
             echo -e "${LH_COLOR_WARNING}╔════════════════════════════════════════╗"
             echo -e "║     ${LH_COLOR_WHITE}COMPLETE SYSTEM RESTORE${LH_COLOR_WARNING}        ║"
             echo -e "╚════════════════════════════════════════╝${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ROOT_SNAPSHOT'):${LH_COLOR_RESET} $(basename "$selected_root")"
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_HOME_SNAPSHOT'):${LH_COLOR_RESET} $(basename "$selected_home")"
+            for subvol in "${restore_subvols[@]}"; do
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_SUBVOLUME_SNAPSHOT' "$subvol"):${LH_COLOR_RESET} $(basename "${selected_snapshots[$subvol]}")"
+            done
             echo ""
             echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_COMPLETE_SYSTEM_WARNING')${LH_COLOR_RESET}"
             echo ""
@@ -1747,84 +1699,90 @@ select_restore_type_and_snapshot() {
             fi
             
             # Perform atomic complete system restore with rollback capability
-            restore_log_msg "INFO" "Starting atomic complete system restore"
+            restore_log_msg "INFO" "Starting atomic complete system restore for subvolumes: ${restore_subvols[*]}"
             local restore_timestamp=$(date '+%Y%m%d_%H%M%S')
-            local root_backup_created="false"
-            local home_backup_created="false"
+            declare -A backup_created
+            declare -A original_backups
             local bootloader_modified="false"
+            local restore_success=true
+            local current_phase=1
+            local total_phases=$((${#restore_subvols[@]} + 1))  # +1 for bootloader
             
-            # Store original state information for potential rollback
-            local original_root_backup="${TARGET_ROOT}/@.backup_before_restore_${restore_timestamp}"
-            local original_home_backup="${TARGET_ROOT}/@home.backup_before_restore_${restore_timestamp}"
+            # Initialize backup tracking
+            for subvol in "${restore_subvols[@]}"; do
+                backup_created["$subvol"]="false"
+                original_backups["$subvol"]="${TARGET_ROOT}/${subvol}.backup_before_restore_${restore_timestamp}"
+            done
             
-            # Perform root restore with rollback tracking
-            restore_log_msg "INFO" "Phase 1/3: Root subvolume restore"
-            if perform_subvolume_restore "@" "$selected_root" "@"; then
-                root_backup_created="true"
-                restore_log_msg "INFO" "Root restore successful, proceeding to home restore"
+            # Perform restore for each subvolume in order
+            for subvol in "${restore_subvols[@]}"; do
+                local selected_snap="${selected_snapshots[$subvol]}"
+                restore_log_msg "INFO" "Phase $current_phase/$total_phases: $subvol subvolume restore"
                 
-                # Perform home restore with rollback capability
-                restore_log_msg "INFO" "Phase 2/3: Home subvolume restore"
-                if perform_subvolume_restore "@home" "$selected_home" "@home"; then
-                    home_backup_created="true"
-                    restore_log_msg "INFO" "Both subvolume restores successful, configuring bootloader"
-                    
-                    # Handle bootloader configuration for root subvolume
-                    restore_log_msg "INFO" "Phase 3/3: Bootloader configuration"
-                    if handle_bootloader_configuration; then
-                        bootloader_modified="true"
-                        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_COMPLETE_SYSTEM_SUCCESS')${LH_COLOR_RESET}"
-                        restore_log_msg "INFO" "Complete system restore successful"
-                        return 0
-                    else
-                        restore_log_msg "ERROR" "Bootloader configuration failed"
-                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_BOOTLOADER_FAILED')${LH_COLOR_RESET}"
-                        
-                        # Bootloader failure - offer rollback but system might still be usable
-                        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_BOOTLOADER_ROLLBACK_OPTION')${LH_COLOR_RESET}"
-                        if lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_COMPLETE_ROLLBACK_BOOTLOADER')" "n"; then
-                            perform_complete_system_rollback "$restore_timestamp" "$root_backup_created" "$home_backup_created" "$bootloader_modified"
-                            return 1
-                        else
-                            restore_log_msg "WARN" "User chose to keep partially restored system with bootloader issues"
-                            echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_MANUAL_BOOTLOADER_REQUIRED')${LH_COLOR_RESET}"
-                            return 0
-                        fi
-                    fi
+                if perform_subvolume_restore "$subvol" "$selected_snap" "$subvol"; then
+                    backup_created["$subvol"]="true"
+                    restore_log_msg "INFO" "$subvol restore successful"
+                    ((current_phase++))
                 else
-                    restore_log_msg "ERROR" "Home restore failed after successful root restore"
-                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_HOME_FAILED')${LH_COLOR_RESET}"
-                    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_PARTIAL_SUCCESS_ROLLBACK')${LH_COLOR_RESET}"
+                    restore_log_msg "ERROR" "$subvol restore failed"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_SUBVOLUME_FAILED' "$subvol")${LH_COLOR_RESET}"
+                    restore_success=false
+                    break
+                fi
+            done
+            
+            # Handle restoration results
+            if [[ "$restore_success" == true ]]; then
+                # All subvolumes restored successfully, configure bootloader
+                restore_log_msg "INFO" "Phase $current_phase/$total_phases: Bootloader configuration"
+                if handle_bootloader_configuration; then
+                    bootloader_modified="true"
+                    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_COMPLETE_SYSTEM_SUCCESS')${LH_COLOR_RESET}"
+                    restore_log_msg "INFO" "Complete system restore successful"
+                    return 0
+                else
+                    restore_log_msg "ERROR" "Bootloader configuration failed"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_BOOTLOADER_FAILED')${LH_COLOR_RESET}"
                     
-                    # Home restore failed - automatic rollback recommended
-                    if lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_ROLLBACK_ROOT')" "y"; then
-                        perform_complete_system_rollback "$restore_timestamp" "$root_backup_created" "false" "false"
+                    # Bootloader failure - offer rollback but system might still be usable
+                    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_BOOTLOADER_ROLLBACK_OPTION')${LH_COLOR_RESET}"
+                    if lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_COMPLETE_ROLLBACK_BOOTLOADER')" "n"; then
+                        perform_complete_system_rollback "$restore_timestamp" backup_created "$bootloader_modified"
                         return 1
                     else
-                        restore_log_msg "WARN" "User chose to keep partially restored system (root only)"
-                        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_PARTIAL_SYSTEM_WARNING')${LH_COLOR_RESET}"
+                        restore_log_msg "WARN" "User chose to keep partially restored system with bootloader issues"
+                        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_MANUAL_BOOTLOADER_REQUIRED')${LH_COLOR_RESET}"
                         return 0
                     fi
                 fi
             else
-                restore_log_msg "ERROR" "Root restore failed - no rollback needed"
-                echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ROOT_FAILED')${LH_COLOR_RESET}"
-                return 1
+                restore_log_msg "ERROR" "Subvolume restore failed during complete system restore"
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_PARTIAL_FAILURE')${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_PARTIAL_SUCCESS_ROLLBACK')${LH_COLOR_RESET}"
+                
+                # Partial restore failed - automatic rollback recommended
+                if lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_ROLLBACK_PARTIAL')" "y"; then
+                    perform_complete_system_rollback "$restore_timestamp" backup_created "false"
+                    return 1
+                else
+                    restore_log_msg "WARN" "User chose to keep partially restored system"
+                    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_PARTIAL_SYSTEM_WARNING')${LH_COLOR_RESET}"
+                    return 0
+                fi
             fi
             ;;
             
-        2|3)
-            # Single subvolume restore
-            local subvolume
-            local restore_name
+        *)
+            # Single subvolume restore - handle dynamic options
+            local subvol_index=$((restore_type - 2))
             
-            if [[ "$restore_type" == "2" ]]; then
-                subvolume="@"
-                restore_name="$(lh_msg 'RESTORE_ROOT_SUBVOLUME')"
-            else
-                subvolume="@home"
-                restore_name="$(lh_msg 'RESTORE_HOME_SUBVOLUME')"
+            if [[ "$subvol_index" -lt 0 || "$subvol_index" -ge ${#available_subvols[@]} ]]; then
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
+                return 1
             fi
+            
+            local subvolume="${available_subvols[$subvol_index]}"
+            local restore_name="$(lh_msg 'RESTORE_SUBVOLUME' "$subvolume")"
             
             echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_SINGLE_SUBVOLUME_SELECTED' "$restore_name")${LH_COLOR_RESET}"
             
@@ -1912,8 +1870,8 @@ select_restore_type_and_snapshot() {
             if perform_subvolume_restore "$subvolume" "$selected_snapshot" "$subvolume"; then
                 echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_SINGLE_SUBVOLUME_SUCCESS' "$restore_name")${LH_COLOR_RESET}"
                 
-                # Handle bootloader configuration if root was restored
-                if [[ "$subvolume" == "@" ]]; then
+                # Handle bootloader configuration if root subvolume was restored
+                if [[ "$subvolume" == "@" ]] || [[ "$subvolume" == "@root" ]]; then
                     handle_bootloader_configuration
                 fi
             else
@@ -2307,9 +2265,8 @@ execute_default_subvol_strategy() {
 # Perform complete system rollback after partial restore failure
 perform_complete_system_rollback() {
     local restore_timestamp="$1"
-    local root_backup_created="$2"
-    local home_backup_created="$3"
-    local bootloader_modified="$4"
+    local -n backup_created_ref="$2"  # Reference to associative array
+    local bootloader_modified="$3"
     
     restore_log_msg "INFO" "Starting complete system rollback for timestamp: $restore_timestamp"
     echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_STARTING_ROLLBACK')${LH_COLOR_RESET}"
@@ -2330,86 +2287,50 @@ perform_complete_system_rollback() {
         fi
     fi
     
-    # Phase 2: Rollback home subvolume
-    if [[ "$home_backup_created" == "true" ]]; then
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ROLLBACK_HOME')${LH_COLOR_RESET}"
-        restore_log_msg "INFO" "Rolling back home subvolume"
-        
-        local home_backup_path="${TARGET_ROOT}/@home.broken_${restore_timestamp}"
-        if [[ -d "$home_backup_path" ]]; then
-            # Remove the failed restored @home and restore the backup
-            if [[ -d "${TARGET_ROOT}/@home" ]]; then
-                if [[ "$DRY_RUN" == "false" ]]; then
-                    if btrfs subvolume delete "${TARGET_ROOT}/@home" 2>/dev/null; then
-                        restore_log_msg "INFO" "Deleted failed home restore"
-                    else
-                        restore_log_msg "WARN" "Could not delete failed home restore"
-                    fi
-                    
-                    # Restore original home from backup
-                    if mv "$home_backup_path" "${TARGET_ROOT}/@home"; then
-                        restore_log_msg "INFO" "Home subvolume rollback successful"
-                        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_ROLLBACK_HOME_SUCCESS')${LH_COLOR_RESET}"
-                    else
-                        restore_log_msg "ERROR" "Failed to restore original home subvolume"
-                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ROLLBACK_HOME_FAILED')${LH_COLOR_RESET}"
-                        rollback_success="false"
-                    fi
-                else
-                    restore_log_msg "INFO" "DRY-RUN: Would rollback home subvolume"
-                fi
-            fi
-        else
-            restore_log_msg "WARN" "Home backup not found for rollback: $home_backup_path"
-        fi
-    fi
+    # Phase 2: Rollback all subvolumes that had backups created
+    local rollback_subvolumes=()
+    readarray -t rollback_subvolumes < <(get_restore_subvolumes)
     
-    # Phase 3: Rollback root subvolume (most critical)
-    if [[ "$root_backup_created" == "true" ]]; then
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ROLLBACK_ROOT')${LH_COLOR_RESET}"
-        restore_log_msg "INFO" "Rolling back root subvolume"
-        
-        local root_backup_path="${TARGET_ROOT}/@.broken_${restore_timestamp}"
-        if [[ -d "$root_backup_path" ]]; then
-            # Remove the failed restored @ and restore the backup
-            if [[ -d "${TARGET_ROOT}/@" ]]; then
-                if [[ "$DRY_RUN" == "false" ]]; then
-                    if btrfs subvolume delete "${TARGET_ROOT}/@" 2>/dev/null; then
-                        restore_log_msg "INFO" "Deleted failed root restore"
-                    else
-                        restore_log_msg "WARN" "Could not delete failed root restore"
-                    fi
-                    
-                    # Restore original root from backup
-                    if mv "$root_backup_path" "${TARGET_ROOT}/@"; then
-                        restore_log_msg "INFO" "Root subvolume rollback successful"
-                        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_ROLLBACK_ROOT_SUCCESS')${LH_COLOR_RESET}"
+    # Rollback in reverse order (typically @home first, then @)
+    local reversed_subvols=()
+    for (( i=${#rollback_subvolumes[@]}-1; i>=0; i-- )); do
+        reversed_subvols+=("${rollback_subvolumes[i]}")
+    done
+    
+    for subvol in "${reversed_subvols[@]}"; do
+        if [[ "${backup_created_ref[$subvol]}" == "true" ]]; then
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ROLLBACK_SUBVOLUME' "$subvol")${LH_COLOR_RESET}"
+            restore_log_msg "INFO" "Rolling back $subvol subvolume"
+            
+            local subvol_backup_path="${TARGET_ROOT}/${subvol}.broken_${restore_timestamp}"
+            if [[ -d "$subvol_backup_path" ]]; then
+                # Remove the failed restored subvolume and restore the backup
+                if [[ -d "${TARGET_ROOT}/${subvol}" ]]; then
+                    if [[ "$DRY_RUN" == "false" ]]; then
+                        if btrfs subvolume delete "${TARGET_ROOT}/${subvol}" 2>/dev/null; then
+                            restore_log_msg "INFO" "Deleted failed $subvol restore"
+                        else
+                            restore_log_msg "WARN" "Could not delete failed $subvol restore"
+                        fi
                         
-                        # Restore original default subvolume if needed
-                        local original_subvol_id
-                        original_subvol_id=$(btrfs subvolume list "$TARGET_ROOT" | grep -E "\s@$" | awk '{print $2}')
-                        if [[ -n "$original_subvol_id" ]]; then
-                            if btrfs subvolume set-default "$original_subvol_id" "$TARGET_ROOT"; then
-                                restore_log_msg "INFO" "Restored original default subvolume: $original_subvol_id"
-                            else
-                                restore_log_msg "WARN" "Could not restore original default subvolume"
-                            fi
+                        # Restore original subvolume from backup
+                        if mv "$subvol_backup_path" "${TARGET_ROOT}/${subvol}"; then
+                            restore_log_msg "INFO" "$subvol subvolume rollback successful"
+                            echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_ROLLBACK_SUBVOLUME_SUCCESS' "$subvol")${LH_COLOR_RESET}"
+                        else
+                            restore_log_msg "ERROR" "Failed to restore original $subvol subvolume"
+                            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ROLLBACK_SUBVOLUME_FAILED' "$subvol")${LH_COLOR_RESET}"
+                            rollback_success="false"
                         fi
                     else
-                        restore_log_msg "ERROR" "CRITICAL: Failed to restore original root subvolume"
-                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ROLLBACK_ROOT_CRITICAL_FAILED')${LH_COLOR_RESET}"
-                        rollback_success="false"
+                        restore_log_msg "INFO" "DRY-RUN: Would rollback $subvol subvolume"
                     fi
-                else
-                    restore_log_msg "INFO" "DRY-RUN: Would rollback root subvolume"
                 fi
+            else
+                restore_log_msg "WARN" "$subvol backup not found for rollback: $subvol_backup_path"
             fi
-        else
-            restore_log_msg "ERROR" "CRITICAL: Root backup not found for rollback: $root_backup_path"
-            rollback_success="false"
         fi
-    fi
-    
+    done
     # Report rollback results
     if [[ "$rollback_success" == "true" ]]; then
         echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_ROLLBACK_COMPLETE_SUCCESS')${LH_COLOR_RESET}"
@@ -2478,10 +2399,25 @@ handle_bootloader_configuration() {
     DETECTED_CURRENT_DEFAULT=""
     BOOTLOADER_BACKUP_FILES=()
     
-    local restored_root="${TARGET_ROOT}/@"
+    # Determine root subvolume dynamically
+    local available_subvols=()
+    readarray -t available_subvols < <(get_restore_subvolumes)
+    local root_subvol="@"  # Default fallback
+    
+    # Find the root subvolume (prefer @ but handle others)
+    for subvol in "${available_subvols[@]}"; do
+        if [[ "$subvol" == "@" ]]; then
+            root_subvol="@"
+            break
+        elif [[ "$subvol" == "@root" ]]; then
+            root_subvol="@root"
+        fi
+    done
+    
+    local restored_root="${TARGET_ROOT}/${root_subvol}"
     
     # Execute the enhanced boot strategy selection
-    if choose_boot_strategy "$TARGET_ROOT" "@"; then
+    if choose_boot_strategy "$TARGET_ROOT" "$root_subvol"; then
         echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_BOOTLOADER_CONFIGURATION_COMPLETE')${LH_COLOR_RESET}"
     else
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_BOOTLOADER_CONFIGURATION_INCOMPLETE')${LH_COLOR_RESET}"
@@ -2502,27 +2438,29 @@ handle_bootloader_configuration() {
 restore_folder_from_snapshot() {
     lh_print_header "$(lh_msg 'RESTORE_FOLDER_FROM_SNAPSHOT')"
     
-    # Step 1: Select source subvolume
+    # Step 1: Select source subvolume dynamically
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_SELECT_SOURCE_SUBVOLUME'):${LH_COLOR_RESET}"
-    echo -e "1. @ ($(lh_msg 'RESTORE_ROOT_FILESYSTEM'))"
-    echo -e "2. @home ($(lh_msg 'RESTORE_HOME_DIRECTORIES'))"
+    
+    # Get available subvolumes for folder restore
+    local folder_restore_subvols=()
+    readarray -t folder_restore_subvols < <(get_restore_subvolumes)
+    
+    # Display dynamic menu
+    for i in "${!folder_restore_subvols[@]}"; do
+        local subvol="${folder_restore_subvols[i]}"
+        echo -e "$((i+1)). $subvol ($(lh_msg 'RESTORE_SUBVOLUME_DESCRIPTION' "$subvol"))"
+    done
     
     local subvol_choice
     subvol_choice=$(lh_ask_for_input "$(lh_msg 'RESTORE_SELECT_SUBVOLUME')")
     
-    local selected_subvolume
-    case "$subvol_choice" in
-        1)
-            selected_subvolume="@"
-            ;;
-        2)
-            selected_subvolume="@home"
-            ;;
-        *)
-            echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
-            return 1
-            ;;
-    esac
+    # Validate selection
+    if [[ ! "$subvol_choice" =~ ^[0-9]+$ ]] || [[ "$subvol_choice" -lt 1 ]] || [[ "$subvol_choice" -gt ${#folder_restore_subvols[@]} ]]; then
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
+        return 1
+    fi
+    
+    local selected_subvolume="${folder_restore_subvols[$((subvol_choice-1))]}"
     
     # Step 2: List and select snapshot
     echo ""
@@ -2559,13 +2497,7 @@ restore_folder_from_snapshot() {
     folder_path="${folder_path#/}"
     
     local source_folder="${selected_snapshot}/${folder_path}"
-    local target_folder
-    
-    if [[ "$selected_subvolume" == "@" ]]; then
-        target_folder="${TARGET_ROOT}/@/${folder_path}"
-    else
-        target_folder="${TARGET_ROOT}/@home/${folder_path}"
-    fi
+    local target_folder="${TARGET_ROOT}/${selected_subvolume}/${folder_path}"
     
     # Verify source folder exists
     if [[ ! -e "$source_folder" ]]; then
