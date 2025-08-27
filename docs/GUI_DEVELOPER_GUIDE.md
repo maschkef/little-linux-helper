@@ -117,26 +117,12 @@ For detailed development information, refer to these specialized guides:
 - Translation validation and fallback handling
 - Language switching implementation
 
-### **[Development Workflow](docs/gui/doc_development_workflow.md)**
-- Environment setup and dependency management
-- Development and production build processes
-- Testing strategies and debugging techniques
-- Performance optimization guidelines
-- Deployment considerations
-
 ### **[Module Integration](docs/gui/doc_module_integration.md)**
 - How CLI modules automatically integrate
 - Adding new module categories
 - Environment variable handling
 - Module discovery and execution process
 - Troubleshooting integration issues
-
-### **[Troubleshooting Guide](docs/gui/doc_troubleshooting.md)**
-- Common development and runtime issues
-- Debugging techniques and diagnostic tools
-- Performance problem resolution
-- Network and deployment troubleshooting
-- Log analysis and health checking
 
 ### **[Customization Guide](docs/gui/doc_customization.md)**
 - Theme customization and CSS variables
@@ -291,10 +277,8 @@ func handleApiEndpoint(c *fiber.Ctx) error {
 
 ### Documentation Navigation
 - Start with this overview for general understanding
-- Use **[Development Workflow](docs/gui/doc_development_workflow.md)** for setup and process
 - Refer to **[Backend API](docs/gui/doc_backend_api.md)** for Go development  
 - See **[Frontend React](docs/gui/doc_frontend_react.md)** for React development
-- Check **[Troubleshooting](docs/gui/doc_troubleshooting.md)** for common issues
 
 ### Development Resources
 - React DevTools browser extension for component debugging
