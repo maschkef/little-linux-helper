@@ -192,6 +192,54 @@ var moduleDocMap = map[string]string{
 }
 ```
 
+#### `POST /api/shutdown`
+**Purpose:** Gracefully shut down the GUI server with session awareness
+
+**Query Parameters:**
+- `force` (optional, boolean): If `true`, forces shutdown even with active sessions
+
+**Response Format (no active sessions):**
+```json
+{
+    "activeSessions": [],
+    "message": "Server shutdown initiated"
+}
+```
+
+**Response Format (with active sessions, force=false):**
+```json
+{
+    "activeSessions": [
+        {
+            "id": "restarts_1234567890",
+            "module": "restarts",
+            "moduleName": "Services & Desktop Restart Options",
+            "createdAt": "2025-08-27T22:06:00.000Z",
+            "status": "running"
+        }
+    ],
+    "message": "Server shutdown initiated",
+    "warning": "Active sessions will be terminated"
+}
+```
+
+**Implementation Details:**
+- **Session Detection**: Automatically detects and reports all active running modules
+- **Graceful Termination**: Uses SIGTERM signal first, then SIGKILL after 2-second timeout
+- **Force Shutdown**: `?force=true` parameter bypasses session warnings and immediately shuts down
+- **Process Safety**: Cleans up all PTY connections and session data before exit
+- **Response Timing**: Server exits after 500ms delay to ensure response is sent
+- **Frontend Integration**: Designed to work with ExitButton.jsx confirmation dialogs
+
+**Usage Example:**
+```bash
+# Check for active sessions first
+curl -X POST http://localhost:3000/api/shutdown
+
+# Force shutdown regardless of active sessions
+curl -X POST "http://localhost:3000/api/shutdown?force=true"
+```
+
 ### System Endpoints
 
 #### `GET /api/health`

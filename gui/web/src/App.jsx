@@ -14,6 +14,7 @@ import HelpPanel from './components/HelpPanel.jsx';
 import ResizablePanels from './components/ResizablePanels.jsx';
 import SessionDropdown from './components/SessionDropdown.jsx';
 import LanguageSelector from './components/LanguageSelector.jsx';
+import ExitButton from './components/ExitButton.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { SessionProvider, useSession } from './contexts/SessionContext.jsx';
 import './i18n'; // Initialize i18n
@@ -198,6 +199,7 @@ function AppContent() {
           </div>
           <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
             <LanguageSelector />
+            <ExitButton />
           </div>
         </div>
       </header>

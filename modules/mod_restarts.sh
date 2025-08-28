@@ -861,6 +861,413 @@ function restart_network_services_action() {
     fi
 }
 
+# Function to restart Bluetooth services
+function restart_bluetooth_services_action() {
+    lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_STARTING')"
+    
+    local bluetooth_restarted=false
+    local services_restarted=0
+    local services_attempted=0
+    
+    # Check for systemd bluetooth service
+    if systemctl is-active --quiet bluetooth.service; then
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_SERVICE_DETECTED')"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_BLUETOOTH_SERVICE_DETECTED')${LH_COLOR_RESET}"
+        
+        ((services_attempted++))
+        lh_log_msg "DEBUG" "Attempting to restart bluetooth.service"
+        if $LH_SUDO_CMD systemctl restart bluetooth.service; then
+            lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_SERVICE_SUCCESS')"
+            echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTART_BLUETOOTH_SERVICE_SUCCESS')${LH_COLOR_RESET}"
+            ((services_restarted++))
+            bluetooth_restarted=true
+        else
+            lh_log_msg "ERROR" "$(lh_msg 'RESTART_BLUETOOTH_SERVICE_ERROR')"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTART_BLUETOOTH_SERVICE_ERROR')${LH_COLOR_RESET}"
+        fi
+        
+        # Give service time to initialize
+        sleep 2
+    else
+        lh_log_msg "WARN" "$(lh_msg 'RESTART_BLUETOOTH_SERVICE_NOT_ACTIVE')"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_BLUETOOTH_SERVICE_NOT_ACTIVE')${LH_COLOR_RESET}"
+    fi
+    
+    # Reset Bluetooth adapter using hciconfig (if available)
+    if command -v hciconfig >/dev/null; then
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_ADAPTER_RESET')"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_BLUETOOTH_ADAPTER_RESET')${LH_COLOR_RESET}"
+        
+        ((services_attempted++))
+        lh_log_msg "DEBUG" "Attempting to reset Bluetooth adapter with hciconfig"
+        
+        # Get first available Bluetooth adapter
+        local bt_adapter=""
+        bt_adapter=$(hciconfig 2>/dev/null | grep -o "hci[0-9]*" | head -n1)
+        
+        if [ -n "$bt_adapter" ]; then
+            lh_log_msg "DEBUG" "Found Bluetooth adapter: $bt_adapter"
+            if $LH_SUDO_CMD hciconfig "$bt_adapter" down && sleep 2 && $LH_SUDO_CMD hciconfig "$bt_adapter" up; then
+                lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_ADAPTER_SUCCESS' "$bt_adapter")"
+                echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTART_BLUETOOTH_ADAPTER_SUCCESS' "$bt_adapter")${LH_COLOR_RESET}"
+                ((services_restarted++))
+                bluetooth_restarted=true
+            else
+                lh_log_msg "WARN" "$(lh_msg 'RESTART_BLUETOOTH_ADAPTER_ERROR' "$bt_adapter")"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_BLUETOOTH_ADAPTER_ERROR' "$bt_adapter")${LH_COLOR_RESET}"
+            fi
+        else
+            lh_log_msg "WARN" "$(lh_msg 'RESTART_BLUETOOTH_NO_ADAPTER')"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_BLUETOOTH_NO_ADAPTER')${LH_COLOR_RESET}"
+        fi
+    else
+        lh_log_msg "DEBUG" "hciconfig not available, skipping adapter reset"
+    fi
+    
+    # Check for and restart user-level bluetooth services
+    lh_get_target_user_info
+    if [ $? -eq 0 ]; then
+        local TARGET_USER="${LH_TARGET_USER_INFO[TARGET_USER]}"
+        lh_log_msg "DEBUG" "Checking user-level Bluetooth services for user: $TARGET_USER"
+        
+        # Check for PulseAudio Bluetooth module
+        if lh_run_command_as_target_user "systemctl --user is-active --quiet pulseaudio.service" 2>/dev/null; then
+            lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_PULSEAUDIO_DETECTED')"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_BLUETOOTH_PULSEAUDIO_DETECTED')${LH_COLOR_RESET}"
+            
+            ((services_attempted++))
+            lh_log_msg "DEBUG" "Reloading PulseAudio Bluetooth modules"
+            
+            # Unload and reload Bluetooth modules
+            lh_run_command_as_target_user "pactl unload-module module-bluetooth-policy" >/dev/null 2>&1 || true
+            lh_run_command_as_target_user "pactl unload-module module-bluetooth-discover" >/dev/null 2>&1 || true
+            sleep 1
+            
+            if lh_run_command_as_target_user "pactl load-module module-bluetooth-discover" >/dev/null 2>&1 && \
+               lh_run_command_as_target_user "pactl load-module module-bluetooth-policy" >/dev/null 2>&1; then
+                lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_PULSEAUDIO_SUCCESS')"
+                echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTART_BLUETOOTH_PULSEAUDIO_SUCCESS')${LH_COLOR_RESET}"
+                ((services_restarted++))
+                bluetooth_restarted=true
+            else
+                lh_log_msg "WARN" "$(lh_msg 'RESTART_BLUETOOTH_PULSEAUDIO_ERROR')"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_BLUETOOTH_PULSEAUDIO_ERROR')${LH_COLOR_RESET}"
+            fi
+        else
+            lh_log_msg "DEBUG" "PulseAudio not active for user, skipping Bluetooth module restart"
+        fi
+        
+        # Check for PipeWire Bluetooth modules
+        if lh_run_command_as_target_user "systemctl --user is-active --quiet pipewire.service" 2>/dev/null; then
+            lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_PIPEWIRE_DETECTED')"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_BLUETOOTH_PIPEWIRE_DETECTED')${LH_COLOR_RESET}"
+            
+            ((services_attempted++))
+            lh_log_msg "DEBUG" "Restarting PipeWire Bluetooth service"
+            
+            if lh_run_command_as_target_user "systemctl --user restart pipewire-pulse.service" >/dev/null 2>&1; then
+                lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_PIPEWIRE_SUCCESS')"
+                echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTART_BLUETOOTH_PIPEWIRE_SUCCESS')${LH_COLOR_RESET}"
+                ((services_restarted++))
+                bluetooth_restarted=true
+            else
+                lh_log_msg "WARN" "$(lh_msg 'RESTART_BLUETOOTH_PIPEWIRE_ERROR')"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_BLUETOOTH_PIPEWIRE_ERROR')${LH_COLOR_RESET}"
+            fi
+        else
+            lh_log_msg "DEBUG" "PipeWire not active for user, skipping Bluetooth service restart"
+        fi
+    else
+        lh_log_msg "WARN" "$(lh_msg 'RESTART_BLUETOOTH_USER_CONTEXT_ERROR')"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_BLUETOOTH_USER_CONTEXT_ERROR')${LH_COLOR_RESET}"
+    fi
+    
+    # Final status
+    lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_SUMMARY' "$services_restarted" "$services_attempted")"
+    
+    if [ $services_restarted -gt 0 ]; then
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_SUCCESS')"
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTART_BLUETOOTH_SUCCESS')${LH_COLOR_RESET}"
+        return 0
+    elif [ $services_attempted -eq 0 ]; then
+        lh_log_msg "WARN" "$(lh_msg 'RESTART_BLUETOOTH_NO_SERVICES')"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_BLUETOOTH_NO_SERVICES')${LH_COLOR_RESET}"
+        return 1
+    else
+        lh_log_msg "ERROR" "$(lh_msg 'RESTART_BLUETOOTH_FAILED')"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTART_BLUETOOTH_FAILED')${LH_COLOR_RESET}"
+        return 1
+    fi
+}
+
+# Function to restart graphics system
+function restart_graphics_system_action() {
+    lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_STARTING')"
+    
+    local graphics_restarted=false
+    local has_wayland=false
+    local has_x11=false
+    local compositor=""
+    
+    # Detect display server type
+    lh_get_target_user_info
+    if [ $? -eq 0 ]; then
+        local TARGET_USER="${LH_TARGET_USER_INFO[TARGET_USER]}"
+        local USER_DISPLAY="${LH_TARGET_USER_INFO[USER_DISPLAY]}"
+        
+        # Determine session type
+        local SESSION_TYPE_TMP=$(mktemp)
+        lh_run_command_as_target_user "printenv XDG_SESSION_TYPE 2>/dev/null" > "$SESSION_TYPE_TMP"
+        local SESSION_TYPE=$(cat "$SESSION_TYPE_TMP" | grep -v "^\[" | tail -n 1)
+        rm -f "$SESSION_TYPE_TMP"
+        
+        if [ "$SESSION_TYPE" = "wayland" ]; then
+            has_wayland=true
+            lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_WAYLAND_DETECTED')"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_GRAPHICS_WAYLAND_DETECTED')${LH_COLOR_RESET}"
+            
+            # Detect Wayland compositor
+            if lh_run_command_as_target_user "pgrep -x mutter" >/dev/null; then
+                compositor="mutter (GNOME)"
+            elif lh_run_command_as_target_user "pgrep -x kwin_wayland" >/dev/null; then
+                compositor="kwin_wayland (KDE)"
+            elif lh_run_command_as_target_user "pgrep -x sway" >/dev/null; then
+                compositor="sway"
+            elif lh_run_command_as_target_user "pgrep -x weston" >/dev/null; then
+                compositor="weston"
+            else
+                compositor="unknown"
+            fi
+            
+            lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_COMPOSITOR_DETECTED' "$compositor")"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_GRAPHICS_COMPOSITOR_DETECTED' "$compositor")${LH_COLOR_RESET}"
+        else
+            has_x11=true
+            lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_X11_DETECTED')"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_GRAPHICS_X11_DETECTED')${LH_COLOR_RESET}"
+        fi
+    else
+        lh_log_msg "WARN" "$(lh_msg 'RESTART_GRAPHICS_USER_CONTEXT_ERROR')"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_GRAPHICS_USER_CONTEXT_ERROR')${LH_COLOR_RESET}"
+        # Assume X11 as fallback
+        has_x11=true
+    fi
+    
+    # Restart graphics drivers (especially useful for NVIDIA issues)
+    lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_CHECKING_DRIVERS')"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_GRAPHICS_CHECKING_DRIVERS')${LH_COLOR_RESET}"
+    
+    if lsmod | grep -q nvidia; then
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_NVIDIA_DETECTED')"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_GRAPHICS_NVIDIA_DETECTED')${LH_COLOR_RESET}"
+        
+        # Try to restart NVIDIA services
+        if systemctl is-active --quiet nvidia-persistenced.service; then
+            lh_log_msg "DEBUG" "Restarting nvidia-persistenced.service"
+            if $LH_SUDO_CMD systemctl restart nvidia-persistenced.service; then
+                lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_NVIDIA_PERSISTENCED_SUCCESS')"
+                echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTART_GRAPHICS_NVIDIA_PERSISTENCED_SUCCESS')${LH_COLOR_RESET}"
+                graphics_restarted=true
+            else
+                lh_log_msg "WARN" "$(lh_msg 'RESTART_GRAPHICS_NVIDIA_PERSISTENCED_ERROR')"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_GRAPHICS_NVIDIA_PERSISTENCED_ERROR')${LH_COLOR_RESET}"
+            fi
+        fi
+        
+        # Restart nvidia-powerd if available (for newer systems)
+        if systemctl is-active --quiet nvidia-powerd.service; then
+            lh_log_msg "DEBUG" "Restarting nvidia-powerd.service"
+            if $LH_SUDO_CMD systemctl restart nvidia-powerd.service; then
+                lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_NVIDIA_POWERD_SUCCESS')"
+                echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTART_GRAPHICS_NVIDIA_POWERD_SUCCESS')${LH_COLOR_RESET}"
+                graphics_restarted=true
+            fi
+        fi
+    elif lsmod | grep -q amdgpu; then
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_AMD_DETECTED')"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_GRAPHICS_AMD_DETECTED')${LH_COLOR_RESET}"
+    elif lsmod | grep -q i915; then
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_INTEL_DETECTED')"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_GRAPHICS_INTEL_DETECTED')${LH_COLOR_RESET}"
+    else
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_NO_SPECIFIC_DRIVER')"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_GRAPHICS_NO_SPECIFIC_DRIVER')${LH_COLOR_RESET}"
+    fi
+    
+    # Handle display server specific restarts
+    if $has_wayland && [ -n "$TARGET_USER" ]; then
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_GRAPHICS_WAYLAND_WARNING')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_GRAPHICS_WAYLAND_COMPOSITOR_INFO' "$compositor")${LH_COLOR_RESET}"
+        
+        if lh_confirm_action "$(lh_msg 'RESTART_GRAPHICS_WAYLAND_CONTINUE')" "n"; then
+            lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_WAYLAND_RESTARTING')"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_GRAPHICS_WAYLAND_RESTARTING')${LH_COLOR_RESET}"
+            
+            # This will typically log the user out in Wayland
+            if [[ "$compositor" == *"mutter"* ]]; then
+                lh_run_command_as_target_user "killall -TERM gnome-shell" 2>/dev/null || true
+            elif [[ "$compositor" == *"kwin_wayland"* ]]; then
+                lh_run_command_as_target_user "killall -TERM kwin_wayland" 2>/dev/null || true
+            elif [[ "$compositor" == *"sway"* ]]; then
+                lh_run_command_as_target_user "swaymsg exit" 2>/dev/null || true
+            else
+                lh_log_msg "WARN" "$(lh_msg 'RESTART_GRAPHICS_WAYLAND_UNKNOWN_COMPOSITOR')"
+                echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_GRAPHICS_WAYLAND_UNKNOWN_COMPOSITOR')${LH_COLOR_RESET}"
+            fi
+            graphics_restarted=true
+        else
+            lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_WAYLAND_CANCELLED')"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_GRAPHICS_WAYLAND_CANCELLED')${LH_COLOR_RESET}"
+        fi
+    elif $has_x11 && [ -n "$USER_DISPLAY" ]; then
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_X11_RESTARTING')"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_GRAPHICS_X11_RESTARTING')${LH_COLOR_RESET}"
+        
+        # For X11, try to restart the window manager/compositor
+        if lh_run_command_as_target_user "pgrep -x compiz" >/dev/null; then
+            lh_run_command_as_target_user "compiz --replace &" 2>/dev/null
+            graphics_restarted=true
+        elif lh_run_command_as_target_user "pgrep -x picom" >/dev/null; then
+            lh_run_command_as_target_user "killall picom && picom -b &" 2>/dev/null
+            graphics_restarted=true
+        elif lh_run_command_as_target_user "pgrep -x compton" >/dev/null; then
+            lh_run_command_as_target_user "killall compton && compton -b &" 2>/dev/null
+            graphics_restarted=true
+        else
+            lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_X11_NO_COMPOSITOR')"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_GRAPHICS_X11_NO_COMPOSITOR')${LH_COLOR_RESET}"
+        fi
+    fi
+    
+    # Final status
+    if $graphics_restarted; then
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_SUCCESS')"
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTART_GRAPHICS_SUCCESS')${LH_COLOR_RESET}"
+        return 0
+    else
+        lh_log_msg "WARN" "$(lh_msg 'RESTART_GRAPHICS_LIMITED')"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_GRAPHICS_LIMITED')${LH_COLOR_RESET}"
+        return 1
+    fi
+}
+
+# Function for power management options
+function power_management_action() {
+    lh_log_msg "INFO" "$(lh_msg 'POWER_MANAGEMENT_STARTING')"
+    
+    while true; do
+        lh_print_header "$(lh_msg 'POWER_MANAGEMENT_TITLE')"
+        
+        lh_print_menu_item 1 "$(lh_msg 'POWER_SHUTDOWN')"
+        lh_print_menu_item 2 "$(lh_msg 'POWER_RESTART')"
+        lh_print_menu_item 3 "$(lh_msg 'POWER_SUSPEND')"
+        lh_print_menu_item 4 "$(lh_msg 'POWER_HIBERNATE')"
+        lh_print_menu_item 5 "$(lh_msg 'POWER_SHUTDOWN_DELAYED')"
+        lh_print_menu_item 6 "$(lh_msg 'POWER_RESTART_DELAYED')"
+        lh_print_menu_item 0 "$(lh_msg 'POWER_BACK')"
+        echo ""
+        
+        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'POWER_CHOOSE_OPTION')${LH_COLOR_RESET}")" power_option
+        
+        case $power_option in
+            1)
+                # Immediate shutdown
+                if lh_confirm_action "$(lh_msg 'POWER_CONFIRM_SHUTDOWN')" "n"; then
+                    lh_log_msg "INFO" "$(lh_msg 'POWER_EXECUTING_SHUTDOWN')"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg 'POWER_EXECUTING_SHUTDOWN')${LH_COLOR_RESET}"
+                    $LH_SUDO_CMD systemctl poweroff
+                    return 0
+                fi
+                ;;
+            2)
+                # Immediate restart
+                if lh_confirm_action "$(lh_msg 'POWER_CONFIRM_RESTART')" "n"; then
+                    lh_log_msg "INFO" "$(lh_msg 'POWER_EXECUTING_RESTART')"
+                    echo -e "${LH_COLOR_INFO}$(lh_msg 'POWER_EXECUTING_RESTART')${LH_COLOR_RESET}"
+                    $LH_SUDO_CMD systemctl reboot
+                    return 0
+                fi
+                ;;
+            3)
+                # Suspend (standby)
+                if systemctl list-units --type target | grep -q suspend.target; then
+                    if lh_confirm_action "$(lh_msg 'POWER_CONFIRM_SUSPEND')" "n"; then
+                        lh_log_msg "INFO" "$(lh_msg 'POWER_EXECUTING_SUSPEND')"
+                        echo -e "${LH_COLOR_INFO}$(lh_msg 'POWER_EXECUTING_SUSPEND')${LH_COLOR_RESET}"
+                        $LH_SUDO_CMD systemctl suspend
+                        return 0
+                    fi
+                else
+                    lh_log_msg "ERROR" "$(lh_msg 'POWER_SUSPEND_NOT_AVAILABLE')"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'POWER_SUSPEND_NOT_AVAILABLE')${LH_COLOR_RESET}"
+                fi
+                ;;
+            4)
+                # Hibernate
+                if systemctl list-units --type target | grep -q hibernate.target; then
+                    if lh_confirm_action "$(lh_msg 'POWER_CONFIRM_HIBERNATE')" "n"; then
+                        lh_log_msg "INFO" "$(lh_msg 'POWER_EXECUTING_HIBERNATE')"
+                        echo -e "${LH_COLOR_INFO}$(lh_msg 'POWER_EXECUTING_HIBERNATE')${LH_COLOR_RESET}"
+                        $LH_SUDO_CMD systemctl hibernate
+                        return 0
+                    fi
+                else
+                    lh_log_msg "ERROR" "$(lh_msg 'POWER_HIBERNATE_NOT_AVAILABLE')"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'POWER_HIBERNATE_NOT_AVAILABLE')${LH_COLOR_RESET}"
+                fi
+                ;;
+            5)
+                # Delayed shutdown
+                echo -e "${LH_COLOR_PROMPT}$(lh_msg 'POWER_ENTER_MINUTES')${LH_COLOR_RESET}"
+                read -p ": " minutes
+                if [[ "$minutes" =~ ^[0-9]+$ ]] && [ "$minutes" -gt 0 ]; then
+                    if lh_confirm_action "$(lh_msg 'POWER_CONFIRM_DELAYED_SHUTDOWN' "$minutes")" "n"; then
+                        lh_log_msg "INFO" "$(lh_msg 'POWER_SCHEDULING_SHUTDOWN' "$minutes")"
+                        echo -e "${LH_COLOR_INFO}$(lh_msg 'POWER_SCHEDULING_SHUTDOWN' "$minutes")${LH_COLOR_RESET}"
+                        $LH_SUDO_CMD shutdown -h "+$minutes"
+                        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'POWER_DELAYED_SHUTDOWN_SCHEDULED' "$minutes")${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_INFO}$(lh_msg 'POWER_CANCEL_WITH_COMMAND')${LH_COLOR_RESET}"
+                        return 0
+                    fi
+                else
+                    lh_log_msg "WARN" "$(lh_msg 'POWER_INVALID_MINUTES' "$minutes")"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'POWER_INVALID_MINUTES' "$minutes")${LH_COLOR_RESET}"
+                fi
+                ;;
+            6)
+                # Delayed restart
+                echo -e "${LH_COLOR_PROMPT}$(lh_msg 'POWER_ENTER_MINUTES')${LH_COLOR_RESET}"
+                read -p ": " minutes
+                if [[ "$minutes" =~ ^[0-9]+$ ]] && [ "$minutes" -gt 0 ]; then
+                    if lh_confirm_action "$(lh_msg 'POWER_CONFIRM_DELAYED_RESTART' "$minutes")" "n"; then
+                        lh_log_msg "INFO" "$(lh_msg 'POWER_SCHEDULING_RESTART' "$minutes")"
+                        echo -e "${LH_COLOR_INFO}$(lh_msg 'POWER_SCHEDULING_RESTART' "$minutes")${LH_COLOR_RESET}"
+                        $LH_SUDO_CMD shutdown -r "+$minutes"
+                        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'POWER_DELAYED_RESTART_SCHEDULED' "$minutes")${LH_COLOR_RESET}"
+                        echo -e "${LH_COLOR_INFO}$(lh_msg 'POWER_CANCEL_WITH_COMMAND')${LH_COLOR_RESET}"
+                        return 0
+                    fi
+                else
+                    lh_log_msg "WARN" "$(lh_msg 'POWER_INVALID_MINUTES' "$minutes")"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'POWER_INVALID_MINUTES' "$minutes")${LH_COLOR_RESET}"
+                fi
+                ;;
+            0)
+                lh_log_msg "INFO" "$(lh_msg 'POWER_BACK_TO_MAIN')"
+                return 0
+                ;;
+            *)
+                lh_log_msg "WARN" "$(lh_msg 'INVALID_SELECTION' "$power_option")"
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'POWER_INVALID_SELECTION')${LH_COLOR_RESET}"
+                ;;
+        esac
+        
+        echo ""
+        lh_press_any_key 'POWER_PRESS_KEY_CONTINUE'
+        echo ""
+    done
+}
+
 # Main function of the module: show submenu and control actions
 function restart_module_menu() {
     while true; do
@@ -870,6 +1277,9 @@ function restart_module_menu() {
         lh_print_menu_item 2 "$(lh_msg 'RESTART_SOUND_SYSTEM')"
         lh_print_menu_item 3 "$(lh_msg 'RESTART_DESKTOP_ENVIRONMENT')"
         lh_print_menu_item 4 "$(lh_msg 'RESTART_NETWORK_SERVICES')"
+        lh_print_menu_item 5 "$(lh_msg 'RESTART_BLUETOOTH_SERVICES')"
+        lh_print_menu_item 6 "$(lh_msg 'RESTART_GRAPHICS_SYSTEM')"
+        lh_print_menu_item 7 "$(lh_msg 'POWER_MANAGEMENT')"
         lh_print_menu_item 0 "$(lh_msg 'RESTART_BACK_TO_MAIN')"
         echo ""
 
@@ -887,6 +1297,15 @@ function restart_module_menu() {
                 ;;
             4)
                 restart_network_services_action
+                ;;
+            5)
+                restart_bluetooth_services_action
+                ;;
+            6)
+                restart_graphics_system_action
+                ;;
+            7)
+                power_management_action
                 ;;
             0)
                 lh_log_msg "INFO" "$(lh_msg 'RESTART_BACK_TO_MAIN_LOG')"

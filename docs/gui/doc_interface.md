@@ -55,6 +55,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   `DocumentBrowser.jsx` - Independent documentation browser with categorized navigation
         *   `ResizablePanels.jsx` - Flexible panel layout management with hide/show panel controls
         *   `LanguageSelector.jsx` - Language selection component with real-time switching
+        *   `ExitButton.jsx` - Application exit component with session-aware confirmation and graceful shutdown
     *   **Dependencies (system):** `node.js` (18+), `npm`, React ecosystem, React i18next.
     *   **Internationalization Features:**
         *   Full multi-language support with React i18next framework

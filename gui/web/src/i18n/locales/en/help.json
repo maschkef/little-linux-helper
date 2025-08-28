@@ -1,16 +1,22 @@
 {
   "restarts": {
-    "overview": "Restart system services and desktop components safely.",
+    "overview": "Restart system services, desktop components, and manage system power safely. Includes comprehensive restart options for all major system components plus power management features.",
     "options": [
       "1. Restart Login Manager - Restarts display manager (GDM, SDDM, etc.)",
-      "2. Restart Sound System - Restarts PulseAudio/PipeWire",
-      "3. Restart Desktop Environment - Restarts your desktop session",
-      "4. Restart Network Services - Restarts network components"
+      "2. Restart Sound System - Restarts PulseAudio/PipeWire and audio services",
+      "3. Restart Desktop Environment - Restarts your desktop session (KDE, GNOME, XFCE, etc.)",
+      "4. Restart Network Services - Restarts NetworkManager and network components",
+      "5. Restart Bluetooth Services - Restarts Bluetooth system and user services",
+      "6. Restart Graphics System - Restarts graphics drivers and display components",
+      "7. Power Management Options - System shutdown, restart, suspend, hibernate with scheduling"
     ],
     "notes": [
-      "Some operations may require sudo privileges",
-      "Desktop restart will close all applications",
-      "Network restart may temporarily disconnect you"
+      "Most operations require administrator privileges",
+      "Desktop and graphics restart may log you out of your session",
+      "Network restart may temporarily disconnect your internet",
+      "Bluetooth restart affects all connected devices",
+      "Power options include immediate and scheduled actions",
+      "Wayland compositor restart will end your desktop session"
     ]
   },
   "system_info": {

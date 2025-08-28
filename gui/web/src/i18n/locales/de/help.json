@@ -1,16 +1,22 @@
 {
   "restarts": {
-    "overview": "Systemdienste und Desktop-Komponenten sicher neustarten.",
+    "overview": "Systemdienste, Desktop-Komponenten und System-Energieverwaltung sicher neustarten. Umfasst umfassende Neustart-Optionen für alle wichtigen Systemkomponenten sowie Energieverwaltungsfunktionen.",
     "options": [
       "1. Login-Manager neustarten - Startet den Display-Manager neu (GDM, SDDM, etc.)",
-      "2. Sound-System neustarten - Startet PulseAudio/PipeWire neu",
-      "3. Desktop-Umgebung neustarten - Startet Ihre Desktop-Sitzung neu",
-      "4. Netzwerkdienste neustarten - Startet Netzwerkkomponenten neu"
+      "2. Sound-System neustarten - Startet PulseAudio/PipeWire und Audio-Dienste neu",
+      "3. Desktop-Umgebung neustarten - Startet Ihre Desktop-Sitzung neu (KDE, GNOME, XFCE, etc.)",
+      "4. Netzwerkdienste neustarten - Startet NetworkManager und Netzwerkkomponenten neu",
+      "5. Bluetooth-Dienste neustarten - Startet Bluetooth-System und Benutzerdienste neu",
+      "6. Grafik-System neustarten - Startet Grafiktreiber und Display-Komponenten neu",
+      "7. Energieverwaltung - System herunterfahren, neustarten, suspendieren, hibernieren mit Terminplanung"
     ],
     "notes": [
-      "Einige Vorgänge erfordern möglicherweise sudo-Rechte",
-      "Desktop-Neustart schließt alle Anwendungen",
-      "Netzwerk-Neustart kann Sie vorübergehend vom Netz trennen"
+      "Die meisten Vorgänge erfordern Administrator-Rechte",
+      "Desktop- und Grafik-Neustart kann Sie aus Ihrer Sitzung abmelden",
+      "Netzwerk-Neustart kann Ihre Internetverbindung vorübergehend unterbrechen",
+      "Bluetooth-Neustart betrifft alle verbundenen Geräte",
+      "Energieoptionen umfassen sofortige und geplante Aktionen",
+      "Wayland-Compositor-Neustart beendet Ihre Desktop-Sitzung"
     ]
   },
   "system_info": {

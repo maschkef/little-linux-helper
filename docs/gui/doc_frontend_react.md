@@ -37,6 +37,7 @@ web/src/
 │   ├── ResizablePanels.jsx      # Panel layout system
 │   ├── SessionDropdown.jsx      # Session management dropdown
 │   ├── LanguageSelector.jsx     # EN/DE language switching
+│   ├── ExitButton.jsx           # Application exit with session-aware confirmation
 │   └── ErrorBoundary.jsx        # Error handling wrapper
 ├── contexts/            # React contexts
 │   └── SessionContext.jsx      # Session and WebSocket management
@@ -618,6 +619,91 @@ useEffect(() => {
   window.addEventListener('terminal-output', handleOutput);
   return () => window.removeEventListener('terminal-output', handleOutput);
 }, [activeSessionId]);
+```
+
+### ExitButton.jsx - Application Exit with Session Management
+
+**Purpose:** Provides safe application exit functionality with session-aware confirmation dialogs
+
+**Key Features:**
+- **Session Detection**: Automatically detects and lists active running modules
+- **Smart Confirmation**: Shows different dialogs based on session status
+- **Progressive Warnings**: Lists each active session with module name and start time
+- **Graceful Shutdown**: Coordinates with backend API to properly terminate sessions
+- **Browser Integration**: Attempts automatic window close with fallback message
+
+**Component Implementation:**
+```jsx
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useSession } from '../contexts/SessionContext.jsx';
+
+const ExitButton = () => {
+  const { t } = useTranslation('common');
+  const { sessions } = useSession();
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isShuttingDown, setIsShuttingDown] = useState(false);
+  
+  // Get active sessions for warning display
+  const activeSessions = Array.from(sessions.values()).filter(session => 
+    session.status !== 'stopped'
+  );
+  
+  const handleConfirmExit = async (force = false) => {
+    const url = force ? '/api/shutdown?force=true' : '/api/shutdown';
+    const response = await fetch(url, { method: 'POST' });
+    const result = await response.json();
+    
+    // Close browser window after server shutdown
+    if (result.activeSessions?.length === 0 || force) {
+      setTimeout(() => {
+        window.close();
+        // Fallback message if window.close() fails
+        setTimeout(() => alert(t('exit.browserCloseMessage')), 1000);
+      }, 1500);
+    }
+  };
+  
+  return (
+    <button onClick={() => setShowConfirmDialog(true)}>
+      {t('exit.exit')}
+    </button>
+  );
+};
+```
+
+**Confirmation Dialog Features:**
+- **Session Warnings**: Lists all running modules by name and start time
+- **Visual Hierarchy**: Warning colors for destructive actions (red buttons)
+- **Two-Step Confirmation**: Cancel/Exit options with clear messaging
+- **Internationalization**: All text elements support EN/DE translations
+- **Shutdown Progress**: "Shutting down..." status with server response display
+
+**API Integration:**
+- **Initial Call**: `POST /api/shutdown` (checks for active sessions)
+- **Force Shutdown**: `POST /api/shutdown?force=true` (bypasses warnings)
+- **Response Handling**: Processes server response for session details
+- **Error Handling**: Graceful degradation with user-friendly error messages
+
+**Translation Keys Used:**
+```json
+{
+  "exit.confirmTitle": "Confirm Exit",
+  "exit.activeSessionsWarning": "Active Sessions Running:",
+  "exit.sessionsWillBeTerminated": "All running modules will be stopped.",
+  "exit.confirmExit": "Exit Application",
+  "exit.shuttingDown": "Shutting down...",
+  "exit.browserCloseMessage": "Server has been stopped. You can now close this browser window."
+}
+```
+
+**Integration with App.jsx:**
+```jsx
+// Header placement alongside LanguageSelector
+<div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+  <LanguageSelector />
+  <ExitButton />
+</div>
 ```
 
 ## Development Patterns

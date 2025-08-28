@@ -294,6 +294,9 @@ func main() {
 	// Stop module session
 	api.Delete("/sessions/:sessionId", stopSession)
 
+	// Shutdown server gracefully
+	api.Post("/shutdown", shutdownServer)
+
 	// WebSocket for real-time communication
 	app.Use("/ws", websocket.New(handleWebSocket))
 
@@ -447,10 +450,10 @@ func getModules(c *fiber.Ctx) error {
 		{
 			ID:             "restarts",
 			Name:           "Services & Desktop Restart Options",
-			Description:    "Restart system services and desktop environment components",
+			Description:    "Restart system services, desktop environment, and power management",
 			Path:           "modules/mod_restarts.sh",
 			Category:       "Recovery & Restarts",
-			SubmoduleCount: 4,
+			SubmoduleCount: 7,
 		},
 		{
 			ID:             "system_info",
@@ -960,6 +963,86 @@ func stopSession(c *fiber.Ctx) error {
 	}()
 
 	return c.JSON(fiber.Map{"status": "stopped"})
+}
+
+// shutdownServer handles graceful server shutdown
+func shutdownServer(c *fiber.Ctx) error {
+	// Get current active sessions
+	sessionManager.mutex.RLock()
+	activeSessions := make([]SessionInfo, 0, len(sessionManager.sessions))
+	for _, session := range sessionManager.sessions {
+		if session.Status != "stopped" {
+			activeSessions = append(activeSessions, SessionInfo{
+				ID:         session.ID,
+				Module:     session.Module,
+				ModuleName: session.ModuleName,
+				CreatedAt:  session.CreatedAt,
+				Status:     session.Status,
+			})
+		}
+	}
+	sessionManager.mutex.RUnlock()
+
+	// Return session information so frontend can show warnings
+	response := fiber.Map{
+		"activeSessions": activeSessions,
+		"message":        "Server shutdown initiated",
+	}
+
+	// If there are active sessions, allow frontend to decide
+	if len(activeSessions) > 0 {
+		// Check if force shutdown is requested
+		forceShutdown := c.QueryBool("force", false)
+		if !forceShutdown {
+			response["warning"] = "Active sessions will be terminated"
+			return c.JSON(response)
+		}
+	}
+
+	// Perform cleanup in a separate goroutine to allow response to be sent
+	go func() {
+		log.Println("Initiating graceful server shutdown...")
+		
+		// Stop all active sessions
+		sessionManager.mutex.Lock()
+		for sessionId, session := range sessionManager.sessions {
+			if session.Status != "stopped" {
+				log.Printf("Stopping session %s (%s)", sessionId, session.ModuleName)
+				session.Status = "stopped"
+				
+				// Terminate the process and close PTY
+				if session.PTY != nil {
+					session.PTY.Close()
+				}
+				if session.Process != nil && session.Process.Process != nil {
+					// Try graceful shutdown first
+					_ = session.Process.Process.Signal(unix.SIGTERM)
+					select {
+					case <-session.Done:
+						// Process exited gracefully
+						log.Printf("Session %s stopped gracefully", sessionId)
+					case <-time.After(2 * time.Second):
+						// Force kill if still running
+						_ = session.Process.Process.Kill()
+						log.Printf("Session %s force-killed", sessionId)
+					}
+				}
+			}
+		}
+		// Clear all sessions
+		sessionManager.sessions = make(map[string]*ModuleSession)
+		sessionManager.mutex.Unlock()
+
+		log.Println("All sessions stopped. Exiting...")
+		
+		// Give a moment for the response to be sent
+		time.Sleep(500 * time.Millisecond)
+		
+		// Exit the application
+		os.Exit(0)
+	}()
+
+	return c.JSON(response)
 }
 
 func getHealth(c *fiber.Ctx) error {

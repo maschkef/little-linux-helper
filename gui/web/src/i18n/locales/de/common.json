@@ -38,6 +38,20 @@
     "developerDocsTooltip": "Technische Dokumentation und Entwicklerleitfäden für das aktuell ausgewählte oder aktive Modul anzeigen",
     "comprehensiveDocsTooltip": "Vollständigen Browser mit der gesamten Projektdokumentation öffnen, einschließlich Entwicklerleitfäden, Bibliotheksreferenzen und Moduldokumentation"
   },
+  "exit": {
+    "exit": "Beenden",
+    "exitTooltip": "Anwendung beenden",
+    "confirmTitle": "Beenden bestätigen",
+    "confirmMessage": "Sind Sie sicher, dass Sie Little Linux Helper beenden möchten?",
+    "activeSessionsWarning": "Aktive Sitzungen laufen:",
+    "startedAt": "gestartet um {{time}}",
+    "sessionsWillBeTerminated": "Alle laufenden Module werden gestoppt.",
+    "confirmExit": "Anwendung beenden",
+    "cancel": "Abbrechen",
+    "shuttingDown": "Wird beendet...",
+    "shutdownError": "Fehler beim Herunterfahren aufgetreten. Möglicherweise müssen Sie das Browser-Fenster manuell schließen.",
+    "browserCloseMessage": "Server wurde gestoppt. Sie können dieses Browser-Fenster jetzt schließen."
+  },
   "modules": {
     "availableModules": "Verfügbare Module",
     "start": "Starten",
@@ -52,7 +66,7 @@
       "backup_and_recovery": "Backup & Wiederherstellung"
     },
     "names": {
-      "restarts": "Dienste & Desktop-Neustart-Optionen",
+      "restarts": "Dienste, Desktop & Energieverwaltung",
       "system_info": "Systeminformationen anzeigen",
       "disk": "Festplatten-Tools",
       "logs": "Log-Analyse-Tools",

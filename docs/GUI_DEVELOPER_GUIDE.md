@@ -23,6 +23,7 @@ The Little Linux Helper GUI is a modern web-based interface that provides graphi
 - **Real-time Experience**: Live terminal output and interaction
 - **Multi-language Support**: Complete internationalization system
 - **Responsive Design**: Works on desktop and mobile devices
+- **Session Management**: Safe application exit with active session detection
 
 ### Technology Stack
 - **Backend**: Go with Fiber web framework

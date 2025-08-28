@@ -38,6 +38,20 @@
     "developerDocsTooltip": "View technical documentation and developer guides for the currently selected or active module",
     "comprehensiveDocsTooltip": "Open a full browser with all project documentation, including developer guides, library references, and module documentation"
   },
+  "exit": {
+    "exit": "Exit",
+    "exitTooltip": "Exit the application",
+    "confirmTitle": "Confirm Exit",
+    "confirmMessage": "Are you sure you want to exit Little Linux Helper?",
+    "activeSessionsWarning": "Active Sessions Running:",
+    "startedAt": "started at {{time}}",
+    "sessionsWillBeTerminated": "All running modules will be stopped.",
+    "confirmExit": "Exit Application",
+    "cancel": "Cancel",
+    "shuttingDown": "Shutting down...",
+    "shutdownError": "Error occurred during shutdown. You may need to close the browser window manually.",
+    "browserCloseMessage": "Server has been stopped. You can now close this browser window."
+  },
   "modules": {
     "availableModules": "Available Modules",
     "start": "Start",
@@ -52,7 +66,7 @@
       "backup_and_recovery": "Backup & Recovery"
     },
     "names": {
-      "restarts": "Services & Desktop Restart Options",
+      "restarts": "Services, Desktop & Power Management",
       "system_info": "Display System Information",
       "disk": "Disk Tools", 
       "logs": "Log Analysis Tools",

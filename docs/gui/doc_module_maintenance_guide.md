@@ -346,6 +346,9 @@ const [expandedCategories, setExpandedCategories] = useState({
 - [ ] Document browser shows module in correct category
 - [ ] All text displays correctly in both languages
 - [ ] No missing translation warnings in browser console
+- [ ] **Exit functionality**: Exit button shows active sessions correctly
+- [ ] **Session warnings**: Exit dialog lists running modules with details
+- [ ] **Graceful shutdown**: Exit with active sessions terminates them properly
 
 ### Development vs Production
 
@@ -498,6 +501,13 @@ cd gui/
 - Check both `en/` and `de/` translation files
 - Verify key structures match between languages
 - Look for console warnings about missing keys
+
+**Exit Button Issues**:
+- Check if exit button appears in header next to language selector
+- Verify exit translations exist in `common.json` files (`exit.confirmTitle`, `exit.activeSessionsWarning`, etc.)
+- Test exit functionality with active sessions to ensure warning dialog appears
+- Check browser console for API call errors to `/api/shutdown` endpoint
+- Verify server logs show proper session cleanup during shutdown
 
 ### Browser Console Debugging
 
