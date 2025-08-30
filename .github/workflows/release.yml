@@ -22,7 +22,7 @@ jobs:
     steps:
     # Step 1: Download your code
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     # Step 2: Install Node.js (latest LTS for build process)
     - name: Setup Node.js
