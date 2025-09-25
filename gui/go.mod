@@ -1,6 +1,6 @@
 module little-linux-helper-gui
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.6
 
@@ -8,7 +8,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/gofiber/websocket/v2 v2.2.1
-	golang.org/x/sys v0.35.0
+	golang.org/x/sys v0.36.0
 )
 
 require (
