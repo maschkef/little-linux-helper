@@ -757,10 +757,16 @@ MSG_DE[BTRFS_CLEANUP_WITH_SUDO]="Bereinigung mit sudo ausführen?"
 MSG_DE[BTRFS_MENU_BACKUP]="BTRFS-Backup erstellen"
 MSG_DE[BTRFS_MENU_CONFIG]="Konfiguration anzeigen/ändern"
 MSG_DE[BTRFS_MENU_STATUS]="Backup-Status anzeigen"
+MSG_DE[BTRFS_MENU_STATUS_INFO]="Status & Informationen"
 MSG_DE[BTRFS_MENU_DELETE]="BTRFS-Backups löschen"
 MSG_DE[BTRFS_MENU_CLEANUP]="Problematische Backups bereinigen"
 MSG_DE[BTRFS_MENU_RESTORE]="BTRFS-Backup wiederherstellen"
 MSG_DE[BTRFS_MENU_BACK]="Zurück zum Hauptmenü"
+MSG_DE[BTRFS_MENU_MAINTENANCE]="Wartung"
+MSG_DE[BTRFS_MENU_MAINTENANCE_TITLE]="BTRFS-Wartung"
+MSG_DE[BTRFS_MENU_CLEANUP_SOURCE]="Von Skript erstellte Quell-Snapshots bereinigen"
+MSG_DE[BTRFS_MENU_CLEANUP_RECEIVING]="Verwaiste Empfangsverzeichnisse (.receiving_*) bereinigen"
+MSG_DE[BTRFS_MENU_DEBUG_CHAIN]="Inkrementelle Kette inspizieren (Debug)"
 
 # BTRFS log messages - problematic cleanup
 MSG_DE[BTRFS_LOG_CLEANUP_PROBLEMATIC_COMPLETE]="Problematische Bereinigung abgeschlossen: %d erfolgreich, %d Fehler"
@@ -775,6 +781,24 @@ MSG_DE[INVALID_SELECTION]="Ungültige Auswahl"
 MSG_DE[PRESS_KEY_CONTINUE]="Drücken Sie eine beliebige Taste zum Fortfahren..."
 MSG_DE[BTRFS_LOG_BACKUP_SUBVOL_DIR_ERROR]="Backup-Subvolume-Verzeichnis für %s konnte nicht erstellt werden"
 MSG_DE[BTRFS_LOG_TRANSFER_SNAPSHOT]="Übertrage Snapshot für Subvolume: %s"
+
+# Empfangsverzeichnis-Bereinigung und Debug-Menü
+MSG_DE[BTRFS_RECEIVING_CLEANUP_HEADER]="Verwaiste .receiving_* Verzeichnisse bereinigen"
+MSG_DE[BTRFS_RECEIVING_AGE_PROMPT]="Nur .receiving_* berücksichtigen, die älter als wie viele Minuten sind? (Standard %d)"
+MSG_DE[BTRFS_RECEIVING_NONE_FOUND]="Keine verwaisten .receiving_* Verzeichnisse gefunden"
+MSG_DE[BTRFS_RECEIVING_FOUND_COUNT]="%d verwaiste .receiving_* Verzeichnisse gefunden"
+MSG_DE[BTRFS_RECEIVING_SUBVOL_LABEL]="Subvolume: %s"
+MSG_DE[BTRFS_RECEIVING_CONFIRM_DELETE_ALL]="ALLE %d aufgelisteten .receiving_* Verzeichnisse jetzt löschen?"
+MSG_DE[BTRFS_RECEIVING_DELETE_ERROR]="Entfernen fehlgeschlagen: %s"
+MSG_DE[BTRFS_RECEIVING_DELETE_SUCCESS]="Entfernt: %s"
+MSG_DE[BTRFS_RECEIVING_SUMMARY]="Bereinigung abgeschlossen: %d entfernt, %d Fehler"
+MSG_DE[BTRFS_NO_SUBVOLUMES_FOUND]="Keine Subvolumes gefunden"
+MSG_DE[BTRFS_DEBUG_CHAIN_HEADER]="Inkrementelle Kette inspizieren"
+MSG_DE[BTRFS_SELECT_SUBVOLUME]="Subvolume auswählen (1-%d):"
+
+# Atomare Receive-Eingabeaufforderungen
+MSG_DE[BTRFS_PROMPT_REMOVE_RECEIVING_NOW]="Temporäres Empfangsverzeichnis jetzt entfernen? (%s)"
+MSG_DE[BTRFS_KEEP_RECEIVING_DIR]="Temporäres Empfangsverzeichnis zur Analyse beibehalten: %s"
 
 # Sub-module information messages
 MSG_DE[BACKUP_TAR_MODULE_INFO]="Starte TAR-Backup-Operationen..."

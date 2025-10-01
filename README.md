@@ -148,6 +148,7 @@ Both interfaces provide access to the following modules:
     * **Incremental Backups**: Intelligent parent detection, automatic fallback, and comprehensive chain integrity validation
     * **Restore Capabilities**: Complete system restore, individual subvolume restore, folder-level restoration, and bootloader integration *(Note: Restore functions are implemented but require comprehensive testing)*
     * **Safety Features**: Live environment detection, filesystem health checking, rollback capabilities, and dry-run support
+    * **Maintenance Submenu**: Dedicated maintenance section with deletion tools, problematic backup cleanup, source snapshot management, incremental chain inspection, and orphan `.receiving_*` cleanup
     * **Detailed Documentation**: See `docs/mod/doc_btrfs_backup.md`, `docs/mod/doc_btrfs_restore.md`, and `docs/lib/doc_btrfs.md`
 
 * **TAR Archive Backup & Restore** (`modules/backup/mod_backup_tar.sh`, `modules/backup/mod_restore_tar.sh`):

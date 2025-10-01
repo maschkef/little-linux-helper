@@ -48,16 +48,24 @@ This module provides comprehensive BTRFS snapshot-based backup functionality wit
     *   `validate_btrfs_implementation`: Comprehensive self-validation framework
 *   **Key System Commands:** `btrfs`, `mount`, `grep`, `awk`, `sort`, `head`, `tail`, `mkdir`, `rm`, `mv`, `date`, `stat`, `df`, `du`, `find`, `basename`, `dirname`, `touch`, `numfmt`, `sed`, `cat`, `hostname`.
 
-**3. Main Menu Function: `main_menu()`**
-This is the entry point and main interactive loop for the BTRFS backup module. It presents a menu with options for:
-1. **Create BTRFS Backup:** Execute the main backup operation
-2. **Configure Backup Settings:** Modify backup parameters and preferences
-3. **Show Backup Status:** Display comprehensive backup status and information
-4. **Delete BTRFS Backups:** Interactive backup deletion with multiple options
-5. **Clean up Problematic Backups:** Automated cleanup of corrupted or incomplete backups
-6. **Clean up Script-Created Source Snapshots:** Manage preserved source snapshots
-7. **Enhanced Restore (with set-default):** Access to the advanced restore module with bootloader integration
-8. **Exit:** Return to main system menu
+**3. Menu Structure**
+The module exposes a streamlined two-level menu:
+
+- Top‑level (`main_menu`):
+  1. Create Backup
+  2. Restore Backup (Enhanced)
+  3. Status & Info
+  4. Configuration
+  5. Maintenance
+  0. Back to Main Menu
+
+- Maintenance submenu (`maintenance_menu`):
+  1. Delete BTRFS Backups
+  2. Cleanup Problematic Backups
+  3. Clean up script‑created source snapshots
+  4. Cleanup Orphan Receiving Dirs (.receiving_*)
+  5. Inspect Incremental Chain (debug)
+  0. Back
 
 **4. Module Functions:**
 
@@ -183,6 +191,18 @@ This is the entry point and main interactive loop for the BTRFS backup module. I
         *   For each snapshot, calls `check_backup_integrity`. If status is not "OK" or "WIRD_ERSTELLT", it's listed as problematic.
         *   If problematic backups are found, prompts for confirmation (via `lh_confirm_action`) to delete them all.
     *   **Mechanism:** Deletes BTRFS subvolumes and their marker files.
+
+*   **`cleanup_orphan_receiving_dirs()`**
+    *   **Purpose:** Finds and optionally removes orphan `.receiving_*` directories that can remain from interrupted `btrfs receive` operations.
+    *   **Mechanism:**
+        *   Scans `$LH_BACKUP_ROOT$LH_BACKUP_DIR/*/.receiving_*` with an age filter (default: 30 minutes) to avoid interfering with in‑flight backups
+        *   Previews candidates grouped by subvolume and shows contained snapshot directory names
+        *   On confirmation, deletes any subvolumes within each `.receiving_*` dir using `btrfs subvolume delete`, then removes the directory (tries `rmdir`, falls back to `rm -rf`)
+    *   **Interaction:** Fully interactive with confirmation prompts; reports a removal summary.
+
+*   **`maintenance_debug_chain()`**
+    *   **Purpose:** Helper that lets you select a backup subvolume and runs the detailed `debug_incremental_backup_chain()` diagnostics.
+    *   **Interaction:** Presents subvolumes for selection and prints chain analysis.
 
 *   **`show_backup_status()`**
     *   **Purpose:** Displays an overview of the current BTRFS backup situation.
@@ -391,8 +411,9 @@ The module creates its own snapshots in the designated temporary snapshot direct
 7. **Snapshot creation:** Create read-only snapshots of determined target subvolumes with comprehensive validation, optionally in permanent locations for preservation
 8. **Chain validation:** Use `validate_parent_snapshot_chain()` to verify incremental backup chain integrity from both temporary and preserved source snapshots
 9. **Atomic transfer:** Use `atomic_receive_with_validation()` for true atomic operations with comprehensive validation:
-   - Incremental transfers when suitable parent snapshots with valid `received_uuid` are available
-   - Automatic fallback to full backup when incremental chains are broken
+   - Atomic pattern: receive into a `.receiving_*` directory → validate → atomic rename (`mv`) to the final path (within the same BTRFS filesystem)
+   - On errors, the module offers to remove the temporary `.receiving_*` directory (default Yes) or keep it for inspection
+   - Incremental transfers when suitable parent snapshots with valid `received_uuid` are available; automatic fallback to full backup when chains are broken
    - Intelligent error handling with `handle_btrfs_error()` for automatic recovery strategies
 10. **UUID protection:** Use `verify_received_uuid_integrity()` and `protect_received_snapshots()` to maintain backup chain integrity
 11. **Verification:** Create completion markers and verify successful transfer with comprehensive integrity checking

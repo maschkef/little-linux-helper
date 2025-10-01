@@ -18,6 +18,7 @@ This library provides advanced BTRFS-specific functions for backup and restore o
 - **Atomic Backup Operations**: True atomic patterns preventing incomplete backups
 - **Incremental Chain Protection**: received_uuid integrity verification and protection
 - **Intelligent Cleanup**: Chain-aware backup rotation that preserves dependencies
+ - **Receiving Artifact Management**: Utilities to list and clean up temporary `.receiving_*` directories
 - **BTRFS-Specific Space Checking**: Metadata exhaustion detection and accurate space calculation
 - **Comprehensive Health Monitoring**: Filesystem corruption detection and validation
 - **Advanced Error Analysis**: BTRFS-specific error pattern recognition and handling
@@ -43,10 +44,10 @@ This library provides advanced BTRFS-specific functions for backup and restore o
 **Critical Problem Solved:** Standard `btrfs receive` can leave incomplete snapshots that appear valid but are actually corrupted, leading to unreliable backups.
 
 **Atomic Workflow Implementation:**
-1. **Receive into temporary directory** with `.receiving` suffix
+1. **Receive into temporary directory** with `.receiving_*` suffix
 2. **Validate operation success** through exit code and snapshot verification
 3. **Atomic rename using mv** (atomic operation for BTRFS subvolumes)
-4. **Clean up temporary files** on any failure
+4. **Interactive cleanup on failure**: the module offers to remove the temporary `.receiving_*` directory (default Yes) or keep it for inspection
 
 **Parameters:**
 - `$1: source_snapshot` - Path to source snapshot (must be read-only)
@@ -83,6 +84,40 @@ atomic_receive_with_validation \
 
 **Dependencies (internal):** `handle_btrfs_error`, `lh_log_msg`
 **Dependencies (system):** `btrfs send`, `btrfs receive`, `btrfs property`, `btrfs subvolume`
+
+### `btrfs_list_receiving_dirs()`
+
+Purpose: List temporary `.receiving_*` directories (created by `btrfs receive`) older than a specified age, to avoid interfering with in-flight operations.
+
+Parameters:
+- `$1: base_dir` – Base directory to scan (e.g., backup root directory)
+- `$2: min_age_minutes` – Minimum age in minutes (default 30)
+
+Output: NUL-separated paths written to stdout for robust parsing.
+
+Usage Example:
+```bash
+# List candidates older than 45 minutes under backup directory
+btrfs_list_receiving_dirs "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 45 | xargs -0 -I{} echo {}
+```
+
+### `btrfs_cleanup_receiving_dir()`
+
+Purpose: Safely remove a single `.receiving_*` directory by deleting any BTRFS subvolumes inside it first, then removing the directory.
+
+Parameters:
+- `$1: receiving_dir` – Path to `.receiving_*` directory
+
+Return Codes:
+- `0`: Removed successfully
+- `1`: Failed to remove completely
+
+Usage Example:
+```bash
+while IFS= read -r -d '' d; do
+  btrfs_cleanup_receiving_dir "$d"
+done < <(btrfs_list_receiving_dirs "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 30)
+```
 
 **4. Backup Chain Validation**
 

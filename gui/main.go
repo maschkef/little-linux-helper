@@ -528,7 +528,7 @@ func getModules(c *fiber.Ctx) error {
 		{
 			ID:             "btrfs_backup",
 			Name:           "BTRFS Backup",
-			Description:    "Advanced BTRFS snapshot-based backup system",
+			Description:    "Advanced BTRFS snapshot-based backup system with maintenance tools",
 			Path:           "modules/backup/mod_btrfs_backup.sh",
 			Category:       "Backup & Recovery",
 			Parent:         "backup",

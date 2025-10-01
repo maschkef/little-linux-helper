@@ -3497,16 +3497,153 @@ cleanup_problematic_backups() {
 # like Snapper/Timeshift are completely bypassed to avoid sibling snapshot
 # issues that would break incremental backup chain integrity.
 
+maintenance_menu() {
+    while true; do
+        lh_print_header "$(lh_msg 'BTRFS_MENU_MAINTENANCE_TITLE')"
+        lh_print_menu_item 1 "$(lh_msg 'BTRFS_MENU_DELETE')"
+        lh_print_menu_item 2 "$(lh_msg 'BTRFS_MENU_CLEANUP')"
+        lh_print_menu_item 3 "$(lh_msg 'BTRFS_MENU_CLEANUP_SOURCE')"
+        lh_print_menu_item 4 "$(lh_msg 'BTRFS_MENU_CLEANUP_RECEIVING')"
+        lh_print_menu_item 5 "$(lh_msg 'BTRFS_MENU_DEBUG_CHAIN')"
+        lh_print_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
+        echo ""
+
+        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET}")" subopt
+        case $subopt in
+            1)
+                delete_btrfs_backups
+                ;;
+            2)
+                cleanup_problematic_backups
+                ;;
+            3)
+                cleanup_script_created_snapshots
+                ;;
+            4)
+                cleanup_orphan_receiving_dirs
+                ;;
+            5)
+                maintenance_debug_chain
+                ;;
+            0)
+                return 0
+                ;;
+            *)
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
+                ;;
+        esac
+
+        lh_press_any_key
+        echo ""
+    done
+}
+
+cleanup_orphan_receiving_dirs() {
+    local base_dir="$LH_BACKUP_ROOT$LH_BACKUP_DIR"
+    if [ ! -d "$base_dir" ]; then
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BACKUP_DIR_NOT_EXISTS' "$base_dir")${LH_COLOR_RESET}"
+        return 1
+    fi
+
+    lh_print_header "$(lh_msg 'BTRFS_RECEIVING_CLEANUP_HEADER')"
+
+    # Ask age filter (minutes), default 30
+    local default_age=30
+    local age_input=$(lh_ask_for_input "$(lh_msg 'BTRFS_RECEIVING_AGE_PROMPT' "$default_age")")
+    local age_minutes="$default_age"
+    if [[ -n "$age_input" && "$age_input" =~ ^[0-9]+$ ]]; then
+        age_minutes="$age_input"
+    fi
+
+    # Collect candidates using library helper (NUL-separated)
+    local -a candidates=()
+    while IFS= read -r -d '' d; do
+        candidates+=("$d")
+    done < <(btrfs_list_receiving_dirs "$base_dir" "$age_minutes")
+
+    if [ ${#candidates[@]} -eq 0 ]; then
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RECEIVING_NONE_FOUND')${LH_COLOR_RESET}"
+        return 0
+    fi
+
+    printf "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RECEIVING_FOUND_COUNT' "${#candidates[@]}")${LH_COLOR_RESET}\n"
+    echo -e "${LH_COLOR_SEPARATOR}----------------------------------------${LH_COLOR_RESET}"
+    for dir in "${candidates[@]}"; do
+        local subvol_name=$(basename "$(dirname "$dir")")
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_RECEIVING_SUBVOL_LABEL' "$subvol_name")${LH_COLOR_RESET} $dir"
+        # Preview contained snapshot directory name(s)
+        for s in "$dir"/*; do
+            [ -d "$s" ] || continue
+            echo "  -> $(basename "$s")"
+        done
+    done
+
+    echo ""
+    if lh_confirm_action "$(lh_msg 'BTRFS_RECEIVING_CONFIRM_DELETE_ALL' "${#candidates[@]}")" "n"; then
+        local ok_count=0
+        local err_count=0
+        for dir in "${candidates[@]}"; do
+            if ! btrfs_cleanup_receiving_dir "$dir"; then
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_RECEIVING_DELETE_ERROR' "$dir")${LH_COLOR_RESET}"
+                ((err_count++))
+            else
+                echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_RECEIVING_DELETE_SUCCESS' "$dir")${LH_COLOR_RESET}"
+                ((ok_count++))
+            fi
+        done
+        echo ""
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_RECEIVING_SUMMARY' "$ok_count" "$err_count")${LH_COLOR_RESET}"
+    else
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
+    fi
+}
+
+maintenance_debug_chain() {
+    local base_dir="$LH_BACKUP_ROOT$LH_BACKUP_DIR"
+    if [ ! -d "$base_dir" ]; then
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BACKUP_DIR_NOT_EXISTS' "$base_dir")${LH_COLOR_RESET}"
+        return 1
+    fi
+
+    # Collect subvolumes
+    local -a subvols=()
+    for d in "$base_dir"/*; do
+        [ -d "$d" ] || continue
+        subvols+=("$(basename "$d")")
+    done
+    if [ ${#subvols[@]} -eq 0 ]; then
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_NO_SUBVOLUMES_FOUND')${LH_COLOR_RESET}"
+        return 0
+    fi
+
+    lh_print_header "$(lh_msg 'BTRFS_DEBUG_CHAIN_HEADER')"
+    local i=1
+    for sv in "${subvols[@]}"; do
+        lh_print_menu_item "$i" "$sv"
+        i=$((i+1))
+    done
+    lh_print_menu_item 0 "$(lh_msg 'BTRFS_MENU_BACK')"
+    echo ""
+    local choice=$(lh_ask_for_input "$(lh_msg 'BTRFS_SELECT_SUBVOLUME' "$i")")
+    if [[ "$choice" = "0" ]]; then
+        return 0
+    fi
+    if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt ${#subvols[@]} ]; then
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
+        return 1
+    fi
+    local sel="${subvols[$((choice-1))]}"
+    debug_incremental_backup_chain "$sel" "$base_dir/$sel" "$LH_TEMP_SNAPSHOT_DIR"
+}
+
 main_menu() {
     while true; do
         lh_print_header "$(lh_msg 'BACKUP_MENU_TITLE') - BTRFS"
         lh_print_menu_item 1 "$(lh_msg 'BTRFS_MENU_BACKUP')"
-        lh_print_menu_item 2 "$(lh_msg 'BTRFS_MENU_CONFIG')"
-        lh_print_menu_item 3 "$(lh_msg 'BTRFS_MENU_STATUS')"
-        lh_print_menu_item 4 "$(lh_msg 'BTRFS_MENU_DELETE')"
-        lh_print_menu_item 5 "$(lh_msg 'BTRFS_MENU_CLEANUP')"
-        lh_print_menu_item 6 "Clean up script-created source snapshots"
-        lh_print_menu_item 7 "$(lh_msg 'BTRFS_MENU_RESTORE') - Enhanced Restore (with set-default)"
+        lh_print_menu_item 2 "$(lh_msg 'BTRFS_MENU_RESTORE')"
+        lh_print_menu_item 3 "$(lh_msg 'BTRFS_MENU_STATUS_INFO')"
+        lh_print_menu_item 4 "$(lh_msg 'BTRFS_MENU_CONFIG')"
+        lh_print_menu_item 5 "$(lh_msg 'BTRFS_MENU_MAINTENANCE')"
         lh_print_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
         echo ""
 
@@ -3517,23 +3654,17 @@ main_menu() {
                 btrfs_backup
                 ;;
             2)
-                configure_backup
+                # Enhanced restore (with set-default)
+                show_restore_menu
                 ;;
             3)
                 show_backup_status
                 ;;
             4)
-                delete_btrfs_backups
+                configure_backup
                 ;;
             5)
-                cleanup_problematic_backups
-                ;;
-            6)
-                cleanup_script_created_snapshots
-                ;;
-            7)
-                # Use enhanced restore module with btrfs subvolume set-default support
-                show_restore_menu
+                maintenance_menu
                 ;;
             0)
                 return 0
