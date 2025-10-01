@@ -18,6 +18,7 @@ The `mod_restarts.sh` module provides functionality to restart various system se
 - Sound System (PipeWire, PulseAudio, ALSA)
 - Desktop Environment (KDE Plasma, GNOME, XFCE, Cinnamon, MATE, LXDE, LXQt)
 - Network Services (NetworkManager, systemd-networkd, etc.)
+- Firewall Components (firewalld, UFW, nftables, netfilter-persistent, Shorewall)
 
 It aims to offer convenient restart options, especially for troubleshooting or applying certain configuration changes that require a service restart.
 
@@ -51,7 +52,7 @@ The module's primary entry point is `restart_module_menu()`, which displays a me
 *   `restart_module_menu()`
     *   **Purpose:** Displays the main menu for this module and handles user input to call specific action functions.
     *   **Workflow:**
-        1.  Presents options: Restart Login Manager, Sound System, Desktop Environment, Network Services.
+        1.  Presents options: Restart Login Manager, Sound System, Desktop Environment, Network Services, Firewall.
         2.  Reads user choice.
         3.  Calls the corresponding `_action` function.
         4.  Pauses for user to read output before re-displaying the menu.
@@ -125,6 +126,25 @@ The module's primary entry point is `restart_module_menu()`, which displays a me
         4.  Restarts selected service(s) using `$LH_SUDO_CMD systemctl restart <service>`.
     *   **Side Effects:** Temporarily disconnects network connectivity.
     *   **Special Considerations:** Relies on `systemctl` for service management.
+
+*   `restart_firewall_services_action()`
+    *   **Purpose:** Reloads or restarts common firewall components.
+    *   **Detection:** Uses command presence and/or systemd unit files to detect:
+        - firewalld (`firewall-cmd`, `firewalld.service`)
+        - UFW (`ufw`, `ufw.service`)
+        - nftables (`nft`, `nftables.service`)
+        - netfilter-persistent (`netfilter-persistent`, `netfilter-persistent.service`)
+        - Shorewall (`shorewall`, `shorewall.service`)
+    *   **Workflow:**
+        1.  Lists detected components; user can pick one or all.
+        2.  Warns that traffic may briefly interrupt; asks for confirmation.
+        3.  Executes preferred reload where possible, with safe fallbacks:
+            - firewalld: `firewall-cmd --reload`, fallback `systemctl reload/restart`.
+            - UFW: `ufw reload`, fallback `systemctl restart ufw`.
+            - nftables: `systemctl reload/restart nftables`, fallback `nft -f /etc/nftables.conf`.
+            - netfilter-persistent: `systemctl reload/restart`, fallback `netfilter-persistent reload`.
+            - Shorewall: `shorewall reload`, fallback `systemctl reload/restart`.
+        4.  Summarizes success/failure across selected components.
 
 ### 4. Usage
 

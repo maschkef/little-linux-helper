@@ -18,6 +18,7 @@ MSG_DE[RESTART_LOGIN_MANAGER]="Login Manager neu starten (Alle Userprozesse werd
 MSG_DE[RESTART_SOUND_SYSTEM]="Sound-System neu starten"
 MSG_DE[RESTART_DESKTOP_ENVIRONMENT]="Desktop-Umgebung neu starten"
 MSG_DE[RESTART_NETWORK_SERVICES]="Netzwerkdienste neu starten"
+MSG_DE[RESTART_FIREWALL]="Firewall neu laden/neu starten"
 
 # Login Manager restart
 MSG_DE[RESTART_LOGIN_MANAGER_STARTING]="Login Manager wird neu gestartet..."
@@ -203,6 +204,29 @@ MSG_DE[RESTART_NET_SERVICE_SUCCESS]="Erfolgreich neu gestartet: %s."
 MSG_DE[RESTART_NET_SERVICE_ERROR]="FEHLER beim Neustart von %s."
 MSG_DE[RESTART_NET_ALL_SUCCESS]="Ausgewählte Netzwerkdienste erfolgreich neu gestartet."
 MSG_DE[RESTART_NET_SOME_FAILED]="Mindestens ein Netzwerkdienst konnte nicht erfolgreich neu gestartet werden."
+
+# Firewall-Neustart
+MSG_DE[RESTART_FW_CHECKING]="Prüfe Firewall-Komponenten..."
+MSG_DE[RESTART_FW_FIREWALLD_DETECTED]="firewalld erkannt"
+MSG_DE[RESTART_FW_UFW_DETECTED]="UFW erkannt"
+MSG_DE[RESTART_FW_NFTABLES_DETECTED]="nftables erkannt"
+MSG_DE[RESTART_FW_NETFILTER_PERSISTENT_DETECTED]="netfilter-persistent erkannt"
+MSG_DE[RESTART_FW_SHOREWALL_DETECTED]="Shorewall erkannt"
+MSG_DE[RESTART_FW_NONE_DETECTED]="Keine Firewall-Komponente gefunden, die neu geladen/gestartet werden kann."
+MSG_DE[RESTART_FW_DETECTED_SERVICES]="Erkannte Firewall-Komponenten"
+MSG_DE[RESTART_FW_ALL_SERVICES]="Alle oben genannten neu laden/neustarten"
+MSG_DE[RESTART_FW_CHOOSE_SERVICE]="Firewall zum Neu laden/Neustarten wählen (1-%d, 0 Abbruch): "
+MSG_DE[RESTART_FW_INVALID_SELECTION]="Ungültige Auswahl."
+MSG_DE[RESTART_FW_CANCELLED]="Firewall-Neuladen/Neustart abgebrochen."
+MSG_DE[RESTART_FW_ALL_RESTARTING]="Lade/Starte alle erkannten Firewall-Komponenten neu..."
+MSG_DE[RESTART_FW_SERVICE_RESTARTING]="Lade/Starte %s neu..."
+MSG_DE[RESTART_FW_WARNING_INTERRUPTION]="WARNUNG: Das Neu laden/Neustarten der Firewall kann Netzwerkverkehr kurzzeitig unterbrechen."
+MSG_DE[RESTART_FW_CONFIRM_CONTINUE]="Möchten Sie fortfahren?"
+MSG_DE[RESTART_FW_RELOADING_SERVICE]="Lade/Starte %s neu..."
+MSG_DE[RESTART_FW_SERVICE_SUCCESS]="Erfolgreich neu geladen/neu gestartet: %s."
+MSG_DE[RESTART_FW_SERVICE_ERROR]="Fehler beim Neu laden/Neustarten von %s."
+MSG_DE[RESTART_FW_ALL_SUCCESS]="Firewall-Komponenten erfolgreich neu geladen/neu gestartet."
+MSG_DE[RESTART_FW_SOME_FAILED]="Mindestens eine Firewall-Komponente konnte nicht neu geladen/neu gestartet werden."
 
 # Restart individual services
 MSG_DE[RESTART_SOUND_RESTARTING_SERVICE]="Starte %s neu..."

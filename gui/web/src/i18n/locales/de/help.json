@@ -6,14 +6,16 @@
       "2. Sound-System neustarten - Startet PulseAudio/PipeWire und Audio-Dienste neu",
       "3. Desktop-Umgebung neustarten - Startet Ihre Desktop-Sitzung neu (KDE, GNOME, XFCE, etc.)",
       "4. Netzwerkdienste neustarten - Startet NetworkManager und Netzwerkkomponenten neu",
-      "5. Bluetooth-Dienste neustarten - Startet Bluetooth-System und Benutzerdienste neu",
-      "6. Grafik-System neustarten - Startet Grafiktreiber und Display-Komponenten neu",
-      "7. Energieverwaltung - System herunterfahren, neustarten, suspendieren, hibernieren mit Terminplanung"
+      "5. Firewall neu laden/neustarten - Lädt oder startet Firewall-Komponenten neu (firewalld, UFW, nftables)",
+      "6. Bluetooth-Dienste neustarten - Startet Bluetooth-System und Benutzerdienste neu",
+      "7. Grafik-System neustarten - Startet Grafiktreiber und Display-Komponenten neu",
+      "8. Energieverwaltung - System herunterfahren, neustarten, suspendieren, hibernieren mit Terminplanung"
     ],
     "notes": [
       "Die meisten Vorgänge erfordern Administrator-Rechte",
       "Desktop- und Grafik-Neustart kann Sie aus Ihrer Sitzung abmelden",
       "Netzwerk-Neustart kann Ihre Internetverbindung vorübergehend unterbrechen",
+      "Firewall-Neuladen/Neustart kann den Netzwerkverkehr kurzzeitig unterbrechen",
       "Bluetooth-Neustart betrifft alle verbundenen Geräte",
       "Energieoptionen umfassen sofortige und geplante Aktionen",
       "Wayland-Compositor-Neustart beendet Ihre Desktop-Sitzung"
