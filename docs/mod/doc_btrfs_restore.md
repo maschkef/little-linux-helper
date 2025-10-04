@@ -53,18 +53,31 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
 *   **`TARGET_ROOT`**: Path to target system mount point (configured interactively)  
 *   **`TEMP_SNAPSHOT_DIR`**: Temporary directory for restoration operations (`${TARGET_ROOT}/.snapshots_recovery`)
 *   **`DRY_RUN`**: Boolean flag for dry-run mode (user configurable)
-*   **`LH_RESTORE_LOG`**: Path to restore-specific log file with timestamp
+*   **`LH_RESTORE_LOG`**: Path to restore-specific log file; created lazily once the main logging system is initialised so sourcing the module from other scripts doesn’t leave stray files
+*   **`RESTORE_LIVE_ENV_STATUS`**: Cached result of the live-environment detection ("true"/"false") to avoid repeated probing
+*   **`RESTORE_LIVE_MESSAGE_SHOWN`**: Tracks whether the "live environment detected" notice has already been displayed for the current session
+*   **`RESTORE_NON_LIVE_OVERRIDE`**: Tracks whether the user acknowledged running on a non-live system so subsequent operations don’t prompt again
+*   **`RESTORE_NON_LIVE_NOTICE_SHOWN`**: Ensures the informational reminder about running non-live is printed only once after override
 
 **4. Core Safety and Validation Functions:**
 
-*   **`check_live_environment()`**
-    *   **Purpose:** Detects if running in a live environment and warns users about risks of running on active systems.
+*   **`detect_live_environment()`**
+    *   **Purpose:** Performs heuristic live-environment detection and returns "true"/"false".
     *   **Mechanism:**
-        *   Checks for live environment indicators: `/run/archiso`, `/etc/calamares`, `/live`, `/rofs`, `/casper`
-        *   Provides clear warnings and recommendations if not in live environment
-        *   Allows user override with explicit confirmation for non-live environments
-    *   **Safety Features:** Prevents accidental execution on running systems
-    *   **Dependencies (internal):** `lh_print_header`, `lh_confirm_action`, `restore_log_msg`
+        *   Looks for common live-image artefacts (e.g. `/run/archiso`, `/run/initramfs/live`, `/live`, `/rofs`, `/casper`, `/usr/lib/live`, `/var/lib/live`)
+        *   Examines `findmnt /` to identify overlay/squashfs/loop-based roots or read-only mounts
+        *   Parses `/proc/cmdline` for live boot parameters (`boot=live`, `casper`, `archiso`, `toram`, etc.)
+        *   Respects the override environment variable `LH_RESTORE_ASSUME_LIVE=true` for scripted usage or unusual live setups
+
+*   **`check_live_environment()`**
+    *   **Purpose:** Warns about destructive operations when the module is not running from a detected live environment.
+    *   **Mechanism:**
+        *   Uses the cached result from `detect_live_environment()` and logs the detection decision
+        *   Displays the success banner only once when a live environment is confirmed
+        *   If not live, prints a warning/recommendation and requires an explicit confirmation before proceeding
+        *   Remembers the user’s override so later operations in the same session do not ask again, while still showing a single informational reminder
+    *   **Safety Features:** Prevents accidental execution on running systems while avoiding repeated prompts once the user has consciously overridden the warning
+    *   **Dependencies (internal):** `lh_print_header`, `lh_confirm_action`, `restore_log_msg`, `detect_live_environment`
 
 *   **`validate_filesystem_health()`**
     *   **Purpose:** Validates BTRFS filesystem health using comprehensive library functions before operations.

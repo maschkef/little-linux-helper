@@ -116,7 +116,7 @@ recreate_filesystem_structure() {
     local temp_mount="/tmp/btrfs_recreate_$$"
     mkdir -p "$temp_mount"
     
-    if ! mount "$target_device" "$temp_mount"; then
+    if ! $LH_SUDO_CMD mount "$target_device" "$temp_mount"; then
         restore_log_msg "ERROR" "Failed to mount $target_device for subvolume creation"
         rmdir "$temp_mount" 2>/dev/null
         return 1
@@ -129,7 +129,7 @@ recreate_filesystem_structure() {
     for subvol in $detected_subvols; do
         restore_log_msg "INFO" "Creating subvolume: $subvol"
         
-        if btrfs subvolume create "$temp_mount/$subvol" >/dev/null 2>&1; then
+        if $LH_SUDO_CMD btrfs subvolume create "$temp_mount/$subvol" >/dev/null 2>&1; then
             restore_log_msg "DEBUG" "Successfully created subvolume: $subvol"
             created_subvolumes+=("$subvol")
         else
@@ -138,7 +138,7 @@ recreate_filesystem_structure() {
     done
     
     # Unmount temporary mount
-    umount "$temp_mount"
+    $LH_SUDO_CMD umount "$temp_mount"
     rmdir "$temp_mount" 2>/dev/null
     
     if [[ ${#created_subvolumes[@]} -gt 0 ]]; then
@@ -160,7 +160,7 @@ create_default_filesystem_structure() {
     local temp_mount="/tmp/btrfs_default_$$" 
     mkdir -p "$temp_mount"
     
-    if ! mount "$target_device" "$temp_mount"; then
+    if ! $LH_SUDO_CMD mount "$target_device" "$temp_mount"; then
         restore_log_msg "ERROR" "Failed to mount $target_device"
         rmdir "$temp_mount" 2>/dev/null
         return 1
@@ -171,7 +171,7 @@ create_default_filesystem_structure() {
     local created=0
     
     for subvol in "${default_subvols[@]}"; do
-        if btrfs subvolume create "$temp_mount/$subvol" >/dev/null 2>&1; then
+        if $LH_SUDO_CMD btrfs subvolume create "$temp_mount/$subvol" >/dev/null 2>&1; then
             restore_log_msg "INFO" "Created default subvolume: $subvol"
             ((created++))
         else
@@ -179,7 +179,7 @@ create_default_filesystem_structure() {
         fi
     done
     
-    umount "$temp_mount"
+    $LH_SUDO_CMD umount "$temp_mount"
     rmdir "$temp_mount" 2>/dev/null
     
     if [[ $created -gt 0 ]]; then
@@ -224,7 +224,7 @@ generate_fstab_entries() {
     
     # Get device UUID
     local device_uuid
-    device_uuid=$(blkid -s UUID -o value "$target_device" 2>/dev/null || echo "$target_device")
+    device_uuid=$($LH_SUDO_CMD blkid -s UUID -o value "$target_device" 2>/dev/null || echo "$target_device")
     
     # Get detected subvolumes
     local detected_subvols
@@ -241,7 +241,13 @@ generate_fstab_entries() {
             "@cache") mount_point="/var/cache" ;;
             "@log") mount_point="/var/log" ;;
             "@tmp") mount_point="/var/tmp" ;;
-            *) mount_point="/$subvol" ;;  # Generic fallback
+            *)
+                if [[ "$subvol" == @* ]]; then
+                    mount_point="/${subvol#@}"
+                else
+                    mount_point="/$subvol"
+                fi
+                ;;
         esac
         
         echo "UUID=$device_uuid $mount_point btrfs subvol=/$subvol,defaults,noatime,compress=zstd 0 0"
@@ -257,7 +263,7 @@ generate_default_fstab_entries() {
     restore_log_msg "DEBUG" "Generating default fstab entries for $target_device"
     
     local device_uuid
-    device_uuid=$(blkid -s UUID -o value "$target_device" 2>/dev/null || echo "$target_device")
+    device_uuid=$($LH_SUDO_CMD blkid -s UUID -o value "$target_device" 2>/dev/null || echo "$target_device")
     
     echo "# Default BTRFS fstab entries"
     echo "UUID=$device_uuid /        btrfs subvol=/@,defaults,noatime,compress=zstd 0 0"
@@ -328,18 +334,114 @@ TARGET_ROOT=""              # Path to target system mount point
 TEMP_SNAPSHOT_DIR=""        # Temporary directory for restoration operations
 DRY_RUN="false"            # Boolean flag for dry-run mode
 LH_RESTORE_LOG=""          # Path to restore-specific log file
+RESTORE_LIVE_ENV_STATUS=""   # Cached detection result for live environment check
+RESTORE_LIVE_MESSAGE_SHOWN="false"  # Ensure success message only appears once per session
+RESTORE_NON_LIVE_OVERRIDE="false"   # Tracks whether user explicitly accepted running on a non-live system
+RESTORE_NON_LIVE_NOTICE_SHOWN="false"  # Avoid repeating informational message after override
+
+# LH_RESTORE_KEEP_ANCHOR controls whether we keep the read-only snapshot that was
+# just received from the backup. Set this to "true" if you want an extra safety
+# copy to stay inside the temporary restore folder after the restore finished.
+# Keep it at "false" (the default) to automatically delete the received snapshot
+# once the writable copy has been created in its final location.
+LH_RESTORE_KEEP_ANCHOR="${LH_RESTORE_KEEP_ANCHOR:-false}"
+
+# LH_RESTORE_SPACE_MULTIPLIER tells the restore how much free space should be
+# available compared to the size of the selected snapshot. For example, a value
+# of "2" means "have roughly twice as much free space as the snapshot size".
+# The default value "3" gives extra room for the temporary files used by the
+# atomic restore workflow. Increase it if you prefer more safety margin.
+LH_RESTORE_SPACE_MULTIPLIER="${LH_RESTORE_SPACE_MULTIPLIER:-3}"
+
+# Try to determine whether we are running from a live/rescue system.
+# Returns "true" or "false" via stdout.
+detect_live_environment() {
+    if [[ "${LH_RESTORE_ASSUME_LIVE:-}" == "true" ]]; then
+        echo "true"
+        return 0
+    fi
+
+    local indicator
+    local directory_indicators=(
+        "/run/archiso"
+        "/run/initramfs/live"
+        "/run/live"
+        "/etc/calamares"
+        "/live"
+        "/rofs"
+        "/casper"
+        "/usr/lib/live"
+        "/var/lib/live"
+    )
+
+    for indicator in "${directory_indicators[@]}"; do
+        if [[ -d "$indicator" ]]; then
+            echo "true"
+            return 0
+        fi
+    done
+
+    # Many live systems boot with squashfs/overlay root or mark the root filesystem read-only.
+    local root_fstype
+    root_fstype=$(findmnt -n -o FSTYPE / 2>/dev/null || echo "")
+    if [[ "$root_fstype" =~ ^(overlay|squashfs|tmpfs)$ ]]; then
+        echo "true"
+        return 0
+    fi
+
+    local root_source
+    root_source=$(findmnt -n -o SOURCE / 2>/dev/null || echo "")
+    if [[ "$root_source" =~ (squashfs|overlay|loop|casper|archiso|luks-archiso) ]]; then
+        echo "true"
+        return 0
+    fi
+
+    local root_opts
+    root_opts=$(findmnt -n -o OPTIONS / 2>/dev/null || echo "")
+    if [[ "$root_opts" =~ (^|,)ro(,|$) ]]; then
+        echo "true"
+        return 0
+    fi
+
+    if [[ -r /proc/cmdline ]]; then
+        local cmdline
+        cmdline=$(< /proc/cmdline)
+        if [[ "$cmdline" =~ (boot=live|boot=casper|boot=archiso|boot=overlay|cow_device|cowfile|toram|iso-scan|frugal|persistence|live-media) ]]; then
+            echo "true"
+            return 0
+        fi
+    fi
+
+    echo "false"
+}
 
 # Initialize restore-specific log file
 init_restore_log() {
-    local log_timestamp=$(date '+%y%m%d-%H%M')
-    LH_RESTORE_LOG="${LH_LOG_DIR}/${log_timestamp}_btrfs_restore.log"
-    
-    if ! touch "$LH_RESTORE_LOG" 2>/dev/null; then
-        lh_log_msg "WARN" "Could not create restore log file: $LH_RESTORE_LOG"
-        LH_RESTORE_LOG=""
-    else
-        lh_log_msg "INFO" "Restore log initialized: $LH_RESTORE_LOG"
+    LH_RESTORE_LOG=""
+
+    if [[ -z "${LH_LOG_DIR:-}" ]]; then
+        lh_log_msg "DEBUG" "Restore log initialization deferred because LH_LOG_DIR is not set"
+        return 0
     fi
+
+    if [[ ! -d "$LH_LOG_DIR" ]]; then
+        if ! mkdir -p "$LH_LOG_DIR" 2>/dev/null; then
+            lh_log_msg "WARN" "Could not create restore log directory: $LH_LOG_DIR"
+            return 0
+        fi
+    fi
+
+    local log_timestamp
+    log_timestamp=$(date '+%y%m%d-%H%M')
+    local log_path="${LH_LOG_DIR}/${log_timestamp}_btrfs_restore.log"
+
+    if ! touch "$log_path" 2>/dev/null; then
+        lh_log_msg "WARN" "Could not create restore log file: $log_path"
+        return 0
+    fi
+
+    LH_RESTORE_LOG="$log_path"
+    lh_log_msg "INFO" "Restore log initialized: $LH_RESTORE_LOG"
 }
 
 # Enhanced BTRFS-specific error handling for restore operations
@@ -598,6 +700,10 @@ restore_log_msg() {
     lh_log_msg "$level" "$message"
 
     # Additionally log to restore-specific log if available
+    if [[ -z "$LH_RESTORE_LOG" && -n "${LH_LOG_DIR:-}" ]]; then
+        init_restore_log
+    fi
+
     if [[ -n "$LH_RESTORE_LOG" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$LH_RESTORE_LOG"
     fi
@@ -607,36 +713,42 @@ restore_log_msg() {
 check_live_environment() {
     lh_print_header "$(lh_msg 'RESTORE_ENVIRONMENT_CHECK')"
     
-    local is_live_env=false
-    local live_indicators=(
-        "/run/archiso"
-        "/etc/calamares"
-        "/live"
-        "/rofs"
-        "/casper"
-    )
-    
-    for indicator in "${live_indicators[@]}"; do
-        if [[ -d "$indicator" ]]; then
-            is_live_env=true
-            break
-        fi
-    done
-    
-    if [[ "$is_live_env" == "false" ]]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_NOT_LIVE_WARNING')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_LIVE_RECOMMENDATION')${LH_COLOR_RESET}"
-        echo ""
-        
-        if ! lh_confirm_action "$(lh_msg 'RESTORE_CONTINUE_NOT_LIVE')" "n"; then
-            restore_log_msg "INFO" "User aborted due to non-live environment"
-            return 1
-        fi
-    else
-        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_LIVE_DETECTED')${LH_COLOR_RESET}"
+    if [[ -z "$RESTORE_LIVE_ENV_STATUS" ]]; then
+        RESTORE_LIVE_ENV_STATUS=$(detect_live_environment)
+        restore_log_msg "DEBUG" "Live environment auto-detect result: $RESTORE_LIVE_ENV_STATUS"
     fi
-    
-    restore_log_msg "INFO" "Live environment check completed. Live: $is_live_env"
+
+    if [[ "$RESTORE_LIVE_ENV_STATUS" == "true" ]]; then
+        if [[ "$RESTORE_LIVE_MESSAGE_SHOWN" != "true" ]]; then
+            echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_LIVE_DETECTED')${LH_COLOR_RESET}"
+            RESTORE_LIVE_MESSAGE_SHOWN="true"
+        fi
+        restore_log_msg "INFO" "Live environment check completed. Live: true"
+        return 0
+    fi
+
+    # Not detected as live
+    if [[ "$RESTORE_NON_LIVE_OVERRIDE" == "true" ]]; then
+        if [[ "$RESTORE_NON_LIVE_NOTICE_SHOWN" != "true" ]]; then
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_NOT_LIVE_WARNING')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_LIVE_RECOMMENDATION')${LH_COLOR_RESET}"
+            RESTORE_NON_LIVE_NOTICE_SHOWN="true"
+        fi
+        restore_log_msg "INFO" "Live environment check completed. Live: false (user override)"
+        return 0
+    fi
+
+    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_NOT_LIVE_WARNING')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_LIVE_RECOMMENDATION')${LH_COLOR_RESET}"
+    echo ""
+
+    if ! lh_confirm_action "$(lh_msg 'RESTORE_CONTINUE_NOT_LIVE')" "n"; then
+        restore_log_msg "INFO" "User aborted due to non-live environment"
+        return 1
+    fi
+
+    RESTORE_NON_LIVE_OVERRIDE="true"
+    restore_log_msg "WARN" "Proceeding without live environment after user confirmation"
     return 0
 }
 
@@ -713,7 +825,13 @@ check_restore_space() {
                 # Enhanced: Check if we have enough space for atomic workflow
                 # Atomic workflow needs space for: temporary receiving + final destination + overhead
                 if [[ -n "$estimated_snapshot_size" && "$estimated_snapshot_size" =~ ^[0-9]+$ ]]; then
-                    local required_bytes=$((estimated_snapshot_size * 3))  # 3x for safety: temp + final + overhead
+                    local multiplier="$LH_RESTORE_SPACE_MULTIPLIER"
+                    if [[ -z "$multiplier" || ! "$multiplier" =~ ^[0-9]+$ || "$multiplier" -lt 1 ]]; then
+                        restore_log_msg "WARN" "Invalid LH_RESTORE_SPACE_MULTIPLIER value '$multiplier' - using default 3"
+                        multiplier=3
+                    fi
+                    restore_log_msg "DEBUG" "Atomic workflow space multiplier: x$multiplier"
+                    local required_bytes=$((estimated_snapshot_size * multiplier))
                     if [[ $available_bytes -lt $required_bytes ]]; then
                         local required_gb=$((required_bytes / 1024 / 1024 / 1024))
                         restore_log_msg "WARN" "Insufficient space for atomic workflow: need ~${required_gb}GB, have ${available_gb}GB"
@@ -1006,7 +1124,7 @@ remove_readonly_flag() {
     
     # Check current read-only status
     local current_ro
-    current_ro=$(btrfs property get "$subvol_path" ro 2>/dev/null | cut -d'=' -f2)
+    current_ro=$($LH_SUDO_CMD btrfs property get "$subvol_path" ro 2>/dev/null | cut -d'=' -f2)
     
     if [[ "$current_ro" == "true" ]]; then
         echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_REMOVING_READONLY' "$subvol_name")${LH_COLOR_RESET}"
@@ -1024,7 +1142,7 @@ remove_readonly_flag() {
         else
             # Check if this is a received snapshot before modifying
             local received_uuid
-            received_uuid=$(btrfs subvolume show "$subvol_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+            received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$subvol_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
             
             if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
                 restore_log_msg "WARN" "WARNING: Removing read-only flag from received snapshot"
@@ -1042,13 +1160,13 @@ remove_readonly_flag() {
         fi
         
         if [[ "$DRY_RUN" == "false" ]]; then
-            if btrfs property set "$subvol_path" ro false; then
+            if $LH_SUDO_CMD btrfs property set "$subvol_path" ro false; then
                 restore_log_msg "INFO" "Successfully removed read-only flag from: $subvol_path"
                 echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_READONLY_REMOVED')${LH_COLOR_RESET}"
                 
                 # Log the received_uuid destruction if applicable
                 local received_uuid_check
-                received_uuid_check=$(btrfs subvolume show "$subvol_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+                received_uuid_check=$($LH_SUDO_CMD btrfs subvolume show "$subvol_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
                 if [[ -z "$received_uuid_check" || "$received_uuid_check" == "-" ]]; then
                     restore_log_msg "WARN" "received_uuid destroyed as expected"
                 fi
@@ -1059,7 +1177,7 @@ remove_readonly_flag() {
         else
             restore_log_msg "INFO" "DRY-RUN: Would remove read-only flag from $subvol_path"
             local received_uuid
-            received_uuid=$(btrfs subvolume show "$subvol_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+            received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$subvol_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
             if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
                 restore_log_msg "INFO" "DRY-RUN: This would destroy received_uuid: $received_uuid"
             fi
@@ -1083,7 +1201,7 @@ safely_replace_subvolume() {
     restore_log_msg "INFO" "Safely replacing subvolume: $existing_subvol"
     
     # Check if target subvolume exists
-    if ! btrfs subvolume show "$existing_subvol" >/dev/null 2>&1; then
+    if ! $LH_SUDO_CMD btrfs subvolume show "$existing_subvol" >/dev/null 2>&1; then
         restore_log_msg "DEBUG" "Target subvolume $existing_subvol does not exist, no replacement needed"
         return 0
     fi
@@ -1096,22 +1214,22 @@ safely_replace_subvolume() {
     
     if [[ "$DRY_RUN" == "false" ]]; then
         # Check if existing subvolume has received_uuid (critical for BTRFS)
-        local existing_received_uuid=$(sudo btrfs subvolume show "$existing_subvol" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+        local existing_received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$existing_subvol" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
         
         if [[ -n "$existing_received_uuid" && "$existing_received_uuid" != "-" ]]; then
             restore_log_msg "WARN" "Existing subvolume has received_uuid: $existing_received_uuid"
             restore_log_msg "WARN" "Using BTRFS snapshot instead of mv to preserve metadata integrity"
             
             # Use BTRFS snapshot to preserve all metadata including received_uuid
-            if btrfs subvolume snapshot "$existing_subvol" "$backup_name"; then
+            if $LH_SUDO_CMD btrfs subvolume snapshot "$existing_subvol" "$backup_name"; then
                 # Now safely delete the original
-                if btrfs subvolume delete "$existing_subvol"; then
+                if $LH_SUDO_CMD btrfs subvolume delete "$existing_subvol"; then
                     restore_log_msg "INFO" "Successfully created BTRFS snapshot backup: $backup_name"
                     echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_EXISTING_BACKED_UP')${LH_COLOR_RESET}"
                 else
                     restore_log_msg "ERROR" "Failed to delete original subvolume after snapshot: $existing_subvol"
                     # Clean up the snapshot backup
-                    btrfs subvolume delete "$backup_name" 2>/dev/null || true
+                    $LH_SUDO_CMD btrfs subvolume delete "$backup_name" 2>/dev/null || true
                     return 1
                 fi
             else
@@ -1120,7 +1238,7 @@ safely_replace_subvolume() {
             fi
         else
             # Standard rename for subvolumes without received_uuid
-            if mv "$existing_subvol" "$backup_name"; then
+            if $LH_SUDO_CMD mv "$existing_subvol" "$backup_name"; then
                 restore_log_msg "INFO" "Successfully renamed existing subvolume to: $backup_name"
                 echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_EXISTING_BACKED_UP')${LH_COLOR_RESET}"
             else
@@ -1130,7 +1248,7 @@ safely_replace_subvolume() {
         fi
     else
         # Enhanced dry-run logging with received_uuid awareness
-        local existing_received_uuid=$(sudo btrfs subvolume show "$existing_subvol" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+        local existing_received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$existing_subvol" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
         
         if [[ -n "$existing_received_uuid" && "$existing_received_uuid" != "-" ]]; then
             restore_log_msg "INFO" "DRY-RUN: Would create BTRFS snapshot $existing_subvol -> $backup_name (preserving received_uuid: $existing_received_uuid)"
@@ -1164,7 +1282,7 @@ perform_subvolume_restore() {
     fi
     
     # Validate that source is a proper BTRFS subvolume
-    if ! btrfs subvolume show "$snapshot_to_use" >/dev/null 2>&1; then
+    if ! $LH_SUDO_CMD btrfs subvolume show "$snapshot_to_use" >/dev/null 2>&1; then
         restore_log_msg "ERROR" "Source is not a valid BTRFS subvolume: $snapshot_to_use"
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_INVALID_SOURCE_SUBVOLUME' "$snapshot_to_use")${LH_COLOR_RESET}"
         lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
@@ -1210,12 +1328,12 @@ perform_subvolume_restore() {
     if [[ "$DRY_RUN" == "false" ]]; then
         # CRITICAL FIX: Ensure source snapshot is read-only (required for btrfs send)
         local source_ro
-        source_ro=$(btrfs property get "$snapshot_to_use" ro 2>/dev/null | cut -d'=' -f2)
+        source_ro=$($LH_SUDO_CMD btrfs property get "$snapshot_to_use" ro 2>/dev/null | cut -d'=' -f2)
         if [[ "$source_ro" != "true" ]]; then
             restore_log_msg "WARN" "Source snapshot is not read-only, making it read-only for send operation"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_MAKING_SOURCE_READONLY')${LH_COLOR_RESET}"
             
-            if ! btrfs property set "$snapshot_to_use" ro true; then
+            if ! $LH_SUDO_CMD btrfs property set "$snapshot_to_use" ro true; then
                 restore_log_msg "ERROR" "Failed to make source snapshot read-only"
                 lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
                 return 1
@@ -1225,7 +1343,25 @@ perform_subvolume_restore() {
         # CRITICAL FIX: Use atomic_receive_with_validation from BTRFS library
         # This handles received_uuid correctly and implements proper atomic pattern
         local final_destination="${TARGET_ROOT}/${target_subvol_name}"
-        local expected_received_path="${TARGET_ROOT}/$(basename "$snapshot_to_use")"
+
+        if ! $LH_SUDO_CMD mkdir -p "$TEMP_SNAPSHOT_DIR"; then
+            restore_log_msg "ERROR" "Failed to create temporary snapshot directory: $TEMP_SNAPSHOT_DIR"
+            lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
+            return 1
+        fi
+
+        local expected_received_path="${TEMP_SNAPSHOT_DIR}/$(basename "$snapshot_to_use")"
+
+        if [[ -d "$expected_received_path" ]]; then
+            if [[ "$LH_RESTORE_KEEP_ANCHOR" == "true" ]]; then
+                restore_log_msg "ERROR" "Existing restore anchor already present: $expected_received_path"
+                echo -e "${LH_COLOR_ERROR}Existing restore anchor already present at: $expected_received_path${LH_COLOR_RESET}"
+                lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
+                return 1
+            fi
+            restore_log_msg "WARN" "Removing leftover temporary snapshot: $expected_received_path"
+            $LH_SUDO_CMD btrfs subvolume delete "$expected_received_path" 2>/dev/null || $LH_SUDO_CMD rm -rf "$expected_received_path" 2>/dev/null || true
+        fi
         
         restore_log_msg "INFO" "Using atomic receive pattern from BTRFS library"
         restore_log_msg "DEBUG" "Final destination: $final_destination"
@@ -1246,25 +1382,28 @@ perform_subvolume_restore() {
                 if [[ -d "$expected_received_path" ]]; then
                     # Check if received snapshot has received_uuid before moving
                     local received_uuid
-                    received_uuid=$(btrfs subvolume show "$expected_received_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+                    received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$expected_received_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
                     
                     if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
                         # Use snapshot instead of mv to preserve received_uuid
                         restore_log_msg "DEBUG" "Creating snapshot to preserve received_uuid: $received_uuid"
-                        if btrfs subvolume snapshot "$expected_received_path" "$final_destination"; then
-                            # Remove original received snapshot after successful copy
-                            btrfs subvolume delete "$expected_received_path" 2>/dev/null || true
+                        if $LH_SUDO_CMD btrfs subvolume snapshot "$expected_received_path" "$final_destination"; then
+                            if [[ "$LH_RESTORE_KEEP_ANCHOR" == "true" ]]; then
+                                restore_log_msg "INFO" "Keeping read-only restore anchor at: $expected_received_path"
+                            else
+                                $LH_SUDO_CMD btrfs subvolume delete "$expected_received_path" 2>/dev/null || true
+                            fi
                         else
                             restore_log_msg "ERROR" "Failed to create final snapshot from received snapshot"
-                            btrfs subvolume delete "$expected_received_path" 2>/dev/null || true
+                            $LH_SUDO_CMD btrfs subvolume delete "$expected_received_path" 2>/dev/null || true
                             lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
                             return 1
                         fi
                     else
                         # Safe to use mv for non-received snapshots
-                        if ! mv "$expected_received_path" "$final_destination"; then
+                        if ! $LH_SUDO_CMD mv "$expected_received_path" "$final_destination"; then
                             restore_log_msg "ERROR" "Failed to rename snapshot to final destination"
-                            btrfs subvolume delete "$expected_received_path" 2>/dev/null || true
+                            $LH_SUDO_CMD btrfs subvolume delete "$expected_received_path" 2>/dev/null || true
                             lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
                             return 1
                         fi
@@ -1322,14 +1461,14 @@ validate_restore_snapshot() {
     restore_log_msg "DEBUG" "Validating snapshot for restore: $snapshot_path ($context)"
     
     # Basic BTRFS subvolume validation
-    if ! btrfs subvolume show "$snapshot_path" >/dev/null 2>&1; then
+    if ! $LH_SUDO_CMD btrfs subvolume show "$snapshot_path" >/dev/null 2>&1; then
         restore_log_msg "ERROR" "Invalid BTRFS subvolume: $snapshot_path"
         return 1
     fi
     
     # Check if snapshot has received_uuid (indicates it's from incremental backup)
     local received_uuid
-    received_uuid=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+    received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
     
     if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
         restore_log_msg "DEBUG" "Snapshot has received_uuid: $received_uuid (part of incremental chain)"
@@ -1357,7 +1496,7 @@ validate_restore_snapshot() {
         
         # For received snapshots, verify they are read-only
         local ro_status
-        ro_status=$(btrfs property get "$snapshot_path" ro 2>/dev/null | cut -d'=' -f2)
+        ro_status=$($LH_SUDO_CMD btrfs property get "$snapshot_path" ro 2>/dev/null | cut -d'=' -f2)
         if [[ "$ro_status" != "true" ]]; then
             restore_log_msg "WARN" "Received snapshot is not read-only - integrity may be compromised"
             echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_RECEIVED_NOT_READONLY' "$(basename "$snapshot_path")")${LH_COLOR_RESET}"
@@ -1372,7 +1511,7 @@ validate_restore_snapshot() {
     
     # Validate filesystem health of the snapshot's parent filesystem
     local snapshot_mount
-    snapshot_mount=$(findmnt -n -o TARGET "$snapshot_path" 2>/dev/null || dirname "$snapshot_path")
+    snapshot_mount=$(findmnt -n -o TARGET -T "$snapshot_path" 2>/dev/null || dirname "$snapshot_path")
     
     # Use library function for health check
     if ! check_filesystem_health "$snapshot_mount" >/dev/null 2>&1; then
@@ -1397,34 +1536,33 @@ validate_restore_snapshot() {
 list_available_snapshots() {
     local subvolume="$1"  # e.g., "@" or "@home"
     local backup_path="${BACKUP_ROOT}${LH_BACKUP_DIR}/${subvolume}"
-    
+
     restore_log_msg "DEBUG" "Listing snapshots for $subvolume in $backup_path"
-    
+
     if [[ ! -d "$backup_path" ]]; then
-        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_NO_BACKUP_DIR' "$backup_path")${LH_COLOR_RESET}"
+        printf '%s\n' "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_NO_BACKUP_DIR' "$backup_path")${LH_COLOR_RESET}" >&2
         return 1
     fi
-    
+
     # Find snapshots with flexible patterns to support different naming conventions
     local -a snapshots=()
     local -a valid_snapshots=()
-    
+
     # Multiple patterns to support different backup naming schemes:
     # 1. Standard: @-2025-08-05_21-13-12
-    # 2. Underscore: @_2025-08-05_21-13-12  
+    # 2. Underscore: @_2025-08-05_21-13-12
     # 3. Prefix variations: backup_@_2025-08-05, home_backup-2025-08-05, etc.
     local -a patterns=(
-        "${subvolume}-20*"           # Standard: @-2025-*
-        "${subvolume}_20*"           # Underscore: @_2025-*
-        "*${subvolume}*20*"          # Contains subvolume name and year
-        "${subvolume}[-_]*"          # Any separator after subvolume name
-        "*[-_]${subvolume}[-_]*20*"  # Subvolume name in middle with separators
+        "${subvolume}-20*"
+        "${subvolume}_20*"
+        "*${subvolume}*20*"
+        "${subvolume}[-_]*"
+        "*[-_]${subvolume}[-_]*20*"
     )
-    
+
     restore_log_msg "DEBUG" "Searching with flexible patterns for different backup naming schemes"
     for pattern in "${patterns[@]}"; do
         while IFS= read -r -d '' snapshot; do
-            # Avoid duplicates by checking if already in array
             local already_found=false
             for existing in "${snapshots[@]}"; do
                 if [[ "$existing" == "$snapshot" ]]; then
@@ -1432,24 +1570,27 @@ list_available_snapshots() {
                     break
                 fi
             done
-            
+
             if [[ "$already_found" == false ]]; then
                 snapshots+=("$snapshot")
             fi
         done < <(find "$backup_path" -maxdepth 1 -type d -name "$pattern" -print0 2>/dev/null)
     done
-    
-    # Sort snapshots by modification time (newest first)
+
     if [[ ${#snapshots[@]} -gt 0 ]]; then
-        readarray -t snapshots < <(printf '%s\n' "${snapshots[@]}" | xargs -I {} stat -c '%Y %s' {} | sort -rn | cut -d' ' -f2-)
+        mapfile -t snapshots < <(
+            printf '%s\0' "${snapshots[@]}" \
+            | xargs -0 -r stat -c '%Y:%n' 2>/dev/null \
+            | sort -rn \
+            | cut -d':' -f2-
+        )
     fi
-    
+
     if [[ ${#snapshots[@]} -eq 0 ]]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_NO_SNAPSHOTS_FOUND' "$subvolume")${LH_COLOR_RESET}"
+        printf '%s\n' "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_NO_SNAPSHOTS_FOUND' "$subvolume")${LH_COLOR_RESET}" >&2
         return 1
     fi
-    
-    # Validate each snapshot and filter out invalid ones
+
     restore_log_msg "DEBUG" "Validating ${#snapshots[@]} found snapshots"
     for snapshot in "${snapshots[@]}"; do
         if validate_restore_snapshot "$snapshot" "listing validation"; then
@@ -1458,32 +1599,30 @@ list_available_snapshots() {
             restore_log_msg "WARN" "Skipping invalid snapshot: $(basename "$snapshot")"
         fi
     done
-    
+
     if [[ ${#valid_snapshots[@]} -eq 0 ]]; then
-        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_NO_VALID_SNAPSHOTS_FOUND' "$subvolume")${LH_COLOR_RESET}"
+        printf '%s\n' "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_NO_VALID_SNAPSHOTS_FOUND' "$subvolume")${LH_COLOR_RESET}" >&2
         return 1
     fi
-    
-    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_AVAILABLE_SNAPSHOTS' "$subvolume"):${LH_COLOR_RESET}"
-    
+
+    printf '%s\n' "${LH_COLOR_INFO}$(lh_msg 'RESTORE_AVAILABLE_SNAPSHOTS' "$subvolume"):${LH_COLOR_RESET}" >&2
+
     for i in "${!valid_snapshots[@]}"; do
         local snapshot="${valid_snapshots[i]}"
-        local snapshot_name=$(basename "$snapshot")
+        local snapshot_name
+        snapshot_name=$(basename "$snapshot")
         local size_info=""
         local date_info=""
         local status_info=""
-        
-        # Get size information if possible
+
         if command -v du >/dev/null 2>&1; then
             size_info=$(du -sh "$snapshot" 2>/dev/null | cut -f1)
         fi
-        
-        # Extract date from snapshot name if possible
+
         if [[ "$snapshot_name" =~ ([0-9]{4}-[0-9]{2}-[0-9]{2}) ]]; then
             date_info="${BASH_REMATCH[1]}"
         fi
-        
-        # Check if it's an incremental snapshot
+
         local received_uuid
         received_uuid=$(btrfs subvolume show "$snapshot" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
         if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
@@ -1491,14 +1630,14 @@ list_available_snapshots() {
         else
             status_info="[full]"
         fi
-        
-        printf "  %2d. %-40s" "$((i+1))" "$snapshot_name"
-        [[ -n "$date_info" ]] && printf " [%s]" "$date_info"
-        [[ -n "$status_info" ]] && printf " %s" "$status_info"
-        [[ -n "$size_info" ]] && printf " (%s)" "$size_info"
-        printf "\n"
+
+        printf '  %2d. %-40s' "$((i + 1))" "$snapshot_name" >&2
+        [[ -n "$date_info" ]] && printf ' [%s]' "$date_info" >&2
+        [[ -n "$status_info" ]] && printf ' %s' "$status_info" >&2
+        [[ -n "$size_info" ]] && printf ' (%s)' "$size_info" >&2
+        printf '%s\n' '' >&2
     done
-    
+
     printf '%s\n' "${valid_snapshots[@]}"
 }
 
@@ -1657,7 +1796,7 @@ select_restore_type_and_snapshot() {
                     while IFS= read -r -d '' potential_parent; do
                         if [[ -d "$potential_parent" ]]; then
                             local parent_uuid
-                            parent_uuid=$(btrfs subvolume show "$potential_parent" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
+                    parent_uuid=$($LH_SUDO_CMD btrfs subvolume show "$potential_parent" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
                             
                             if [[ "$parent_uuid" == "$received_uuid" ]]; then
                                 if validate_parent_snapshot_chain "$potential_parent" "$snapshot_path" "$snapshot_path"; then
@@ -1786,8 +1925,9 @@ select_restore_type_and_snapshot() {
             
             echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_SINGLE_SUBVOLUME_SELECTED' "$restore_name")${LH_COLOR_RESET}"
             
-            local -a snapshots=($(list_available_snapshots "$subvolume"))
-            
+            local -a snapshots=()
+            mapfile -t snapshots < <(list_available_snapshots "$subvolume")
+
             if [[ ${#snapshots[@]} -eq 0 ]]; then
                 return 1
             fi
@@ -1826,7 +1966,7 @@ select_restore_type_and_snapshot() {
                 while IFS= read -r -d '' potential_parent; do
                     if [[ -d "$potential_parent" ]]; then
                         local parent_uuid
-                        parent_uuid=$(btrfs subvolume show "$potential_parent" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
+                        parent_uuid=$($LH_SUDO_CMD btrfs subvolume show "$potential_parent" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
                         
                         if [[ "$parent_uuid" == "$received_uuid" ]]; then
                             restore_log_msg "DEBUG" "Found matching parent snapshot: $(basename "$potential_parent")"
@@ -1904,7 +2044,7 @@ detect_boot_configuration() {
     local boot_strategy="unknown"
     
     # Check current default subvolume
-    current_default_subvol=$(btrfs subvolume get-default "$target_root" 2>/dev/null | awk '{print $9}' || echo "")
+    current_default_subvol=$($LH_SUDO_CMD btrfs subvolume get-default "$target_root" 2>/dev/null | awk '{print $9}' || echo "")
     restore_log_msg "DEBUG" "Current default subvolume: $current_default_subvol"
     
     # Analysis 1: Check /etc/fstab for explicit subvol= options
@@ -2044,7 +2184,7 @@ backup_bootloader_files() {
     local fstab_path="${target_root}/@/etc/fstab"
     if [[ -f "$fstab_path" ]]; then
         if [[ "$DRY_RUN" == "false" ]]; then
-            if cp "$fstab_path" "${fstab_path}${backup_suffix}"; then
+            if $LH_SUDO_CMD cp "$fstab_path" "${fstab_path}${backup_suffix}"; then
                 restore_log_msg "INFO" "Backed up fstab: ${fstab_path}${backup_suffix}"
                 backup_files+=("${fstab_path}${backup_suffix}")
                 backup_created="true"
@@ -2061,7 +2201,7 @@ backup_bootloader_files() {
     local grub_cfg_path="${target_root}/@/boot/grub/grub.cfg"
     if [[ -f "$grub_cfg_path" ]]; then
         if [[ "$DRY_RUN" == "false" ]]; then
-            if cp "$grub_cfg_path" "${grub_cfg_path}${backup_suffix}"; then
+            if $LH_SUDO_CMD cp "$grub_cfg_path" "${grub_cfg_path}${backup_suffix}"; then
                 restore_log_msg "INFO" "Backed up GRUB config: ${grub_cfg_path}${backup_suffix}"
                 backup_files+=("${grub_cfg_path}${backup_suffix}")
                 backup_created="true"
@@ -2201,7 +2341,7 @@ execute_default_subvol_strategy() {
     
     # Get the subvolume ID of the restored root
     local subvol_id
-    subvol_id=$(btrfs subvolume list "$target_root" | grep -E "\s${restored_subvol_name}$" | awk '{print $2}')
+    subvol_id=$($LH_SUDO_CMD btrfs subvolume list "$target_root" | grep -E "\s${restored_subvol_name}$" | awk '{print $2}')
     
     if [[ -z "$subvol_id" ]]; then
         restore_log_msg "ERROR" "Cannot determine subvolume ID for restored $restored_subvol_name"
@@ -2228,13 +2368,13 @@ execute_default_subvol_strategy() {
     if [[ "$DRY_RUN" == "false" ]]; then
         echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_SETTING_DEFAULT_SUBVOLUME')${LH_COLOR_RESET}"
         
-        if btrfs subvolume set-default "$subvol_id" "$target_root"; then
+        if $LH_SUDO_CMD btrfs subvolume set-default "$subvol_id" "$target_root"; then
             restore_log_msg "INFO" "Successfully set default subvolume ID: $subvol_id ($restored_subvol_name)"
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_DEFAULT_SUBVOLUME_SET')${LH_COLOR_RESET}"
             
             # Verify the change
             local new_default
-            new_default=$(btrfs subvolume get-default "$target_root" 2>/dev/null | awk '{print $9}' || echo "")
+            new_default=$($LH_SUDO_CMD btrfs subvolume get-default "$target_root" 2>/dev/null | awk '{print $9}' || echo "")
             if [[ "$new_default" == "$restored_subvol_name" ]] || [[ "$new_default" =~ $restored_subvol_name$ ]]; then
                 restore_log_msg "INFO" "Verified: Default subvolume is now $new_default"
                 echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_DEFAULT_SUBVOLUME_VERIFIED')${LH_COLOR_RESET}"
@@ -2307,14 +2447,14 @@ perform_complete_system_rollback() {
                 # Remove the failed restored subvolume and restore the backup
                 if [[ -d "${TARGET_ROOT}/${subvol}" ]]; then
                     if [[ "$DRY_RUN" == "false" ]]; then
-                        if btrfs subvolume delete "${TARGET_ROOT}/${subvol}" 2>/dev/null; then
+                    if $LH_SUDO_CMD btrfs subvolume delete "${TARGET_ROOT}/${subvol}" 2>/dev/null; then
                             restore_log_msg "INFO" "Deleted failed $subvol restore"
                         else
                             restore_log_msg "WARN" "Could not delete failed $subvol restore"
                         fi
                         
                         # Restore original subvolume from backup
-                        if mv "$subvol_backup_path" "${TARGET_ROOT}/${subvol}"; then
+                        if $LH_SUDO_CMD mv "$subvol_backup_path" "${TARGET_ROOT}/${subvol}"; then
                             restore_log_msg "INFO" "$subvol subvolume rollback successful"
                             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_ROLLBACK_SUBVOLUME_SUCCESS' "$subvol")${LH_COLOR_RESET}"
                         else
@@ -2357,7 +2497,7 @@ rollback_bootloader_changes() {
             restore_log_msg "INFO" "Rolling back: $original_file"
             
             if [[ "$DRY_RUN" == "false" ]]; then
-                if cp "$backup_file" "$original_file"; then
+                if $LH_SUDO_CMD cp "$backup_file" "$original_file"; then
                     restore_log_msg "INFO" "Successfully rolled back: $original_file"
                 else
                     restore_log_msg "ERROR" "Failed to rollback: $original_file"
@@ -2464,8 +2604,9 @@ restore_folder_from_snapshot() {
     
     # Step 2: List and select snapshot
     echo ""
-    local -a snapshots=($(list_available_snapshots "$selected_subvolume"))
-    
+    local -a snapshots=()
+    mapfile -t snapshots < <(list_available_snapshots "$selected_subvolume")
+
     if [[ ${#snapshots[@]} -eq 0 ]]; then
         return 1
     fi
@@ -2513,7 +2654,7 @@ restore_folder_from_snapshot() {
             local backup_folder="${target_folder}.backup_$(date '+%Y%m%d_%H%M%S')"
             
             if [[ "$DRY_RUN" == "false" ]]; then
-                if mv "$target_folder" "$backup_folder"; then
+                if $LH_SUDO_CMD mv "$target_folder" "$backup_folder"; then
                     restore_log_msg "INFO" "Backed up existing folder to: $backup_folder"
                     echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_FOLDER_BACKED_UP' "$backup_folder")${LH_COLOR_RESET}"
                 else
@@ -2549,7 +2690,7 @@ restore_folder_from_snapshot() {
         mkdir -p "$parent_dir"
         
         # Copy with preserved attributes
-        if cp -a "$source_folder" "$target_folder"; then
+        if $LH_SUDO_CMD cp -a "$source_folder" "$target_folder"; then
             restore_log_msg "INFO" "Successfully restored folder: $folder_path"
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_FOLDER_SUCCESS')${LH_COLOR_RESET}"
         else
@@ -2605,7 +2746,7 @@ cleanup_old_restore_artifacts() {
             
             if [[ -d "$artifact" ]]; then
                 # Try to delete as subvolume first, then as directory
-                if ! btrfs subvolume delete "$artifact" 2>/dev/null; then
+                if ! $LH_SUDO_CMD btrfs subvolume delete "$artifact" 2>/dev/null; then
                     rm -rf "$artifact" 2>/dev/null || restore_log_msg "WARN" "Failed to remove: $artifact"
                 fi
             else
@@ -2638,13 +2779,13 @@ show_disk_information() {
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_BTRFS_SUBVOLUMES'):${LH_COLOR_RESET}"
     if [[ -n "$TARGET_ROOT" ]] && [[ -d "$TARGET_ROOT" ]]; then
         echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_TARGET_SUBVOLUMES' "$TARGET_ROOT"):${LH_COLOR_RESET}"
-        btrfs subvolume list "$TARGET_ROOT" 2>/dev/null | head -20 || echo -e "  $(lh_msg 'RESTORE_NO_SUBVOLUMES_FOUND')"
+        $LH_SUDO_CMD btrfs subvolume list "$TARGET_ROOT" 2>/dev/null | head -20 || echo -e "  $(lh_msg 'RESTORE_NO_SUBVOLUMES_FOUND')"
     fi
     
     if [[ -n "$BACKUP_ROOT" ]] && [[ -d "$BACKUP_ROOT" ]]; then
         echo ""
         echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_BACKUP_SUBVOLUMES' "$BACKUP_ROOT"):${LH_COLOR_RESET}"
-        btrfs subvolume list "$BACKUP_ROOT" 2>/dev/null | head -20 || echo -e "  $(lh_msg 'RESTORE_NO_SUBVOLUMES_FOUND')"
+        $LH_SUDO_CMD btrfs subvolume list "$BACKUP_ROOT" 2>/dev/null | head -20 || echo -e "  $(lh_msg 'RESTORE_NO_SUBVOLUMES_FOUND')"
     fi
     
     # Enhanced: Show BTRFS filesystem health and space information using library functions

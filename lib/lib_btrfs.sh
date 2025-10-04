@@ -197,6 +197,25 @@ atomic_receive_with_validation() {
                 $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || true
                 return 1
             fi
+
+            # Additional validation: ensure received_uuid is present and snapshot is read-only
+            local recv_uuid
+            recv_uuid=$($LH_SUDO_CMD btrfs subvolume show "$temp_received_snapshot" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+            local recv_ro
+            recv_ro=$($LH_SUDO_CMD btrfs property get "$temp_received_snapshot" ro 2>/dev/null | cut -d'=' -f2)
+            if [[ -z "$recv_uuid" || "$recv_uuid" == "-" || "$recv_ro" != "true" ]]; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Post-receive validation failed (received_uuid/ro)."
+                lh_log_msg "DEBUG" "  Received UUID: ${recv_uuid:-none}"
+                lh_log_msg "DEBUG" "  Read-only: ${recv_ro:-unknown}"
+                $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
+                # Offer cleanup of receiving dir
+                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$temp_receive_dir")" "y"; then
+                    $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || $LH_SUDO_CMD rm -rf "$temp_receive_dir" 2>/dev/null || true
+                else
+                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$temp_receive_dir")"
+                fi
+                return 1
+            fi
             
             # Step 3: Atomic rename to final destination within same filesystem
             lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 3 - Atomic rename to final destination: $final_destination"
@@ -335,6 +354,25 @@ atomic_receive_with_validation() {
                 lh_log_msg "ERROR" "atomic_receive_with_validation: Received snapshot is not valid: $temp_received_snapshot"
                 $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
                 $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || true
+                return 1
+            fi
+
+            # Additional validation: ensure received_uuid is present and snapshot is read-only
+            local recv_uuid
+            recv_uuid=$($LH_SUDO_CMD btrfs subvolume show "$temp_received_snapshot" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+            local recv_ro
+            recv_ro=$($LH_SUDO_CMD btrfs property get "$temp_received_snapshot" ro 2>/dev/null | cut -d'=' -f2)
+            if [[ -z "$recv_uuid" || "$recv_uuid" == "-" || "$recv_ro" != "true" ]]; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Post-receive validation failed (received_uuid/ro)."
+                lh_log_msg "DEBUG" "  Received UUID: ${recv_uuid:-none}"
+                lh_log_msg "DEBUG" "  Read-only: ${recv_ro:-unknown}"
+                $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
+                # Offer cleanup of receiving dir
+                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$temp_receive_dir")" "y"; then
+                    $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || $LH_SUDO_CMD rm -rf "$temp_receive_dir" 2>/dev/null || true
+                else
+                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$temp_receive_dir")"
+                fi
                 return 1
             fi
             
