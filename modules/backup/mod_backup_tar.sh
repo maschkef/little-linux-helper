@@ -68,6 +68,7 @@ tar_backup() {
     lh_log_msg "DEBUG" "Configuration: LH_TAR_EXCLUDES='$LH_TAR_EXCLUDES', LH_RETENTION_BACKUP='$LH_RETENTION_BACKUP'"
     
     lh_print_header "$(lh_msg 'BACKUP_TAR_HEADER')"
+    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP')" "$(lh_msg 'BACKUP_TAR_HEADER')")"
 
     # Capture start time
     BACKUP_START_TIME=$(date +%s)
@@ -150,6 +151,7 @@ tar_backup() {
     echo -e "  ${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg "BACKUP_OPTION_FULL_SYSTEM")${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_MENU_NUMBER}5.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg "BACKUP_OPTION_CUSTOM")${LH_COLOR_RESET}"
     
+    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
     read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg "CHOOSE_OPTION")${LH_COLOR_RESET}")" choice
     lh_log_msg "DEBUG" "User selected option: '$choice'"
     
@@ -330,6 +332,7 @@ tar_backup() {
     
     # Execute TAR backup
     lh_log_msg "DEBUG" "Starting TAR backup execution"
+    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_BACKUP')" "$(basename "$tar_file")")"
     local cmd="$LH_SUDO_CMD tar czf \"$tar_file\" --exclude-from=\"$exclude_file\" --exclude=\"$tar_file\" ${backup_dirs[*]}"
     lh_log_msg "DEBUG" "TAR command: $cmd"
     $LH_SUDO_CMD tar czf "$tar_file" \
@@ -389,6 +392,7 @@ tar_backup() {
             "$(lh_msg 'BACKUP_NOTIFICATION_FAILED_DETAILS' "$tar_status" "$timestamp" "$(basename "$LH_BACKUP_LOG")")"
         
         lh_log_msg "DEBUG" "=== Exiting tar_backup function with error ==="
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         return 1
     fi
 
@@ -414,6 +418,7 @@ tar_backup() {
     
     # Clean up old backups
     lh_log_msg "DEBUG" "Starting cleanup of old TAR backups"
+    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_CLEANUP')" "TAR")"
     backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_CLEANUP' "TAR")"
     ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | sort -r | tail -n +$((LH_RETENTION_BACKUP+1)) | while read backup; do
         lh_log_msg "DEBUG" "Removing old backup: $backup"
@@ -423,6 +428,7 @@ tar_backup() {
     lh_log_msg "DEBUG" "Old backup cleanup completed"
     
     lh_log_msg "DEBUG" "=== Finished tar_backup function successfully ==="
+    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
     return 0
 }
 
@@ -430,15 +436,17 @@ tar_backup() {
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     lh_log_msg "DEBUG" "=== Starting modules/backup/mod_backup_tar.sh sub-module ==="
     lh_log_msg "DEBUG" "Module called with parameters: $*"
-    
+
+    lh_log_active_sessions_debug "$(lh_msg 'BACKUP_TAR_HEADER')"
+    lh_begin_module_session "mod_backup_tar" "$(lh_msg 'BACKUP_TAR_HEADER')" "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP')" "$(lh_msg 'BACKUP_TAR_HEADER')")"
+
     # Brief info message
     echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_TAR_MODULE_INFO')${LH_COLOR_RESET}"
-    
+
     # Call TAR backup function directly
     tar_backup
     exit_code=$?
-    
+
     lh_log_msg "DEBUG" "=== TAR backup sub-module finished with exit code: $exit_code ==="
     exit $exit_code
 fi
-

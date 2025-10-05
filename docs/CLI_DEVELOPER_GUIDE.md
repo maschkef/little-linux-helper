@@ -201,6 +201,127 @@ Color definitions are now organized in `lib/lib_colors.sh` and are automatically
 - **Usage:** Use with `echo -e` for colored output. Always end a colored string with `${LH_COLOR_RESET}` to prevent color bleeding. Example: `echo -e "${LH_COLOR_ERROR}$(lh_msg 'ERROR_MESSAGE')${LH_COLOR_RESET}"`
 - **Library Integration:** Many library functions like `lh_print_header`, `lh_print_menu_item`, `lh_log_msg`, `lh_confirm_action`, and `lh_ask_for_input` already incorporate these colors for their output. When using these functions, manual color application is often not needed for their standard output.
 
+### 4.5 Enhanced Session Awareness with Blocking Categories
+
+The CLI provides an intelligent session registry with selective conflict detection stored in `logs/sessions/registry.tsv`. Every running module can register itself with blocking categories, allowing other modules to detect conflicts and prevent dangerous operations. Each entry includes session metadata, blocking categories, severity levels, and audit information for comprehensive operation coordination.
+
+#### Core Session Functions
+
+Available helpers from `lib_common.sh`:
+
+- `lh_begin_module_session module_id module_name [activity] [blocks] [severity]`
+    - Registers the session with optional blocking categories and severity level
+    - Installs an EXIT trap that removes the entry automatically
+    - Call immediately after loading translations for localized `module_name`
+    - Example: `lh_begin_module_session "mod_backup" "$(lh_msg 'MENU_BACKUP')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')" "${LH_BLOCK_FILESYSTEM_WRITE},${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"`
+
+- `lh_update_module_session activity [status] [blocks] [severity]`
+    - Updates activity text, status, blocking categories, and/or severity
+    - Use shared translations: `LIB_SESSION_ACTIVITY_MENU`, `LIB_SESSION_ACTIVITY_WAITING`, `LIB_SESSION_ACTIVITY_SECTION`, `LIB_SESSION_ACTIVITY_ACTION`, `LIB_SESSION_ACTIVITY_PREP`, `LIB_SESSION_ACTIVITY_BACKUP`, `LIB_SESSION_ACTIVITY_RESTORE`, `LIB_SESSION_ACTIVITY_CLEANUP`
+
+- `lh_end_module_session [status]`
+    - Updates status and removes registry entry
+    - Normally invoked by automatic exit handler
+
+#### Blocking Categories
+
+**Available Blocking Categories:**
+- `LH_BLOCK_FILESYSTEM_WRITE` - File operations that could interfere with ongoing I/O
+- `LH_BLOCK_SYSTEM_CRITICAL` - Operations that could restart or destabilize the system
+- `LH_BLOCK_RESOURCE_INTENSIVE` - Resource-heavy operations competing for CPU/disk
+- `LH_BLOCK_NETWORK_DEPENDENT` - Operations requiring stable network connectivity
+
+**Severity Levels:** `HIGH`, `MEDIUM`, `LOW` - determines override difficulty and warning prominence
+
+#### Conflict Detection Functions
+
+- `lh_check_blocking_conflicts required_categories calling_location [allow_override]`
+    - Checks for conflicts between required categories and active sessions
+    - Shows detailed warnings with conflicting operations
+    - Returns: `0`=proceed, `1`=blocked/cancelled, `2`=user override
+    - `allow_override` defaults to `true` - set to `false` for immediate blocking
+    - Example: `lh_check_blocking_conflicts "${LH_BLOCK_SYSTEM_CRITICAL}" "mod_restarts.sh:restart_login_manager"`
+
+- `lh_wait_for_clear_with_override required_categories calling_location [wait_message] [override_prompt]`
+    - Waits for conflicting operations to complete with periodic checks
+    - Allows user to skip waiting with override confirmation
+    - Useful for automated workflows that can wait or be forced
+
+#### Session Information Functions
+
+- `lh_get_active_sessions [include_self]`
+    - Returns current registry entries as tab-separated lines with blocking metadata
+    - Format: `session_id`, `module_id`, `module_name`, `status`, `activity`, `context`, `started`, `blocks`, `severity`
+    - Use for custom conflict analysis or monitoring
+
+- `lh_log_active_sessions_debug module_name`
+    - Prints DEBUG summary of all other active sessions before module starts
+
+#### Usage Patterns
+
+**Basic Module with Blocking:**
+```bash
+lh_begin_module_session "mod_backup" "$(lh_msg 'MENU_BACKUP')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')" "${LH_BLOCK_FILESYSTEM_WRITE},${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"
+
+# Before critical operations
+lh_check_blocking_conflicts "${LH_BLOCK_SYSTEM_CRITICAL}" "mod_backup.sh:create_snapshot"
+if [[ $? -eq 1 ]]; then
+    return 1  # Operation blocked
+elif [[ $? -eq 2 ]]; then
+    lh_log_msg "WARN" "User forced backup despite conflicts"
+fi
+
+lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_BACKUP')" "running"
+# ... perform backup ...
+```
+
+**System-Critical Operations:**
+```bash
+# Check for conflicts before dangerous operations
+lh_check_blocking_conflicts "${LH_BLOCK_SYSTEM_CRITICAL}" "mod_restarts.sh:restart_desktop"
+local result=$?
+if [[ $result -eq 1 ]]; then
+    echo "Operation cancelled due to active critical operations"
+    return 1
+elif [[ $result -eq 2 ]]; then
+    lh_log_msg "WARN" "OVERRIDE: User forced restart despite active backup operations"
+fi
+
+# Proceed with operation
+lh_update_module_session "$(lh_msg 'RESTART_DESKTOP_ACTION')" "running" "${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"
+```
+
+**Resource-Intensive Operations:**
+```bash
+# Resource-heavy operations should check for conflicts
+lh_check_blocking_conflicts "${LH_BLOCK_RESOURCE_INTENSIVE}" "mod_security.sh:rootkit_scan"
+if [[ $? -ne 0 ]]; then
+    return 1  # Don't compete with other resource-intensive tasks
+fi
+
+lh_update_module_session "$(lh_msg 'SECURITY_ROOTKIT_SCANNING')" "running" "${LH_BLOCK_RESOURCE_INTENSIVE}" "MEDIUM"
+```
+
+#### Best Practices
+
+**Module Authors should:**
+- Register sessions with appropriate blocking categories based on operation type
+- Check for conflicts before performing system-critical or resource-intensive operations
+- Use meaningful location identifiers for audit trails (`module.sh:function_name`)
+- Provide override capability for legitimate use cases with proper warnings
+- Chain EXIT traps if installing custom cleanup: `trap 'custom_cleanup; lh_session_exit_handler' EXIT`
+
+**Blocking Category Guidelines:**
+- **FILESYSTEM_WRITE**: Backups, restores, package installations, large file operations
+- **SYSTEM_CRITICAL**: Service restarts, system reboots, desktop environment changes
+- **RESOURCE_INTENSIVE**: CPU/disk heavy operations (rootkit scans, disk speed tests, large compressions)
+- **NETWORK_DEPENDENT**: Operations requiring stable connectivity (downloads, sync operations)
+
+**Override Logging:**
+All overrides are logged with format: `OVERRIDE: mod_restarts.sh:line_123 forced SYSTEM_CRITICAL despite conflicts: Backup Module: Backing up /home (HIGH)`
+
+This enables administrators to review forced operations and adjust blocking rules if needed.
+
 ## Library Function Reference
 
 The library functions are now organized in individual documentation files for better maintainability. For detailed function documentation, refer to:

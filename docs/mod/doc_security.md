@@ -24,6 +24,8 @@ This module provides a suite of tools for performing various security checks on 
     *   `lh_ask_for_input`: For prompting user for specific text input (used in Docker path configuration).
     *   Color variables (e.g., `LH_COLOR_INFO`, `LH_COLOR_ERROR`, `LH_COLOR_PROMPT`, `LH_COLOR_SEPARATOR`, `LH_COLOR_HEADER`, `LH_COLOR_MENU_ITEM`, `LH_COLOR_SUCCESS`, `LH_COLOR_WARNING`): For styled terminal output.
     *   Global variables: Accesses `LH_SUDO_CMD` (for privileged operations) and `LH_PKG_MANAGER`.
+*   **Session Awareness:** Uses `lh_log_active_sessions_debug` to report other running modules, registers itself via `lh_begin_module_session`, and updates the shared registry (`lh_update_module_session`) as it waits for user choices or executes checks so administrators can spot overlapping operations (e.g., restarts or backups).
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
 *   **Key System Commands:** `ss`, `nmap`, `journalctl`, `grep`, `tail`, `lastb`, `rkhunter`, `chkrootkit`, `ufw`, `firewall-cmd`, `iptables`, `pacman`, `apt`, `dnf`, `yay`, `passwd`, `wc`, `command -v`, `read`.
 
 **3. Main Menu Function: `security_checks_menu()`**

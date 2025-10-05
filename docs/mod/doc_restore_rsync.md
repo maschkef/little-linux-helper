@@ -25,6 +25,8 @@ This specialized module provides comprehensive RSYNC backup restoration function
     *   `lh_confirm_action`: For user confirmations and safety warnings
     *   `lh_ask_for_input`: For interactive backup and destination selection
     *   Color variables for styled terminal output
+    *   `lh_log_active_sessions_debug`, `lh_begin_module_session`, `lh_update_module_session`: Keep the session registry informed about active RSYNC restore operations when the module runs standalone.
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
 *   **Key System Commands:** `rsync`, `du`, `ls`, `sort`, `mkdir`, `date`
 *   **Dependencies:** RSYNC utilities must be available; assumes backup directories were created by compatible RSYNC backup module
 

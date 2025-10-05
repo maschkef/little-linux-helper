@@ -35,6 +35,7 @@ This module provides comprehensive BTRFS snapshot-based backup functionality wit
     *   `lh_save_backup_config`: To persist backup configuration changes.
     *   Color variables (e.g., `LH_COLOR_INFO`, `LH_COLOR_ERROR`, `LH_COLOR_PROMPT`).
     *   Global variables: `LH_PKG_MANAGER`, `LH_SUDO_CMD`, `EUID`.
+*   **Session Handling:** When executed directly, the module announces other active sessions (`lh_log_active_sessions_debug`), registers itself via `lh_begin_module_session`, and updates activity text through `lh_update_module_session` while individual subvolumes are processed. The cleanup trap chains `lh_session_exit_handler` so the registry remains accurate even on interruption.
 *   **BTRFS Library Functions Used:**
     *   `atomic_receive_with_validation`: Atomic backup operations with comprehensive validation
     *   `validate_parent_snapshot_chain`: Incremental backup chain validation
@@ -63,7 +64,7 @@ The module exposes a streamlined two-level menu:
   1. Delete BTRFS Backups
   2. Cleanup Problematic Backups
   3. Clean up script‑created source snapshots
-  4. Cleanup Orphan Receiving Dirs (.receiving_*)
+  4. Cleanup Orphan Receiving Artifacts (.receiving_*)
   5. Inspect Incremental Chain (debug)
   0. Back
 
@@ -193,11 +194,11 @@ The module exposes a streamlined two-level menu:
     *   **Mechanism:** Deletes BTRFS subvolumes and their marker files.
 
 *   **`cleanup_orphan_receiving_dirs()`**
-    *   **Purpose:** Finds and optionally removes orphan `.receiving_*` directories that can remain from interrupted `btrfs receive` operations.
+    *   **Purpose:** Finds and optionally removes orphan `.receiving_*` staging artifacts (directories from older runs or staged snapshots) that can remain from interrupted `btrfs receive` operations.
     *   **Mechanism:**
-        *   Scans `$LH_BACKUP_ROOT$LH_BACKUP_DIR/*/.receiving_*` with an age filter (default: 30 minutes) to avoid interfering with in‑flight backups
-        *   Previews candidates grouped by subvolume and shows contained snapshot directory names
-        *   On confirmation, deletes any subvolumes within each `.receiving_*` dir using `btrfs subvolume delete`, then removes the directory (tries `rmdir`, falls back to `rm -rf`)
+        *   Scans `$LH_BACKUP_ROOT$LH_BACKUP_DIR` for entries ending in `.receiving_*` with an age filter (default: 30 minutes) to avoid interfering with in-flight backups
+        *   Previews candidates grouped by subvolume and shows contained snapshot directory names when applicable
+        *   On confirmation, deletes staged snapshots directly or removes nested subvolumes and the directory for legacy layouts
     *   **Interaction:** Fully interactive with confirmation prompts; reports a removal summary.
 
 *   **`maintenance_debug_chain()`**
@@ -411,8 +412,8 @@ The module creates its own snapshots in the designated temporary snapshot direct
 7. **Snapshot creation:** Create read-only snapshots of determined target subvolumes with comprehensive validation, optionally in permanent locations for preservation
 8. **Chain validation:** Use `validate_parent_snapshot_chain()` to verify incremental backup chain integrity from both temporary and preserved source snapshots
 9. **Atomic transfer:** Use `atomic_receive_with_validation()` for true atomic operations with comprehensive validation:
-   - Atomic pattern: receive into a `.receiving_*` directory → validate → atomic rename (`mv`) to the final path (within the same BTRFS filesystem)
-   - On errors, the module offers to remove the temporary `.receiving_*` directory (default Yes) or keep it for inspection
+   - Atomic pattern: receive into the backup directory → stage by renaming the snapshot with a `.receiving_*` suffix → validate → atomic rename (`mv`) within the same parent to reveal the final path
+   - On errors, the module offers to remove the staged `.receiving_*` snapshot (default Yes) or keep it for inspection
    - Incremental transfers when suitable parent snapshots with valid `received_uuid` are available; automatic fallback to full backup when chains are broken
    - Intelligent error handling with `handle_btrfs_error()` for automatic recovery strategies
 10. **UUID protection:** Use `verify_received_uuid_integrity()` and `protect_received_snapshots()` to maintain backup chain integrity

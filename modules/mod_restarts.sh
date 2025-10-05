@@ -29,8 +29,21 @@ if [[ -z "${MSG[RESTART_LOGIN_MANAGER_STARTING]:-}" ]]; then
     lh_load_language_module "lib"
 fi
 
+lh_log_active_sessions_debug "$(lh_msg 'MENU_RESTARTS')"
+lh_begin_module_session "mod_restarts" "$(lh_msg 'MENU_RESTARTS')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
+
 # Function to restart the login manager
 function restart_login_manager_action() {
+    # Check for blocking conflicts before proceeding
+    lh_check_blocking_conflicts "${LH_BLOCK_SYSTEM_CRITICAL}" "mod_restarts.sh:restart_login_manager_action"
+    local conflict_result=$?
+    if [[ $conflict_result -eq 1 ]]; then
+        return 1  # Operation cancelled or blocked
+    elif [[ $conflict_result -eq 2 ]]; then
+        lh_log_msg "WARN" "User forced restart despite active system-critical operations"
+    fi
+
+    lh_update_module_session "$(lh_msg 'RESTART_LOGIN_MANAGER_STARTING')" "running" "${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"
     lh_log_msg "INFO" "$(lh_msg 'RESTART_LOGIN_MANAGER_STARTING')"
     local DM_SERVICE=""
     local INIT_SYSTEM=""
@@ -383,6 +396,16 @@ function restart_sound_system_action() {
 
 # Function to restart the desktop environment
 function restart_desktop_environment_action() {
+    # Check for blocking conflicts before proceeding
+    lh_check_blocking_conflicts "${LH_BLOCK_SYSTEM_CRITICAL}" "mod_restarts.sh:restart_desktop_environment_action"
+    local conflict_result=$?
+    if [[ $conflict_result -eq 1 ]]; then
+        return 1  # Operation cancelled or blocked
+    elif [[ $conflict_result -eq 2 ]]; then
+        lh_log_msg "WARN" "User forced desktop environment restart despite active system-critical operations"
+    fi
+
+    lh_update_module_session "$(lh_msg 'RESTART_DE_STARTING')" "running" "${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"
     lh_log_msg "INFO" "$(lh_msg 'RESTART_DE_STARTING')"
 
     # Get user info
@@ -1479,6 +1502,7 @@ function power_management_action() {
 # Main function of the module: show submenu and control actions
 function restart_module_menu() {
     while true; do
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
         lh_print_header "$(lh_msg 'RESTART_MODULE_TITLE')"
 
         lh_print_menu_item 1 "$(lh_msg 'RESTART_LOGIN_MANAGER')"
@@ -1492,31 +1516,40 @@ function restart_module_menu() {
         lh_print_menu_item 0 "$(lh_msg 'RESTART_BACK_TO_MAIN')"
         echo ""
 
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTART_CHOOSE_OPTION_PROMPT')${LH_COLOR_RESET}")" option
 
         case $option in
             1)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_LOGIN_MANAGER')")"
                 restart_login_manager_action
                 ;;
             2)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_SOUND_SYSTEM')")"
                 restart_sound_system_action
                 ;;
             3)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_DESKTOP_ENVIRONMENT')")"
                 restart_desktop_environment_action
                 ;;
             4)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_NETWORK_SERVICES')")"
                 restart_network_services_action
                 ;;
             5)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_FIREWALL')")"
                 restart_firewall_services_action
                 ;;
             6)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_BLUETOOTH_SERVICES')")"
                 restart_bluetooth_services_action
                 ;;
             7)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_GRAPHICS_SYSTEM')")"
                 restart_graphics_system_action
                 ;;
             8)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'POWER_MANAGEMENT')")"
                 power_management_action
                 ;;
             0)
@@ -1528,6 +1561,8 @@ function restart_module_menu() {
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTART_INVALID_SELECTION')${LH_COLOR_RESET}"
                 ;;
         esac
+
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
 
         # Short pause so the user can read the output
         echo ""

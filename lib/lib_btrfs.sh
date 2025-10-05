@@ -155,152 +155,137 @@ atomic_receive_with_validation() {
     
     local send_result=0
     local source_snapshot_name=$(basename "$source_snapshot")
+    local staging_suffix=".receiving_$$"
+    local staging_snapshot_name="${source_snapshot_name}${staging_suffix}"
+    local staging_snapshot_path="${backup_base_dir}/${staging_snapshot_name}"
+    local initial_received_path="${backup_base_dir}/${source_snapshot_name}"
+
+    # Clean up any leftover staging snapshot from previous runs
+    if [[ -d "$staging_snapshot_path" ]]; then
+        lh_log_msg "WARN" "atomic_receive_with_validation: Found leftover staging snapshot: $staging_snapshot_path"
+        if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$staging_snapshot_path")" "y"; then
+            if ! $LH_SUDO_CMD btrfs subvolume delete "$staging_snapshot_path" 2>/dev/null; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Unable to remove staging snapshot: $staging_snapshot_path"
+                return 1
+            fi
+        else
+            lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$staging_snapshot_path")"
+            return 1
+        fi
+    fi
+
     
     if [[ -n "$parent_snapshot" ]]; then
-        # Incremental backup with true atomic pattern
         lh_log_msg "DEBUG" "atomic_receive_with_validation: Performing atomic incremental send/receive"
         lh_log_msg "DEBUG" "  Source: $source_snapshot"
         lh_log_msg "DEBUG" "  Parent: $parent_snapshot"
-        
-        # Verify parent snapshot exists
+
         if [[ ! -d "$parent_snapshot" ]]; then
             lh_log_msg "WARN" "atomic_receive_with_validation: Parent snapshot not found: $parent_snapshot"
             return 2  # Special code for parent validation failure
         fi
-        
-        # Step 1: Receive into temporary location with .receiving suffix
-        # Note: We use a subdirectory approach since btrfs receive creates snapshot with original name
-        local temp_receive_dir="${backup_base_dir}/.receiving_$$"
-        if ! $LH_SUDO_CMD mkdir -p "$temp_receive_dir"; then
-            lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot create temporary receive directory: $temp_receive_dir"
-            return 1
-        fi
-        
-        lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 1 - Receiving into temporary directory: $temp_receive_dir"
-        if $LH_SUDO_CMD btrfs send -p "$parent_snapshot" "$source_snapshot" | $LH_SUDO_CMD btrfs receive "$temp_receive_dir"; then
-            # Step 2: Validate operation success (exit code check)
-            lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 2 - Receive successful, verifying result"
-            
-            # The snapshot is created with its original name in temp_receive_dir
-            local temp_received_snapshot="$temp_receive_dir/$source_snapshot_name"
-            
-            if [[ ! -d "$temp_received_snapshot" ]]; then
-                lh_log_msg "ERROR" "atomic_receive_with_validation: Expected snapshot not found in temp directory: $temp_received_snapshot"
-                $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || true
-                return 1
-            fi
-            
-            # Validate the received snapshot
-            if ! $LH_SUDO_CMD btrfs subvolume show "$temp_received_snapshot" >/dev/null 2>&1; then
-                lh_log_msg "ERROR" "atomic_receive_with_validation: Received snapshot is not valid: $temp_received_snapshot"
-                $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || true
+
+        # Step 1 - Receive snapshot into destination directory on backup filesystem
+        if $LH_SUDO_CMD btrfs send -p "$parent_snapshot" "$source_snapshot" | $LH_SUDO_CMD btrfs receive "$backup_base_dir"; then
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Incremental receive complete, staging snapshot for validation"
+
+            if [[ ! -d "$initial_received_path" ]]; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Received snapshot not found at expected path: $initial_received_path"
                 return 1
             fi
 
-            # Additional validation: ensure received_uuid is present and snapshot is read-only
+            # Step 2 - Stage snapshot with .receiving suffix and perform validation checks
+            local stage_output
+            stage_output=$($LH_SUDO_CMD mv "$initial_received_path" "$staging_snapshot_path" 2>&1)
+            local stage_exit_code=$?
+            if [[ $stage_exit_code -ne 0 ]]; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Failed to stage received snapshot (exit code: $stage_exit_code)"
+                lh_log_msg "ERROR" "mv error output: $stage_output"
+                if [[ -d "$initial_received_path" ]]; then
+                    if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$initial_received_path")" "y"; then
+                        $LH_SUDO_CMD btrfs subvolume delete "$initial_received_path" 2>/dev/null || true
+                    else
+                        lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$initial_received_path")"
+                    fi
+                fi
+                return 1
+            fi
+
+            if ! $LH_SUDO_CMD btrfs subvolume show "$staging_snapshot_path" >/dev/null 2>&1; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Received snapshot is not a valid BTRFS subvolume: $staging_snapshot_path"
+                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$staging_snapshot_path")" "y"; then
+                    $LH_SUDO_CMD btrfs subvolume delete "$staging_snapshot_path" 2>/dev/null || true
+                else
+                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$staging_snapshot_path")"
+                fi
+                return 1
+            fi
+
             local recv_uuid
-            recv_uuid=$($LH_SUDO_CMD btrfs subvolume show "$temp_received_snapshot" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+            recv_uuid=$($LH_SUDO_CMD btrfs subvolume show "$staging_snapshot_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
             local recv_ro
-            recv_ro=$($LH_SUDO_CMD btrfs property get "$temp_received_snapshot" ro 2>/dev/null | cut -d'=' -f2)
+            recv_ro=$($LH_SUDO_CMD btrfs property get "$staging_snapshot_path" ro 2>/dev/null | cut -d'=' -f2)
             if [[ -z "$recv_uuid" || "$recv_uuid" == "-" || "$recv_ro" != "true" ]]; then
-                lh_log_msg "ERROR" "atomic_receive_with_validation: Post-receive validation failed (received_uuid/ro)."
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Post-receive validation failed (received_uuid/ro) for $staging_snapshot_path"
                 lh_log_msg "DEBUG" "  Received UUID: ${recv_uuid:-none}"
                 lh_log_msg "DEBUG" "  Read-only: ${recv_ro:-unknown}"
-                $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                # Offer cleanup of receiving dir
-                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$temp_receive_dir")" "y"; then
-                    $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || $LH_SUDO_CMD rm -rf "$temp_receive_dir" 2>/dev/null || true
+                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$staging_snapshot_path")" "y"; then
+                    $LH_SUDO_CMD btrfs subvolume delete "$staging_snapshot_path" 2>/dev/null || true
                 else
-                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$temp_receive_dir")"
+                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$staging_snapshot_path")"
                 fi
                 return 1
             fi
-            
-            # Step 3: Atomic rename to final destination within same filesystem
-            lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 3 - Atomic rename to final destination: $final_destination"
-            local final_parent_dir=$(dirname "$final_destination")
-            if ! $LH_SUDO_CMD mkdir -p "$final_parent_dir"; then
-                lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot create final parent directory: $final_parent_dir"
-                # Offer to cleanup temp on failure
-                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$temp_receive_dir")" "y"; then
-                    $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                    $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || $LH_SUDO_CMD rm -rf "$temp_receive_dir" 2>/dev/null || true
-                else
-                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$temp_receive_dir")"
-                fi
-                return 1
-            fi
-            
-            # If target exists (shouldn't for timestamped names), handle safely
-            if [[ -d "$final_destination" ]]; then
-                lh_log_msg "WARN" "atomic_receive_with_validation: Final destination already exists, removing non-received snapshot: $final_destination"
-                if $LH_SUDO_CMD btrfs subvolume show "$final_destination" >/dev/null 2>&1; then
-                    # Try delete directly (received snapshots will be protected by earlier check)
-                    if ! $LH_SUDO_CMD btrfs subvolume delete "$final_destination" 2>/dev/null; then
-                        lh_log_msg "ERROR" "atomic_receive_with_validation: Failed to remove existing destination: $final_destination"
-                        # Offer to cleanup temp before returning
-                        if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$temp_receive_dir")" "y"; then
-                            $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                            $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || $LH_SUDO_CMD rm -rf "$temp_receive_dir" 2>/dev/null || true
-                        else
-                            lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$temp_receive_dir")"
-                        fi
-                        return 1
-                    fi
-                else
-                    lh_log_msg "ERROR" "atomic_receive_with_validation: Destination path exists but is not a BTRFS subvolume: $final_destination"
-                    # Offer to cleanup temp before returning
-                    if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$temp_receive_dir")" "y"; then
-                        $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                        $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || $LH_SUDO_CMD rm -rf "$temp_receive_dir" 2>/dev/null || true
-                    else
-                        lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$temp_receive_dir")"
-                    fi
-                    return 1
-                fi
-            fi
-            
-            # Perform atomic move
-            if $LH_SUDO_CMD mv "$temp_received_snapshot" "$final_destination" 2>/dev/null; then
+
+            # Step 3 - Atomic rename within same parent to reveal final snapshot name
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Performing final atomic rename to $final_destination"
+            local mv_error_output
+            mv_error_output=$($LH_SUDO_CMD mv "$staging_snapshot_path" "$final_destination" 2>&1)
+            local mv_exit_code=$?
+            if [[ $mv_exit_code -eq 0 ]]; then
                 lh_log_msg "INFO" "atomic_receive_with_validation: Incremental backup completed successfully at: $final_destination"
-                # Step 4: Cleanup temp directory
-                $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || true
                 return 0
-            else
-                local mv_rc=$?
-                lh_log_msg "ERROR" "atomic_receive_with_validation: Atomic rename failed with exit code: $mv_rc"
-                # Offer to cleanup
-                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$temp_receive_dir")" "y"; then
-                    $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                    $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || $LH_SUDO_CMD rm -rf "$temp_receive_dir" 2>/dev/null || true
-                else
-                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$temp_receive_dir")"
-                fi
-                return 1
             fi
+
+            lh_log_msg "ERROR" "atomic_receive_with_validation: Atomic rename failed with exit code: $mv_exit_code"
+            lh_log_msg "ERROR" "mv error output: $mv_error_output"
+
+            lh_log_msg "DEBUG" "Source subvolume info:"
+            $LH_SUDO_CMD btrfs subvolume show "$staging_snapshot_path" 2>/dev/null | head -10 | while IFS= read -r line; do
+                lh_log_msg "DEBUG" "  $line"
+            done
+
+            lh_log_msg "DEBUG" "Filesystem information:"
+            lh_log_msg "DEBUG" "  Destination filesystem: $($LH_SUDO_CMD stat -f -c '%T' "$(dirname "$final_destination")" 2>/dev/null || echo "unknown")"
+            lh_log_msg "DEBUG" "  Destination parent permissions: $($LH_SUDO_CMD ls -ld "$(dirname "$final_destination")" 2>/dev/null || echo "unknown")"
+
+            # Step 4 - Cleanup staging artifact if atomic rename failed
+            if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$staging_snapshot_path")" "y"; then
+                $LH_SUDO_CMD btrfs subvolume delete "$staging_snapshot_path" 2>/dev/null || true
+            else
+                lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$staging_snapshot_path")"
+            fi
+            return 1
         else
             send_result=$?
             lh_log_msg "ERROR" "atomic_receive_with_validation: Incremental send/receive failed with exit code: $send_result"
-            
-            # Step 4: Offer to clean up temporary files on failure
-            local partial_snapshot="$temp_receive_dir/$source_snapshot_name"
-            if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$temp_receive_dir")" "y"; then
-                [[ -d "$partial_snapshot" ]] && $LH_SUDO_CMD btrfs subvolume delete "$partial_snapshot" 2>/dev/null || true
-                $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || $LH_SUDO_CMD rm -rf "$temp_receive_dir" 2>/dev/null || true
-            else
-                lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$temp_receive_dir")"
+
+            # Step 4 - Cleanup staging artifacts created before failure
+            if [[ -d "$initial_received_path" ]]; then
+                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$initial_received_path")" "y"; then
+                    $LH_SUDO_CMD btrfs subvolume delete "$initial_received_path" 2>/dev/null || true
+                else
+                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$initial_received_path")"
+                fi
             fi
-            
-            # Capture error details for analysis
+
             local error_details
             error_details=$($LH_SUDO_CMD dmesg | tail -10 | grep -i "btrfs\|error" || echo "No specific BTRFS errors in dmesg")
-            
-            # Use enhanced error handling to determine appropriate response
+
             local error_analysis_result
             error_analysis_result=$(handle_btrfs_error "$error_details" "incremental send/receive" "$send_result")
             local error_code=$?
-            
+
             case $error_code in
                 2)
                     lh_log_msg "WARN" "Parent validation failed - incremental chain broken"
@@ -321,141 +306,116 @@ atomic_receive_with_validation() {
             esac
         fi
     else
-        # Full backup with true atomic pattern
         lh_log_msg "DEBUG" "atomic_receive_with_validation: Performing atomic full send/receive"
         lh_log_msg "DEBUG" "  Source: $source_snapshot"
-        
-        # Step 1: Receive into temporary location with .receiving suffix
-        local temp_receive_dir="${backup_base_dir}/.receiving_$$"
-        if ! $LH_SUDO_CMD mkdir -p "$temp_receive_dir"; then
-            lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot create temporary receive directory: $temp_receive_dir"
-            return 1
-        fi
-        
-        lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 1 - Receiving into temporary directory: $temp_receive_dir"
-        # Create temporary file to capture error output
-        local error_log=$(mktemp)
-        if $LH_SUDO_CMD btrfs send "$source_snapshot" 2>"$error_log" | $LH_SUDO_CMD btrfs receive "$temp_receive_dir" 2>>"$error_log"; then
-            # Step 2: Validate operation success (exit code check)
-            lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 2 - Receive successful, verifying result"
+
+        local error_log
+        error_log=$(mktemp)
+
+        # Step 1 - Receive snapshot into destination directory on backup filesystem
+        if $LH_SUDO_CMD btrfs send "$source_snapshot" 2>"$error_log" | $LH_SUDO_CMD btrfs receive "$backup_base_dir" 2>>"$error_log"; then
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Full receive complete, staging snapshot for validation"
             $LH_SUDO_CMD rm -f "$error_log"
-            
-            # The snapshot is created with its original name in temp_receive_dir
-            local temp_received_snapshot="$temp_receive_dir/$source_snapshot_name"
-            
-            if [[ ! -d "$temp_received_snapshot" ]]; then
-                lh_log_msg "ERROR" "atomic_receive_with_validation: Expected snapshot not found in temp directory: $temp_received_snapshot"
-                $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || true
-                return 1
-            fi
-            
-            # Validate the received snapshot
-            if ! $LH_SUDO_CMD btrfs subvolume show "$temp_received_snapshot" >/dev/null 2>&1; then
-                lh_log_msg "ERROR" "atomic_receive_with_validation: Received snapshot is not valid: $temp_received_snapshot"
-                $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || true
+
+            if [[ ! -d "$initial_received_path" ]]; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Received snapshot not found at expected path: $initial_received_path"
                 return 1
             fi
 
-            # Additional validation: ensure received_uuid is present and snapshot is read-only
+            # Step 2 - Stage snapshot with .receiving suffix and perform validation checks
+            local stage_output
+            stage_output=$($LH_SUDO_CMD mv "$initial_received_path" "$staging_snapshot_path" 2>&1)
+            local stage_exit_code=$?
+            if [[ $stage_exit_code -ne 0 ]]; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Failed to stage received snapshot (exit code: $stage_exit_code)"
+                lh_log_msg "ERROR" "mv error output: $stage_output"
+                if [[ -d "$initial_received_path" ]]; then
+                    if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$initial_received_path")" "y"; then
+                        $LH_SUDO_CMD btrfs subvolume delete "$initial_received_path" 2>/dev/null || true
+                    else
+                        lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$initial_received_path")"
+                    fi
+                fi
+                return 1
+            fi
+
+            if ! $LH_SUDO_CMD btrfs subvolume show "$staging_snapshot_path" >/dev/null 2>&1; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Received snapshot is not a valid BTRFS subvolume: $staging_snapshot_path"
+                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$staging_snapshot_path")" "y"; then
+                    $LH_SUDO_CMD btrfs subvolume delete "$staging_snapshot_path" 2>/dev/null || true
+                else
+                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$staging_snapshot_path")"
+                fi
+                return 1
+            fi
+
             local recv_uuid
-            recv_uuid=$($LH_SUDO_CMD btrfs subvolume show "$temp_received_snapshot" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+            recv_uuid=$($LH_SUDO_CMD btrfs subvolume show "$staging_snapshot_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
             local recv_ro
-            recv_ro=$($LH_SUDO_CMD btrfs property get "$temp_received_snapshot" ro 2>/dev/null | cut -d'=' -f2)
+            recv_ro=$($LH_SUDO_CMD btrfs property get "$staging_snapshot_path" ro 2>/dev/null | cut -d'=' -f2)
             if [[ -z "$recv_uuid" || "$recv_uuid" == "-" || "$recv_ro" != "true" ]]; then
-                lh_log_msg "ERROR" "atomic_receive_with_validation: Post-receive validation failed (received_uuid/ro)."
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Post-receive validation failed (received_uuid/ro) for $staging_snapshot_path"
                 lh_log_msg "DEBUG" "  Received UUID: ${recv_uuid:-none}"
                 lh_log_msg "DEBUG" "  Read-only: ${recv_ro:-unknown}"
-                $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                # Offer cleanup of receiving dir
-                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$temp_receive_dir")" "y"; then
-                    $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || $LH_SUDO_CMD rm -rf "$temp_receive_dir" 2>/dev/null || true
+                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$staging_snapshot_path")" "y"; then
+                    $LH_SUDO_CMD btrfs subvolume delete "$staging_snapshot_path" 2>/dev/null || true
                 else
-                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$temp_receive_dir")"
+                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$staging_snapshot_path")"
                 fi
                 return 1
             fi
-            
-            # Step 3: Atomic rename to final destination within same filesystem
-            lh_log_msg "DEBUG" "atomic_receive_with_validation: Step 3 - Atomic rename to final destination: $final_destination"
-            local final_parent_dir=$(dirname "$final_destination")
-            if ! $LH_SUDO_CMD mkdir -p "$final_parent_dir"; then
-                lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot create final parent directory: $final_parent_dir"
-                # Offer to cleanup temp
-                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$temp_receive_dir")" "y"; then
-                    $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                    $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || $LH_SUDO_CMD rm -rf "$temp_receive_dir" 2>/dev/null || true
-                else
-                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$temp_receive_dir")"
-                fi
-                return 1
-            fi
-            
-            # If target exists (unexpected for timestamped name), try to remove safely
-            if [[ -d "$final_destination" ]]; then
-                lh_log_msg "WARN" "atomic_receive_with_validation: Final destination already exists, removing non-received snapshot: $final_destination"
-                if $LH_SUDO_CMD btrfs subvolume show "$final_destination" >/dev/null 2>&1; then
-                    if ! $LH_SUDO_CMD btrfs subvolume delete "$final_destination" 2>/dev/null; then
-                        lh_log_msg "ERROR" "atomic_receive_with_validation: Failed to remove existing destination: $final_destination"
-                        # Offer to cleanup temp before returning
-                        if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$temp_receive_dir")" "y"; then
-                            $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                            $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || $LH_SUDO_CMD rm -rf "$temp_receive_dir" 2>/dev/null || true
-                        else
-                            lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$temp_receive_dir")"
-                        fi
-                        return 1
-                    fi
-                else
-                    lh_log_msg "ERROR" "atomic_receive_with_validation: Destination path exists but is not a BTRFS subvolume: $final_destination"
-                    # Offer to cleanup temp before returning
-                    if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$temp_receive_dir")" "y"; then
-                        $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                        $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || $LH_SUDO_CMD rm -rf "$temp_receive_dir" 2>/dev/null || true
-                    else
-                        lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$temp_receive_dir")"
-                    fi
-                    return 1
-                fi
-            fi
-            
-            # Perform atomic move
-            if $LH_SUDO_CMD mv "$temp_received_snapshot" "$final_destination" 2>/dev/null; then
+
+            # Step 3 - Atomic rename within same parent to reveal final snapshot name
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Performing final atomic rename to $final_destination"
+            local mv_error_output
+            mv_error_output=$($LH_SUDO_CMD mv "$staging_snapshot_path" "$final_destination" 2>&1)
+            local mv_exit_code=$?
+            if [[ $mv_exit_code -eq 0 ]]; then
                 lh_log_msg "INFO" "atomic_receive_with_validation: Full backup completed successfully at: $final_destination"
-                # Step 4: Cleanup temp directory
-                $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || true
                 return 0
-            else
-                local mv_rc=$?
-                lh_log_msg "ERROR" "atomic_receive_with_validation: Atomic rename failed with exit code: $mv_rc"
-                # Offer to cleanup
-                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$temp_receive_dir")" "y"; then
-                    $LH_SUDO_CMD btrfs subvolume delete "$temp_received_snapshot" 2>/dev/null || true
-                    $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || $LH_SUDO_CMD rm -rf "$temp_receive_dir" 2>/dev/null || true
-                else
-                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$temp_receive_dir")"
-                fi
-                return 1
             fi
+
+            lh_log_msg "ERROR" "atomic_receive_with_validation: Atomic rename failed with exit code: $mv_exit_code"
+            lh_log_msg "ERROR" "mv error output: $mv_error_output"
+
+            lh_log_msg "DEBUG" "Source subvolume info:"
+            $LH_SUDO_CMD btrfs subvolume show "$staging_snapshot_path" 2>/dev/null | head -10 | while IFS= read -r line; do
+                lh_log_msg "DEBUG" "  $line"
+            done
+
+            lh_log_msg "DEBUG" "Filesystem information:"
+            lh_log_msg "DEBUG" "  Destination filesystem: $($LH_SUDO_CMD stat -f -c '%T' "$(dirname "$final_destination")" 2>/dev/null || echo "unknown")"
+            lh_log_msg "DEBUG" "  Destination parent permissions: $($LH_SUDO_CMD ls -ld "$(dirname "$final_destination")" 2>/dev/null || echo "unknown")"
+
+            # Step 4 - Cleanup staging artifact if atomic rename failed
+            if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$staging_snapshot_path")" "y"; then
+                $LH_SUDO_CMD btrfs subvolume delete "$staging_snapshot_path" 2>/dev/null || true
+            else
+                lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$staging_snapshot_path")"
+            fi
+            return 1
         else
             send_result=$?
             lh_log_msg "ERROR" "atomic_receive_with_validation: Full send/receive failed with exit code: $send_result"
-            if [ -s "$error_log" ]; then
-                lh_log_msg "ERROR" "BTRFS send/receive error output:"
+
+            # Step 4 - Cleanup staging artifacts created before failure
+            if [[ -d "$initial_received_path" ]]; then
+                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$initial_received_path")" "y"; then
+                    $LH_SUDO_CMD btrfs subvolume delete "$initial_received_path" 2>/dev/null || true
+                else
+                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$initial_received_path")"
+                fi
+            fi
+
+            if [[ -s "$error_log" ]]; then
                 while IFS= read -r line; do
-                    lh_log_msg "ERROR" "  $line"
+                    lh_log_msg "ERROR" "btrfs receive: $line"
                 done < "$error_log"
             fi
-            
-            # Step 4: Offer to clean up temporary files on failure
-            local partial_snapshot="$temp_receive_dir/$source_snapshot_name"
-            if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$temp_receive_dir")" "y"; then
-                [[ -d "$partial_snapshot" ]] && $LH_SUDO_CMD btrfs subvolume delete "$partial_snapshot" 2>/dev/null || true
-                $LH_SUDO_CMD rmdir "$temp_receive_dir" 2>/dev/null || $LH_SUDO_CMD rm -rf "$temp_receive_dir" 2>/dev/null || true
-            else
-                lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$temp_receive_dir")"
-            fi
+
             $LH_SUDO_CMD rm -f "$error_log"
+            local partial_snapshot="$staging_snapshot_path"
+            [[ -d "$partial_snapshot" ]] && $LH_SUDO_CMD btrfs subvolume delete "$partial_snapshot" 2>/dev/null || true
             return 1
         fi
     fi
@@ -813,7 +773,7 @@ btrfs_list_receiving_dirs() {
     fi
 
     # Limit search to one sublevel below backup base where subvolume dirs live
-    find "$base_dir" -mindepth 2 -maxdepth 2 -type d -name ".receiving_*" -mmin +"$min_age_minutes" -print0 2>/dev/null || true
+    find "$base_dir" -mindepth 2 -maxdepth 2 -type d \( -name ".receiving_*" -o -name "*.receiving_*" \) -mmin +"$min_age_minutes" -print0 2>/dev/null || true
 }
 
 #
@@ -835,17 +795,25 @@ btrfs_cleanup_receiving_dir() {
     fi
 
     local had_error=false
-    # Delete any BTRFS subvolumes inside first
-    for s in "$receiving_dir"/*; do
-        [[ -d "$s" ]] || continue
-        if $LH_SUDO_CMD btrfs subvolume show "$s" >/dev/null 2>&1; then
-            $LH_SUDO_CMD btrfs subvolume delete "$s" >/dev/null 2>&1 || had_error=true
-        else
-            $LH_SUDO_CMD rm -rf "$s" >/dev/null 2>&1 || had_error=true
+
+    if $LH_SUDO_CMD btrfs subvolume show "$receiving_dir" >/dev/null 2>&1; then
+        # Path itself is a subvolume (new staging pattern)
+        if ! $LH_SUDO_CMD btrfs subvolume delete "$receiving_dir" >/dev/null 2>&1; then
+            had_error=true
         fi
-    done
-    # Remove the receiving directory itself
-    $LH_SUDO_CMD rmdir "$receiving_dir" >/dev/null 2>&1 || $LH_SUDO_CMD rm -rf "$receiving_dir" >/dev/null 2>&1 || had_error=true
+    else
+        # Delete any BTRFS subvolumes inside first (legacy directory pattern)
+        for s in "$receiving_dir"/*; do
+            [[ -d "$s" ]] || continue
+            if $LH_SUDO_CMD btrfs subvolume show "$s" >/dev/null 2>&1; then
+                $LH_SUDO_CMD btrfs subvolume delete "$s" >/dev/null 2>&1 || had_error=true
+            else
+                $LH_SUDO_CMD rm -rf "$s" >/dev/null 2>&1 || had_error=true
+            fi
+        done
+        # Remove the receiving directory itself
+        $LH_SUDO_CMD rmdir "$receiving_dir" >/dev/null 2>&1 || $LH_SUDO_CMD rm -rf "$receiving_dir" >/dev/null 2>&1 || had_error=true
+    fi
 
     if [[ "$had_error" == true ]]; then
         lh_log_msg "ERROR" "btrfs_cleanup_receiving_dir: Failed to fully remove: $receiving_dir"
@@ -1647,28 +1615,38 @@ validate_btrfs_implementation() {
     
     # Test 10: Verify that atomic pattern constants are properly defined
     local atomic_patterns=(
-        "Receive into temporary location"
-        "Validate operation success"
-        "Atomic rename"
-        "Clean up on failure"
+        "Step 1 - Receive"
+        "Step 2 - Stage"
+        "Step 3 - Atomic rename"
+        "Step 4 - Cleanup"
     )
-    
-    # Check if the atomic pattern is mentioned in the atomic function
-    local atomic_function_source
-    if atomic_function_source=$(declare -f atomic_receive_with_validation 2>/dev/null); then
-        local missing_patterns=0
+
+    # Check if the atomic pattern is mentioned in the library source
+    local atomic_function_path="${LH_ROOT_DIR:-.}/lib/lib_btrfs.sh"
+    if [[ -f "$atomic_function_path" ]]; then
+        lh_log_msg "DEBUG" "Atomic pattern check: scanning $atomic_function_path"
+        local missing_patterns=()
         for pattern in "${atomic_patterns[@]}"; do
-            if ! echo "$atomic_function_source" | grep -q "Step [1-4]"; then
-                ((missing_patterns++))
+            if grep -F -q "$pattern" "$atomic_function_path"; then
+                lh_log_msg "DEBUG" "Atomic pattern check: found '$pattern'"
+            else
+                lh_log_msg "WARN" "Atomic pattern check: missing '$pattern'"
+                missing_patterns+=("$pattern")
             fi
         done
-        
-        if [[ "$missing_patterns" -eq 0 ]]; then
+
+        if [[ ${#missing_patterns[@]} -eq 0 ]]; then
             lh_log_msg "DEBUG" "✓ Atomic backup pattern properly implemented with 4-step workflow"
         else
-            lh_log_msg "WARN" "Atomic backup pattern may not fully implement 4-step workflow"
-            ((validation_warnings++))
+            lh_log_msg "WARN" "Atomic backup pattern may not fully implement 4-step workflow (${#missing_patterns[@]} missing)"
+            for pattern in "${missing_patterns[@]}"; do
+                lh_log_msg "WARN" "  Missing step detail: $pattern"
+            done
+            ((validation_warnings+=${#missing_patterns[@]}))
         fi
+    else
+        lh_log_msg "WARN" "Atomic pattern check: source file not found at $atomic_function_path"
+        ((validation_warnings++))
     fi
     
     # Summary

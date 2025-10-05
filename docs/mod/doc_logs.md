@@ -24,6 +24,7 @@ This module provides a collection of tools for viewing, filtering, and analyzing
     *   `lh_check_command`: Used to verify the presence of essential external commands like `dmesg` and `python3`, offering to install them if missing.
     *   Color variables (e.g., `LH_COLOR_INFO`, `LH_COLOR_ERROR`, `LH_COLOR_PROMPT`): For styled terminal output.
     *   Global variables: Accesses `LH_LOG_DIR` (for saving logs), `LH_SUDO_CMD` (for privileged operations), `LH_PKG_MANAGER` (for package manager logs), and `LH_ROOT_DIR` (for locating the advanced analysis script).
+*   **Session Awareness:** The module records concurrent sessions via `lh_log_active_sessions_debug`, registers itself with `lh_begin_module_session`, and posts activity updates (`lh_update_module_session`) while the menu waits for input or when a specific log task is running.
 *   **Key System Commands:** `journalctl`, `date`, `awk`, `grep`, `tail`, `head`, `cut`, `systemctl`, `less`, `dmesg`, `python3` (for advanced analysis), `cp`.
 
 **3. Main Menu Function: `log_analyzer_menu()`**

@@ -44,6 +44,8 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
     *   `lh_ask_for_input`: For interactive configuration and selections
     *   Color variables: For styled terminal output and safety warnings
     *   `lh_load_language_module`: For internationalization support
+    *   `lh_log_active_sessions_debug`, `lh_begin_module_session`, `lh_update_module_session`: Provide session visibility and continuous status updates while navigation or restore steps run.
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
 *   **Key System Commands:** `btrfs`, `mount`, `find`, `mv`, `mkdir`, `date`.
 *   **Critical Dependencies:** BTRFS utilities must be available; module exits if `btrfs` command is not found.
 
@@ -56,6 +58,7 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
 *   **`LH_RESTORE_LOG`**: Path to restore-specific log file; created lazily once the main logging system is initialised so sourcing the module from other scripts doesn’t leave stray files
 *   **`RESTORE_LIVE_ENV_STATUS`**: Cached result of the live-environment detection ("true"/"false") to avoid repeated probing
 *   **`RESTORE_LIVE_MESSAGE_SHOWN`**: Tracks whether the "live environment detected" notice has already been displayed for the current session
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
 *   **`RESTORE_NON_LIVE_OVERRIDE`**: Tracks whether the user acknowledged running on a non-live system so subsequent operations don’t prompt again
 *   **`RESTORE_NON_LIVE_NOTICE_SHOWN`**: Ensures the informational reminder about running non-live is printed only once after override
 
@@ -76,6 +79,7 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
         *   Displays the success banner only once when a live environment is confirmed
         *   If not live, prints a warning/recommendation and requires an explicit confirmation before proceeding
         *   Remembers the user’s override so later operations in the same session do not ask again, while still showing a single informational reminder
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
     *   **Safety Features:** Prevents accidental execution on running systems while avoiding repeated prompts once the user has consciously overridden the warning
     *   **Dependencies (internal):** `lh_print_header`, `lh_confirm_action`, `restore_log_msg`, `detect_live_environment`
 

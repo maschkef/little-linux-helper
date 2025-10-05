@@ -25,6 +25,8 @@ This module serves as a central hub for Docker operations within the little-linu
     *   `lh_ask_for_input`: For prompting user for specific configuration input.
     *   Color variables (e.g., `LH_COLOR_INFO`, `LH_COLOR_ERROR`, `LH_COLOR_PROMPT`, `LH_COLOR_SEPARATOR`, `LH_COLOR_HEADER`, `LH_COLOR_MENU_TEXT`, `LH_COLOR_SUCCESS`, `LH_COLOR_WARNING`): For styled terminal output.
     *   Global variables: Accesses `LH_SUDO_CMD` (for privileged operations).
+    *   `lh_log_active_sessions_debug`, `lh_begin_module_session`, `lh_update_module_session`: Provide visibility into concurrent modules and keep the shared session registry updated while menu actions run.
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
 *   **Key System Commands:** `docker`, `wc`, `systemctl`.
 
 **3. Main Menu Function: `docker_functions_menu()`**

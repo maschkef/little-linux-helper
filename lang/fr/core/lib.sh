@@ -61,6 +61,24 @@ MSG_FR[LIB_WARNING_INITIAL_LOG_DIR]="AVERTISSEMENT : Impossible de créer le ré
 # UI-specific messages
 MSG_FR[LIB_UI_INVALID_INPUT]="Entrée invalide. Veuillez réessayer."
 
+# Session registry messages
+MSG_FR[LIB_SESSION_ACTIVITY_INITIALIZING]="Initialisation en cours"
+MSG_FR[LIB_SESSION_ACTIVITY_MENU]="Affichage du menu"
+MSG_FR[LIB_SESSION_ACTIVITY_WAITING]="En attente d'une entrée utilisateur"
+MSG_FR[LIB_SESSION_ACTIVITY_SECTION]="Traitement : %s"
+MSG_FR[LIB_SESSION_ACTIVITY_ACTION]="Exécution : %s"
+MSG_FR[LIB_SESSION_ACTIVITY_PREP]="Préparation : %s"
+MSG_FR[LIB_SESSION_ACTIVITY_BACKUP]="Sauvegarde : %s"
+MSG_FR[LIB_SESSION_ACTIVITY_RESTORE]="Restauration : %s"
+MSG_FR[LIB_SESSION_ACTIVITY_CLEANUP]="Nettoyage : %s"
+MSG_FR[LIB_SESSION_LOCK_TIMEOUT]="Registre des sessions occupé, mise à jour ignorée."
+MSG_FR[LIB_SESSION_REGISTERED]="Session démarrée : %s (%s)"
+MSG_FR[LIB_SESSION_UPDATED]="Session mise à jour : %s -> %s"
+MSG_FR[LIB_SESSION_UNREGISTERED]="Session terminée : %s"
+MSG_FR[LIB_SESSION_DEBUG_NONE]="Aucune autre session active (module : %s)"
+MSG_FR[LIB_SESSION_DEBUG_LIST_HEADER]="Sessions actives avant de démarrer %s (%d au total) :"
+MSG_FR[LIB_SESSION_DEBUG_ENTRY]="%s [%s] %s (%s)"
+
 # Notification messages
 MSG_FR[LIB_NOTIFICATION_INCOMPLETE_PARAMS]="lh_send_notification : Paramètres incomplets (type, title, message requis)"
 MSG_FR[LIB_NOTIFICATION_TRYING_SEND]="Tentative d'envoi de notification de bureau : [%s] %s - %s"

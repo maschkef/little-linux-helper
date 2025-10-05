@@ -345,6 +345,7 @@ MSG_EN[STATUS_NO_BACKUPS]="No backups available yet."
 MSG_EN[STATUS_RECENT_ACTIVITIES]="=== Recent Backup Activities (from %s) ==="
 
 # Main backup menu
+MSG_EN[MENU_BACKUP]="Backup & Recovery"
 MSG_EN[MENU_BACKUP_TITLE]="Backup & Recovery"
 MSG_EN[MENU_BTRFS_OPERATIONS]="BTRFS Operations (Backup/Restore/Delete)"
 MSG_EN[MENU_TAR_BACKUP]="TAR Archive Backup"
@@ -625,7 +626,7 @@ MSG_EN[BTRFS_MENU_RESTORE]="Restore BTRFS Backup"
 MSG_EN[BTRFS_MENU_MAINTENANCE]="Maintenance"
 MSG_EN[BTRFS_MENU_MAINTENANCE_TITLE]="BTRFS Maintenance"
 MSG_EN[BTRFS_MENU_CLEANUP_SOURCE]="Clean up script-created source snapshots"
-MSG_EN[BTRFS_MENU_CLEANUP_RECEIVING]="Cleanup Orphan Receiving Dirs (.receiving_*)"
+MSG_EN[BTRFS_MENU_CLEANUP_RECEIVING]="Cleanup Orphan Receiving Artifacts (.receiving_*)"
 MSG_EN[BTRFS_MENU_DEBUG_CHAIN]="Inspect Incremental Chain (debug)"
 
 # BTRFS log messages - problematic cleanup
@@ -639,12 +640,12 @@ MSG_EN[BTRFS_LOG_BACKUP_SUBVOL_DIR_ERROR]="Could not create backup subvolume dir
 MSG_EN[BTRFS_LOG_TRANSFER_SNAPSHOT]="Transferring snapshot for subvolume: %s"
 
 # Receiving dir cleanup and debug menu
-MSG_EN[BTRFS_RECEIVING_CLEANUP_HEADER]="Cleanup Orphan .receiving_* Directories"
+MSG_EN[BTRFS_RECEIVING_CLEANUP_HEADER]="Cleanup Orphan .receiving_* Artifacts"
 MSG_EN[BTRFS_RECEIVING_AGE_PROMPT]="Only include .receiving_* older than how many minutes? (default %d)"
-MSG_EN[BTRFS_RECEIVING_NONE_FOUND]="No orphan .receiving_* directories found"
-MSG_EN[BTRFS_RECEIVING_FOUND_COUNT]="Found %d orphan .receiving_* directories"
+MSG_EN[BTRFS_RECEIVING_NONE_FOUND]="No orphan .receiving_* artifacts found"
+MSG_EN[BTRFS_RECEIVING_FOUND_COUNT]="Found %d orphan .receiving_* artifacts"
 MSG_EN[BTRFS_RECEIVING_SUBVOL_LABEL]="Subvolume: %s"
-MSG_EN[BTRFS_RECEIVING_CONFIRM_DELETE_ALL]="Delete ALL %d listed .receiving_* directories now?"
+MSG_EN[BTRFS_RECEIVING_CONFIRM_DELETE_ALL]="Delete ALL %d listed .receiving_* artifacts now?"
 MSG_EN[BTRFS_RECEIVING_DELETE_ERROR]="Failed to remove: %s"
 MSG_EN[BTRFS_RECEIVING_DELETE_SUCCESS]="Removed: %s"
 MSG_EN[BTRFS_RECEIVING_SUMMARY]="Cleanup finished: %d removed, %d errors"
@@ -653,8 +654,8 @@ MSG_EN[BTRFS_DEBUG_CHAIN_HEADER]="Inspect Incremental Chain"
 MSG_EN[BTRFS_SELECT_SUBVOLUME]="Select subvolume (1-%d):"
 
 # Atomic receive prompts
-MSG_EN[BTRFS_PROMPT_REMOVE_RECEIVING_NOW]="Remove temporary receiving directory now? (%s)"
-MSG_EN[BTRFS_KEEP_RECEIVING_DIR]="Keeping temporary receiving directory for inspection: %s"
+MSG_EN[BTRFS_PROMPT_REMOVE_RECEIVING_NOW]="Remove temporary receiving artifact now? (%s)"
+MSG_EN[BTRFS_KEEP_RECEIVING_DIR]="Keeping temporary receiving artifact for inspection: %s"
 
 # Sub-module information messages
 MSG_EN[BACKUP_TAR_MODULE_INFO]="Starting TAR backup operations..."

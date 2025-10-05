@@ -77,6 +77,49 @@ MSG_EN[LIB_WARNING_INITIAL_LOG_DIR]="WARNING: Could not create initial log direc
 # UI-specific messages
 MSG_EN[LIB_UI_INVALID_INPUT]="Invalid input. Please try again."
 
+# Session registry messages
+MSG_EN[LIB_SESSION_ACTIVITY_INITIALIZING]="Initializing"
+MSG_EN[LIB_SESSION_ACTIVITY_MENU]="Displaying menu"
+MSG_EN[LIB_SESSION_ACTIVITY_WAITING]="Waiting for user input"
+MSG_EN[LIB_SESSION_ACTIVITY_SECTION]="Working on: %s"
+MSG_EN[LIB_SESSION_ACTIVITY_ACTION]="Running: %s"
+MSG_EN[LIB_SESSION_ACTIVITY_PREP]="Preparing: %s"
+MSG_EN[LIB_SESSION_ACTIVITY_BACKUP]="Backing up: %s"
+MSG_EN[LIB_SESSION_ACTIVITY_RESTORE]="Restoring: %s"
+MSG_EN[LIB_SESSION_ACTIVITY_CLEANUP]="Cleaning up: %s"
+MSG_EN[LIB_SESSION_ACTIVITY_COMPLETED]="Completed: %s"
+MSG_EN[LIB_SESSION_ACTIVITY_BACKUP_FINISHED]="Backup finished: %s"
+MSG_EN[LIB_SESSION_ACTIVITY_RESTORE_FINISHED]="Restore finished: %s"
+MSG_EN[LIB_SESSION_ACTIVITY_FAILED]="Failed: %s"
+MSG_EN[LIB_SESSION_LOCK_TIMEOUT]="Session registry busy, skipping update."
+MSG_EN[LIB_SESSION_REGISTERED]="Session started: %s (%s)"
+MSG_EN[LIB_SESSION_UPDATED]="Session updated: %s -> %s"
+MSG_EN[LIB_SESSION_UNREGISTERED]="Session ended: %s"
+MSG_EN[LIB_SESSION_DEBUG_NONE]="No other sessions active (module: %s)"
+MSG_EN[LIB_SESSION_DEBUG_LIST_HEADER]="Active sessions before starting %s (%d total):"
+MSG_EN[LIB_SESSION_DEBUG_ENTRY]="%s [%s] %s (%s)"
+
+# Blocking categories and conflict management
+MSG_EN[LIB_BLOCK_FILESYSTEM_WRITE]="File operations that could interfere with ongoing I/O"
+MSG_EN[LIB_BLOCK_SYSTEM_CRITICAL]="Operations that could restart or destabilize the system"
+MSG_EN[LIB_BLOCK_RESOURCE_INTENSIVE]="Resource-heavy operations competing for CPU/disk"
+MSG_EN[LIB_BLOCK_NETWORK_DEPENDENT]="Operations requiring stable network connectivity"
+
+# Session conflict management
+MSG_EN[LIB_CONFLICT_WARNING_HEADER]="⚠️  WARNING: %s operations are currently blocked!"
+MSG_EN[LIB_CONFLICT_ACTIVE_SESSIONS]="Active conflicting sessions:"
+MSG_EN[LIB_CONFLICT_SESSION_ENTRY]="  - %s: %s (%s)"
+MSG_EN[LIB_CONFLICT_RISKS_HEADER]="⚠️  FORCING this operation could cause:"
+MSG_EN[LIB_CONFLICT_RISK_DATA_CORRUPTION]="  - Data corruption during backup"
+MSG_EN[LIB_CONFLICT_RISK_SYSTEM_INSTABILITY]="  - System instability"
+MSG_EN[LIB_CONFLICT_RISK_FAILED_INSTALLATIONS]="  - Failed installations"
+MSG_EN[LIB_CONFLICT_OVERRIDE_PROMPT]="Type 'FORCE' to override anyway (any other input cancels): "
+MSG_EN[LIB_CONFLICT_PROCEEDING_WITH_OVERRIDE]="⚠️  PROCEEDING WITH OVERRIDE - USE AT YOUR OWN RISK"
+MSG_EN[LIB_CONFLICT_OPERATION_CANCELLED]="Operation cancelled by user."
+MSG_EN[LIB_CONFLICT_OPERATION_BLOCKED]="Operation blocked due to conflicts."
+MSG_EN[LIB_CONFLICT_WAIT_MESSAGE]="Waiting for conflicting operations to complete..."
+MSG_EN[LIB_CONFLICT_WAIT_PROMPT]="Waiting... (SKIP to override, CTRL+C to cancel): "
+
 # Notification messages
 MSG_EN[LIB_NOTIFICATION_INCOMPLETE_PARAMS]="lh_send_notification: Incomplete parameters (type, title, message required)"
 MSG_EN[LIB_NOTIFICATION_TRYING_SEND]="Trying to send desktop notification: [%s] %s - %s"

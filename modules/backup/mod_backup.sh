@@ -35,6 +35,9 @@ if [[ -z "${MSG[BACKUP_MENU_TITLE]:-}" ]]; then
     lh_load_language_module "lib"
 fi
 
+lh_log_active_sessions_debug "$(lh_msg 'MENU_BACKUP')"
+lh_begin_module_session "mod_backup" "$(lh_msg 'MENU_BACKUP')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')" "${LH_BLOCK_FILESYSTEM_WRITE},${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"
+
 # Function for logging with backup-specific messages
 backup_log_msg() {
     lh_log_msg "DEBUG" "=== Function: backup_log_msg() ==="
@@ -64,6 +67,7 @@ restore_menu() {
     lh_log_msg "DEBUG" "=== Starting restore_menu function ==="
     
     while true; do
+        lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'MENU_RESTORE')")"
         lh_log_msg "DEBUG" "Displaying restore menu"
         lh_print_header "$(lh_msg 'RESTORE_MENU_TITLE')"
         
@@ -73,15 +77,18 @@ restore_menu() {
         lh_print_menu_item 0 "$(lh_msg 'RESTORE_MENU_BACK')"
         echo ""
         
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" option
         lh_log_msg "DEBUG" "User selected option: '$option'"
         
         case $option in
             1)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTORE_MENU_TAR')")"
                 lh_log_msg "DEBUG" "Taking path: TAR restore"
                 bash "$LH_ROOT_DIR/modules/backup/mod_restore_tar.sh"
                 ;;
             2)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTORE_MENU_RSYNC')")"
                 lh_log_msg "DEBUG" "Taking path: RSYNC restore"
                 bash "$LH_ROOT_DIR/modules/backup/mod_restore_rsync.sh"
                 ;;
@@ -96,6 +103,7 @@ restore_menu() {
                 ;;
         esac
         
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         lh_press_any_key
         echo ""
     done
@@ -342,6 +350,7 @@ backup_menu() {
     lh_log_msg "DEBUG" "=== Starting backup_menu function ==="
     
     while true; do
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
         lh_log_msg "DEBUG" "Displaying backup main menu"
         lh_print_header "$(lh_msg "MENU_BACKUP_TITLE")"
         
@@ -354,31 +363,38 @@ backup_menu() {
         lh_print_menu_item 0 "$(lh_msg "BACK_TO_MAIN_MENU")"
         echo ""
         
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg "CHOOSE_OPTION") ${LH_COLOR_RESET}")" option
         lh_log_msg "DEBUG" "User selected option: '$option'"
         
         case $option in
             1)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg "MENU_BTRFS_OPERATIONS")")"
                 lh_log_msg "DEBUG" "Taking path: BTRFS operations"
                 bash "$LH_ROOT_DIR/modules/backup/mod_btrfs_backup.sh"
                 ;;
             2)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg "MENU_TAR_BACKUP")")"
                 lh_log_msg "DEBUG" "Taking path: TAR backup"
                 bash "$LH_ROOT_DIR/modules/backup/mod_backup_tar.sh"
                 ;;
             3)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg "MENU_RSYNC_BACKUP")")"
                 lh_log_msg "DEBUG" "Taking path: RSYNC backup"
                 bash "$LH_ROOT_DIR/modules/backup/mod_backup_rsync.sh"
                 ;;
             4)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg "MENU_RESTORE")")"
                 lh_log_msg "DEBUG" "Taking path: Restore menu"
                 restore_menu
                 ;;
             5)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg "MENU_BACKUP_STATUS")")"
                 lh_log_msg "DEBUG" "Taking path: Backup status"
                 show_backup_status
                 ;;
             6)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg "MENU_BACKUP_CONFIG")")"
                 lh_log_msg "DEBUG" "Taking path: Backup configuration"
                 configure_backup
                 ;;
@@ -393,6 +409,7 @@ backup_menu() {
                 ;;
         esac
         
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         lh_press_any_key
         echo ""
     done

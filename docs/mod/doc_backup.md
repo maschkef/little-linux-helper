@@ -16,6 +16,7 @@ This module serves as a central dispatcher and coordinator for all backup and re
 *   **Library Source:** The module begins by sourcing the common library: `source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"`.
 *   **Conditional Initialization:** When run directly, it performs complete initialization including general config loading, logging setup, package manager detection, and backup config loading. When sourced from main script, it only loads backup config if needed.
 *   **Language Module Loading:** Loads backup, common, and lib language modules for internationalization support.
+*   **Session Registration:** Registers with the session registry using blocking categories `FILESYSTEM_WRITE,SYSTEM_CRITICAL` at HIGH severity to prevent conflicting operations during backup processes.
 *   **Backup Configuration:** It loads backup-specific configurations by calling `lh_load_backup_config`. This function populates variables like `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_RETENTION_BACKUP`, `LH_TAR_EXCLUDES`, and `LH_BACKUP_LOG`.
 *   **Core Library Functions Used:**
     *   `lh_log_msg`: For general logging to the main log file.
@@ -104,3 +105,5 @@ The menu provides a centralized access point while maintaining clean separation 
 *   **Error Handling:** Uses centralized `backup_log_msg` for error logging with detailed debug information
 *   **Status Reporting:** Provides comprehensive status overview covering all backup methodologies in the system
 *   **Module Independence:** Each launched module operates independently while sharing core configuration and logging infrastructure
+*   **Session Awareness:** Before showing the menu the dispatcher logs other running modules (`lh_log_active_sessions_debug`) and registers itself (`lh_begin_module_session`). Activity updates are pushed via `lh_update_module_session` so long-running submodules (e.g., backups) can be observed by other components.
+*   **Conflict Prevention:** Registers with blocking categories `FILESYSTEM_WRITE,SYSTEM_CRITICAL` at HIGH severity to prevent system restarts, package updates, and other conflicting operations during backup processes. Other modules will be warned or blocked when attempting operations that could interfere with active backups.

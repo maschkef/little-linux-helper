@@ -51,6 +51,11 @@ if [[ -z "${MSG[BACKUP_MENU_TITLE]:-}" ]]; then
     lh_load_language_module "lib"
 fi
 
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    lh_log_active_sessions_debug "$(lh_msg 'BTRFS_BACKUP_HEADER')"
+    lh_begin_module_session "mod_btrfs_backup" "$(lh_msg 'BTRFS_BACKUP_HEADER')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')" "${LH_BLOCK_FILESYSTEM_WRITE},${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"
+fi
+
 # Check if btrfs is available
 if ! lh_check_command "btrfs" "true"; then
     echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_TOOLS_MISSING')${LH_COLOR_RESET}"
@@ -715,8 +720,8 @@ btrfs_backup() {
     
     # Enhanced proactive checks
     backup_log_msg "INFO" "Performing enhanced proactive validation checks"
-    
-    # 1. Root-Rechte prüfen
+
+    # 1. Check root privileges
     backup_log_msg "DEBUG" "Checking root privileges (EUID=$EUID)..."
     if ! lh_elevate_privileges "$(lh_msg 'BTRFS_ERROR_NEED_ROOT')" "$(lh_msg 'BTRFS_RUN_WITH_SUDO')"; then
         trap - INT TERM EXIT
@@ -1081,10 +1086,30 @@ btrfs_backup() {
     
     echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BACKUP_SESSION_STARTED' "$timestamp")${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'BACKUP_SEPARATOR')${LH_COLOR_RESET}"
-    
+
+    # Initialize timing and progress tracking
+    local backup_start_time=$(date +%s)
+    local total_subvolumes=${#subvolumes[@]}
+    local current_subvolume=0
+
+    echo -e "${LH_COLOR_INFO}Backup plan: Processing ${total_subvolumes} subvolume(s): ${subvolumes[*]}${LH_COLOR_RESET}"
+    echo ""
+
     # Main loop: Process each subvolume
     for subvol in "${subvolumes[@]}"; do
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_PROCESSING_SUBVOLUME' "$subvol")${LH_COLOR_RESET}"
+        ((current_subvolume++))
+        local subvol_start_time=$(date +%s)
+
+        echo -e "${LH_COLOR_INFO}[${current_subvolume}/${total_subvolumes}] $(lh_msg 'BTRFS_PROCESSING_SUBVOLUME' "$subvol")${LH_COLOR_RESET}"
+
+        # Show elapsed time if not the first subvolume
+        if [ $current_subvolume -gt 1 ]; then
+            local elapsed_total=$(($(date +%s) - backup_start_time))
+            local elapsed_min=$((elapsed_total / 60))
+            local elapsed_sec=$((elapsed_total % 60))
+            echo -e "${LH_COLOR_DEBUG}  ⏱️  Total elapsed time: ${elapsed_min}m ${elapsed_sec}s${LH_COLOR_RESET}"
+        fi
+        lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_BACKUP')" "$subvol")"
         
         # Define snapshot names and paths
         local snapshot_name="$subvol-$timestamp"
@@ -1567,13 +1592,21 @@ btrfs_backup() {
             fi
         fi
         
+        # Calculate subvolume processing time
+        local subvol_end_time=$(date +%s)
+        local subvol_duration=$((subvol_end_time - subvol_start_time))
+        local subvol_min=$((subvol_duration / 60))
+        local subvol_sec=$((subvol_duration % 60))
+
         # Check success and create marker
         if [ $send_result -ne 0 ]; then
             backup_log_msg "ERROR" "$(lh_msg 'BTRFS_LOG_TRANSFER_ERROR' "$subvol")"
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_TRANSFER_ERROR' "$subvol")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_DEBUG}  Subvolume processing time: ${subvol_min}m ${subvol_sec}s${LH_COLOR_RESET}"
         else
             backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_TRANSFER_SUCCESS' "$final_snapshot_path")"
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BTRFS_BACKUP_SUCCESS' "$subvol")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_DEBUG}  Subvolume processing time: ${subvol_min}m ${subvol_sec}s${LH_COLOR_RESET}"
             
             # Create backup marker
             if ! create_backup_marker "$final_snapshot_path" "$timestamp" "$subvol"; then
@@ -1624,6 +1657,8 @@ btrfs_backup() {
         
         echo "" # Empty line for spacing
     done
+
+    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_CLEANUP')" "BTRFS")"
   
     # Clean up old chain parent markers before finishing
     cleanup_old_chain_markers "$LH_TEMP_SNAPSHOT_DIR"
@@ -1632,10 +1667,16 @@ btrfs_backup() {
     trap - INT TERM EXIT
     
     local end_time=$(date +%s)
+    local total_duration=$((end_time - backup_start_time))
+    local total_min=$((total_duration / 60))
+    local total_sec=$((total_duration % 60))
+
     echo -e "${LH_COLOR_SEPARATOR}----------------------------------------${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'BACKUP_SESSION_FINISHED' "$timestamp")${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SUCCESS}  Total backup time: ${total_min}m ${total_sec}s${LH_COLOR_RESET}"
     backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SESSION_COMPLETE')"
-    
+    backup_log_msg "INFO" "Total backup duration: ${total_min}m ${total_sec}s"
+
     # Summary
     echo ""
     echo -e "${LH_COLOR_HEADER}$(lh_msg 'BACKUP_SUMMARY')${LH_COLOR_RESET}"
@@ -1643,6 +1684,7 @@ btrfs_backup() {
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_HOST')${LH_COLOR_RESET} $(hostname)"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_TARGET_DIR')${LH_COLOR_RESET} $LH_BACKUP_ROOT$LH_BACKUP_DIR"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_BACKED_DIRS')${LH_COLOR_RESET} ${subvolumes[*]}"
+    echo -e "  ${LH_COLOR_INFO}Duration:${LH_COLOR_RESET} ${total_min}m ${total_sec}s"
 
     # Calculate size of snapshots created in this backup session from marker files
     backup_log_msg "DEBUG" "Reading backup sizes from marker files created during this session"
@@ -1698,6 +1740,7 @@ $(lh_msg 'BTRFS_NOTIFICATION_SUCCESS_TIME' "$timestamp")"
     fi
     
     # Re-enable system standby after backup completion
+    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
     lh_allow_standby "BTRFS backup"
     
     return 0
@@ -2098,6 +2141,7 @@ cleanup_on_exit() {
     lh_allow_standby "BTRFS backup (interrupted)"
     
     # Exit with the original exit code
+    lh_session_exit_handler
     exit $exit_code
 }
 
@@ -3499,6 +3543,7 @@ cleanup_problematic_backups() {
 
 maintenance_menu() {
     while true; do
+        lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_MAINTENANCE')")"
         lh_print_header "$(lh_msg 'BTRFS_MENU_MAINTENANCE_TITLE')"
         lh_print_menu_item 1 "$(lh_msg 'BTRFS_MENU_DELETE')"
         lh_print_menu_item 2 "$(lh_msg 'BTRFS_MENU_CLEANUP')"
@@ -3508,22 +3553,33 @@ maintenance_menu() {
         lh_print_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
         echo ""
 
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET}")" subopt
         case $subopt in
             1)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_DELETE')")"
                 delete_btrfs_backups
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             2)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_CLEANUP')")"
                 cleanup_problematic_backups
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             3)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_CLEANUP_SOURCE')")"
                 cleanup_script_created_snapshots
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             4)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_CLEANUP_RECEIVING')")"
                 cleanup_orphan_receiving_dirs
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             5)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_DEBUG_CHAIN')")"
                 maintenance_debug_chain
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             0)
                 return 0
@@ -3533,6 +3589,7 @@ maintenance_menu() {
                 ;;
         esac
 
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         lh_press_any_key
         echo ""
     done
@@ -3638,6 +3695,7 @@ maintenance_debug_chain() {
 
 main_menu() {
     while true; do
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
         lh_print_header "$(lh_msg 'BACKUP_MENU_TITLE') - BTRFS"
         lh_print_menu_item 1 "$(lh_msg 'BTRFS_MENU_BACKUP')"
         lh_print_menu_item 2 "$(lh_msg 'BTRFS_MENU_RESTORE')"
@@ -3647,24 +3705,35 @@ main_menu() {
         lh_print_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
         echo ""
 
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET}")" option
 
         case $option in
             1)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'BTRFS_MENU_BACKUP')")"
                 btrfs_backup
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             2)
                 # Enhanced restore (with set-default)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'BTRFS_MENU_RESTORE')")"
                 show_restore_menu
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             3)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_STATUS_INFO')")"
                 show_backup_status
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             4)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_CONFIG')")"
                 configure_backup
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             5)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_MAINTENANCE')")"
                 maintenance_menu
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             0)
                 return 0
@@ -3674,6 +3743,7 @@ main_menu() {
                 ;;
         esac
 
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         lh_press_any_key
         echo ""
     done

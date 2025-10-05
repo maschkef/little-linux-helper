@@ -68,6 +68,7 @@ rsync_backup() {
     lh_log_msg "DEBUG" "Configuration: LH_RSYNC_EXCLUDES='$LH_RSYNC_EXCLUDES', LH_RETENTION_BACKUP='$LH_RETENTION_BACKUP'"
     
     lh_print_header "$(lh_msg 'BACKUP_RSYNC_HEADER')"
+    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP')" "$(lh_msg 'BACKUP_RSYNC_HEADER')")"
 
     # Capture start time
     BACKUP_START_TIME=$(date +%s)
@@ -155,6 +156,7 @@ rsync_backup() {
     echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BACKUP_OPTION_FULL_SYSTEM')${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BACKUP_OPTION_CUSTOM')${LH_COLOR_RESET}"
     
+    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
     read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') (1-3) ${LH_COLOR_RESET}")" choice
     lh_log_msg "DEBUG" "User selected option: '$choice'"
     
@@ -279,6 +281,7 @@ rsync_backup() {
     echo -e "  ${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BACKUP_RSYNC_FULL_OPTION')${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BACKUP_RSYNC_INCREMENTAL_OPTION')${LH_COLOR_RESET}"
     
+    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
     read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" backup_type
     lh_log_msg "DEBUG" "User selected backup type: '$backup_type'"
     
@@ -287,6 +290,7 @@ rsync_backup() {
     if lh_confirm_action "$(lh_msg 'BACKUP_ADDITIONAL_EXCLUDES')" "n"; then
         lh_log_msg "DEBUG" "User wants to add additional exclusions"
         echo -e "${LH_COLOR_PROMPT}$(lh_msg 'BACKUP_ENTER_EXCLUDES')${LH_COLOR_RESET}"
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'BACKUP_ENTER_EXCLUDES_INPUT') ${LH_COLOR_RESET}")" additional_excludes
         lh_log_msg "DEBUG" "User entered additional exclusions: '$additional_excludes'"
         for exclude in $additional_excludes; do
@@ -331,6 +335,7 @@ rsync_backup() {
         backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_RSYNC_FULL')"
         local cmd="$LH_SUDO_CMD rsync $rsync_options $exclude_options ${source_dirs[*]} \"$rsync_dest/\""
         lh_log_msg "DEBUG" "RSYNC command: $cmd"
+        lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_BACKUP')" "$(lh_msg 'BACKUP_RSYNC_FULL_CREATING')")"
         $LH_SUDO_CMD rsync $rsync_options $exclude_options "${source_dirs[@]}" "$rsync_dest/" 2>"$LH_BACKUP_LOG.tmp"
         local rsync_status=$?
     else
@@ -351,6 +356,7 @@ rsync_backup() {
         echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_RSYNC_INCREMENTAL_CREATING')${LH_COLOR_RESET}"
         local cmd="$LH_SUDO_CMD rsync $rsync_options $exclude_options $link_dest ${source_dirs[*]} \"$rsync_dest/\""
         lh_log_msg "DEBUG" "RSYNC command: $cmd"
+        lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_BACKUP')" "$(lh_msg 'BACKUP_RSYNC_INCREMENTAL_CREATING')")"
         $LH_SUDO_CMD rsync $rsync_options $exclude_options $link_dest "${source_dirs[@]}" "$rsync_dest/" 2>"$LH_BACKUP_LOG.tmp" # Corrected variable
         local rsync_status=$?
     fi
@@ -414,6 +420,7 @@ rsync_backup() {
             "$(lh_msg 'BACKUP_NOTIFICATION_FAILED_DETAILS' "$rsync_status" "$timestamp" "$(basename "$LH_BACKUP_LOG")")"
         
         lh_log_msg "DEBUG" "=== Exiting rsync_backup function with error ==="
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         return 1
     fi
     
@@ -441,6 +448,7 @@ rsync_backup() {
     
     # Clean up old backups
     lh_log_msg "DEBUG" "Starting cleanup of old RSYNC backups"
+    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_CLEANUP')" "RSYNC")"
     backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_RSYNC_CLEANUP')"
     ls -1d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/rsync_backup_"* 2>/dev/null | sort -r | tail -n +$((LH_RETENTION_BACKUP+1)) | while read backup; do
         lh_log_msg "DEBUG" "Removing old backup: $backup"
@@ -450,6 +458,7 @@ rsync_backup() {
     lh_log_msg "DEBUG" "Old backup cleanup completed"
     
     lh_log_msg "DEBUG" "=== Finished rsync_backup function successfully ==="
+    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
     return 0
 }
 
@@ -457,10 +466,13 @@ rsync_backup() {
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     lh_log_msg "DEBUG" "=== Starting modules/backup/mod_backup_rsync.sh sub-module ==="
     lh_log_msg "DEBUG" "Module called with parameters: $*"
-    
+
+    lh_log_active_sessions_debug "$(lh_msg 'BACKUP_RSYNC_HEADER')"
+    lh_begin_module_session "mod_backup_rsync" "$(lh_msg 'BACKUP_RSYNC_HEADER')" "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP')" "$(lh_msg 'BACKUP_RSYNC_HEADER')")"
+
     # Brief info message
     echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_RSYNC_MODULE_INFO')${LH_COLOR_RESET}"
-    
+
     # Call RSYNC backup function directly
     rsync_backup
     exit_code=$?

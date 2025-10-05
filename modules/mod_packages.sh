@@ -35,8 +35,21 @@ if [[ -z "${MSG[PKG_HEADER_SYSTEM_UPDATE]:-}" ]]; then
     lh_load_language_module "lib"
 fi
 
+lh_log_active_sessions_debug "$(lh_msg 'MENU_PACKAGE_MGMT')"
+lh_begin_module_session "mod_packages" "$(lh_msg 'MENU_PACKAGE_MGMT')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
+
 # Function for system update
 function pkg_system_update() {
+    # Check for blocking conflicts before proceeding - package updates can conflict with backups
+    lh_check_blocking_conflicts "${LH_BLOCK_FILESYSTEM_WRITE},${LH_BLOCK_SYSTEM_CRITICAL}" "mod_packages.sh:pkg_system_update"
+    local conflict_result=$?
+    if [[ $conflict_result -eq 1 ]]; then
+        return 1  # Operation cancelled or blocked
+    elif [[ $conflict_result -eq 2 ]]; then
+        lh_log_msg "WARN" "User forced package update despite active filesystem/system operations"
+    fi
+
+    lh_update_module_session "$(lh_msg 'PKG_HEADER_SYSTEM_UPDATE')" "running" "${LH_BLOCK_FILESYSTEM_WRITE},${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"
     lh_print_header "$(lh_msg PKG_HEADER_SYSTEM_UPDATE)"
 
     local auto_confirm=false
@@ -1146,6 +1159,7 @@ function package_management_menu() {
     fi
 
     while true; do
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
         lh_print_header "$(lh_msg PKG_HEADER_MAIN)"
 
         lh_print_menu_item 1 "$(lh_msg PKG_MENU_SYSTEM_UPDATE)"
@@ -1164,28 +1178,36 @@ function package_management_menu() {
             echo ""
         fi
 
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_OPTION) ${LH_COLOR_RESET}")" option
         
         case $option in
             1)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg PKG_MENU_SYSTEM_UPDATE)")"
                 pkg_system_update
                 ;;
             2)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg PKG_MENU_FIND_ORPHANS)")"
                 pkg_find_orphans
                 ;;
             3)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg PKG_MENU_CLEAN_CACHE)")"
                 pkg_clean_cache
                 ;;
             4)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg PKG_MENU_SEARCH_INSTALL)")"
                 pkg_search_install
                 ;;
             5) 
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg PKG_MENU_DOCKER_SETUP)")"
                 bash "$LH_ROOT_DIR/modules/mod_docker_setup.sh" 
                 ;;
             6)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg PKG_MENU_LIST_INSTALLED)")"
                 pkg_list_installed
                 ;;
             7)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg PKG_MENU_SHOW_LOGS)")"
                 pkg_show_logs
                 ;;
             0)
@@ -1197,6 +1219,8 @@ function package_management_menu() {
                 echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_INVALID_SELECTION)${LH_COLOR_RESET}"
                 ;;
         esac
+
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
 
         # Short pause so the user can read the output
         echo ""

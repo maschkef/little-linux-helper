@@ -326,11 +326,24 @@ function check_docker_service_status() {
 
 # Main function
 function main() {
+    lh_log_active_sessions_debug "$(lh_msg 'DOCKER_SETUP_MAIN_TITLE')"
+    lh_begin_module_session "mod_docker_setup" "$(lh_msg 'DOCKER_SETUP_MAIN_TITLE')" "$(lh_msg 'LIB_SESSION_ACTIVITY_INITIALIZING')" "${LH_BLOCK_SYSTEM_CRITICAL},${LH_BLOCK_FILESYSTEM_WRITE}" "HIGH"
+
+    # Check for blocking conflicts before starting Docker installation/setup
+    lh_check_blocking_conflicts "${LH_BLOCK_SYSTEM_CRITICAL},${LH_BLOCK_FILESYSTEM_WRITE}" "mod_docker_setup.sh:main"
+    local conflict_result=$?
+    if [[ $conflict_result -eq 1 ]]; then
+        return 1  # Operation cancelled or blocked
+    elif [[ $conflict_result -eq 2 ]]; then
+        lh_log_msg "WARN" "User forced Docker setup despite active system/filesystem operations"
+    fi
+
+    lh_update_module_session "$(lh_msg 'DOCKER_SETUP_MAIN_TITLE')" "running"
     lh_print_header "$(lh_msg 'DOCKER_SETUP_MAIN_TITLE')"
-    
+
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_SETUP_DESCRIPTION')${LH_COLOR_RESET}"
     echo ""
-    
+
     check_docker_installation
     
     echo ""

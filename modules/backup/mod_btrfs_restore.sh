@@ -2864,6 +2864,7 @@ show_disk_information() {
 # Restore menu function
 show_restore_menu() {
     while true; do
+        lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTORE_MENU_TITLE')")"
         lh_print_header "$(lh_msg 'RESTORE_MENU_TITLE') - BTRFS"
         
         # Show current configuration if set up
@@ -2884,36 +2885,48 @@ show_restore_menu() {
         lh_print_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
         echo ""
 
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET}")" option
 
         case $option in
             1)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTORE_MENU_SETUP')")"
                 if check_live_environment && display_safety_warnings; then
                     setup_restore_environment
                 fi
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             2)
                 if [[ -z "$BACKUP_ROOT" ]] || [[ -z "$TARGET_ROOT" ]]; then
                     echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_SETUP_REQUIRED')${LH_COLOR_RESET}"
                 else
+                    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'RESTORE_MENU_SYSTEM_RESTORE')")"
                     select_restore_type_and_snapshot
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 fi
                 ;;
             3)
                 if [[ -z "$BACKUP_ROOT" ]] || [[ -z "$TARGET_ROOT" ]]; then
                     echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_SETUP_REQUIRED')${LH_COLOR_RESET}"
                 else
+                    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'RESTORE_MENU_FOLDER_RESTORE')")"
                     restore_folder_from_snapshot
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 fi
                 ;;
             4)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTORE_MENU_DISK_INFO')")"
                 show_disk_information
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             5)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTORE_MENU_SAFETY_CHECK')")"
                 check_live_environment && display_safety_warnings
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             6)
                 if [[ -n "$TARGET_ROOT" ]] && [[ -d "$TARGET_ROOT" ]]; then
+                    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_CLEANUP')" "BTRFS")"
                     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_CLEANUP_ARTIFACTS')${LH_COLOR_RESET}"
                     cleanup_old_restore_artifacts "$TARGET_ROOT" "artifacts"
                     
@@ -2934,6 +2947,7 @@ show_restore_menu() {
                 ;;
         esac
 
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         lh_press_any_key
         echo ""
     done
@@ -2944,6 +2958,9 @@ init_restore_log
 
 # If the script is run directly, show menu
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    lh_log_active_sessions_debug "$(lh_msg 'RESTORE_MENU_TITLE')"
+    lh_begin_module_session "mod_btrfs_restore" "$(lh_msg 'RESTORE_MENU_TITLE')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')" "${LH_BLOCK_FILESYSTEM_WRITE},${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"
+
     # Check for root privileges
     if [[ $EUID -ne 0 ]]; then
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ROOT_REQUIRED')${LH_COLOR_RESET}"

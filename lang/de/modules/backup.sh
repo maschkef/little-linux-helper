@@ -765,7 +765,7 @@ MSG_DE[BTRFS_MENU_BACK]="Zurück zum Hauptmenü"
 MSG_DE[BTRFS_MENU_MAINTENANCE]="Wartung"
 MSG_DE[BTRFS_MENU_MAINTENANCE_TITLE]="BTRFS-Wartung"
 MSG_DE[BTRFS_MENU_CLEANUP_SOURCE]="Von Skript erstellte Quell-Snapshots bereinigen"
-MSG_DE[BTRFS_MENU_CLEANUP_RECEIVING]="Verwaiste Empfangsverzeichnisse (.receiving_*) bereinigen"
+MSG_DE[BTRFS_MENU_CLEANUP_RECEIVING]="Verwaiste Empfangsartefakte (.receiving_*) bereinigen"
 MSG_DE[BTRFS_MENU_DEBUG_CHAIN]="Inkrementelle Kette inspizieren (Debug)"
 
 # BTRFS log messages - problematic cleanup
@@ -783,12 +783,12 @@ MSG_DE[BTRFS_LOG_BACKUP_SUBVOL_DIR_ERROR]="Backup-Subvolume-Verzeichnis für %s 
 MSG_DE[BTRFS_LOG_TRANSFER_SNAPSHOT]="Übertrage Snapshot für Subvolume: %s"
 
 # Empfangsverzeichnis-Bereinigung und Debug-Menü
-MSG_DE[BTRFS_RECEIVING_CLEANUP_HEADER]="Verwaiste .receiving_* Verzeichnisse bereinigen"
+MSG_DE[BTRFS_RECEIVING_CLEANUP_HEADER]="Verwaiste .receiving_* Artefakte bereinigen"
 MSG_DE[BTRFS_RECEIVING_AGE_PROMPT]="Nur .receiving_* berücksichtigen, die älter als wie viele Minuten sind? (Standard %d)"
-MSG_DE[BTRFS_RECEIVING_NONE_FOUND]="Keine verwaisten .receiving_* Verzeichnisse gefunden"
-MSG_DE[BTRFS_RECEIVING_FOUND_COUNT]="%d verwaiste .receiving_* Verzeichnisse gefunden"
+MSG_DE[BTRFS_RECEIVING_NONE_FOUND]="Keine verwaisten .receiving_* Artefakte gefunden"
+MSG_DE[BTRFS_RECEIVING_FOUND_COUNT]="%d verwaiste .receiving_* Artefakte gefunden"
 MSG_DE[BTRFS_RECEIVING_SUBVOL_LABEL]="Subvolume: %s"
-MSG_DE[BTRFS_RECEIVING_CONFIRM_DELETE_ALL]="ALLE %d aufgelisteten .receiving_* Verzeichnisse jetzt löschen?"
+MSG_DE[BTRFS_RECEIVING_CONFIRM_DELETE_ALL]="ALLE %d aufgelisteten .receiving_* Artefakte jetzt löschen?"
 MSG_DE[BTRFS_RECEIVING_DELETE_ERROR]="Entfernen fehlgeschlagen: %s"
 MSG_DE[BTRFS_RECEIVING_DELETE_SUCCESS]="Entfernt: %s"
 MSG_DE[BTRFS_RECEIVING_SUMMARY]="Bereinigung abgeschlossen: %d entfernt, %d Fehler"
@@ -797,8 +797,8 @@ MSG_DE[BTRFS_DEBUG_CHAIN_HEADER]="Inkrementelle Kette inspizieren"
 MSG_DE[BTRFS_SELECT_SUBVOLUME]="Subvolume auswählen (1-%d):"
 
 # Atomare Receive-Eingabeaufforderungen
-MSG_DE[BTRFS_PROMPT_REMOVE_RECEIVING_NOW]="Temporäres Empfangsverzeichnis jetzt entfernen? (%s)"
-MSG_DE[BTRFS_KEEP_RECEIVING_DIR]="Temporäres Empfangsverzeichnis zur Analyse beibehalten: %s"
+MSG_DE[BTRFS_PROMPT_REMOVE_RECEIVING_NOW]="Temporäres Empfangsartefakt jetzt entfernen? (%s)"
+MSG_DE[BTRFS_KEEP_RECEIVING_DIR]="Temporäres Empfangsartefakt zur Analyse beibehalten: %s"
 
 # Sub-module information messages
 MSG_DE[BACKUP_TAR_MODULE_INFO]="Starte TAR-Backup-Operationen..."

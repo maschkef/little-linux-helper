@@ -66,6 +66,7 @@ restore_rsync() {
     lh_log_msg "DEBUG" "Backup configuration: LH_BACKUP_ROOT='$LH_BACKUP_ROOT', LH_BACKUP_DIR='$LH_BACKUP_DIR'"
     
     lh_print_header "$(lh_msg 'RESTORE_RSYNC_HEADER')"
+    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP')" "$(lh_msg 'RESTORE_RSYNC_HEADER')")"
     
     # List available RSYNC backups
     lh_log_msg "DEBUG" "Checking for backup directory: $LH_BACKUP_ROOT$LH_BACKUP_DIR"
@@ -99,6 +100,7 @@ restore_rsync() {
         lh_log_msg "DEBUG" "Backup $((i+1)): $basename ($size)"
     done
     
+    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
     read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTORE_SELECT_RSYNC' "${#backups[@]}"): ${LH_COLOR_RESET}")" choice
     lh_log_msg "DEBUG" "User selected backup number: '$choice'"
     
@@ -113,6 +115,7 @@ restore_rsync() {
         echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'RESTORE_OPTION_TEMP_RSYNC')${LH_COLOR_RESET}"
         echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'RESTORE_OPTION_CUSTOM')${LH_COLOR_RESET}"
         
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" restore_choice
         lh_log_msg "DEBUG" "User selected restore option: '$restore_choice'"
         
@@ -152,11 +155,22 @@ restore_rsync() {
         esac
         
         lh_log_msg "DEBUG" "Final restore path: $restore_path"
+
+        # Check for blocking conflicts before starting restore
+        lh_check_blocking_conflicts "${LH_BLOCK_FILESYSTEM_WRITE},${LH_BLOCK_SYSTEM_CRITICAL}" "mod_restore_rsync.sh:restore_operation"
+        local conflict_result=$?
+        if [[ $conflict_result -eq 1 ]]; then
+            return 1  # Operation cancelled or blocked
+        elif [[ $conflict_result -eq 2 ]]; then
+            lh_log_msg "WARN" "User forced RSYNC restore despite active filesystem/system operations"
+        fi
+
         echo ""
         echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_RESTORING_RSYNC')${LH_COLOR_RESET}"
-        
+
         local cmd="$LH_SUDO_CMD rsync -avxHS --progress \"$selected_backup/\" \"$restore_path/\""
         lh_log_msg "DEBUG" "RSYNC restore command: $cmd"
+        lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_RESTORE')" "$(basename "$selected_backup")")"
         $LH_SUDO_CMD rsync -avxHS --progress "$selected_backup/" "$restore_path/"
         
         if [ $? -eq 0 ]; then
@@ -172,6 +186,7 @@ restore_rsync() {
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR')${LH_COLOR_RESET}"
             backup_log_msg "ERROR" "RSYNC restore failed: $selected_backup"
         fi
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
     else
         lh_log_msg "DEBUG" "Invalid backup selection: '$choice'"
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
@@ -184,10 +199,13 @@ restore_rsync() {
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     lh_log_msg "DEBUG" "=== Starting modules/backup/mod_restore_rsync.sh sub-module ==="
     lh_log_msg "DEBUG" "Module called with parameters: $*"
-    
+
+    lh_log_active_sessions_debug "$(lh_msg 'RESTORE_RSYNC_HEADER')"
+    lh_begin_module_session "mod_restore_rsync" "$(lh_msg 'RESTORE_RSYNC_HEADER')" "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP')" "$(lh_msg 'RESTORE_RSYNC_HEADER')")" "${LH_BLOCK_FILESYSTEM_WRITE},${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"
+
     # Brief info message
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_RSYNC_MODULE_INFO')${LH_COLOR_RESET}"
-    
+
     # Call RSYNC restore function directly
     restore_rsync
     exit_code=$?

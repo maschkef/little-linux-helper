@@ -61,7 +61,7 @@ This starts:
 3. Test module execution and terminal output (modules run interactively inside a PTY)
 4. Try language switching (EN/DE)
 5. Explore documentation panel
-6. For BTRFS Backup, note the streamlined CLI menu with a dedicated "Maintenance" submenu (delete backups, cleanup problematic, cleanup script‑created source snapshots, incremental chain inspection, and orphan `.receiving_*` cleanup). These actions are available interactively from within the module when launched in the GUI.
+6. For BTRFS Backup, note the streamlined CLI menu with a dedicated "Maintenance" submenu (delete backups, cleanup problematic, cleanup script‑created source snapshots, incremental chain inspection, and orphan `.receiving_*` staging snapshot cleanup). These actions are available interactively from within the module when launched in the GUI.
 
 ## Architecture Overview
 
