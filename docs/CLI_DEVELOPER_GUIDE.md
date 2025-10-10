@@ -159,6 +159,8 @@ The following variables are defined across the library system. Those marked as "
 - `LH_SUDO_CMD`: Contains the string 'sudo' if the script is not run as root, otherwise empty. Set by `lh_check_root_privileges`.
 - `LH_GUI_MODE`: Boolean flag ('true'/'false') indicating if the system is running in GUI mode. When 'true', modules automatically skip "Any Key" prompts for seamless operation. Set by the GUI backend or CLI `--gui` parameter. Exported.
 - `LH_PKG_MANAGER`: The detected primary package manager (e.g., 'pacman', 'apt', 'dnf'). Set by `lh_detect_package_manager`.
+
+**Note on Sudo and File Ownership:** When the tool is run with `sudo`, all files and directories are automatically created with the correct ownership (restored to the user who invoked sudo). The `lh_fix_ownership()` function is called automatically after creating log directories, config directories, session registry files, and GUI build artifacts. This prevents root-owned files from causing permission issues. The ownership fix is transparent and requires no action from module developers.
  `LH_ALT_PKG_MANAGERS`: An array of detected alternative package managers (e.g., 'flatpak', 'snap'). Set by `lh_detect_alternative_managers`. (Modules should call `lh_detect_alternative_managers()` after sourcing `lib_common.sh` to ensure this array is correctly populated in their context, see Section 3.)
 - `LH_TARGET_USER_INFO`: An associative array storing information about the target user for GUI interactions. Populated by `lh_get_target_user_info`. Contains keys like `TARGET_USER`, `USER_DISPLAY`, `USER_XDG_RUNTIME_DIR`, `USER_DBUS_SESSION_BUS_ADDRESS`, `USER_XAUTHORITY`.
 - `LH_BACKUP_ROOT_DEFAULT`: Default value for the root directory of backups.
@@ -167,12 +169,14 @@ The following variables are defined across the library system. Those marked as "
 - `LH_TIMESHIFT_BASE_DIR_DEFAULT`: Default value for the Timeshift base directory (absolute).
 - `LH_RETENTION_BACKUP_DEFAULT`: Default value for the number of backups to retain.
 - `LH_BACKUP_LOG_BASENAME_DEFAULT`: Default basename for the backup log file (e.g., "backup.log").
+- `LH_SOURCE_SNAPSHOT_RETENTION_DEFAULT`: Default value for preserved source snapshots per subvolume.
 - `LH_BACKUP_ROOT`: Currently configured value for the root directory of backups. Set by `lh_load_backup_config`.
 - `LH_BACKUP_DIR`: Currently configured value for the backup subdirectory. Set by `lh_load_backup_config`.
 - `LH_TEMP_SNAPSHOT_DIR`: Currently configured value for the temporary snapshot directory. Set by `lh_load_backup_config`.
 - `LH_TIMESHIFT_BASE_DIR`: Currently configured value for the Timeshift base directory. Set by `lh_load_backup_config`.
 - `LH_RETENTION_BACKUP`: Currently configured value for the number of backups to retain. Set by `lh_load_backup_config`.
 - `LH_BACKUP_LOG_BASENAME`: Currently configured basename for the backup log file. Set by `lh_load_backup_config`.
+- `LH_SOURCE_SNAPSHOT_RETENTION`: Currently configured value for preserved source snapshots per subvolume. Set by `lh_load_backup_config`.
 - `LH_BACKUP_LOG`: Absolute path to the timestamped backup log file for the current run. Set by `lh_load_backup_config`. (e.g., `<LH_LOG_DIR>/250609-1630_backup.log`)
 - `LH_LANG`: Current language setting for the user interface (e.g., 'de', 'en'). Set by `lh_load_general_config` and defaults to 'en' if not configured. Exported.
 - `LH_GENERAL_CONFIG_FILE`: Absolute path to the general configuration file (`$LH_CONFIG_DIR/general.conf`).
@@ -946,3 +950,244 @@ export LH_LOG_SHOW_EXTENDED_TIMESTAMP="true"
 - **Development workflow**: Quick configuration changes for different development phases
 
 **Remember:** The goal is to make debugging easy and comprehensive. Since debug messages are hidden by default (INFO level), there's no reason to be sparing with debug output. Good debug logging dramatically reduces development and troubleshooting time.
+
+### Variable Scope and Subshell Pitfalls
+
+One of the most common and subtle bugs in Bash scripting involves **subshell scope issues** where variables set inside functions don't persist to the calling code. Understanding and avoiding these pitfalls is critical for reliable module development.
+
+#### The Subshell Problem
+
+**The Issue:**
+When a function is executed in a subshell (created by command substitution, pipes, or certain redirections), any variables set inside that subshell are **lost** when the subshell exits. This can lead to variables mysteriously appearing empty even though they were explicitly set.
+
+**Common Causes of Subshells:**
+
+1. **Command Substitution** (most common):
+```bash
+# ❌ WRONG: Variables set inside are lost
+result=$(my_function)  # my_function runs in a subshell
+echo "$GLOBAL_VAR"     # Empty! Variable was set in subshell
+
+# ❌ WRONG: Backticks do the same thing
+result=`my_function`   # Also creates a subshell
+```
+
+2. **Pipes**:
+```bash
+# ❌ WRONG: Right side of pipe runs in subshell
+echo "data" | while read line; do
+    COUNTER=$((COUNTER + 1))  # Set in subshell
+done
+echo "$COUNTER"  # Empty! Lost in subshell
+```
+
+3. **Output Redirection** (less common but possible):
+```bash
+# ⚠️ POTENTIALLY PROBLEMATIC:
+my_function > output.txt  # May create subshell depending on context
+echo "$GLOBAL_VAR"        # Might be empty
+```
+
+#### Real-World Example: BTRFS Restore Boot Detection
+
+**The Bug:**
+In the BTRFS restore module, bootloader configuration detection was failing silently:
+
+```bash
+# The function correctly parsed the marker file and set variables
+function detect_boot_configuration() {
+    # ... parsing logic ...
+    DETECTED_BOOT_STRATEGY="explicit_subvol"  # Set correctly
+    DETECTED_FSTAB_USES_SUBVOL="true"
+    echo "Boot analysis complete"
+}
+
+# But calling with output redirection created a subshell
+detect_boot_configuration "$target_root" "$marker_file" > "$temp_output"
+
+# Variables were empty here!
+echo "Strategy: $DETECTED_BOOT_STRATEGY"  # Prints: "Strategy: "
+```
+
+**Why It Failed:**
+- The output redirection `> "$temp_output"` combined with the function call created a subshell
+- All variable assignments inside the function happened in that subshell
+- When the subshell exited, the variables were lost
+- The calling code saw empty variables even though the function succeeded
+
+**The Fix:**
+Use **global variables** for inter-function communication instead of capturing output:
+
+```bash
+# Declare global variables for results
+DETECTED_BOOT_STRATEGY=""
+DETECTED_BOOT_CONFIG_RESULT=""
+
+function detect_boot_configuration() {
+    local boot_strategy="explicit_subvol"
+    local boot_config_result="Analysis: ..."
+    
+    # Set global variables directly
+    DETECTED_BOOT_STRATEGY="$boot_strategy"
+    DETECTED_BOOT_CONFIG_RESULT="$boot_config_result"
+    
+    # Also output for backward compatibility
+    echo "$boot_config_result"
+    return 0
+}
+
+# Call function directly WITHOUT output redirection
+detect_boot_configuration "$target_root" "$marker_file"
+exit_code=$?
+
+# Variables persist correctly!
+echo "Strategy: $DETECTED_BOOT_STRATEGY"  # ✅ Works!
+
+# Get output from global variable if needed
+if [[ -n "$DETECTED_BOOT_CONFIG_RESULT" ]]; then
+    echo "$DETECTED_BOOT_CONFIG_RESULT"
+fi
+```
+
+#### Best Practices for Variable Scope
+
+**✅ DO: Use Global Variables for Function Results**
+
+```bash
+# Pattern 1: Direct global variable assignment
+RESULT=""
+function compute_value() {
+    RESULT="computed value"
+    return 0
+}
+
+compute_value
+echo "$RESULT"  # ✅ Works: "computed value"
+```
+
+**✅ DO: Call Functions Directly**
+
+```bash
+# Pattern 2: Call without capturing output
+function process_data() {
+    PROCESSED_COUNT=42
+    echo "Processing complete"
+}
+
+process_data  # No $() or ``, no pipes
+echo "Count: $PROCESSED_COUNT"  # ✅ Works: 42
+```
+
+**✅ DO: Use Return Codes for Status**
+
+```bash
+# Pattern 3: Return codes, not output capture
+function check_condition() {
+    if [[ -f "$file" ]]; then
+        FOUND_FILE="$file"
+        return 0  # Success
+    fi
+    return 1  # Failure
+}
+
+if check_condition; then
+    echo "Found: $FOUND_FILE"  # ✅ Variable persists
+fi
+```
+
+**❌ DON'T: Capture Output When Setting Variables**
+
+```bash
+# Anti-pattern 1: Command substitution for variable-setting functions
+result=$(function_that_sets_globals)  # ❌ Variables lost in subshell
+
+# Anti-pattern 2: Pipes for sequential processing
+cat file | process_lines  # ❌ Variables in process_lines are lost
+
+# Anti-pattern 3: Combining output capture with side effects
+$(set_config_value "key" "value")  # ❌ Config not actually set
+```
+
+#### Debugging Subshell Issues
+
+**Add Debug Logging:**
+
+```bash
+function my_function() {
+    local local_var="value"
+    GLOBAL_VAR="global value"
+    
+    # Log immediately after setting
+    lh_log_msg "DEBUG" "Inside function: GLOBAL_VAR='$GLOBAL_VAR'"
+}
+
+# Call and log
+my_function
+lh_log_msg "DEBUG" "After function: GLOBAL_VAR='$GLOBAL_VAR'"
+
+# If the second log shows empty, you have a subshell issue
+```
+
+**Check for Subshell Indicators:**
+
+```bash
+# The $BASH_SUBSHELL variable indicates subshell depth
+function check_subshell() {
+    echo "Subshell level: $BASH_SUBSHELL"  # 0 = no subshell, >0 = in subshell
+}
+
+check_subshell              # Prints: 0
+$(check_subshell)           # Prints: 1 (in subshell)
+echo "test" | check_subshell  # Prints: 1 (in subshell)
+```
+
+#### Migration Pattern for Existing Code
+
+If you find code with subshell issues, refactor using this pattern:
+
+**Before (Problematic):**
+```bash
+function get_data() {
+    DATA_VALUE="important"
+    echo "Data processed"
+}
+
+output=$(get_data)  # ❌ DATA_VALUE lost
+echo "$DATA_VALUE"   # Empty!
+```
+
+**After (Fixed):**
+```bash
+# Add global variable for output
+DATA_VALUE=""
+DATA_OUTPUT=""
+
+function get_data() {
+    DATA_VALUE="important"
+    DATA_OUTPUT="Data processed"
+    echo "$DATA_OUTPUT"  # Optional, for backward compatibility
+    return 0
+}
+
+# Call directly
+get_data
+# OR, if you really need to capture output:
+# DATA_OUTPUT=$(get_data)  # But DATA_VALUE is still set globally
+
+echo "$DATA_VALUE"   # ✅ Works: "important"
+echo "$DATA_OUTPUT"  # ✅ Works: "Data processed"
+```
+
+#### Key Takeaways
+
+1. **Subshells are invisible** - They don't produce errors, just silent failure
+2. **Command substitution is the main culprit** - `$(...)` creates subshells
+3. **Use global variables** for inter-function communication
+4. **Return codes for status**, global variables for data
+5. **Debug logging** immediately after variable assignment catches issues early
+6. **Test variable persistence** explicitly in your module tests
+
+**References:**
+- BTRFS Restore Module: Lines 2367-2707 in `modules/backup/mod_btrfs_restore.sh`
+- Fix Documentation: `/temp/SUBSHELL_SCOPE_FIX_COMPLETE.md`
+- Test Script: `/temp/test_marker_parsing.sh`

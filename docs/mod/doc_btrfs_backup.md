@@ -9,17 +9,132 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 
 ## Module: `modules/backup/mod_btrfs_backup.sh` - BTRFS Snapshot-Based Backup Operations
 
-**1. Purpose:**
+### Bundle-Based Backup Architecture
+
+**Layout Structure:**
+
+The updated backup system uses a **bundle-based layout** where all subvolumes from a single backup session are grouped together under a timestamp directory:
+
+```
+${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/
+├── snapshots/                        # All backup bundles
+│   ├── 2025-10-06_150226/            # Bundle: timestamp directory
+│   │   ├── @/                        # Subvolume snapshot (BTRFS subvolume)
+│   │   ├── @.backup_complete         # Marker file (next to snapshot)
+│   │   ├── @home/                    # Subvolume snapshot (BTRFS subvolume)
+│   │   ├── @home.backup_complete     # Marker file (next to snapshot)
+│   │   ├── @var/                     # Subvolume snapshot (BTRFS subvolume)
+│   │   └── @var.backup_complete      # Marker file (next to snapshot)
+│   ├── 2025-10-07_083015/            # Another bundle
+│   │   ├── @/
+│   │   ├── @.backup_complete
+│   │   ├── @home/
+│   │   └── @home.backup_complete
+│   └── 2025-10-08_120145/            # Most recent bundle
+│       ├── @/
+│       ├── @.backup_complete
+│       ├── @home/
+│       ├── @home.backup_complete
+│       ├── @var/
+│       └── @var.backup_complete
+└── meta/                             # Metadata directory
+    ├── 2025-10-06_150226.json        # Metadata for first bundle
+    ├── 2025-10-07_083015.json        # Metadata for second bundle
+    └── 2025-10-08_120145.json        # Metadata for latest bundle
+```
+
+**Key Layout Concepts:**
+
+1. **Bundle = Complete Backup Session:**
+   - One timestamp directory = one backup run
+   - Contains ALL subvolumes backed up in that session
+   - All subvolumes share the same timestamp
+   - Unified lifecycle management (delete entire bundle at once)
+
+2. **Consistent Timestamps:**
+   - Timestamp format: `YYYY-MM-DD_HHMMSS`
+   - Same timestamp used for:
+     - Bundle directory name: `snapshots/${timestamp}/`
+     - Metadata file: `meta/${timestamp}.json`
+     - All subvolume markers within bundle
+
+3. **Path Helpers (lib/btrfs/05_layout.sh):**
+   ```bash
+   # Get base directories
+   btrfs_backup_snapshot_root      # Returns: ${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/snapshots
+   btrfs_backup_meta_root          # Returns: ${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/meta
+   
+   # Get bundle path
+   btrfs_bundle_path "2025-10-06_150226"
+   # Returns: ${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/snapshots/2025-10-06_150226
+   
+   # Get subvolume path within bundle
+   btrfs_bundle_path "2025-10-06_150226" "@home"
+   # Returns: ${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/snapshots/2025-10-06_150226/@home
+   ```
+
+4. **Marker Files:**
+   - Each subvolume gets its own `.backup_complete` marker
+   - Marker placed NEXT TO the subvolume directory (not inside it)
+   - Naming pattern: `${subvol}.backup_complete` (e.g., `@.backup_complete`, `@home.backup_complete`)
+   - Marker contains: timestamp, size, duration, status
+   - Located at: `snapshots/${timestamp}/${subvol}.backup_complete`
+   - Used for integrity checking and bundle validation
+
+5. **Metadata Files:**
+   - One JSON file per backup session
+   - Located at: `meta/${timestamp}.json`
+   - Contains comprehensive session information (see section below)
+
+### Shared Bundle Inventory (`btrfs_collect_bundle_inventory`)
+
+The maintenance menu and restore module now consume a shared bundle inventory produced by `lib/btrfs/05_layout.sh`. The helper scans `snapshots/` and `meta/` once and emits `bundle|…` / `subvol|…` records including marker sizes, metadata flags, UUIDs, and bundle timestamps.
+
+* **Single Scan:** Eliminates repeated `find`/`btrfs subvolume show` loops when listing bundles.
+* **Consistency:** Backup deletion, status reporting, and restore menus render from the same data set.
+* **Metadata Integration:** When `jq` is available, per-subvolume size/error information is embedded in the output.
+* **Override Support:** Restore passes an alternate backup root so external drives can be inspected without remounting.
+
+See `docs/lib/doc_btrfs_layout.md` for the full field description.
+
+**Migration from Old Layout:**
+
+The system is backward compatible with the old per-subvolume layout:
+```
+# Old layout (still supported for reading)
+backups/
+├── @/
+│   ├── @_2025-10-01_120000/
+│   ├── @_2025-10-02_120000/
+│   └── @_2025-10-03_120000/
+└── @home/
+    ├── @home_2025-10-01_120000/
+    └── @home_2025-10-02_120000/
+```
+
+New backups automatically use the bundle-based layout. No migration is needed - both layouts can coexist.
+
+### 1. Purpose
+
 This module provides comprehensive BTRFS snapshot-based backup functionality with dynamic subvolume selection. It creates read-only snapshots of configured and auto-detected BTRFS subvolumes and transfers them to a backup destination using `btrfs send/receive`. The module includes integrity checking, cleanup mechanisms, and management tools for BTRFS backups. It supports both manual configuration and automatic detection of BTRFS subvolumes, making it compatible with various BTRFS layouts used by different Linux distributions.
 
-**2. Initialization & Dependencies:**
+**Key Features:**
+- Atomic backup operations ensuring data integrity
+- Incremental backup support with chain validation
+- Bundle-based organization (all subvolumes from one backup session grouped together)
+- Per-run metadata JSON files with comprehensive backup information
+- Bundle-aware deletion for easy management
+- Intelligent cleanup respecting backup chains
+- Comprehensive error handling and validation
+
+### 2. Initialization & Dependencies
 *   **Library Source:** The module sources two critical libraries:
     *   `lib_common.sh`: For general helper functions and system utilities
     *   `lib_btrfs.sh`: For BTRFS-specific atomic operations and safety functions
 *   **BTRFS Library Integration:** The module now heavily integrates with `lib_btrfs.sh` which provides atomic backup patterns, comprehensive error handling, and advanced BTRFS safety mechanisms.
 *   **BTRFS Implementation Validation:** The module performs comprehensive validation of all required BTRFS library functions at startup using `validate_btrfs_implementation()`, ensuring critical atomic functions are available before proceeding.
 *   **Package Manager Detection:** It calls `lh_detect_package_manager()` to set up `LH_PKG_MANAGER` for potential package installations (e.g., `btrfs-progs`).
-*   **Backup Configuration:** It loads backup-specific configurations by calling `lh_load_backup_config`. This function populates variables like `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_SOURCE_SNAPSHOT_DIR`, `LH_RETENTION_BACKUP`, `LH_BACKUP_LOG`, `LH_KEEP_SOURCE_SNAPSHOTS`, `LH_DEBUG_LOG_LIMIT`, `LH_BACKUP_SUBVOLUMES`, and `LH_AUTO_DETECT_SUBVOLUMES`.
+*   **Backup Configuration:** It loads backup-specific configurations by calling `lh_load_backup_config`. This function populates variables like `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_SOURCE_SNAPSHOT_DIR`, `LH_SOURCE_SNAPSHOT_RETENTION`, `LH_RETENTION_BACKUP`, `LH_BACKUP_LOG`, `LH_KEEP_SOURCE_SNAPSHOTS`, `LH_DEBUG_LOG_LIMIT`, `LH_BACKUP_SUBVOLUMES`, and `LH_AUTO_DETECT_SUBVOLUMES`.
 *   **Critical Safety Features:**
     *   `set -o pipefail`: Enables pipeline failure detection for critical backup operations
     *   Atomic backup patterns that prevent corrupted or incomplete backups
@@ -67,6 +182,8 @@ The module exposes a streamlined two-level menu:
   4. Cleanup Orphan Receiving Artifacts (.receiving_*)
   5. Inspect Incremental Chain (debug)
   0. Back
+
+  The deletion workflow and status views consume the shared bundle inventory so each menu renders from a single filesystem scan. Metadata such as marker presence, total size, and error flags are displayed without re-running `find`/`btrfs subvolume show` for each bundle.
 
 **4. Module Functions:**
 
@@ -119,8 +236,8 @@ The module exposes a streamlined two-level menu:
     *   **Mechanism:** Attempts to delete the subvolume using `btrfs subvolume delete` up to `max_attempts` (3) times with a short sleep between attempts.
     *   **Interaction:** Logs attempts and outcome. If deletion fails, it prints a warning and instructions for manual deletion.
 
-*   **`btrfs_backup()`**
-    *   **Purpose:** Main function to perform BTRFS snapshot-based backups using advanced atomic patterns from lib_btrfs.sh.
+*   **`btrfs_backup()`** *(enhanced for bundle-aware backups)*
+    *   **Purpose:** Main function to perform BTRFS snapshot-based backups using advanced atomic patterns from lib_btrfs.sh. Now creates bundle-based backups with comprehensive JSON metadata.
     *   **Interaction:**
         *   Sets trap for `cleanup_on_exit`.
         *   Validates BTRFS implementation using `validate_btrfs_implementation()` from lib_btrfs.sh.
@@ -130,12 +247,13 @@ The module exposes a streamlined two-level menu:
         *   Performs comprehensive space checking using `check_btrfs_space()` and `get_btrfs_available_space()` from lib_btrfs.sh, which includes metadata exhaustion detection.
         *   Ensures backup target (`$LH_BACKUP_ROOT$LH_BACKUP_DIR`) and temporary snapshot (`$LH_TEMP_SNAPSHOT_DIR`) directories exist, creating them if necessary.
         *   Calls `cleanup_orphaned_temp_snapshots()`.
+        *   **Bundle Creation**: Creates a timestamp-based bundle directory using `btrfs_bundle_path()` from lib/btrfs/05_layout.sh for organizing all subvolumes from this backup session.
         *   **Dynamic Subvolume Selection**: Uses `get_backup_subvolumes()` to determine the final list of subvolumes to backup, which combines configured subvolumes (`LH_BACKUP_SUBVOLUMES`) with auto-detected subvolumes when `LH_AUTO_DETECT_SUBVOLUMES` is enabled.
         *   Iterates through the dynamically determined list of subvolumes.
         *   For each subvolume:
             *   Sets `CURRENT_TEMP_SNAPSHOT`.
             *   Calls `create_direct_snapshot()` to create a read-only snapshot.
-            *   Creates the target directory for the subvolume in the backup location.
+            *   Creates the target directory for the subvolume in the bundle path.
             *   **Atomic Transfer**: Uses `atomic_receive_with_validation()` from lib_btrfs.sh which implements true atomic backup patterns with comprehensive validation.
             *   **Incremental Logic**: Automatically detects suitable parent snapshots using `validate_parent_snapshot_chain()` and performs incremental transfers when possible, falling back to full transfers when necessary.
             *   **received_uuid Protection**: Uses `verify_received_uuid_integrity()` and `protect_received_snapshots()` to validate parent snapshots have proper `received_uuid` before attempting incremental operations.
@@ -143,16 +261,153 @@ The module exposes a streamlined two-level menu:
             *   Calls `create_backup_marker()` upon successful transfer.
             *   Uses `intelligent_cleanup()` from lib_btrfs.sh for safe cleanup respecting backup chains.
             *   Cleans old backups for the subvolume based on `$LH_RETENTION_BACKUP` using `ls`, `sort`, `head`, and `btrfs subvolume delete`. Also removes corresponding `.backup_complete` marker files.
+        *   **Metadata Creation**: After all subvolumes are backed up, calls `create_backup_session_metadata()` to generate comprehensive JSON metadata file in `meta/` directory.
         *   Resets trap.
         *   Prints a summary (timestamp, source, destination, processed subvolumes, status, duration).
         *   Checks `$LH_BACKUP_LOG` for "ERROR" to determine overall status.
         *   Sends desktop notification via `lh_send_notification`.
     *   **Global Variable:** Uses `CURRENT_TEMP_SNAPSHOT` to track the snapshot being processed for cleanup purposes.
+    *   **Bundle-Oriented Enhancements:**
+        *   Bundle-based layout: all subvolumes grouped under single timestamp directory
+        *   Per-run metadata JSON files with comprehensive session information
+        *   Consistent path management via lib/btrfs/05_layout.sh helpers
 
 *   **`create_backup_marker(snapshot_path, timestamp, subvol)`**
     *   **Purpose:** Creates a `.backup_complete` marker file alongside the successfully transferred BTRFS snapshot in the backup destination.
-    *   **Mechanism:** Writes metadata (timestamp, subvolume, completion time, host, script version, snapshot path, size) into the marker file.
+    *   **Mechanism:** Writes metadata (timestamp, subvolume, completion time, host, script identifier, snapshot path, size) into the marker file.
     *   **Location:** The marker file is named `snapshot_name.backup_complete`.
+
+*   **`json_escape_string(input)`**
+    *   **Purpose:** Properly escapes text for inclusion in JSON strings, handling newlines, tabs, quotes, backslashes, and control characters.
+    *   **Mechanism:**
+        *   Primary: Uses Python's `json.dumps()` for perfect JSON escaping (if Python available)
+        *   Fallback: Manual bash escaping for systems without Python
+    *   **Handles:** `\n`, `\t`, `\r`, `"`, `\`, and other control characters
+    *   **Usage:** Called by `create_backup_session_metadata()` for all string fields
+
+*   **`create_backup_session_metadata(timestamp, duration_seconds, total_size_bytes, subvolumes...)`**
+    *   **Purpose:** Creates a comprehensive JSON metadata file for each backup session in the `meta/` directory.
+    *   **Mechanism:**
+        *   Collects session information (timestamp, duration, error status, paths)
+        *   Gathers system details (hostname, OS, kernel, BTRFS version)
+        *   Captures the little-linux-helper release tag (git describe or configured value)
+        *   Aggregates backup summary (total size, subvolume count)
+        *   Compiles per-subvolume details from marker files
+        *   Uses `json_escape_string()` for all text fields
+        *   Writes JSON using `lh_json_write_pretty()` from `lib/lib_json.sh`
+    *   **Output File:** `${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/meta/${timestamp}.json`
+    *   **JSON Structure:**
+        ```json
+        {
+          "schema_label": "bundle",
+          "session": {
+            "timestamp": "2025-10-06_150226",
+            "date_completed": "2025-10-06 15:03:45",
+            "date_iso8601": "2025-10-06T15:03:45+02:00",
+            "duration_seconds": 123,
+            "duration_human": "00h 02m 03s",
+            "has_errors": false,
+            "backup_root": "/mnt/backup",
+            "bundle_path": "/mnt/backup/snapshots/2025-10-06_150226"
+          },
+          "tool_release": "v0.5.0-beta",
+          "system": {
+            "hostname": "myhost",
+            "os_release": "Ubuntu 24.04 LTS",
+            "kernel_version": "6.8.0-45-generic",
+            "btrfs_version": "btrfs-progs v6.6.3"
+          },
+          "backup_summary": {
+            "total_size_bytes": 12884901888,
+            "total_size_human": "12G",
+            "subvolume_count": 3
+          },
+          "subvolumes": [
+            {
+              "name": "@",
+              "snapshot_path": "/mnt/backup/snapshots/2025-10-06_150226/@",
+              "size_bytes": 5368709120,
+              "size_human": "5.0G",
+              "duration_seconds": 45,
+              "backup_type": "incremental",
+              "parent_snapshot": "/mnt/backup/snapshots/2025-10-05_150226/@",
+              "status": "completed",
+              "marker_file": "/mnt/backup/snapshots/2025-10-06_150226/@/.backup_complete"
+            },
+            {
+              "name": "@home",
+              "snapshot_path": "/mnt/backup/snapshots/2025-10-06_150226/@home",
+              "size_bytes": 6442450944,
+              "size_human": "6.0G",
+              "duration_seconds": 58,
+              "backup_type": "full",
+              "status": "completed",
+              "marker_file": "/mnt/backup/snapshots/2025-10-06_150226/@home/.backup_complete"
+            },
+            {
+              "name": "@var",
+              "snapshot_path": "/mnt/backup/snapshots/2025-10-06_150226/@var",
+              "size_bytes": 1073741824,
+              "size_human": "1.0G",
+              "duration_seconds": 20,
+              "backup_type": "incremental",
+              "parent_snapshot": "/mnt/backup/snapshots/2025-10-05_150226/@var",
+              "status": "completed",
+              "marker_file": "/mnt/backup/snapshots/2025-10-06_150226/@var/.backup_complete"
+            }
+          ],
+          "filesystem_config": "# Subvolume configuration\nLH_BACKUP_SUBVOLUMES=\"@ @home @var\"\nLH_AUTO_DETECT_SUBVOLUMES=true\n..."
+        }
+        ```
+    *   **Field Descriptions:**
+        - `schema_label`: Identifies the metadata layout used for the bundle
+        - `session.timestamp`: Backup session timestamp (matches bundle directory name)
+        - `session.date_completed`: Human-readable completion date/time
+        - `session.date_iso8601`: ISO 8601 formatted timestamp with timezone
+        - `session.duration_seconds`: Total backup session duration
+        - `session.duration_human`: Human-readable duration (HH:MM:SS format)
+        - `session.has_errors`: Boolean flag indicating if any errors occurred
+        - `session.backup_root`: Backup destination root path
+        - `session.bundle_path`: Full path to bundle directory
+        - `tool_release`: Release identifier reported by `lh_detect_release_version()`
+        - `system.*`: System information captured at backup time
+        - `backup_summary.*`: Aggregated statistics for entire session
+        - `subvolumes[]`: Array of per-subvolume details
+        - `filesystem_config`: Escaped copy of relevant backup configuration
+    *   **Usage Examples:**
+        ```bash
+        # Read metadata for a specific backup
+        timestamp="2025-10-06_150226"
+        meta_file="${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/meta/${timestamp}.json"
+        
+        # Extract total size
+        total_size=$(lh_json_read_value "$meta_file" "backup_summary.total_size_human")
+        
+        # Check for errors
+        has_errors=$(lh_json_read_value "$meta_file" "session.has_errors")
+        
+        # Get subvolume count
+        subvol_count=$(lh_json_read_value "$meta_file" "backup_summary.subvolume_count")
+        ```
+    *   **Error Handling:** Continues backup even if metadata creation fails (logs warning)
+
+*   **`delete_btrfs_backups()`** *(bundle-aware deletion helpers)*
+    *   **Purpose:** Interactive deletion of backup bundles (complete backup sessions containing all subvolumes).
+    *   **Mechanism:**
+        *   Scans `snapshots/` directory for bundle directories (timestamp-named)
+        *   Displays bundles with: timestamp, subvolume count, total size, marker status, error flag
+        *   Supports flexible selection:
+          - Single: `3`
+          - Range: `1-5`
+          - Multiple: `1,3,5`
+        *   Shows confirmation with details of what will be deleted
+        *   Deletes all subvolumes in selected bundles
+        *   Removes bundle directories, marker files, and metadata JSON files
+    *   **Interaction:**
+        *   Requires elevated privileges (prompts for sudo if needed)
+        *   Clear visual feedback during deletion
+        *   Summary of successful/failed deletions
+    *   **Safety:** Confirms before deletion, validates selections, handles errors gracefully
 
 *   **`check_backup_integrity(snapshot_path, snapshot_name, subvol)`**
     *   **Purpose:** Performs several checks to assess the integrity and completeness of a BTRFS backup snapshot.
@@ -351,7 +606,7 @@ The module exposes a streamlined two-level menu:
 
 **5. Special Considerations:**
 *   **Root Privileges:** Most BTRFS operations, especially creating/deleting snapshots and subvolumes, require root privileges. The script often checks `$EUID` and prompts for `sudo` if necessary.
-*   **Configuration Persistence:** Backup settings are loaded via `lh_load_backup_config` and can be saved via `lh_save_backup_config`. The exact location of the configuration file (`$LH_BACKUP_CONFIG_FILE`) is managed by `lib_common.sh`. New configuration options include source snapshot preservation (`LH_KEEP_SOURCE_SNAPSHOTS`), preservation directory (`LH_SOURCE_SNAPSHOT_DIR`), and debug logging limits (`LH_DEBUG_LOG_LIMIT`).
+*   **Configuration Persistence:** Backup settings are loaded via `lh_load_backup_config` and can be saved via `lh_save_backup_config`. The exact location of the configuration file (`$LH_BACKUP_CONFIG_FILE`) is managed by `lib_common.sh`. New configuration options include source snapshot preservation (`LH_KEEP_SOURCE_SNAPSHOTS`), preservation directory (`LH_SOURCE_SNAPSHOT_DIR`), source snapshot retention (`LH_SOURCE_SNAPSHOT_RETENTION`), and debug logging limits (`LH_DEBUG_LOG_LIMIT`).
 *   **Advanced Error Handling:** The module now uses `handle_btrfs_error()` from lib_btrfs.sh for intelligent error classification, providing automatic fallback strategies and detailed error analysis. Traditional error handling is supplemented with specialized BTRFS error management.
 *   **Temporary Snapshots:** BTRFS backups utilize a temporary snapshot directory (`$LH_TEMP_SNAPSHOT_DIR`). Advanced cleanup mechanisms (`intelligent_cleanup`, `cleanup_on_exit`, `cleanup_orphaned_temp_snapshots`) are in place to manage these while respecting backup chains.
 *   **Backup Markers:** BTRFS backups use `.backup_complete` marker files to indicate a successful transfer and store metadata. These are used by `check_backup_integrity` to verify backup completeness.
@@ -364,7 +619,7 @@ The module exposes a streamlined two-level menu:
 *   **Implementation Validation:** The module validates all required BTRFS library functions at startup using `validate_btrfs_implementation()`, ensuring critical atomic functions are available before proceeding.
 *   **Filesystem Health Monitoring:** The module integrates `check_filesystem_health()` for comprehensive BTRFS health checking throughout backup operations.
 *   **Self-Managed Snapshots:** The module creates and manages its own snapshots exclusively for reliable incremental backup chains. External snapshot tools like Snapper/Timeshift are completely bypassed to avoid sibling snapshot issues that would break incremental backup chain integrity.
-*   **Source Snapshot Preservation:** The module can optionally preserve source snapshots used for incremental backup chains. This is controlled by the `LH_KEEP_SOURCE_SNAPSHOTS` configuration setting and ensures that parent snapshots remain available for future incremental backups.
+*   **Source Snapshot Preservation:** The module can optionally preserve source snapshots used for incremental backup chains. This is controlled by the `LH_KEEP_SOURCE_SNAPSHOTS` configuration setting and ensures that parent snapshots remain available for future incremental backups. The number of preserved parents per subvolume is limited by `LH_SOURCE_SNAPSHOT_RETENTION`, preventing an unlimited buildup of older snapshots.
 *   **Incremental Chain Integrity:** Source parent snapshots are automatically preserved with chain markers (`.chain_parent` files) to maintain incremental backup chain integrity. The module tracks and manages these preservation markers to prevent accidental deletion of snapshots needed for incremental operations.
 *   **Flexible Subvolume Support:** The BTRFS backup logic now supports dynamic subvolume selection through:
     *   Manual configuration via `LH_BACKUP_SUBVOLUMES` for specific subvolume lists
@@ -379,9 +634,11 @@ The module exposes a streamlined two-level menu:
 **7. Configuration Variables:**
 *   `LH_KEEP_SOURCE_SNAPSHOTS`: Controls whether source snapshots are preserved for incremental backup chain integrity (true/false/ask).
 *   `LH_SOURCE_SNAPSHOT_DIR`: Directory path for preserving source snapshots when preservation is enabled.
+*   `LH_SOURCE_SNAPSHOT_RETENTION`: Number of preserved source snapshots per subvolume (0 disables preservation, 1 keeps only the latest parent, higher values retain additional fallbacks).
 *   `LH_DEBUG_LOG_LIMIT`: Limits the number of debug log entries displayed (0 for unlimited, positive integer for limit).
 *   `LH_BACKUP_SUBVOLUMES`: Space-separated list of BTRFS subvolumes to backup (e.g., "@ @home @var @opt"). Default: "@ @home".
 *   `LH_AUTO_DETECT_SUBVOLUMES`: Enable automatic detection of BTRFS subvolumes from system configuration (true/false). Default: "true".
+*   `CFG_LH_RELEASE_TAG`: Optional global override (set in `config/general.conf`) used when embedding release identifiers in backup metadata.
 
 **8. Supported BTRFS Layouts:**
 The module supports flexible BTRFS subvolume configurations through both manual configuration and automatic detection:
@@ -402,28 +659,37 @@ The module supports flexible BTRFS subvolume configurations through both manual 
 
 The module creates its own snapshots in the designated temporary snapshot directory and manages them independently for optimal incremental backup chain integrity.
 
-**9. Backup Process Flow:**
+**9. Bundle-Oriented Backup Process Flow:**
 1. **Implementation validation:** Use `validate_btrfs_implementation()` to ensure all required lib_btrfs.sh functions are available
 2. **Pre-flight checks:** Verify BTRFS support, root privileges, backup destination, filesystem health using `check_filesystem_health()`
-3. **Subvolume determination:** Use `get_backup_subvolumes()` to determine final list of subvolumes combining configured (`LH_BACKUP_SUBVOLUMES`) and auto-detected subvolumes when enabled (`LH_AUTO_DETECT_SUBVOLUMES`)
-4. **Preservation settings:** Use `determine_snapshot_preservation()` to configure source snapshot preservation behavior
-5. **Advanced space checking:** Use `check_btrfs_space()` and `get_btrfs_available_space()` for comprehensive space analysis including metadata exhaustion detection
-6. **Cleanup:** Remove any orphaned temporary snapshots from previous runs using `intelligent_cleanup()`
-7. **Snapshot creation:** Create read-only snapshots of determined target subvolumes with comprehensive validation, optionally in permanent locations for preservation
-8. **Chain validation:** Use `validate_parent_snapshot_chain()` to verify incremental backup chain integrity from both temporary and preserved source snapshots
-9. **Atomic transfer:** Use `atomic_receive_with_validation()` for true atomic operations with comprehensive validation:
-   - Atomic pattern: receive into the backup directory → stage by renaming the snapshot with a `.receiving_*` suffix → validate → atomic rename (`mv`) within the same parent to reveal the final path
-   - On errors, the module offers to remove the staged `.receiving_*` snapshot (default Yes) or keep it for inspection
-   - Incremental transfers when suitable parent snapshots with valid `received_uuid` are available; automatic fallback to full backup when chains are broken
-   - Intelligent error handling with `handle_btrfs_error()` for automatic recovery strategies
-10. **UUID protection:** Use `verify_received_uuid_integrity()` and `protect_received_snapshots()` to maintain backup chain integrity
-11. **Verification:** Create completion markers and verify successful transfer with comprehensive integrity checking
-12. **Chain preservation:** Use `preserve_source_parent_snapshots()` to create chain markers and preserve parent snapshots needed for future incremental backups
-13. **Safe cleanup:** Use `intelligent_cleanup()` to remove temporary snapshots and old backups while respecting backup chains and preservation markers
-14. **Health monitoring:** Final filesystem health check using `check_filesystem_health()`
-15. **Reporting:** Log results and send desktop notifications with detailed status information
+3. **Bundle preparation:** Generate session timestamp and create bundle directory structure using `btrfs_bundle_path()` from lib/btrfs/05_layout.sh
+4. **Subvolume determination:** Use `get_backup_subvolumes()` to determine final list of subvolumes combining configured (`LH_BACKUP_SUBVOLUMES`) and auto-detected subvolumes when enabled (`LH_AUTO_DETECT_SUBVOLUMES`)
+5. **Preservation settings:** Use `determine_snapshot_preservation()` to configure source snapshot preservation behavior
+6. **Advanced space checking:** Use `check_btrfs_space()` and `get_btrfs_available_space()` for comprehensive space analysis including metadata exhaustion detection
+7. **Cleanup:** Remove any orphaned temporary snapshots from previous runs using `intelligent_cleanup()`
+8. **Snapshot creation:** Create read-only snapshots of determined target subvolumes with comprehensive validation, optionally in permanent locations for preservation
+9. **Chain validation:** Use `validate_parent_snapshot_chain()` to verify incremental backup chain integrity from both temporary and preserved source snapshots
+10. **Atomic transfer:** Use `atomic_receive_with_validation()` for true atomic operations with comprehensive validation:
+    - Atomic pattern: receive into the backup directory → stage by renaming the snapshot with a `.receiving_*` suffix → validate → atomic rename (`mv`) within the same parent to reveal the final path
+    - On errors, the module offers to remove the staged `.receiving_*` snapshot (default Yes) or keep it for inspection
+    - Incremental transfers when suitable parent snapshots with valid `received_uuid` are available; automatic fallback to full backup when chains are broken
+    - Intelligent error handling with `handle_btrfs_error()` for automatic recovery strategies
+    - Each subvolume is placed in the bundle directory: `snapshots/${timestamp}/${subvol}/`
+11. **UUID protection:** Use `verify_received_uuid_integrity()` and `protect_received_snapshots()` to maintain backup chain integrity
+12. **Verification:** Create completion markers for each subvolume and verify successful transfer with comprehensive integrity checking
+13. **Chain preservation:** Use `preserve_source_parent_snapshots()` to create chain markers and preserve parent snapshots needed for future incremental backups
+14. **Safe cleanup:** Use `intelligent_cleanup()` to remove temporary snapshots and old backups while respecting backup chains and preservation markers
+15. **Metadata generation:** Call `create_backup_session_metadata()` to generate comprehensive JSON metadata file containing:
+    - Session information (timestamp, duration, error status)
+    - Tool release identifier (git tag or configured value)
+    - System details (hostname, OS, kernel, BTRFS version)
+    - Backup summary (total size, subvolume count)
+    - Per-subvolume details (sizes, backup types, parent relationships)
+    - Configuration snapshot for audit trail
+16. **Health monitoring:** Final filesystem health check using `check_filesystem_health()`
+17. **Reporting:** Log results and send desktop notifications with detailed status information
 
-This module now provides a cutting-edge, enterprise-grade BTRFS backup solution with true atomic operations, comprehensive error handling, intelligent fallback strategies, advanced space management, and robust integrity checking that surpasses standard BTRFS backup implementations.
+This module now provides a cutting-edge, enterprise-grade BTRFS backup solution with true atomic operations, comprehensive error handling, intelligent fallback strategies, advanced space management, robust integrity checking, and detailed metadata tracking that surpasses standard BTRFS backup implementations.
 
 **10. lib_btrfs.sh Integration Details:**
 
@@ -449,8 +715,9 @@ The module's integration with `lib_btrfs.sh` represents a significant architectu
 
 *   **`check_btrfs_space()` and `get_btrfs_available_space()` - Advanced Space Management:**
     *   Detects BTRFS metadata exhaustion conditions that can cause backup failures
-    *   Provides accurate space calculations considering BTRFS-specific overhead
-    *   Intelligently estimates space requirements for incremental vs. full backups
+    *   Provides accurate space calculations using BTRFS's "Free (estimated)" metric, which properly accounts for RAID profiles, metadata overhead, and compression
+    *   Intelligently estimates space requirements for incremental vs. full backups (25% of full size for incremental when backup history exists)
+    *   Applies appropriate BTRFS overhead margins (50% safety margin for metadata and CoW operations)
 
 *   **`handle_btrfs_error()` - Intelligent Error Management:**
     *   Classifies BTRFS-specific errors and provides automated recovery strategies

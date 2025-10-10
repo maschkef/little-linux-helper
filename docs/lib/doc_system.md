@@ -62,6 +62,74 @@ else
 fi
 ```
 
+### `lh_fix_ownership(path)`
+
+Fixes file/directory ownership when running as root via sudo.
+
+**Parameters:**
+- `$1` (`path`): Path to file or directory to fix ownership
+
+**Purpose:**
+- Restore correct ownership of files created when script runs with sudo
+- Prevent root-owned files in user directories (logs, configs, build artifacts)
+- Automatically handle ownership issues transparently
+
+**Features:**
+- **Automatic detection**: Only acts when running as root via sudo (EUID=0 and SUDO_USER set)
+- **Safe operation**: Fails gracefully if ownership cannot be changed
+- **Recursive**: Applies to directories and all contents
+- **No-op when appropriate**: Does nothing when not needed (running as normal user)
+- **Logging integration**: Logs success at DEBUG level, warnings on failure
+
+**Return Values:**
+- `0`: Success or no action needed
+- `1`: Error (missing path, cannot determine user, chown failed)
+
+**Side Effects:**
+- Changes ownership of specified path to the original user who invoked sudo
+- Logs DEBUG message on successful ownership fix
+- Logs WARN message if ownership fix fails
+
+**Dependencies:**
+- `chown`, `id` commands
+- `SUDO_USER`, `EUID` environment variables
+- `lh_log_msg` function
+
+**Usage:**
+```bash
+# After creating a directory
+mkdir -p "$LH_LOG_DIR"
+lh_fix_ownership "$LH_LOG_DIR"
+
+# After creating a file
+touch "$LH_LOG_FILE"
+lh_fix_ownership "$LH_LOG_FILE"
+
+# Can be chained with &&
+mkdir -p "$LH_CONFIG_DIR" && lh_fix_ownership "$LH_CONFIG_DIR"
+
+# Automatically handles all cases:
+# - Running with sudo: fixes ownership to SUDO_USER
+# - Running as normal user: does nothing (no-op)
+# - Running as root directly: does nothing (no SUDO_USER)
+```
+
+**When It's Applied:**
+The system automatically calls this function after creating:
+- Log directories and files
+- Session registry files
+- Configuration directories
+- JSON output directories
+- GUI build artifacts
+
+**Translation Keys:**
+- `LIB_FIX_OWNERSHIP_NO_PATH`: Error when no path provided
+- `LIB_FIX_OWNERSHIP_SUCCESS`: Success message (DEBUG level)
+- `LIB_FIX_OWNERSHIP_FAILED`: Warning when chown fails
+- `LIB_FIX_OWNERSHIP_NO_UID`: Warning when user ID cannot be determined
+
+```
+
 ### `lh_get_target_user_info()`
 
 Determines information about the active graphical session user.

@@ -483,6 +483,62 @@ cd gui/
 
 </details>
 
+## Running with Sudo
+
+<details>
+<summary>🔐 Sudo Usage and File Ownership</summary>
+
+Little Linux Helper automatically handles file ownership issues when run with `sudo`. This ensures that log files, configuration files, and build artifacts maintain correct ownership even when elevated privileges are used.
+
+**Automatic Ownership Correction:**
+When the tool is run with `sudo`, the system automatically:
+- Detects the original user (via `SUDO_USER` environment variable)
+- Creates files and directories with root ownership initially (as expected with sudo)
+- Immediately corrects ownership back to the original user
+- Applies recursively to directories and all their contents
+
+**What Gets Fixed:**
+- **Log files** in `logs/` directory
+- **Log directories** including monthly subdirectories
+- **Session registry** files in `logs/sessions/`
+- **Configuration directories** and files in `config/`
+- **GUI build artifacts** when building with `sudo`
+- **JSON output files** in temporary directories
+
+**How It Works:**
+The `lh_fix_ownership()` function is automatically called after creating files or directories. It:
+1. Only acts when running as root via sudo (checks `EUID=0` and `SUDO_USER` is set)
+2. Determines the original user's UID and GID
+3. Changes ownership recursively using `chown`
+4. Logs the operation at DEBUG level for transparency
+5. Fails gracefully if ownership cannot be changed
+
+**User Experience:**
+- **Transparent**: No user action required
+- **Safe**: Only acts when appropriate (sudo context)
+- **Silent**: Normal operations show DEBUG logs only
+- **Compatible**: Works identically whether run with or without sudo
+
+**For Module Developers:**
+The ownership fix is applied automatically in core library functions. No special handling is needed in custom modules unless creating files outside standard paths. If needed, simply call:
+```bash
+mkdir -p "$my_directory"
+lh_fix_ownership "$my_directory"
+```
+
+**Example:**
+```bash
+# Running with sudo - files will be owned by the original user
+sudo ./help_master.sh
+# Log files in logs/ are automatically owned by your user, not root
+
+# Building GUI with sudo - artifacts owned by original user  
+sudo ./gui/build.sh
+# The little-linux-helper-gui binary and web/build/ are owned by your user
+```
+
+</details>
+
 ## Configuration
 
 <details>

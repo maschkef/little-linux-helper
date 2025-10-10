@@ -36,6 +36,13 @@ cd ..
 echo "🔨 Building Go backend..."
 go build -o little-linux-helper-gui main.go
 
+# Fix ownership if running with sudo
+if [[ $EUID -eq 0 ]] && [[ -n "${SUDO_USER:-}" ]]; then
+	echo "🔧 Fixing file ownership for user $SUDO_USER..."
+	chown -R "$SUDO_USER:$(id -gn "$SUDO_USER")" web/build 2>/dev/null || true
+	chown "$SUDO_USER:$(id -gn "$SUDO_USER")" little-linux-helper-gui 2>/dev/null || true
+fi
+
 echo
 echo "✅ Build completed successfully!"
 echo

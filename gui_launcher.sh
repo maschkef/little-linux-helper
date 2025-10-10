@@ -103,6 +103,11 @@ lh_initialize_logging
 # Log the custom log file location
 lh_log_msg "INFO" "GUI Launcher logging initialized. Log file: $LH_LOG_FILE"
 
+# Detect release version for reporting and downstream processes
+GUI_RELEASE_VERSION=$(lh_detect_release_version)
+lh_log_msg "INFO" "Little Linux Helper release: ${GUI_RELEASE_VERSION}"
+echo -e "${LH_COLOR_INFO}Little Linux Helper release:${LH_COLOR_RESET} ${LH_COLOR_SUCCESS}${GUI_RELEASE_VERSION}${LH_COLOR_RESET}"
+
 # Now that logging is initialized, log CLI argument parsing details (respects log level)
 lh_log_msg "DEBUG" "Starting CLI argument parsing with $ORIGINAL_ARG_COUNT arguments: $ORIGINAL_ARGS"
 lh_log_msg "DEBUG" "CLI parsing completed. BUILD_FLAG=$BUILD_FLAG, OPEN_FIREWALL_FLAG=$OPEN_FIREWALL_FLAG, LAUNCH_PORT='$LAUNCH_PORT', GUI_ARGS=(${GUI_ARGS[*]})"

@@ -86,6 +86,10 @@ export LH_INITIALIZED=1
 # Load main menu translations
 lh_load_language_module "main_menu"
 
+# Detect release version for display/logging
+release_version=$(lh_detect_release_version)
+lh_log_msg "INFO" "Little Linux Helper release: ${release_version}"
+
 # Log GUI mode message after translations are loaded
 if [[ "$LH_GUI_MODE" == "true" ]]; then
     lh_log_msg "INFO" "$(lh_msg "GUI_MODE_ENABLED")"
@@ -95,6 +99,8 @@ fi
 echo -e "${LH_COLOR_BOLD_YELLOW}╔════════════════════════════════════════════╗${LH_COLOR_RESET}"
 echo -e "${LH_COLOR_BOLD_YELLOW}║           ${LH_COLOR_BOLD_WHITE}$(lh_msg "WELCOME_TITLE")${LH_COLOR_BOLD_YELLOW}              ║${LH_COLOR_RESET}"
 echo -e "${LH_COLOR_BOLD_YELLOW}╚════════════════════════════════════════════╝${LH_COLOR_RESET}"
+
+echo -e "${LH_COLOR_BOLD_WHITE}Version:${LH_COLOR_RESET} ${LH_COLOR_INFO}${release_version}${LH_COLOR_RESET}"
 
 lh_log_msg "INFO" "$(lh_msg "LOG_HELPER_STARTED")"
 

@@ -80,21 +80,24 @@ var (
 	sessionManager = &SessionManager{
 		sessions: make(map[string]*ModuleSession),
 	}
-	lhRootDir    string
-	appStartTime time.Time
+	lhRootDir      string
+	appStartTime   time.Time
+	releaseVersion string
 )
 
 // Config holds GUI configuration
 type Config struct {
-	Port string
-	Host string
+	Port       string
+	Host       string
+	ReleaseTag string
 }
 
 // loadConfig reads configuration from config/general.conf
 func loadConfig() *Config {
 	config := &Config{
-		Port: "3000",      // default port
-		Host: "localhost", // default host (secure)
+		Port:       "3000",      // default port
+		Host:       "localhost", // default host (secure)
+		ReleaseTag: "",
 	}
 
 	configPath := filepath.Join(lhRootDir, "config", "general.conf")
@@ -132,6 +135,10 @@ func loadConfig() *Config {
 			if value != "" {
 				config.Host = value
 			}
+		case "CFG_LH_RELEASE_TAG":
+			if value != "" {
+				config.ReleaseTag = value
+			}
 		}
 	}
 
@@ -167,7 +174,7 @@ func init() {
 	} else {
 		// For production builds, check if we're in a release package or development environment
 		executableDir := filepath.Dir(executable)
-		
+
 		// If there's a modules/ directory in the same directory as the executable,
 		// we're in a release package - use the executable's directory as root
 		if _, err := os.Stat(filepath.Join(executableDir, "modules")); err == nil {
@@ -245,6 +252,20 @@ func main() {
 		log.Fatalf("Invalid port in config: %s (must be between 1 and 65535)", config.Port)
 	}
 
+	releaseVersion = strings.TrimSpace(os.Getenv("LH_RELEASE_VERSION"))
+	if releaseVersion == "" && config.ReleaseTag != "" {
+		releaseVersion = config.ReleaseTag
+	}
+	if releaseVersion == "" {
+		if output, err := exec.Command("git", "-C", lhRootDir, "describe", "--tags", "--dirty", "--always").Output(); err == nil {
+			releaseVersion = strings.TrimSpace(string(output))
+		}
+	}
+	if releaseVersion == "" {
+		releaseVersion = "unknown"
+	}
+	log.Printf("Detected Little Linux Helper release: %s", releaseVersion)
+
 	app := fiber.New(fiber.Config{
 		AppName: "Little Linux Helper GUI",
 	})
@@ -267,6 +288,9 @@ func main() {
 
 	// Health endpoint
 	api.Get("/health", getHealth)
+
+	// Release/version information
+	api.Get("/version", getVersion)
 
 	// Get module documentation
 	api.Get("/modules/:id/docs", getModuleDocs)
@@ -1002,14 +1026,14 @@ func shutdownServer(c *fiber.Ctx) error {
 	// Perform cleanup in a separate goroutine to allow response to be sent
 	go func() {
 		log.Println("Initiating graceful server shutdown...")
-		
+
 		// Stop all active sessions
 		sessionManager.mutex.Lock()
 		for sessionId, session := range sessionManager.sessions {
 			if session.Status != "stopped" {
 				log.Printf("Stopping session %s (%s)", sessionId, session.ModuleName)
 				session.Status = "stopped"
-				
+
 				// Terminate the process and close PTY
 				if session.PTY != nil {
 					session.PTY.Close()
@@ -1034,10 +1058,10 @@ func shutdownServer(c *fiber.Ctx) error {
 		sessionManager.mutex.Unlock()
 
 		log.Println("All sessions stopped. Exiting...")
-		
+
 		// Give a moment for the response to be sent
 		time.Sleep(500 * time.Millisecond)
-		
+
 		// Exit the application
 		os.Exit(0)
 	}()
@@ -1058,6 +1082,12 @@ func getHealth(c *fiber.Ctx) error {
 		"status":   "ok",
 		"uptime":   uptime,
 		"sessions": sCount,
+	})
+}
+
+func getVersion(c *fiber.Ctx) error {
+	return c.JSON(fiber.Map{
+		"release": releaseVersion,
 	})
 }
 

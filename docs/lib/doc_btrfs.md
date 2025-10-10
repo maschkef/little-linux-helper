@@ -10,7 +10,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 ## Library: `lib/lib_btrfs.sh` - BTRFS-Specific Operations Library
 
 **1. Purpose:**
-This library provides advanced BTRFS-specific functions for backup and restore operations, implementing atomic backup patterns and sophisticated BTRFS features. It serves as a specialized foundation for safe BTRFS operations within the little-linux-helper system, with particular emphasis on preventing backup corruption, maintaining incremental backup chain integrity, and handling BTRFS-specific space and health conditions.
+This library provides advanced BTRFS-specific functions for backup and restore operations, implementing atomic backup patterns and sophisticated BTRFS features. Refer to `docs/lib/doc_btrfs_core.md` and `docs/lib/doc_btrfs_layout.md` for module-specific helper summaries. It serves as a specialized foundation for safe BTRFS operations within the little-linux-helper system, with particular emphasis on preventing backup corruption, maintaining incremental backup chain integrity, and handling BTRFS-specific space and health conditions.
 
 **Important Note:** This is a specialized library that is NOT part of the core library system automatically loaded by `lib_common.sh`. It is specifically designed for and used exclusively by BTRFS-related modules (`mod_btrfs_backup.sh`, `mod_btrfs_restore.sh`) and must be explicitly sourced when needed.
 
@@ -22,6 +22,7 @@ This library provides advanced BTRFS-specific functions for backup and restore o
 - **BTRFS-Specific Space Checking**: Metadata exhaustion detection and accurate space calculation
 - **Comprehensive Health Monitoring**: Filesystem corruption detection and validation
 - **Advanced Error Analysis**: BTRFS-specific error pattern recognition and handling
+- **Bundle Inventory Services**: Shared helpers that enumerate snapshot bundles once and expose per-subvolume metadata to backup and restore modules
 
 **2. Critical Dependencies and Initialization:**
 
@@ -34,6 +35,11 @@ This library provides advanced BTRFS-specific functions for backup and restore o
 *   **Pipeline Safety:** Enables `set -o pipefail` for critical pipe operation error detection
 *   **Function Exports:** All major functions are exported for use by BTRFS modules
 *   **Validation Framework:** Includes comprehensive self-validation functions
+*   **Extended Library Support**:
+    *   **lib_json.sh**: Used by backup modules for metadata generation (see mod_btrfs_backup.sh)
+    *   **lib/btrfs/05_layout.sh**: Provides consistent path management functions and bundle inventory helpers
+    *   **lib/btrfs/10_core.sh**: Hosts atomic receive primitives and parent-chain validation utilities
+    *   Optional Python for enhanced JSON processing (with bash fallback)
 
 **3. Atomic Backup Operations**
 
@@ -119,7 +125,54 @@ while IFS= read -r -d '' d; do
 done < <(btrfs_list_receiving_dirs "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 30)
 ```
 
-**4. Backup Chain Validation**
+**4. Layout & Inventory Helpers (lib/btrfs/05_layout.sh)**
+
+The bundle-oriented layout is formalised in `lib/btrfs/05_layout.sh`. These helpers are sourced automatically via `lib/lib_btrfs.sh` and exported for subshell use.
+
+#### Path Builders
+
+* `btrfs_backup_snapshot_root()`, `btrfs_backup_meta_root()`, `btrfs_backup_incoming_root()` – return the canonical base directories relative to `${LH_BACKUP_ROOT}${LH_BACKUP_DIR}`.
+* `btrfs_bundle_path(bundle)` – resolves a bundle timestamp to its snapshot directory.
+* `btrfs_bundle_subvol_path(bundle, subvol)` and `btrfs_bundle_subvol_marker(bundle, subvol)` – resolve an individual subvolume and its `.backup_complete` marker.
+
+These helpers ensure both backup and restore modules reference the same locations even when the backup root or directory prefix differs per installation.
+
+#### `btrfs_collect_bundle_inventory([override_root])`
+
+**Purpose:** Enumerate all backup bundles once and emit structured records that contain per-bundle and per-subvolume metadata. This replaces bespoke `find` loops and repeated `btrfs subvolume show` invocations throughout the modules.
+
+**Output Format:**
+
+* `bundle|<name>|<bundle_dir>|<meta_file>|<subvol_count>|<total_size_bytes>|<has_marker>|<has_errors>|<date_completed>`
+* `subvol|<bundle_name>|<subvol_name>|<subvol_path>|<marker_size_bytes>|<marker_present>|<received_uuid>|<meta_has_error>|<meta_size_bytes>|<meta_size_human>|<subvol_uuid>|<parent_uuid>`
+
+All UUID fields are normalised to lowercase so comparisons remain stable regardless of how `btrfs` reports them.
+
+**Key Behaviours:**
+
+* Accepts an optional override root when scanning external mounts (restore module).
+* Falls back gracefully when `btrfs subvolume show` is not permitted (records "-" for unknown UUIDs).
+* Inlines JSON metadata (when `jq` is available) so higher-level modules do not need to reopen the metadata files.
+* Exported via `lib/lib_btrfs.sh` for reuse by shell pipelines (`export -f btrfs_collect_bundle_inventory`).
+
+**Example:**
+
+```bash
+# Build a table of bundles with total size
+while IFS='|' read -r type name _ _ _ total _ _ _; do
+  [[ $type != bundle ]] && continue
+  printf '%-22s %12s\n' "$name" "$(numfmt --to=iec $total)"
+done < <(btrfs_collect_bundle_inventory)
+```
+
+#### Validation Helpers
+
+* `btrfs_is_valid_bundle_name()` – accepts both `YYYY-MM-DD_HHMMSS` and `YYYY-MM-DD_HH-MM-SS` timestamps.
+* `btrfs_find_latest_subvol_snapshot()` / `btrfs_list_subvol_backups_desc()` – now operate against the bundle hierarchy.
+
+**Note:** Dedicated documentation for these helpers is available in `docs/lib/doc_btrfs_layout.md`.
+
+**5. Backup Chain Validation**
 
 ### `validate_parent_snapshot_chain()`
 
@@ -162,7 +215,7 @@ fi
 **Dependencies (internal):** `lh_log_msg`
 **Dependencies (system):** `btrfs subvolume show`
 
-**5. Intelligent Backup Cleanup**
+**6. Intelligent Backup Cleanup**
 
 ### `intelligent_cleanup()`
 
@@ -207,7 +260,7 @@ intelligent_cleanup "@home" "/mnt/backup/snapshots"
 **Dependencies (internal):** `lh_log_msg`
 **Dependencies (system):** `find`, `sort`, `btrfs subvolume show`, `btrfs subvolume delete`
 
-**6. BTRFS Space Management**
+**7. BTRFS Space Management**
 
 ### `check_btrfs_space()`
 
@@ -217,11 +270,12 @@ intelligent_cleanup "@home" "/mnt/backup/snapshots"
 - **BTRFS Filesystem Usage**: Uses `btrfs filesystem usage` instead of `df` for accuracy
 - **Metadata Awareness**: Detects metadata chunk exhaustion (critical BTRFS failure mode)
 - **Compression Accounting**: Considers BTRFS compression and deduplication effects
-- **Unallocated Space**: Monitors device unallocated space for new chunk allocation
+- **Free Space Estimation**: Monitors "Free (estimated)" which accounts for RAID profiles, metadata overhead, and compression
 
 **Space Analysis Components:**
 - **Device Size and Allocation**: Total device capacity and currently allocated chunks
-- **Unallocated Space**: Available space for new chunk allocation
+- **Free (estimated)**: BTRFS's calculation of actual usable free space (primary metric)
+- **Device Unallocated**: Raw space available for new chunk allocation
 - **Data and Metadata Free**: Free space within allocated chunks
 - **Critical Thresholds**: Identifies dangerous low-space conditions
 
@@ -252,10 +306,13 @@ esac
 **Purpose:** Returns accurate available space in bytes for BTRFS filesystem, accounting for BTRFS-specific factors.
 
 **Accurate Space Calculation:**
-- **Unallocated Priority**: Uses device unallocated space as primary metric
-- **Data Free Fallback**: Falls back to data chunk free space if needed
+- **Free (estimated) Primary**: Uses BTRFS's "Free (estimated)" value as the primary metric, which accurately represents usable space accounting for RAID profiles, metadata overhead, and compression
+- **Device Unallocated Fallback**: Falls back to device unallocated space only if "Free (estimated)" is unavailable or zero (conservative estimate for when filesystem is fully allocated)
 - **Byte Precision**: Returns exact byte counts for precise calculations
-- **BTRFS Overhead**: Accounts for metadata overhead and RAID configurations
+- **BTRFS-Aware**: Properly handles BTRFS-specific space concepts:
+  - **Device allocated**: Space allocated to data/metadata/system chunks
+  - **Device unallocated**: Raw device space not yet allocated to chunks
+  - **Free (estimated)**: Actual usable free space within the filesystem (the most accurate metric)
 
 **Parameters:**
 - `$1: filesystem_path` - BTRFS filesystem path
@@ -274,7 +331,7 @@ echo "Available: ${available_gb}GB"
 **Dependencies (internal):** Internal `convert_to_bytes()` function
 **Dependencies (system):** `btrfs filesystem usage`
 
-**7. Filesystem Health Monitoring**
+**8. Filesystem Health Monitoring**
 
 ### `check_filesystem_health()`
 
@@ -320,7 +377,7 @@ esac
 **Dependencies (internal):** `lh_log_msg`
 **Dependencies (system):** `findmnt`, `touch`, `dmesg`, `btrfs scrub status`, `btrfs subvolume`
 
-**8. Advanced Error Handling**
+**9. Advanced Error Handling**
 
 ### `handle_btrfs_error()`
 
@@ -369,7 +426,7 @@ esac
 
 **Dependencies (internal):** `lh_log_msg`
 
-**9. received_uuid Protection System**
+**10. received_uuid Protection System**
 
 ### `verify_received_uuid_integrity()`
 
@@ -432,7 +489,7 @@ fi
 **Dependencies (internal):** `lh_log_msg`
 **Dependencies (system):** `btrfs subvolume show`, `find`
 
-**10. Subvolume Detection and Management Functions**
+**11. Subvolume Detection and Management Functions**
 
 ### `detect_btrfs_subvolumes()`
 
@@ -503,18 +560,48 @@ readarray -t subvolumes < <(get_btrfs_subvolumes)
 - Logs warnings when falling back to default subvolumes
 - Provides consistent behavior across backup and restore operations
 
-**11. Library Validation and Export System**
+**12. Library Validation and Export System**
 
 ### `validate_btrfs_implementation()`
 
-**Purpose:** Comprehensive validation system that tests all critical BTRFS functions and implementation requirements.
+**Purpose:** Comprehensive validation system that tests all critical BTRFS functions and implementation requirements, now with hybrid atomic pattern validation.
 
 **Validation Coverage:**
 1. **Function Availability**: Verifies all exported functions are available
 2. **Implementation Testing**: Tests critical function behaviors
 3. **System Requirements**: Validates BTRFS tools and system state
 4. **Safety Mechanisms**: Confirms pipeline failure detection and other safety features
-5. **Pattern Verification**: Ensures atomic patterns are properly implemented
+5. **Pattern Verification**: Ensures atomic patterns are properly implemented (hybrid approach)
+
+**Atomic Pattern Validation (Hybrid Approach):**
+
+The validation uses a **two-phase hybrid approach** to ensure atomic patterns are properly implemented:
+
+1. **Phase 1 - Function Existence Check (ERROR level):**
+   - Verifies that `atomic_receive_with_validation()` function exists using `declare -f`
+   - Returns ERROR if the function is missing (critical failure)
+   - This ensures the actual implementation is present
+
+2. **Phase 2 - Documentation Pattern Check (WARNING level):**
+   - Searches for atomic pattern documentation in `lib/lib_btrfs.sh`
+   - Looks for the 4-step atomic workflow documentation:
+     - Step 1: Receive snapshot into destination
+     - Step 2: Stage and validate (rename with .receiving suffix)
+     - Step 3: Atomic rename to final destination
+     - Step 4: Cleanup on failure
+   - Uses flexible regex patterns: `"Step 1.*Receive"` instead of exact string matching
+   - Returns WARNING (not ERROR) if documentation is missing
+   - This encourages proper documentation without blocking functionality
+
+**Atomic Pattern Documentation Block:**
+
+The validation expects to find documentation like this in `lib/lib_btrfs.sh`:
+```bash
+# Step 1 - Receive: Receive snapshot into destination
+# Step 2 - Stage: Rename to temporary .receiving suffix and validate
+# Step 3 - Atomic rename: Perform atomic mv to reveal final name
+# Step 4 - Cleanup: Remove staging artifacts if operation fails
+```
 
 **Validation Categories:**
 - **Function Exports**: All critical functions properly exported
@@ -522,10 +609,17 @@ readarray -t subvolumes < <(get_btrfs_subvolumes)
 - **Safety Features**: Pipeline failure detection active
 - **Error Handling**: Error analysis functions operational
 - **Protection Systems**: received_uuid protection mechanisms functional
+- **Atomic Pattern**: Function existence (ERROR) + documentation presence (WARNING)
 
 **Return Codes:**
 - `0`: All validations passed - library fully operational
 - `1`: One or more critical issues found - library may be unreliable
+
+**Validation Improvements:**
+- **Hybrid Validation**: Separates function existence (critical) from documentation (recommended)
+- **Flexible Pattern Matching**: Uses regex patterns for documentation search
+- **Better Error Reporting**: Distinguishes between missing implementation vs. missing documentation
+- **Non-blocking Documentation Checks**: Warnings don't prevent library usage
 
 **Usage Example:**
 ```bash
@@ -537,7 +631,7 @@ else
 fi
 ```
 
-**11. Internal Utility Functions:**
+**13. Internal Utility Functions:**
 
 ### `ensure_pipefail()`
 
@@ -576,7 +670,7 @@ fi
 
 **Usage:** Internal function used by space checking functions for consistent unit conversion.
 
-**12. Function Export System:**
+**14. Function Export System:**
 
 All major functions are exported for use by other modules:
 ```bash
@@ -594,7 +688,7 @@ export -f detect_btrfs_subvolumes
 export -f get_btrfs_subvolumes
 ```
 
-**12. Integration with Main System:**
+**15. Integration with Main System:**
 
 *   **Module Dependencies**: Used exclusively by BTRFS-specific modules (`mod_btrfs_backup.sh`, `mod_btrfs_restore.sh`)
 *   **Library Architecture**: Specialized library separate from the core library system - not loaded by `lib_common.sh`
@@ -604,7 +698,7 @@ export -f get_btrfs_subvolumes
 *   **Error Propagation**: Provides detailed error codes for intelligent handling by calling BTRFS modules
 *   **Safety Integration**: Coordinates with main system safety mechanisms through common patterns
 
-**13. Critical Safety Features:**
+**16. Critical Safety Features:**
 
 *   **Pipeline Failure Detection**: `set -o pipefail` ensures pipe operation failures are caught
 *   **Atomic Operations**: True atomic patterns prevent partial states
@@ -613,14 +707,14 @@ export -f get_btrfs_subvolumes
 *   **Error Recovery**: Cleanup mechanisms for failed operations
 *   **Chain Integrity**: Preserves backup chain dependencies in all operations
 
-**14. Performance Considerations:**
+**17. Performance Considerations:**
 
 *   **Space Efficiency**: Uses BTRFS-specific space calculation for accuracy
 *   **Chain Optimization**: Intelligent cleanup preserves necessary dependencies
 *   **Error Efficiency**: Quick error pattern recognition for fast failure handling
 *   **Validation Optimization**: Efficient validation checks without excessive overhead
 
-**15. Advanced BTRFS Concepts Handled:**
+**18. Advanced BTRFS Concepts Handled:**
 
 *   **Incremental Backup Chains**: Complete understanding and protection of BTRFS incremental mechanisms
 *   **received_uuid Semantics**: Deep understanding of received snapshot metadata

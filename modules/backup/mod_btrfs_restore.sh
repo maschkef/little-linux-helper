@@ -35,7 +35,7 @@ get_restore_subvolumes() {
     get_btrfs_subvolumes "restore"
 }
 
-# Parse filesystem configuration from backup marker
+# Parse filesystem configuration from backup marker (JSON format)
 parse_filesystem_config_from_marker() {
     local marker_file="$1"
     restore_log_msg "DEBUG" "Parsing filesystem configuration from marker: $marker_file"
@@ -45,43 +45,53 @@ parse_filesystem_config_from_marker() {
         return 1
     fi
     
-    # Check if this is an enhanced marker with filesystem config
-    if ! grep -q "SCRIPT_VERSION=2.0" "$marker_file" 2>/dev/null; then
+    # Check if jq is available for JSON parsing
+    if ! command -v jq >/dev/null 2>&1; then
+        restore_log_msg "ERROR" "jq is required for parsing new metadata format but not installed"
+        return 1
+    fi
+    
+    # Check if this marker uses the bundle JSON layout
+    local schema_label
+    schema_label=$(jq -r '.schema_label // "unknown"' "$marker_file" 2>/dev/null)
+    
+    if [[ "$schema_label" == "unknown" || "$schema_label" == "null" ]]; then
         restore_log_msg "WARN" "Legacy marker file detected, filesystem config not available"
         return 1
     fi
     
-    restore_log_msg "INFO" "Enhanced marker file detected with filesystem configuration"
+    restore_log_msg "INFO" "Enhanced marker file detected with filesystem configuration (schema: $schema_label)"
     
-    # Extract key information
+    # Extract key information from JSON
     local detected_subvols
-    detected_subvols=$(grep "^DETECTED_SUBVOLUMES=" "$marker_file" | cut -d'=' -f2- || echo "")
-    
-    local configured_subvols
-    configured_subvols=$(grep "^CONFIGURED_SUBVOLUMES=" "$marker_file" | cut -d'=' -f2- || echo "")
-    
-    local auto_detect_enabled
-    auto_detect_enabled=$(grep "^AUTO_DETECT_ENABLED=" "$marker_file" | cut -d'=' -f2- || echo "true")
+    detected_subvols=$(jq -r '.subvolumes[].name' "$marker_file" 2>/dev/null | tr '\n' ' ' || echo "")
     
     local os_release
-    os_release=$(grep "^OS_RELEASE=" "$marker_file" | cut -d'=' -f2- || echo "Unknown")
+    os_release=$(jq -r '.system.os_release // "Unknown"' "$marker_file" 2>/dev/null)
+    
+    local hostname
+    hostname=$(jq -r '.system.hostname // "Unknown"' "$marker_file" 2>/dev/null)
     
     # Print summary
     echo "Filesystem Configuration Summary:"
     echo "  Original OS: $os_release"
-    echo "  Detected subvolumes: $detected_subvols"
-    echo "  Configured subvolumes: $configured_subvols" 
-    echo "  Auto-detection was: $auto_detect_enabled"
+    echo "  Original hostname: $hostname"
+    echo "  Backed up subvolumes: $detected_subvols"
+    echo "  Backup date: $(jq -r '.session.date_completed // "Unknown"' "$marker_file" 2>/dev/null)"
+    echo "  Backup duration: $(jq -r '.session.duration_human // "Unknown"' "$marker_file" 2>/dev/null)"
     echo
     
-    # Extract FSTAB entries
-    echo "Original FSTAB entries:"
-    while IFS= read -r line; do
-        if [[ "$line" =~ ^FSTAB_ENTRY= ]]; then
+    # Extract FSTAB entries from filesystem_config
+    local filesystem_config
+    filesystem_config=$(jq -r '.filesystem_config // ""' "$marker_file" 2>/dev/null)
+    
+    if [[ -n "$filesystem_config" ]]; then
+        echo "Original FSTAB entries:"
+        echo "$filesystem_config" | grep "^FSTAB_ENTRY=" | while IFS= read -r line; do
             echo "  ${line#FSTAB_ENTRY=}"
-        fi
-    done < "$marker_file"
-    echo
+        done
+        echo
+    fi
     
     return 0
 }
@@ -98,17 +108,26 @@ recreate_filesystem_structure() {
         return 1
     fi
     
-    # Check if this is an enhanced marker
-    if ! grep -q "SCRIPT_VERSION=2.0" "$marker_file" 2>/dev/null; then
+    # Check if jq is available
+    if ! command -v jq >/dev/null 2>&1; then
+        restore_log_msg "WARN" "jq not available - using default subvolume structure"
+        return create_default_filesystem_structure "$target_device"
+    fi
+    
+    # Check if this marker uses the bundle JSON layout
+    local schema_label
+    schema_label=$(jq -r '.schema_label // "unknown"' "$marker_file" 2>/dev/null)
+    
+    if [[ "$schema_label" == "unknown" || "$schema_label" == "null" ]]; then
         restore_log_msg "WARN" "Legacy marker - using default subvolume structure"
         return create_default_filesystem_structure "$target_device"
     fi
     
-    restore_log_msg "DEBUG" "Using enhanced marker for filesystem recreation"
+    restore_log_msg "DEBUG" "Using enhanced marker for filesystem recreation (schema: $schema_label)"
     
-    # Extract subvolume information from marker
+    # Extract subvolume information from JSON
     local detected_subvols
-    detected_subvols=$(grep "^DETECTED_SUBVOLUMES=" "$marker_file" | cut -d'=' -f2- || echo "@ @home")
+    detected_subvols=$(jq -r '.subvolumes[].name' "$marker_file" 2>/dev/null | tr '\n' ' ' || echo "@ @home")
     
     restore_log_msg "INFO" "Creating subvolumes: $detected_subvols"
     
@@ -203,8 +222,17 @@ generate_fstab_entries() {
         return generate_default_fstab_entries "$target_device"
     fi
     
-    # Check for enhanced marker
-    if ! grep -q "SCRIPT_VERSION=2.0" "$marker_file" 2>/dev/null; then
+    # Check if jq is available
+    if ! command -v jq >/dev/null 2>&1; then
+        restore_log_msg "WARN" "jq not available - generating default fstab entries"
+        return generate_default_fstab_entries "$target_device"
+    fi
+    
+    # Check for bundle JSON layout
+    local schema_label
+    schema_label=$(jq -r '.schema_label // "unknown"' "$marker_file" 2>/dev/null)
+    
+    if [[ "$schema_label" == "unknown" || "$schema_label" == "null" ]]; then
         restore_log_msg "WARN" "Legacy marker, generating default fstab entries"
         return generate_default_fstab_entries "$target_device"
     fi
@@ -212,12 +240,15 @@ generate_fstab_entries() {
     echo "# Generated fstab entries from backup configuration"
     echo "# Original system configuration:"
     
-    # Show original entries as comments
-    while IFS= read -r line; do
-        if [[ "$line" =~ ^FSTAB_ENTRY= ]]; then
+    # Show original entries as comments from filesystem_config
+    local filesystem_config
+    filesystem_config=$(jq -r '.filesystem_config // ""' "$marker_file" 2>/dev/null)
+    
+    if [[ -n "$filesystem_config" ]]; then
+        echo "$filesystem_config" | grep "^FSTAB_ENTRY=" | while IFS= read -r line; do
             echo "# ${line#FSTAB_ENTRY=}"
-        fi
-    done < "$marker_file"
+        done
+    fi
     
     echo
     echo "# New entries for restored system:"
@@ -226,9 +257,9 @@ generate_fstab_entries() {
     local device_uuid
     device_uuid=$($LH_SUDO_CMD blkid -s UUID -o value "$target_device" 2>/dev/null || echo "$target_device")
     
-    # Get detected subvolumes
+    # Get detected subvolumes from JSON
     local detected_subvols
-    detected_subvols=$(grep "^DETECTED_SUBVOLUMES=" "$marker_file" | cut -d'=' -f2- || echo "@ @home")
+    detected_subvols=$(jq -r '.subvolumes[].name' "$marker_file" 2>/dev/null | tr '\n' ' ' || echo "@ @home")
     
     # Generate fstab entries based on subvolumes
     for subvol in $detected_subvols; do
@@ -338,6 +369,7 @@ RESTORE_LIVE_ENV_STATUS=""   # Cached detection result for live environment chec
 RESTORE_LIVE_MESSAGE_SHOWN="false"  # Ensure success message only appears once per session
 RESTORE_NON_LIVE_OVERRIDE="false"   # Tracks whether user explicitly accepted running on a non-live system
 RESTORE_NON_LIVE_NOTICE_SHOWN="false"  # Avoid repeating informational message after override
+RESTORE_MARKER_FILE=""      # Path to the backup marker JSON file for the selected snapshot bundle
 
 # LH_RESTORE_KEEP_ANCHOR controls whether we keep the read-only snapshot that was
 # just received from the backup. Set this to "true" if you want an extra safety
@@ -352,6 +384,134 @@ LH_RESTORE_KEEP_ANCHOR="${LH_RESTORE_KEEP_ANCHOR:-false}"
 # The default value "3" gives extra room for the temporary files used by the
 # atomic restore workflow. Increase it if you prefer more safety margin.
 LH_RESTORE_SPACE_MULTIPLIER="${LH_RESTORE_SPACE_MULTIPLIER:-3}"
+
+declare -a RESTORE_BUNDLE_INVENTORY_CACHE=()
+RESTORE_BUNDLE_CACHE_KEY=""
+declare -gA RESTORE_SUBVOL_UUID_CACHE=()
+declare -gA RESTORE_RECEIVED_UUID_CACHE=()
+declare -gA RESTORE_VERIFIED_RECEIVED_UUID=()
+
+btrfs_restore_refresh_subvol_identifiers() {
+    local subvol_path="$1"
+
+    [[ -n "$subvol_path" ]] || return 1
+
+    local cached_uuid="${RESTORE_SUBVOL_UUID_CACHE[$subvol_path]:-}"
+    local cached_received="${RESTORE_RECEIVED_UUID_CACHE[$subvol_path]:-}"
+
+    if [[ -n "$cached_uuid" && -n "$cached_received" ]]; then
+        return 0
+    fi
+
+    local subvol_show=""
+    if [[ -n "${LH_SUDO_CMD:-}" ]]; then
+        subvol_show=$($LH_SUDO_CMD btrfs subvolume show "$subvol_path" 2>/dev/null) || subvol_show=""
+    else
+        subvol_show=$(btrfs subvolume show "$subvol_path" 2>/dev/null) || subvol_show=""
+    fi
+
+    local uuid
+    uuid=$(printf '%s\n' "$subvol_show" | awk '/^\s*UUID:/ {print $2; exit}')
+    [[ -z "$uuid" ]] && uuid="-"
+    uuid=${uuid,,}
+    RESTORE_SUBVOL_UUID_CACHE["$subvol_path"]="$uuid"
+
+    local received
+    received=$(printf '%s\n' "$subvol_show" | awk '/Received UUID:/ {print $3; exit}')
+    [[ -z "$received" || "$received" == "-" ]] && received="-"
+    received=${received,,}
+    RESTORE_RECEIVED_UUID_CACHE["$subvol_path"]="$received"
+
+    return 0
+}
+
+btrfs_restore_format_size() {
+    local bytes="$1"
+    if [[ ! "$bytes" =~ ^[0-9]+$ ]]; then
+        echo ""
+        return
+    fi
+
+    if command -v numfmt >/dev/null 2>&1; then
+        numfmt --to=iec --suffix=B --format='%.1f' "$bytes" 2>/dev/null
+        return
+    fi
+
+    awk -v bytes="$bytes" 'BEGIN {
+        split("B KiB MiB GiB TiB PiB", units)
+        value = bytes
+        idx = 1
+        while (value >= 1024 && idx < length(units)) {
+            value = value / 1024
+            idx++
+        }
+        if (value >= 100) {
+            printf("%.0f%s\n", value, units[idx])
+        } else if (value >= 10) {
+            printf("%.1f%s\n", value, units[idx])
+        } else {
+            printf("%.2f%s\n", value, units[idx])
+        }
+    }'
+}
+
+btrfs_restore_load_bundle_inventory() {
+    local override_root="${BACKUP_ROOT:-}"
+    local cache_key
+
+    if [[ -n "$override_root" ]]; then
+        cache_key="${override_root%/}${LH_BACKUP_DIR:-}"
+    else
+        cache_key="${LH_BACKUP_ROOT:-}${LH_BACKUP_DIR:-}"
+    fi
+
+    if [[ "$RESTORE_BUNDLE_CACHE_KEY" == "$cache_key" && ${#RESTORE_BUNDLE_INVENTORY_CACHE[@]} -gt 0 ]]; then
+        return 0
+    fi
+
+    RESTORE_BUNDLE_CACHE_KEY="$cache_key"
+    RESTORE_BUNDLE_INVENTORY_CACHE=()
+
+    if [[ -n "$override_root" ]]; then
+        mapfile -t RESTORE_BUNDLE_INVENTORY_CACHE < <(btrfs_collect_bundle_inventory "$override_root")
+    else
+        mapfile -t RESTORE_BUNDLE_INVENTORY_CACHE < <(btrfs_collect_bundle_inventory)
+    fi
+}
+
+btrfs_restore_find_subvol_path_by_uuid() {
+    local search_uuid="$1"
+    local subvol_filter="${2:-}"
+
+    [[ -n "$search_uuid" && "$search_uuid" != "-" ]] || return 1
+
+    search_uuid=${search_uuid,,}
+
+    btrfs_restore_load_bundle_inventory
+
+    local line
+    for line in "${RESTORE_BUNDLE_INVENTORY_CACHE[@]}"; do
+        IFS='|' read -r record_type bundle_name subvol_name subvol_path size_bytes marker_present received_uuid meta_has_error meta_size_bytes meta_size_human subvol_uuid parent_uuid <<<"$line"
+        if [[ "$record_type" != "subvol" ]]; then
+            continue
+        fi
+        if [[ -n "$subvol_filter" && "$subvol_name" != "$subvol_filter" ]]; then
+            continue
+        fi
+        local cached_uuid="${RESTORE_SUBVOL_UUID_CACHE[$subvol_path]:-}";
+        if [[ -z "$cached_uuid" || "$cached_uuid" == "-" ]]; then
+            btrfs_restore_refresh_subvol_identifiers "$subvol_path"
+            cached_uuid="${RESTORE_SUBVOL_UUID_CACHE[$subvol_path]:-}"
+        fi
+        cached_uuid=${cached_uuid,,}
+        if [[ "$cached_uuid" == "$search_uuid" ]]; then
+            printf '%s\n' "$subvol_path"
+            return 0
+        fi
+    done
+
+    return 1
+}
 
 # Try to determine whether we are running from a live/rescue system.
 # Returns "true" or "false" via stdout.
@@ -907,8 +1067,15 @@ detect_backup_drives() {
         local mount_point=$(echo "$mount_line" | awk '{print $3}')
         local backup_path="${mount_point}/${LH_BACKUP_DIR}"
         
-        if [[ -d "$backup_path" ]]; then
+        # Check for new bundle-based layout
+        if [[ -d "${backup_path}/snapshots" ]] || [[ -d "${backup_path}/meta" ]]; then
             backup_drives+=("$mount_point")
+        # Also check for old layout for backward compatibility
+        elif [[ -d "$backup_path" ]]; then
+            # Verify it contains actual backups (check for subvolume directories)
+            if find "$backup_path" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | grep -q .; then
+                backup_drives+=("$mount_point")
+            fi
         fi
     done < <(mount | grep "type btrfs")
     
@@ -981,6 +1148,16 @@ setup_restore_environment() {
     if [[ ! -d "$backup_full_path" ]]; then
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_BACKUP_NOT_FOUND' "$backup_full_path")${LH_COLOR_RESET}"
         return 1
+    fi
+    
+    # Verify new bundle-based layout exists
+    if [[ ! -d "${backup_full_path}/snapshots" ]]; then
+        echo -e "${LH_COLOR_ERROR}Snapshots directory not found: ${backup_full_path}/snapshots${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_WARNING}This may be a legacy backup format. Please check your backup structure.${LH_COLOR_RESET}"
+        
+        if ! lh_confirm_action "Continue anyway?" "n"; then
+            return 1
+        fi
     fi
     
     # Validate backup source filesystem health
@@ -1492,6 +1669,7 @@ validate_restore_snapshot() {
             esac
         else
             restore_log_msg "DEBUG" "Snapshot integrity verified: received_uuid intact"
+            RESTORE_VERIFIED_RECEIVED_UUID["$snapshot_path"]="${received_uuid,,}"
         fi
         
         # For received snapshots, verify they are read-only
@@ -1533,112 +1711,109 @@ validate_restore_snapshot() {
 }
 
 # List available snapshots for a given subvolume with validation
+# Updated to work with new bundle-based layout: /backups/snapshots/<timestamp>/<subvolume>
 list_available_snapshots() {
     local subvolume="$1"  # e.g., "@" or "@home"
-    local backup_path="${BACKUP_ROOT}${LH_BACKUP_DIR}/${subvolume}"
+    
+    btrfs_restore_load_bundle_inventory
 
-    restore_log_msg "DEBUG" "Listing snapshots for $subvolume in $backup_path"
-
-    if [[ ! -d "$backup_path" ]]; then
-        printf '%s\n' "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_NO_BACKUP_DIR' "$backup_path")${LH_COLOR_RESET}" >&2
-        return 1
-    fi
-
-    # Find snapshots with flexible patterns to support different naming conventions
     local -a snapshots=()
-    local -a valid_snapshots=()
+    local -A snapshot_bundle=()
+    local -A snapshot_received=()
+    local -A snapshot_meta_error=()
+    local -A snapshot_meta_size_human=()
+    local -A snapshot_size_bytes=()
+    local -A bundle_dates=()
 
-    # Multiple patterns to support different backup naming schemes:
-    # 1. Standard: @-2025-08-05_21-13-12
-    # 2. Underscore: @_2025-08-05_21-13-12
-    # 3. Prefix variations: backup_@_2025-08-05, home_backup-2025-08-05, etc.
-    local -a patterns=(
-        "${subvolume}-20*"
-        "${subvolume}_20*"
-        "*${subvolume}*20*"
-        "${subvolume}[-_]*"
-        "*[-_]${subvolume}[-_]*20*"
-    )
+    local line
+    for line in "${RESTORE_BUNDLE_INVENTORY_CACHE[@]}"; do
+        IFS='|' read -r record_type field2 field3 field4 field5 field6 field7 field8 field9 field10 field11 field12 <<<"$line"
+        if [[ "$record_type" == "bundle" ]]; then
+            bundle_dates["$field2"]="$field9"
+            continue
+        fi
 
-    restore_log_msg "DEBUG" "Searching with flexible patterns for different backup naming schemes"
-    for pattern in "${patterns[@]}"; do
-        while IFS= read -r -d '' snapshot; do
-            local already_found=false
-            for existing in "${snapshots[@]}"; do
-                if [[ "$existing" == "$snapshot" ]]; then
-                    already_found=true
-                    break
-                fi
-            done
+        if [[ "$record_type" != "subvol" ]]; then
+            continue
+        fi
 
-            if [[ "$already_found" == false ]]; then
-                snapshots+=("$snapshot")
-            fi
-        done < <(find "$backup_path" -maxdepth 1 -type d -name "$pattern" -print0 2>/dev/null)
+        local bundle_name="$field2"
+        local subvol_name="$field3"
+        local subvol_path="$field4"
+        local size_bytes="$field5"
+        local marker_present="$field6"
+        local received_uuid="$field7"
+        local meta_has_error="$field8"
+        local meta_size_bytes="$field9"
+        local meta_size_human="$field10"
+
+        if [[ "$subvol_name" != "$subvolume" ]]; then
+            continue
+        fi
+
+        snapshots+=("$subvol_path")
+        snapshot_bundle["$subvol_path"]="$bundle_name"
+        snapshot_received["$subvol_path"]="${received_uuid,,}"
+        snapshot_meta_error["$subvol_path"]="$meta_has_error"
+        snapshot_meta_size_human["$subvol_path"]="$meta_size_human"
+        snapshot_size_bytes["$subvol_path"]="$size_bytes"
     done
-
-    if [[ ${#snapshots[@]} -gt 0 ]]; then
-        mapfile -t snapshots < <(
-            printf '%s\0' "${snapshots[@]}" \
-            | xargs -0 -r stat -c '%Y:%n' 2>/dev/null \
-            | sort -rn \
-            | cut -d':' -f2-
-        )
-    fi
 
     if [[ ${#snapshots[@]} -eq 0 ]]; then
         printf '%s\n' "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_NO_SNAPSHOTS_FOUND' "$subvolume")${LH_COLOR_RESET}" >&2
         return 1
     fi
 
-    restore_log_msg "DEBUG" "Validating ${#snapshots[@]} found snapshots"
-    for snapshot in "${snapshots[@]}"; do
-        if validate_restore_snapshot "$snapshot" "listing validation"; then
-            valid_snapshots+=("$snapshot")
-        else
-            restore_log_msg "WARN" "Skipping invalid snapshot: $(basename "$snapshot")"
-        fi
-    done
-
-    if [[ ${#valid_snapshots[@]} -eq 0 ]]; then
-        printf '%s\n' "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_NO_VALID_SNAPSHOTS_FOUND' "$subvolume")${LH_COLOR_RESET}" >&2
-        return 1
-    fi
-
     printf '%s\n' "${LH_COLOR_INFO}$(lh_msg 'RESTORE_AVAILABLE_SNAPSHOTS' "$subvolume"):${LH_COLOR_RESET}" >&2
 
-    for i in "${!valid_snapshots[@]}"; do
-        local snapshot="${valid_snapshots[i]}"
-        local snapshot_name
-        snapshot_name=$(basename "$snapshot")
-        local size_info=""
-        local date_info=""
+    for i in "${!snapshots[@]}"; do
+        local snapshot_path="${snapshots[i]}"
+        local bundle_name="${snapshot_bundle[$snapshot_path]}"
+        local size_info="${snapshot_meta_size_human[$snapshot_path]}"
         local status_info=""
+        local error_info=""
+        local date_info="${bundle_dates[$bundle_name]}"
 
-        if command -v du >/dev/null 2>&1; then
-            size_info=$(du -sh "$snapshot" 2>/dev/null | cut -f1)
-        fi
-
-        if [[ "$snapshot_name" =~ ([0-9]{4}-[0-9]{2}-[0-9]{2}) ]]; then
+        if [[ -z "$date_info" && "$bundle_name" =~ ([0-9]{4}-[0-9]{2}-[0-9]{2}) ]]; then
             date_info="${BASH_REMATCH[1]}"
+        elif [[ -n "$date_info" ]]; then
+            date_info="${date_info%% *}"
         fi
 
-        local received_uuid
-        received_uuid=$(btrfs subvolume show "$snapshot" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+        if [[ -z "$size_info" ]]; then
+            size_info=$(btrfs_restore_format_size "${snapshot_size_bytes[$snapshot_path]}")
+        fi
+
+        if [[ -z "$size_info" ]]; then
+            if command -v du >/dev/null 2>&1; then
+                size_info=$(du -sh "$snapshot_path" 2>/dev/null | cut -f1)
+            fi
+        fi
+
+        local received_uuid="${snapshot_received[$snapshot_path]}"
+        if [[ -z "$received_uuid" || "$received_uuid" == "-" ]]; then
+            btrfs_restore_refresh_subvol_identifiers "$snapshot_path"
+            received_uuid="${RESTORE_RECEIVED_UUID_CACHE[$snapshot_path]:-}"
+        fi
         if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
             status_info="[incremental]"
         else
             status_info="[full]"
         fi
 
-        printf '  %2d. %-40s' "$((i + 1))" "$snapshot_name" >&2
+        if [[ "${snapshot_meta_error[$snapshot_path]}" == "true" ]]; then
+            error_info=" ${LH_COLOR_ERROR}[ERROR]${LH_COLOR_RESET}"
+        fi
+
+        printf '  %2d. %-50s' "$((i + 1))" "$bundle_name" >&2
         [[ -n "$date_info" ]] && printf ' [%s]' "$date_info" >&2
         [[ -n "$status_info" ]] && printf ' %s' "$status_info" >&2
         [[ -n "$size_info" ]] && printf ' (%s)' "$size_info" >&2
+        [[ -n "$error_info" ]] && printf '%s' "$error_info" >&2
         printf '%s\n' '' >&2
     done
 
-    printf '%s\n' "${valid_snapshots[@]}"
+    printf '%s\n' "${snapshots[@]}"
 }
 
 # Select restore type and specific snapshot
@@ -1696,17 +1871,23 @@ select_restore_type_and_snapshot() {
             
             # Find matching snapshots by timestamp across all subvolumes
             local -a matching_sets=()
+            local -A seen_bundles  # Track bundles we've already added
             local first_subvol="${restore_subvols[0]}"
             read -ra first_snapshots <<< "${subvolume_snapshots[$first_subvol]}"
             
             for first_snap in "${first_snapshots[@]}"; do
-                local first_basename=$(basename "$first_snap")
-                # Extract timestamp from first snapshot name
-                local timestamp=""
-                if [[ "$first_basename" =~ ([0-9]{4}-[0-9]{2}-[0-9]{2}(_[0-9]{2}-[0-9]{2}-[0-9]{2})?) ]]; then
-                    timestamp="${BASH_REMATCH[1]}"
-                    
-                    # Try to find matching snapshots in all other subvolumes
+                # Extract bundle name (timestamp) from snapshot path
+                # New structure: /snapshots/<bundle_timestamp>/<subvolume>
+                local bundle_name=$(basename $(dirname "$first_snap"))
+                
+                # Skip if we've already processed this bundle
+                if [[ -n "${seen_bundles[$bundle_name]:-}" ]]; then
+                    continue
+                fi
+                
+                # Validate bundle name format
+                if btrfs_is_valid_bundle_name "$bundle_name"; then
+                    # Try to find matching snapshots in all other subvolumes within same bundle
                     local matching_set="$first_subvol:$first_snap"
                     local all_match=true
                     
@@ -1715,8 +1896,9 @@ select_restore_type_and_snapshot() {
                         local found_match=false
                         
                         for snap in "${subvol_snapshots[@]}"; do
-                            local snap_basename=$(basename "$snap")
-                            if [[ "$snap_basename" =~ $timestamp ]]; then
+                            local snap_bundle=$(basename $(dirname "$snap"))
+                            # Match by bundle timestamp
+                            if [[ "$snap_bundle" == "$bundle_name" ]]; then
                                 matching_set="$matching_set|$subvol:$snap"
                                 found_match=true
                                 break
@@ -1731,6 +1913,7 @@ select_restore_type_and_snapshot() {
                     
                     if [[ "$all_match" == true ]]; then
                         matching_sets+=("$matching_set")
+                        seen_bundles[$bundle_name]=1  # Mark this bundle as seen
                     fi
                 fi
             done
@@ -1744,12 +1927,13 @@ select_restore_type_and_snapshot() {
             for i in "${!matching_sets[@]}"; do
                 echo -n "  $((i+1)). "
                 IFS='|' read -ra subvol_snapshots <<< "${matching_sets[i]}"
-                local display_parts=()
-                for subvol_snap in "${subvol_snapshots[@]}"; do
-                    IFS=':' read -r subvol snap <<< "$subvol_snap"
-                    display_parts+=("$(basename "$snap")")
-                done
-                IFS='+' eval 'echo "${display_parts[*]}"'
+                # Get bundle name from first snapshot in the set
+                local first_snap="${subvol_snapshots[0]}"
+                IFS=':' read -r _ snap_path <<< "$first_snap"
+                local bundle_name=$(basename $(dirname "$snap_path"))
+                
+                # Display bundle name and subvolume count
+                echo "$bundle_name (${#subvol_snapshots[@]} subvolumes)"
             done
             
             local set_choice
@@ -1789,24 +1973,25 @@ select_restore_type_and_snapshot() {
                 
                 if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
                     restore_log_msg "DEBUG" "Validating $subvol incremental snapshot parent chain"
-                    
-                    local backup_base="${BACKUP_ROOT}${LH_BACKUP_DIR}/${subvol}"
+
+                    if [[ "${RESTORE_VERIFIED_RECEIVED_UUID[$snapshot_path]:-}" == "${received_uuid,,}" ]]; then
+                        restore_log_msg "DEBUG" "Parent chain already validated earlier for $subvol"
+                        continue
+                    fi
+
+                    local potential_parent
+                    potential_parent=$(btrfs_restore_find_subvol_path_by_uuid "$received_uuid" "$subvol") || potential_parent=""
                     local found_parent=false
-                    
-                    while IFS= read -r -d '' potential_parent; do
-                        if [[ -d "$potential_parent" ]]; then
-                            local parent_uuid
-                    parent_uuid=$($LH_SUDO_CMD btrfs subvolume show "$potential_parent" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
-                            
-                            if [[ "$parent_uuid" == "$received_uuid" ]]; then
-                                if validate_parent_snapshot_chain "$potential_parent" "$snapshot_path" "$snapshot_path"; then
-                                    restore_log_msg "DEBUG" "$subvol parent chain validation passed"
-                                    found_parent=true
-                                    break
-                                fi
-                            fi
+
+                    if [[ -n "$potential_parent" ]]; then
+                        if validate_parent_snapshot_chain "$potential_parent" "$snapshot_path" "$snapshot_path"; then
+                            restore_log_msg "DEBUG" "$subvol parent chain validation passed"
+                            RESTORE_VERIFIED_RECEIVED_UUID["$snapshot_path"]="${received_uuid,,}"
+                            found_parent=true
+                        else
+                            restore_log_msg "WARN" "Parent chain validation failed for: $(basename "$potential_parent")"
                         fi
-                    done < <(find "$backup_base" -maxdepth 1 -type d \( -name "${subvol}-20*" -o -name "${subvol}_20*" -o -name "*${subvol}*20*" \) -print0 2>/dev/null)
+                    fi
                     
                     if [[ "$found_parent" == "false" ]]; then
                         restore_log_msg "WARN" "Cannot validate parent chain for $subvol snapshot"
@@ -1825,8 +2010,45 @@ select_restore_type_and_snapshot() {
             echo -e "${LH_COLOR_WARNING}╔════════════════════════════════════════╗"
             echo -e "║     ${LH_COLOR_WHITE}COMPLETE SYSTEM RESTORE${LH_COLOR_WARNING}        ║"
             echo -e "╚════════════════════════════════════════╝${LH_COLOR_RESET}"
+            
+            # Get bundle name for display
+            local first_subvol="${restore_subvols[0]}"
+            local first_snapshot="${selected_snapshots[$first_subvol]}"
+            local bundle_name=$(basename $(dirname "$first_snapshot"))
+            local bundle_path=$(dirname "$first_snapshot")
+            
+            # Set global marker file path for bootloader configuration
+            restore_log_msg "DEBUG" "First snapshot path: $first_snapshot"
+            restore_log_msg "DEBUG" "Bundle path: $bundle_path"
+            restore_log_msg "DEBUG" "Bundle name (timestamp): $bundle_name"
+            
+            # Marker files are stored in backups/meta/ directory with timestamp as filename
+            # Extract BACKUP_ROOT properly by removing /snapshots/timestamp from bundle_path
+            local backups_base=$(dirname $(dirname "$bundle_path"))
+            RESTORE_MARKER_FILE="${backups_base}/meta/${bundle_name}.json"
+            restore_log_msg "DEBUG" "Looking for marker file at: $RESTORE_MARKER_FILE"
+            
+            if [[ ! -f "$RESTORE_MARKER_FILE" ]]; then
+                restore_log_msg "WARN" "Marker file not found at: $RESTORE_MARKER_FILE"
+                
+                # Try alternate location (old format in bundle directory)
+                local alt_marker="${bundle_path}/backup_marker.json"
+                restore_log_msg "DEBUG" "Trying alternate location: $alt_marker"
+                
+                if [[ -f "$alt_marker" ]]; then
+                    RESTORE_MARKER_FILE="$alt_marker"
+                    restore_log_msg "INFO" "Found marker file at alternate location: $RESTORE_MARKER_FILE"
+                else
+                    restore_log_msg "WARN" "Marker file not found at alternate location either"
+                    RESTORE_MARKER_FILE=""
+                fi
+            else
+                restore_log_msg "INFO" "Using marker file: $RESTORE_MARKER_FILE"
+            fi
+            
+            echo -e "${LH_COLOR_INFO}Backup bundle: ${LH_COLOR_RESET}$bundle_name"
             for subvol in "${restore_subvols[@]}"; do
-                echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_SUBVOLUME_SNAPSHOT' "$subvol"):${LH_COLOR_RESET} $(basename "${selected_snapshots[$subvol]}")"
+                echo -e "${LH_COLOR_INFO}  • $subvol${LH_COLOR_RESET}"
             done
             echo ""
             echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_COMPLETE_SYSTEM_WARNING')${LH_COLOR_RESET}"
@@ -1957,37 +2179,33 @@ select_restore_type_and_snapshot() {
             
             if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
                 restore_log_msg "DEBUG" "Validating incremental snapshot parent chain"
-                
-                # Look for source parent snapshot that matches this received_uuid
-                local backup_base="${BACKUP_ROOT}${LH_BACKUP_DIR}/${subvolume}"
                 local found_parent=false
-                
-                # Search for potential parent snapshots
-                while IFS= read -r -d '' potential_parent; do
-                    if [[ -d "$potential_parent" ]]; then
-                        local parent_uuid
-                        parent_uuid=$($LH_SUDO_CMD btrfs subvolume show "$potential_parent" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
-                        
-                        if [[ "$parent_uuid" == "$received_uuid" ]]; then
-                            restore_log_msg "DEBUG" "Found matching parent snapshot: $(basename "$potential_parent")"
-                            
-                            # Use library function to validate the complete chain
-                            if validate_parent_snapshot_chain "$potential_parent" "$selected_snapshot" "$selected_snapshot"; then
-                                restore_log_msg "DEBUG" "Parent chain validation passed"
-                                found_parent=true
-                                break
-                            else
-                                restore_log_msg "WARN" "Parent chain validation failed for: $(basename "$potential_parent")"
-                            fi
+
+                if [[ "${RESTORE_VERIFIED_RECEIVED_UUID[$selected_snapshot]:-}" == "${received_uuid,,}" ]]; then
+                    restore_log_msg "DEBUG" "Parent chain already validated for $selected_snapshot"
+                    found_parent=true
+                else
+                    local potential_parent
+                    potential_parent=$(btrfs_restore_find_subvol_path_by_uuid "$received_uuid" "$subvolume") || potential_parent=""
+
+                    if [[ -n "$potential_parent" ]]; then
+                        restore_log_msg "DEBUG" "Found matching parent snapshot: $(basename $(dirname "$potential_parent"))"
+
+                        if validate_parent_snapshot_chain "$potential_parent" "$selected_snapshot" "$selected_snapshot"; then
+                            restore_log_msg "DEBUG" "Parent chain validation passed"
+                            RESTORE_VERIFIED_RECEIVED_UUID["$selected_snapshot"]="${received_uuid,,}"
+                            found_parent=true
+                        else
+                            restore_log_msg "WARN" "Parent chain validation failed for: $(basename $(dirname "$potential_parent"))"
                         fi
                     fi
-                done < <(find "$backup_base" -maxdepth 1 -type d -name "${subvolume}-20*" -print0 2>/dev/null)
-                
+                fi
+
                 if [[ "$found_parent" == "false" ]]; then
                     restore_log_msg "WARN" "Cannot find valid parent snapshot for incremental restore"
                     echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_PARENT_CHAIN_INCOMPLETE')${LH_COLOR_RESET}"
                     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_INCREMENTAL_RESTORE_EXPLANATION')${LH_COLOR_RESET}"
-                    
+
                     if ! lh_confirm_action "$(lh_msg 'RESTORE_CONTINUE_WITHOUT_PARENT_VALIDATION')" "n"; then
                         restore_log_msg "INFO" "User aborted due to incomplete parent chain"
                         return 1
@@ -2032,8 +2250,20 @@ select_restore_type_and_snapshot() {
 # Detect current boot configuration to determine safe update strategy
 detect_boot_configuration() {
     local target_root="$1"
+    local marker_file="$2"  # Optional: path to backup marker JSON file
     
     restore_log_msg "INFO" "Analyzing current boot configuration for safe bootloader updates"
+    
+    # Validate target_root parameter
+    if [[ -z "$target_root" ]]; then
+        restore_log_msg "ERROR" "detect_boot_configuration called with empty target_root"
+        echo "ERROR: Target root path is empty - cannot analyze boot configuration"
+        DETECTED_BOOT_STRATEGY="default_subvol"
+        DETECTED_FSTAB_USES_SUBVOL="false"
+        DETECTED_GRUB_USES_SUBVOL="false"
+        DETECTED_CURRENT_DEFAULT=""
+        return 1
+    fi
     
     # Initialize detection results
     local boot_config_result=""
@@ -2042,13 +2272,92 @@ detect_boot_configuration() {
     local systemd_uses_subvol="false"
     local current_default_subvol=""
     local boot_strategy="unknown"
+    local using_marker_data="false"
+    local detection_method="filesystem"
     
-    # Check current default subvolume
-    current_default_subvol=$($LH_SUDO_CMD btrfs subvolume get-default "$target_root" 2>/dev/null | awk '{print $9}' || echo "")
-    restore_log_msg "DEBUG" "Current default subvolume: $current_default_subvol"
+    # METHOD 1: Try to extract boot configuration from marker file (PREFERRED)
+    if [[ -n "$marker_file" ]] && [[ -f "$marker_file" ]]; then
+        restore_log_msg "INFO" "Attempting to extract boot configuration from marker file: $marker_file"
+        restore_log_msg "DEBUG" "Marker file exists and is readable"
+        
+        if command -v jq >/dev/null 2>&1; then
+            restore_log_msg "DEBUG" "jq command is available for JSON parsing"
+            
+            # Extract filesystem_config from marker
+            local filesystem_config
+            filesystem_config=$(jq -r '.filesystem_config // ""' "$marker_file" 2>/dev/null)
+            
+            restore_log_msg "DEBUG" "filesystem_config length: ${#filesystem_config} characters"
+            
+            if [[ -n "$filesystem_config" ]]; then
+                restore_log_msg "DEBUG" "Found filesystem_config in marker file"
+                restore_log_msg "DEBUG" "First 200 chars: ${filesystem_config:0:200}"
+                
+                # Parse FSTAB entries from marker
+                local root_fstab_line
+                root_fstab_line=$(echo "$filesystem_config" | grep "^FSTAB_ENTRY=" | grep -E '\s+/\s+btrfs' | head -n1 | sed 's/^FSTAB_ENTRY=//')
+                
+                restore_log_msg "DEBUG" "root_fstab_line extracted: '$root_fstab_line'"
+                
+                if [[ -n "$root_fstab_line" ]]; then
+                    restore_log_msg "DEBUG" "Found root fstab entry from marker: $root_fstab_line"
+                    using_marker_data="true"
+                    detection_method="marker_file"
+                    
+                    if echo "$root_fstab_line" | grep -q "subvol="; then
+                        fstab_uses_subvol="true"
+                        boot_strategy="explicit_subvol"  # Set strategy immediately
+                        local subvol_option
+                        subvol_option=$(echo "$root_fstab_line" | sed -n 's/.*subvol=\([^,[:space:]]\+\).*/\1/p')
+                        restore_log_msg "INFO" "Marker file shows explicit subvol option: $subvol_option"
+                        restore_log_msg "DEBUG" "Boot strategy set to: $boot_strategy"
+                        boot_config_result+="SOURCE: Backup marker file (original system configuration)\n"
+                        boot_config_result+="FSTAB: explicit subvol=$subvol_option\n"
+                    else
+                        boot_strategy="default_subvol"  # Set strategy immediately
+                        restore_log_msg "DEBUG" "No subvol= found in fstab, boot strategy set to: $boot_strategy"
+                        boot_config_result+="SOURCE: Backup marker file (original system configuration)\n"
+                        boot_config_result+="FSTAB: uses default subvolume (no explicit subvol=)\n"
+                    fi
+                else
+                    restore_log_msg "DEBUG" "No root fstab entry found in marker, will try filesystem"
+                fi
+            else
+                restore_log_msg "DEBUG" "No filesystem_config found in marker (empty or missing), will try filesystem"
+            fi
+        else
+            restore_log_msg "WARN" "jq not available - cannot parse marker file"
+        fi
+    else
+        if [[ -n "$marker_file" ]]; then
+            restore_log_msg "DEBUG" "Marker file specified but not found: $marker_file"
+        else
+            restore_log_msg "DEBUG" "No marker file specified"
+        fi
+    fi
     
-    # Analysis 1: Check /etc/fstab for explicit subvol= options
-    local fstab_path="${target_root}/@/etc/fstab"
+    # Check current default subvolume (skip in dry-run if target doesn't exist)
+    if [[ -d "$target_root" ]]; then
+        current_default_subvol=$($LH_SUDO_CMD btrfs subvolume get-default "$target_root" 2>/dev/null | awk '{print $9}' || echo "")
+        restore_log_msg "DEBUG" "Current default subvolume: $current_default_subvol"
+    else
+        restore_log_msg "DEBUG" "Target root does not exist: $target_root (expected in dry-run mode)"
+        if [[ "$using_marker_data" == "false" ]]; then
+            boot_config_result+="DRY-RUN: Target filesystem not accessible\n"
+        fi
+    fi
+    
+    # METHOD 2: Analyze filesystem directly (fallback or supplementary)
+    # Only do filesystem analysis if we didn't get info from marker, or to verify marker data
+    if [[ "$using_marker_data" == "false" ]]; then
+        restore_log_msg "INFO" "Using filesystem analysis for boot configuration detection"
+        detection_method="filesystem"
+        boot_config_result+="SOURCE: Filesystem analysis (live detection)\n"
+    
+        # Analysis 1: Check /etc/fstab for explicit subvol= options
+        local fstab_path="${target_root}/@/etc/fstab"
+    
+    # Try to read from actual filesystem first
     if [[ -f "$fstab_path" ]]; then
         restore_log_msg "DEBUG" "Analyzing fstab: $fstab_path"
         
@@ -2071,8 +2380,59 @@ detect_boot_configuration() {
         else
             boot_config_result+="FSTAB: no BTRFS root entry found\n"
         fi
+    # If filesystem not accessible, try to read from backup marker JSON
+    elif [[ -n "$marker_file" ]] && [[ -f "$marker_file" ]]; then
+        restore_log_msg "INFO" "Reading fstab configuration from backup marker: $marker_file"
+        using_marker_data="true"
+        
+        if command -v jq >/dev/null 2>&1; then
+            # Extract filesystem_config from JSON - it's a shell-format string with newlines
+            local filesystem_config
+            filesystem_config=$(jq -r '.filesystem_config // ""' "$marker_file" 2>/dev/null)
+            
+            restore_log_msg "DEBUG" "Extracted filesystem_config length: ${#filesystem_config} bytes"
+            restore_log_msg "DEBUG" "First 200 chars of filesystem_config: ${filesystem_config:0:200}"
+            
+            # Look for FSTAB_ENTRY lines in the extracted config
+            local fstab_entries
+            fstab_entries=$(echo "$filesystem_config" | grep "^FSTAB_ENTRY=" || echo "")
+            
+            restore_log_msg "DEBUG" "Found $(echo "$fstab_entries" | wc -l) FSTAB_ENTRY lines"
+            
+            if [[ -n "$fstab_entries" ]]; then
+                restore_log_msg "DEBUG" "Found FSTAB entries in marker file"
+                
+                # Look for root mount (mounted at /)
+                local root_fstab_line
+                root_fstab_line=$(echo "$fstab_entries" | grep "FSTAB_ENTRY=" | grep -E '\s+/\s+btrfs' | head -n1)
+                
+                if [[ -n "$root_fstab_line" ]]; then
+                    # Remove the FSTAB_ENTRY= prefix
+                    root_fstab_line="${root_fstab_line#FSTAB_ENTRY=}"
+                    restore_log_msg "DEBUG" "Found root fstab entry from marker: $root_fstab_line"
+                    
+                    if echo "$root_fstab_line" | grep -q "subvol="; then
+                        fstab_uses_subvol="true"
+                        local subvol_option
+                        subvol_option=$(echo "$root_fstab_line" | sed -n 's/.*subvol=\([^,[:space:]]\+\).*/\1/p')
+                        restore_log_msg "INFO" "Marker data shows fstab uses explicit subvol: $subvol_option"
+                        boot_config_result+="FSTAB (from backup): explicit subvol=$subvol_option\n"
+                    else
+                        boot_config_result+="FSTAB (from backup): uses default subvolume (no explicit subvol=)\n"
+                    fi
+                else
+                    boot_config_result+="FSTAB (from backup): no BTRFS root entry found\n"
+                fi
+            else
+                restore_log_msg "WARN" "No FSTAB entries found in marker file"
+                boot_config_result+="FSTAB: not found in backup marker\n"
+            fi
+        else
+            restore_log_msg "WARN" "jq not available, cannot parse marker file"
+            boot_config_result+="FSTAB: cannot read from marker (jq not installed)\n"
+        fi
     else
-        restore_log_msg "WARN" "Cannot access fstab: $fstab_path"
+        restore_log_msg "WARN" "Cannot access fstab: $fstab_path and no marker file provided"
         boot_config_result+="FSTAB: not accessible\n"
     fi
     
@@ -2127,45 +2487,67 @@ detect_boot_configuration() {
         fi
     done
     
-    if [[ "$grub_found" == "true" ]] && [[ "$grub_uses_subvol" == "false" ]]; then
-        boot_config_result+="GRUB: uses default subvolume (no explicit subvol=)\n"
-    elif [[ "$grub_found" == "false" ]]; then
-        boot_config_result+="GRUB: configuration not accessible\n"
-    fi
-    
-    
-    # Analysis 3: Check systemd mount units (if present)
-    local systemd_mount_path="${target_root}/@/etc/systemd/system"
-    if [[ -d "$systemd_mount_path" ]]; then
-        if find "$systemd_mount_path" -name "*.mount" -exec grep -l "What=.*subvol=" {} \; 2>/dev/null | head -n1 | grep -q .; then
-            systemd_uses_subvol="true"
-            boot_config_result+="SYSTEMD: explicit subvol mount units found\n"
+        if [[ "$grub_found" == "true" ]] && [[ "$grub_uses_subvol" == "false" ]]; then
+            boot_config_result+="GRUB: uses default subvolume (no explicit subvol=)\n"
+        elif [[ "$grub_found" == "false" ]]; then
+            boot_config_result+="GRUB: configuration not accessible\n"
         fi
-    fi
+        
+        
+        # Analysis 3: Check systemd mount units (if present)
+        local systemd_mount_path="${target_root}/@/etc/systemd/system"
+        if [[ -d "$systemd_mount_path" ]]; then
+            if find "$systemd_mount_path" -name "*.mount" -exec grep -l "What=.*subvol=" {} \; 2>/dev/null | head -n1 | grep -q .; then
+                systemd_uses_subvol="true"
+                boot_config_result+="SYSTEMD: explicit subvol mount units found\n"
+            fi
+        fi
+    fi  # End of filesystem analysis block
     
     # Determine boot strategy based on analysis
-    if [[ "$fstab_uses_subvol" == "true" ]] || [[ "$grub_uses_subvol" == "true" ]] || [[ "$systemd_uses_subvol" == "true" ]]; then
-        boot_strategy="explicit_subvol"
-    elif [[ "$fstab_uses_subvol" == "false" ]] && [[ -f "$fstab_path" ]]; then
-        boot_strategy="default_subvol"
+    # Only determine strategy if not already set by marker file
+    if [[ "$using_marker_data" == "false" ]] || [[ -z "$boot_strategy" ]] || [[ "$boot_strategy" == "unknown" ]]; then
+        restore_log_msg "DEBUG" "Determining boot strategy from analysis (using_marker_data=$using_marker_data, current_strategy='$boot_strategy')"
+        
+        if [[ "$fstab_uses_subvol" == "true" ]] || [[ "$grub_uses_subvol" == "true" ]] || [[ "$systemd_uses_subvol" == "true" ]]; then
+            boot_strategy="explicit_subvol"
+        elif [[ "$fstab_uses_subvol" == "false" ]]; then
+            boot_strategy="default_subvol"
+        else
+            # CRITICAL: For unknown configs, assume default_subvol for safety
+            # This ensures set-default gets called rather than leaving system unbootable
+            boot_strategy="default_subvol"
+            boot_config_result+="SAFETY: Defaulting to 'default_subvol' strategy due to unclear configuration\n"
+            restore_log_msg "WARN" "Boot configuration unclear - defaulting to set-default strategy for safety"
+        fi
+        restore_log_msg "DEBUG" "Boot strategy determined from analysis: $boot_strategy"
     else
-        # CRITICAL: For unknown configs, assume default_subvol for safety
-        # This ensures set-default gets called rather than leaving system unbootable
-        boot_strategy="default_subvol"
-        boot_config_result+="SAFETY: Defaulting to 'default_subvol' strategy due to unclear configuration\n"
-        restore_log_msg "WARN" "Boot configuration unclear - defaulting to set-default strategy for safety"
+        restore_log_msg "DEBUG" "Boot strategy already set by marker file: $boot_strategy, skipping analysis-based determination"
     fi
+    
+    # Final safety check - ensure boot_strategy is never empty
+    if [[ -z "$boot_strategy" ]] || [[ "$boot_strategy" == "unknown" ]]; then
+        restore_log_msg "ERROR" "Boot strategy detection failed - forcing default_subvol as last resort"
+        boot_strategy="default_subvol"
+        boot_config_result+="ERROR: Strategy detection failed, forcing 'default_subvol' strategy\n"
+    fi
+    
+    # Add detection method info
+    boot_config_result+="DETECTION_METHOD: $detection_method\n"
     
     # Store results in global variables for use by other functions
     DETECTED_BOOT_STRATEGY="$boot_strategy"
     DETECTED_FSTAB_USES_SUBVOL="$fstab_uses_subvol"
     DETECTED_GRUB_USES_SUBVOL="$grub_uses_subvol"
     DETECTED_CURRENT_DEFAULT="$current_default_subvol"
+    DETECTED_BOOT_METHOD="$detection_method"
+    DETECTED_BOOT_CONFIG_RESULT="$boot_config_result"  # Store the full analysis result
     
-    restore_log_msg "INFO" "Boot configuration analysis completed"
+    restore_log_msg "INFO" "Boot configuration analysis completed via $detection_method"
     restore_log_msg "DEBUG" "Detected strategy: $boot_strategy"
+    restore_log_msg "DEBUG" "Global variable DETECTED_BOOT_STRATEGY set to: $DETECTED_BOOT_STRATEGY"
     
-    # Return the analysis results
+    # Also output to stdout for backward compatibility
     echo -e "$boot_config_result"
     return 0
 }
@@ -2228,18 +2610,114 @@ backup_bootloader_files() {
 choose_boot_strategy() {
     local target_root="$1"
     local restored_subvol_name="$2"  # e.g., "@"
+    local marker_file="${3:-$RESTORE_MARKER_FILE}"  # Optional: use provided or global
+    local force_method="${4:-}"  # Optional: "marker" or "filesystem" to skip prompt
     
     restore_log_msg "INFO" "Selecting boot configuration strategy based on detected configuration"
     
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_BOOT_STRATEGY_ANALYSIS'):${LH_COLOR_RESET}"
-    
-    # Display the detection results
-    local analysis_result
-    analysis_result=$(detect_boot_configuration "$target_root")
-    echo -e "$analysis_result"
-    
     echo ""
-    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_DETECTED_STRATEGY' "$DETECTED_BOOT_STRATEGY"):${LH_COLOR_RESET}"
+    
+    # Determine which detection method to use
+    local detection_method="$force_method"
+    local try_fallback="false"
+    
+    if [[ -z "$detection_method" ]]; then
+        # No method forced, let's decide based on availability
+        if [[ -n "$marker_file" ]] && [[ -f "$marker_file" ]]; then
+            echo -e "${LH_COLOR_INFO}Backup marker file available: $(basename "$marker_file")${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_SUCCESS}✓ Recommended: Use original system configuration from backup${LH_COLOR_RESET}"
+            echo ""
+            echo -e "${LH_COLOR_INFO}Detection method options:${LH_COLOR_RESET}"
+            echo -e "  1. ${LH_COLOR_SUCCESS}Marker file${LH_COLOR_RESET} - Use boot config from backup (recommended, most accurate)"
+            echo -e "  2. ${LH_COLOR_WARNING}Filesystem${LH_COLOR_RESET} - Detect from current filesystem (fallback)"
+            echo -e "  3. Auto - Try marker first, fallback to filesystem if needed"
+            echo ""
+            
+            local method_choice
+            method_choice=$(lh_ask_for_input "Select detection method [1-3]" "1")
+            
+            case "$method_choice" in
+                1)
+                    detection_method="marker"
+                    ;;
+                2)
+                    detection_method="filesystem"
+                    ;;
+                3|*)
+                    detection_method="marker"
+                    try_fallback="true"
+                    ;;
+            esac
+        else
+            restore_log_msg "WARN" "No marker file available, using filesystem detection"
+            echo -e "${LH_COLOR_WARNING}Note: Backup marker file not available${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}Using filesystem detection method${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}(Marker provides more accurate detection from original system config)${LH_COLOR_RESET}"
+            echo ""
+            detection_method="filesystem"
+        fi
+    fi
+    
+    # Attempt detection with chosen method
+    local detection_exit_code
+    
+    if [[ "$detection_method" == "marker" ]]; then
+        restore_log_msg "INFO" "Attempting boot detection using marker file"
+        # Call function directly WITHOUT redirection to preserve global variables
+        # The function sets DETECTED_BOOT_STRATEGY and other globals directly
+        detect_boot_configuration "$target_root" "$marker_file"
+        detection_exit_code=$?
+        
+        restore_log_msg "DEBUG" "After marker detection: exit=$detection_exit_code, strategy='$DETECTED_BOOT_STRATEGY'"
+        
+        # Check if marker method failed or produced unclear results
+        if [[ $detection_exit_code -ne 0 ]] || [[ -z "$DETECTED_BOOT_STRATEGY" ]] || [[ "$DETECTED_BOOT_STRATEGY" == "unknown" ]]; then
+            restore_log_msg "WARN" "Marker-based detection failed or unclear (exit: $detection_exit_code, strategy: '$DETECTED_BOOT_STRATEGY')"
+            
+            if [[ "$try_fallback" == "true" ]] || [[ -z "$force_method" ]]; then
+                echo ""
+                echo -e "${LH_COLOR_WARNING}⚠ Marker file detection was unsuccessful${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}Would you like to try filesystem detection instead?${LH_COLOR_RESET}"
+                echo ""
+                
+                if lh_confirm_action "Try filesystem detection method?" "y"; then
+                    restore_log_msg "INFO" "User chose to try filesystem detection"
+                    detection_method="filesystem"
+                    detect_boot_configuration "$target_root" ""
+                    detection_exit_code=$?
+                    restore_log_msg "DEBUG" "After filesystem detection: exit=$detection_exit_code, strategy='$DETECTED_BOOT_STRATEGY'"
+                else
+                    restore_log_msg "INFO" "User declined filesystem detection fallback"
+                fi
+            fi
+        fi
+    else
+        restore_log_msg "INFO" "Using filesystem detection method"
+        detect_boot_configuration "$target_root" ""
+        detection_exit_code=$?
+        restore_log_msg "DEBUG" "After filesystem detection: exit=$detection_exit_code, strategy='$DETECTED_BOOT_STRATEGY'"
+    fi
+    
+    # Get the analysis result from the function's global output variable
+    local analysis_result=""
+    if [[ -n "$DETECTED_BOOT_CONFIG_RESULT" ]]; then
+        analysis_result="$DETECTED_BOOT_CONFIG_RESULT"
+    fi
+    
+    echo -e "$analysis_result"
+    echo ""
+    
+    # Verify detection succeeded and strategy was set
+    if [[ $detection_exit_code -ne 0 ]] || [[ -z "$DETECTED_BOOT_STRATEGY" ]]; then
+        restore_log_msg "WARN" "Boot detection returned error or empty strategy (exit code: $detection_exit_code)"
+        if [[ -z "$DETECTED_BOOT_STRATEGY" ]]; then
+            restore_log_msg "WARN" "Forcing default_subvol strategy as safety fallback"
+            DETECTED_BOOT_STRATEGY="default_subvol"
+        fi
+    fi
+    
+    echo -e "${LH_COLOR_INFO}Detected boot strategy: ${LH_COLOR_YELLOW}$DETECTED_BOOT_STRATEGY${LH_COLOR_RESET}"
     
     case "$DETECTED_BOOT_STRATEGY" in
         "explicit_subvol")
@@ -2262,28 +2740,27 @@ choose_boot_strategy() {
             fi
             ;;
         "default_subvol")
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_STRATEGY_DEFAULT_DETECTED')${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_STRATEGY_DEFAULT_EXPLANATION')${LH_COLOR_RESET}"
-            echo ""
-            
-            if lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_UPDATE_DEFAULT_SUBVOL')" "y"; then
-                execute_default_subvol_strategy "$target_root" "$restored_subvol_name"
-                return $?
-            else
-                restore_log_msg "INFO" "User chose to skip default subvolume update"
-                return 0
-            fi
-            ;;
-        "default_subvol")
-            # This now includes the safety case where config was unclear
-            if [[ "$DETECTED_BOOT_STRATEGY" == "default_subvol" ]] && echo "$analysis_result" | grep -q "SAFETY:"; then
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_STRATEGY_SAFETY_DEFAULT')${LH_COLOR_RESET}"
-                echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_STRATEGY_SAFETY_EXPLANATION')${LH_COLOR_RESET}"
+            # This includes both normal default_subvol configs and safety fallback
+            if echo "$analysis_result" | grep -q "SAFETY:"; then
+                echo -e "${LH_COLOR_WARNING}Safety fallback: Using default subvolume strategy${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}Boot configuration unclear - using safest option${LH_COLOR_RESET}"
             else
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_STRATEGY_DEFAULT_DETECTED')${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_STRATEGY_DEFAULT_EXPLANATION')${LH_COLOR_RESET}"
             fi
             echo ""
+            
+            # Show what will happen
+            if [[ "$DRY_RUN" == "true" ]]; then
+                echo -e "${LH_COLOR_CYAN}In an actual restore, this would:${LH_COLOR_RESET}"
+                echo -e "  1. Backup your current bootloader configuration"
+                echo -e "  2. Set the BTRFS default subvolume to the restored '$restored_subvol_name'"
+                echo -e "  3. Verify the change was successful"
+                echo -e "  4. Allow you to inspect before rebooting"
+                echo ""
+                echo -e "${LH_COLOR_INFO}(Answer 'Y' to see detailed simulation of what would happen)${LH_COLOR_RESET}"
+                echo ""
+            fi
             
             if lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_UPDATE_DEFAULT_SUBVOL')" "y"; then
                 execute_default_subvol_strategy "$target_root" "$restored_subvol_name"
@@ -2294,8 +2771,16 @@ choose_boot_strategy() {
                 return 0
             fi
             ;;
+        "")
+            # Empty strategy - likely due to detection failure
+            restore_log_msg "ERROR" "Boot strategy detection failed - no strategy could be determined"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_BOOTLOADER_DETECTION_FAILED')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_MANUAL_BOOTLOADER_REQUIRED')${LH_COLOR_RESET}"
+            return 1
+            ;;
         *)
-            restore_log_msg "ERROR" "Unknown boot strategy detected: $DETECTED_BOOT_STRATEGY"
+            restore_log_msg "ERROR" "Unknown boot strategy detected: '$DETECTED_BOOT_STRATEGY'"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_UNKNOWN_BOOT_STRATEGY' "$DETECTED_BOOT_STRATEGY")${LH_COLOR_RESET}"
             return 1
             ;;
     esac
@@ -2308,8 +2793,34 @@ execute_explicit_subvol_strategy() {
     
     restore_log_msg "INFO" "Executing explicit subvolume strategy (safest)"
     
-    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_EXPLICIT_STRATEGY_INFO')${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_EXPLICIT_STRATEGY_DETAILS')${LH_COLOR_RESET}"
+    echo ""
+    echo -e "${LH_COLOR_SUCCESS}✓ Explicit Subvolume Strategy (SAFEST)${LH_COLOR_RESET}"
+    echo ""
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo -e "${LH_COLOR_CYAN}═══════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_CYAN}             DRY-RUN: Explicit Subvolume Strategy${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_CYAN}═══════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
+        echo ""
+        echo -e "${LH_COLOR_INFO}📋 What this means:${LH_COLOR_RESET}"
+        echo -e "   Your system uses explicit subvolume references in the bootloader."
+        echo -e "   Example: 'rootflags=subvol=$restored_subvol_name' or 'subvol=$restored_subvol_name' in fstab"
+        echo ""
+        echo -e "${LH_COLOR_SUCCESS}✓ No bootloader changes needed!${LH_COLOR_RESET}"
+        echo -e "   The restored data is already in the correct location ($restored_subvol_name)"
+        echo -e "   Your bootloader configuration already points to this subvolume by name"
+        echo ""
+        echo -e "${LH_COLOR_INFO}What would happen in actual restore:${LH_COLOR_RESET}"
+        echo -e "   • System boots normally using existing bootloader config"
+        echo -e "   • Bootloader looks for subvolume named '$restored_subvol_name'"
+        echo -e "   • Finds the restored data and boots successfully"
+        echo ""
+        echo -e "${LH_COLOR_CYAN}═══════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
+        echo ""
+    else
+        echo -e "${LH_COLOR_INFO}Your system uses explicit subvolume references.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}No bootloader changes needed - configuration is already correct.${LH_COLOR_RESET}"
+    fi
     
     # For explicit subvol strategy, we typically don't need to change anything
     # because the bootloader already knows to look for the specific subvolume name
@@ -2318,7 +2829,7 @@ execute_explicit_subvol_strategy() {
     restore_log_msg "INFO" "Explicit subvolume strategy: No changes needed to boot configuration"
     restore_log_msg "INFO" "Bootloader will continue using explicit subvol=$restored_subvol_name references"
     
-    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_EXPLICIT_STRATEGY_COMPLETE')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SUCCESS}✓ Bootloader configuration complete${LH_COLOR_RESET}"
     return 0
 }
 
@@ -2330,6 +2841,59 @@ execute_default_subvol_strategy() {
     restore_log_msg "INFO" "Executing default subvolume strategy"
     
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_DEFAULT_STRATEGY_INFO')${LH_COLOR_RESET}"
+    
+    # In dry-run mode or when target doesn't exist, provide detailed simulation
+    if [[ "$DRY_RUN" == "true" ]] || [[ ! -d "$target_root" ]]; then
+        echo ""
+        echo -e "${LH_COLOR_CYAN}═══════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_CYAN}             DRY-RUN: Bootloader Configuration Simulation${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_CYAN}═══════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
+        restore_log_msg "INFO" "DRY-RUN: Simulating default subvolume strategy"
+        
+        echo ""
+        echo -e "${LH_COLOR_INFO}📋 What would happen in ACTUAL restore:${LH_COLOR_RESET}"
+        echo ""
+        echo -e "${LH_COLOR_WARNING}Step 1: Backup existing bootloader configuration${LH_COLOR_RESET}"
+        echo -e "   • Create timestamped backup of /etc/fstab"
+        echo -e "   • Create backup of /boot/grub/grub.cfg (if exists)"
+        echo -e "   • Backup stored at: <file>_pre_restore_YYYYMMDD_HHMMSS"
+        echo ""
+        
+        echo -e "${LH_COLOR_WARNING}Step 2: Query BTRFS filesystem${LH_COLOR_RESET}"
+        echo -e "   • Command: btrfs subvolume list $target_root"
+        echo -e "   • Find subvolume named: '$restored_subvol_name'"
+        echo -e "   • Extract subvolume ID (e.g., 256, 257, etc.)"
+        echo ""
+        
+        echo -e "${LH_COLOR_WARNING}Step 3: Update default subvolume${LH_COLOR_RESET}"
+        echo -e "   • Command: btrfs subvolume set-default <ID> $target_root"
+        echo -e "   • This tells BTRFS which subvolume to mount by default"
+        echo -e "   • The bootloader (GRUB) will use this default if no explicit subvol= is specified"
+        echo ""
+        
+        echo -e "${LH_COLOR_WARNING}Step 4: Verify the change${LH_COLOR_RESET}"
+        echo -e "   • Command: btrfs subvolume get-default $target_root"
+        echo -e "   • Confirm it returns: '$restored_subvol_name'"
+        echo ""
+        
+        echo -e "${LH_COLOR_INFO}🔧 Why this is needed:${LH_COLOR_RESET}"
+        echo -e "   • Your system appears to use BTRFS default subvolume mounting"
+        echo -e "   • No explicit 'subvol=$restored_subvol_name' was found in fstab/GRUB"
+        echo -e "   • Without updating the default, the system would boot the OLD subvolume"
+        echo ""
+        
+        echo -e "${LH_COLOR_INFO}✓ After this operation:${LH_COLOR_RESET}"
+        echo -e "   • System will boot into the restored '$restored_subvol_name' subvolume"
+        echo -e "   • Old subvolume remains intact (can be used for rollback)"
+        echo -e "   • No manual GRUB configuration changes needed"
+        echo ""
+        
+        echo -e "${LH_COLOR_SUCCESS}✓ DRY-RUN: Bootloader strategy simulation complete${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_CYAN}═══════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
+        echo ""
+        
+        return 0
+    fi
     
     # Create backups before making changes
     if ! backup_bootloader_files "$target_root"; then
@@ -2572,6 +3136,212 @@ handle_bootloader_configuration() {
     echo ""
     
     create_manual_checkpoint "$(lh_msg 'RESTORE_CHECKPOINT_BOOTLOADER')"
+}
+
+# Post-restore verification and bootloader helper (interactive guide)
+post_restore_verification() {
+    lh_print_header "$(lh_msg 'RESTORE_POST_VERIFICATION_TITLE')"
+    
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_POST_VERIFICATION_INTRO')${LH_COLOR_RESET}"
+    echo ""
+    
+    # Check if we have the necessary global variables set
+    if [[ -z "$TARGET_ROOT" ]]; then
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_TARGET_NOT_SET')${LH_COLOR_RESET}"
+        echo ""
+        
+        local target_input
+        target_input=$(lh_ask_for_input "$(lh_msg 'RESTORE_ENTER_TARGET_ROOT')")
+        
+        if [[ -z "$target_input" ]] || [[ ! -d "$target_input" ]]; then
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_INVALID_TARGET')${LH_COLOR_RESET}"
+            return 1
+        fi
+        
+        TARGET_ROOT="$target_input"
+    fi
+    
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_TARGET_ROOT'): ${LH_COLOR_RESET}$TARGET_ROOT"
+    echo ""
+    
+    # Step 1: Check if restoring to different hardware
+    echo -e "${LH_COLOR_HEADER}$(lh_msg 'RESTORE_STEP') 1/4: $(lh_msg 'RESTORE_CHECK_HARDWARE')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_HARDWARE_CHECK_INFO')${LH_COLOR_RESET}"
+    echo ""
+    
+    if ! lh_confirm_action "$(lh_msg 'RESTORE_DIFFERENT_HARDWARE_Q')" "n"; then
+        echo -e "${LH_COLOR_SUCCESS}✓ $(lh_msg 'RESTORE_SAME_HARDWARE')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_NO_MANUAL_STEPS')${LH_COLOR_RESET}"
+        return 0
+    fi
+    
+    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_DIFFERENT_HARDWARE_DETECTED')${LH_COLOR_RESET}"
+    echo ""
+    
+    # Step 2: Verify and update fstab UUIDs
+    echo -e "${LH_COLOR_HEADER}$(lh_msg 'RESTORE_STEP') 2/4: $(lh_msg 'RESTORE_VERIFY_FSTAB')${LH_COLOR_RESET}"
+    
+    local fstab_path="${TARGET_ROOT}/@/etc/fstab"
+    if [[ ! -f "$fstab_path" ]]; then
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_FSTAB_NOT_FOUND' "$fstab_path")${LH_COLOR_RESET}"
+    else
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_SHOWING_CURRENT_UUIDS')${LH_COLOR_RESET}"
+        echo ""
+        
+        # Show current system UUIDs
+        echo -e "${LH_COLOR_CYAN}$(lh_msg 'RESTORE_CURRENT_DISK_UUIDS'):${LH_COLOR_RESET}"
+        $LH_SUDO_CMD blkid | grep -E "(btrfs|ext4|vfat|swap)" | sed 's/^/  /'
+        echo ""
+        
+        # Show fstab content
+        echo -e "${LH_COLOR_CYAN}$(lh_msg 'RESTORE_CURRENT_FSTAB'):${LH_COLOR_RESET}"
+        grep -v '^#' "$fstab_path" | grep -v '^$' | sed 's/^/  /'
+        echo ""
+        
+        if lh_confirm_action "$(lh_msg 'RESTORE_EDIT_FSTAB_Q')" "y"; then
+            # Offer to open in editor
+            local editor="${EDITOR:-nano}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_OPENING_EDITOR' "$editor")${LH_COLOR_RESET}"
+            $LH_SUDO_CMD $editor "$fstab_path"
+            echo -e "${LH_COLOR_SUCCESS}✓ $(lh_msg 'RESTORE_FSTAB_UPDATED')${LH_COLOR_RESET}"
+        else
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_FSTAB_SKIPPED')${LH_COLOR_RESET}"
+        fi
+    fi
+    echo ""
+    
+    # Step 3: Update GRUB configuration
+    echo -e "${LH_COLOR_HEADER}$(lh_msg 'RESTORE_STEP') 3/4: $(lh_msg 'RESTORE_UPDATE_GRUB_CONFIG')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_GRUB_UPDATE_INFO')${LH_COLOR_RESET}"
+    echo ""
+    
+    if lh_confirm_action "$(lh_msg 'RESTORE_UPDATE_GRUB_NOW_Q')" "y"; then
+        # Check if we can chroot (requires proper mount setup)
+        if mountpoint -q "${TARGET_ROOT}/@/dev" && mountpoint -q "${TARGET_ROOT}/@/proc"; then
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_UPDATING_GRUB')${LH_COLOR_RESET}"
+            
+            # Update GRUB in chroot
+            if $LH_SUDO_CMD chroot "${TARGET_ROOT}/@" grub-mkconfig -o /boot/grub/grub.cfg 2>&1; then
+                echo -e "${LH_COLOR_SUCCESS}✓ $(lh_msg 'RESTORE_GRUB_UPDATED')${LH_COLOR_RESET}"
+            else
+                echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_GRUB_UPDATE_FAILED')${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_MANUAL_GRUB_CMD')${LH_COLOR_RESET}"
+                echo -e "  ${LH_COLOR_CYAN}chroot ${TARGET_ROOT}/@ grub-mkconfig -o /boot/grub/grub.cfg${LH_COLOR_RESET}"
+            fi
+        else
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_MOUNT_NOT_READY')${LH_COLOR_RESET}"
+            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_MANUAL_MOUNT_GRUB')${LH_COLOR_RESET}"
+            echo -e "  ${LH_COLOR_CYAN}mount --bind /dev ${TARGET_ROOT}/@/dev${LH_COLOR_RESET}"
+            echo -e "  ${LH_COLOR_CYAN}mount --bind /proc ${TARGET_ROOT}/@/proc${LH_COLOR_RESET}"
+            echo -e "  ${LH_COLOR_CYAN}mount --bind /sys ${TARGET_ROOT}/@/sys${LH_COLOR_RESET}"
+            echo -e "  ${LH_COLOR_CYAN}chroot ${TARGET_ROOT}/@ grub-mkconfig -o /boot/grub/grub.cfg${LH_COLOR_RESET}"
+        fi
+    else
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_GRUB_UPDATE_SKIPPED')${LH_COLOR_RESET}"
+    fi
+    echo ""
+    
+    # Step 4: Bootloader configuration
+    echo -e "${LH_COLOR_HEADER}$(lh_msg 'RESTORE_STEP') 4/4: $(lh_msg 'RESTORE_BOOTLOADER_CONFIG')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_BOOTLOADER_CONFIG_INFO')${LH_COLOR_RESET}"
+    echo ""
+    
+    if lh_confirm_action "$(lh_msg 'RESTORE_RUN_BOOTLOADER_CONFIG_Q')" "y"; then
+        # Call the existing bootloader configuration function
+        local root_subvol="@"
+        if choose_boot_strategy "$TARGET_ROOT" "$root_subvol" "$RESTORE_MARKER_FILE" ""; then
+            echo -e "${LH_COLOR_SUCCESS}✓ $(lh_msg 'RESTORE_BOOTLOADER_CONFIGURED')${LH_COLOR_RESET}"
+        else
+            echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_BOOTLOADER_CONFIG_INCOMPLETE')${LH_COLOR_RESET}"
+        fi
+    else
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_BOOTLOADER_CONFIG_SKIPPED')${LH_COLOR_RESET}"
+    fi
+    echo ""
+    
+    # Summary and next steps
+    echo -e "${LH_COLOR_SUCCESS}╔════════════════════════════════════════════════════╗${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SUCCESS}║  ${LH_COLOR_WHITE}$(lh_msg 'RESTORE_VERIFICATION_COMPLETE')${LH_COLOR_SUCCESS}                    ║${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SUCCESS}╚════════════════════════════════════════════════════╝${LH_COLOR_RESET}"
+    echo ""
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_NEXT_STEPS'):${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_CYAN}1. $(lh_msg 'RESTORE_NEXT_UNMOUNT')${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_CYAN}2. $(lh_msg 'RESTORE_NEXT_REBOOT')${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_CYAN}3. $(lh_msg 'RESTORE_NEXT_TEST')${LH_COLOR_RESET}"
+    echo ""
+    
+    return 0
+}
+
+# Retry bootloader configuration (can be called from menu after restore)
+retry_bootloader_configuration() {
+    lh_print_header "Retry Bootloader Configuration"
+    
+    echo -e "${LH_COLOR_INFO}This function allows you to retry bootloader configuration${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_INFO}if it failed or needs to be adjusted after the restore.${LH_COLOR_RESET}"
+    echo ""
+    
+    # Check if we have the necessary global variables set
+    if [[ -z "$TARGET_ROOT" ]]; then
+        echo -e "${LH_COLOR_WARNING}Target root not set. You may need to run this from within a restore operation.${LH_COLOR_RESET}"
+        echo ""
+        
+        local target_input
+        target_input=$(lh_ask_for_input "Enter target root path (e.g., /mnt)")
+        
+        if [[ -z "$target_input" ]] || [[ ! -d "$target_input" ]]; then
+            echo -e "${LH_COLOR_ERROR}Invalid target root path${LH_COLOR_RESET}"
+            return 1
+        fi
+        
+        TARGET_ROOT="$target_input"
+    fi
+    
+    echo -e "${LH_COLOR_INFO}Target root: ${LH_COLOR_RESET}$TARGET_ROOT"
+    
+    # Determine root subvolume
+    local root_subvol="@"
+    echo -e "${LH_COLOR_INFO}Root subvolume: ${LH_COLOR_RESET}$root_subvol"
+    echo ""
+    
+    # Ask which detection method to use
+    echo -e "${LH_COLOR_INFO}Select detection method:${LH_COLOR_RESET}"
+    echo -e "  1. Auto - Try marker file first, fallback to filesystem"
+    echo -e "  2. Marker file only - Use backup marker configuration"
+    echo -e "  3. Filesystem only - Detect from current filesystem"
+    echo ""
+    
+    local method_choice
+    method_choice=$(lh_ask_for_input "Select method [1-3]" "1")
+    
+    local force_method=""
+    case "$method_choice" in
+        2)
+            force_method="marker"
+            ;;
+        3)
+            force_method="filesystem"
+            ;;
+        *)
+            force_method=""  # Auto
+            ;;
+    esac
+    
+    echo ""
+    echo -e "${LH_COLOR_WARNING}╔════════════════════════════════════════╗"
+    echo -e "║  ${LH_COLOR_WHITE}RETRY BOOTLOADER CONFIGURATION${LH_COLOR_WARNING}     ║"
+    echo -e "╚════════════════════════════════════════╝${LH_COLOR_RESET}"
+    echo ""
+    
+    # Execute boot strategy selection with chosen method
+    if choose_boot_strategy "$TARGET_ROOT" "$root_subvol" "$RESTORE_MARKER_FILE" "$force_method"; then
+        echo -e "${LH_COLOR_SUCCESS}✓ Bootloader configuration completed successfully${LH_COLOR_RESET}"
+        return 0
+    else
+        echo -e "${LH_COLOR_WARNING}⚠ Bootloader configuration incomplete or failed${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}You may need to configure the bootloader manually${LH_COLOR_RESET}"
+        return 1
+    fi
 }
 
 # Restore individual folders from snapshots
@@ -2882,6 +3652,8 @@ show_restore_menu() {
         lh_print_menu_item 4 "$(lh_msg 'RESTORE_MENU_DISK_INFO')"
         lh_print_menu_item 5 "$(lh_msg 'RESTORE_MENU_SAFETY_CHECK')"
         lh_print_menu_item 6 "$(lh_msg 'RESTORE_MENU_CLEANUP')"
+        lh_print_menu_item 7 "$(lh_msg 'RESTORE_MENU_RETRY_BOOTLOADER')"
+        lh_print_menu_item 8 "$(lh_msg 'RESTORE_MENU_POST_VERIFICATION')"
         lh_print_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
         echo ""
 
@@ -2938,6 +3710,16 @@ show_restore_menu() {
                 else
                     echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_SETUP_REQUIRED')${LH_COLOR_RESET}"
                 fi
+                ;;
+            7)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'RESTORE_MENU_RETRY_BOOTLOADER')")"
+                retry_bootloader_configuration
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
+                ;;
+            8)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'RESTORE_MENU_POST_VERIFICATION')")"
+                post_restore_verification
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             0)
                 return 0

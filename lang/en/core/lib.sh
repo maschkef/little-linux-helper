@@ -69,6 +69,12 @@ MSG_EN[LIB_SUDO_REEXECUTE]="Re-executing script with sudo privileges"
 MSG_EN[LIB_SUDO_DENIED_ELEVATION]="User denied sudo elevation"
 MSG_EN[LIB_SUDO_GUI_MODE_INDIVIDUAL]="GUI mode: Using individual command elevation instead of script re-execution"
 
+# Ownership fix messages
+MSG_EN[LIB_FIX_OWNERSHIP_NO_PATH]="lh_fix_ownership: No path provided"
+MSG_EN[LIB_FIX_OWNERSHIP_SUCCESS]="Fixed ownership of %s for user %s"
+MSG_EN[LIB_FIX_OWNERSHIP_FAILED]="Could not fix ownership for: %s"
+MSG_EN[LIB_FIX_OWNERSHIP_NO_UID]="Could not determine UID/GID for user: %s"
+
 # ...existing messages...
 
 # General warnings

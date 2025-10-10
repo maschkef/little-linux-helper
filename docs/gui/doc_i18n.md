@@ -459,25 +459,6 @@ echo "$(lh_msg 'WELCOME_MESSAGE')"  # Uses LH_LANG from GUI
 
 ## Translation Management
 
-### Recent Updates (v0.3.0-beta)
-
-**Enhanced Documentation & UI Translation Keys:**
-
-*Added to `panels` section:*
-- `hideDeveloperDocs` / `showDeveloperDocs` - Clearer labeling for module-specific documentation
-- `comprehensiveDocumentation` - Descriptive label for full project documentation browser
-- `developerDocsTooltip` - Tooltip explaining module-specific documentation
-- `comprehensiveDocsTooltip` - Tooltip explaining comprehensive documentation browser
-
-*Added to `session` section:*
-- `activeModule` - Label for currently running session's module
-- `selectedModule` - Label for user-selected module
-- `showingDocsFor` - Generic label for documentation source indication
-- `fromActiveSession` - Status indicator for session-based documentation
-- `fromSelectedModule` - Status indicator for user-selected documentation
-
-These additions support the enhanced documentation system with intelligent source tracking and improved user feedback.
-
 ### Adding New Translation Keys
 
 **Step-by-Step Process:**

@@ -69,6 +69,12 @@ MSG_DE[LIB_SUDO_REEXECUTE]="Führe Skript mit sudo-Berechtigungen neu aus"
 MSG_DE[LIB_SUDO_DENIED_ELEVATION]="Benutzer verweigerte sudo-Erhöhung"
 MSG_DE[LIB_SUDO_GUI_MODE_INDIVIDUAL]="GUI-Modus: Verwende individuelle Befehls-Erhöhung anstatt Skript-Neuausführung"
 
+# Ownership fix messages
+MSG_DE[LIB_FIX_OWNERSHIP_NO_PATH]="lh_fix_ownership: Kein Pfad angegeben"
+MSG_DE[LIB_FIX_OWNERSHIP_SUCCESS]="Besitzrechte von %s für Benutzer %s korrigiert"
+MSG_DE[LIB_FIX_OWNERSHIP_FAILED]="Konnte Besitzrechte nicht korrigieren für: %s"
+MSG_DE[LIB_FIX_OWNERSHIP_NO_UID]="Konnte UID/GID für Benutzer nicht ermitteln: %s"
+
 # ...existing messages...
 
 # General warnings

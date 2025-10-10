@@ -24,6 +24,8 @@ function lh_initialize_logging() {
             LH_LOG_FILE=""
             return 1
         }
+        # Fix ownership when running with sudo
+        lh_fix_ownership "$LH_LOG_DIR"
     fi
 
     # Check if the log folder exists, if not, create it
@@ -39,6 +41,8 @@ function lh_initialize_logging() {
                 LH_LOG_FILE=""
                 return 1
             }
+            # Fix ownership when running with sudo
+            lh_fix_ownership "$LH_LOG_DIR"
         fi
 
         LH_LOG_FILE="$LH_LOG_DIR/$(date '+%y%m%d-%H%M')_maintenance_script.log"
@@ -50,6 +54,8 @@ function lh_initialize_logging() {
             LH_LOG_FILE="" 
             return 1
         fi
+        # Fix ownership when running with sudo
+        lh_fix_ownership "$LH_LOG_FILE"
         # Use English fallback before translation system is loaded
         local msg="${MSG[LIB_LOG_INITIALIZED]:-Logging initialized. Log file: %s}"
         lh_log_msg "INFO" "$(printf "$msg" "$LH_LOG_FILE")"

@@ -385,7 +385,13 @@ MSG_EN[BACKUP_CONFIG_BACKUP_ROOT]="Backup target (LH_BACKUP_ROOT):"
 MSG_EN[BACKUP_CONFIG_BACKUP_DIR]="Backup directory (LH_BACKUP_DIR):"
 MSG_EN[BACKUP_CONFIG_TEMP_SNAPSHOT_DIR]="Temporary snapshots (LH_TEMP_SNAPSHOT_DIR):"
 MSG_EN[BACKUP_CONFIG_RETENTION]="Retention (LH_RETENTION_BACKUP):"
+MSG_EN[BACKUP_CONFIG_SOURCE_RETENTION]="Source snapshot retention (LH_SOURCE_SNAPSHOT_RETENTION):"
 MSG_EN[BACKUP_CONFIG_LOGFILE]="Log file (LH_BACKUP_LOG):"
+
+# Source snapshot retention configuration
+MSG_EN[BACKUP_SOURCE_RETENTION_TITLE]="Source Snapshot Retention"
+MSG_EN[BACKUP_ENTER_SOURCE_RETENTION]="Enter number of source snapshots to preserve per subvolume:"
+MSG_EN[BACKUP_NEW_SOURCE_RETENTION]="Updated source snapshot retention:"
 
 # BTRFS Path Validation Messages
 MSG_EN[BACKUP_TARGET_SET_CREATED]="Backup target set to '%s' for this session (newly created)."
@@ -628,6 +634,15 @@ MSG_EN[BTRFS_MENU_MAINTENANCE_TITLE]="BTRFS Maintenance"
 MSG_EN[BTRFS_MENU_CLEANUP_SOURCE]="Clean up script-created source snapshots"
 MSG_EN[BTRFS_MENU_CLEANUP_RECEIVING]="Cleanup Orphan Receiving Artifacts (.receiving_*)"
 MSG_EN[BTRFS_MENU_DEBUG_CHAIN]="Inspect Incremental Chain (debug)"
+MSG_EN[BTRFS_MENU_BACK]="Back to previous menu"
+
+# BTRFS deletion menu
+MSG_EN[BTRFS_DELETE_BACKUPS_HEADER]="Delete BTRFS Backup Sessions"
+MSG_EN[BTRFS_DELETE_NEEDS_ROOT]="Deleting BTRFS backups requires root privileges"
+MSG_EN[BTRFS_DELETE_WITH_SUDO]="Delete backups with sudo?"
+MSG_EN[BTRFS_SELECT_BUNDLE_DELETE]="Enter backup session number(s) to delete (single: 3, range: 1-5, multiple: 1,3,5) or 0 to cancel: "
+MSG_EN[BTRFS_CONFIRM_DELETE_BUNDLES]="Are you sure you want to delete the selected backup session(s)? This action cannot be undone!"
+MSG_EN[BTRFS_NO_BACKUPS_FOUND]="No backup sessions found"
 
 # BTRFS log messages - problematic cleanup
 MSG_EN[BTRFS_LOG_CLEANUP_PROBLEMATIC_COMPLETE]="Problematic cleanup complete: %d successful, %d errors"
@@ -751,7 +766,14 @@ MSG_EN[RESTORE_SNAPSHOT_NOT_FOUND]="Snapshot not found: %s"
 MSG_EN[RESTORE_STARTING_SEND_RECEIVE]="Starting restore from: %s"
 MSG_EN[RESTORE_ESTIMATED_SIZE]="Estimated size: %s"
 MSG_EN[RESTORE_SEND_RECEIVE_SUCCESS]="Snapshot transfer completed successfully"
+MSG_EN[RESTORE_SUBVOLUME]="Subvolume: %s"
 MSG_EN[RESTORE_SUBVOLUME_COMPLETED]="Subvolume %s restored successfully"
+MSG_EN[RESTORE_SUBVOLUME_DESCRIPTION]="Restoring subvolume %s from snapshot %s"
+MSG_EN[RESTORE_SUBVOLUME_FAILED]="Failed to restore subvolume %s"
+MSG_EN[RESTORE_SUBVOLUME_SNAPSHOT]="Subvolume snapshot: %s"
+
+# Missing subvolumes
+MSG_EN[RESTORE_MISSING_SUBVOLUME_SNAPSHOTS]="Missing snapshots for one or more subvolumes"
 
 # Restore type selection
 MSG_EN[RESTORE_SELECT_TYPE_AND_SNAPSHOT]="Select Restore Type and Snapshot"
@@ -759,6 +781,7 @@ MSG_EN[RESTORE_TYPE_OPTIONS]="Restore options"
 MSG_EN[RESTORE_TYPE_COMPLETE_SYSTEM]="Complete system restore (@ + @home)"
 MSG_EN[RESTORE_TYPE_ROOT_ONLY]="Root subvolume only (@)"
 MSG_EN[RESTORE_TYPE_HOME_ONLY]="Home subvolume only (@home)"
+MSG_EN[RESTORE_TYPE_SINGLE_SUBVOLUME]="Single subvolume restore: %s"
 MSG_EN[RESTORE_SELECT_TYPE]="Select restore type (1-3):"
 
 MSG_EN[RESTORE_COMPLETE_SYSTEM_SELECTED]="Complete system restore selected"
@@ -798,10 +821,58 @@ MSG_EN[RESTORE_SETTING_DEFAULT_SUBVOLUME]="Setting default BTRFS subvolume..."
 MSG_EN[RESTORE_DEFAULT_SUBVOLUME_SET]="Default subvolume set successfully"
 MSG_EN[RESTORE_DEFAULT_SUBVOLUME_FAILED]="Failed to set default subvolume"
 MSG_EN[RESTORE_SUBVOLUME_ID_FAILED]="Could not determine subvolume ID"
-MSG_EN[RESTORE_BOOTLOADER_RECOMMENDATIONS]="Manual steps recommended:"
-MSG_EN[RESTORE_BOOTLOADER_CHROOT]="Chroot into restored system"
-MSG_EN[RESTORE_BOOTLOADER_UPDATE_GRUB]="Update GRUB configuration"
-MSG_EN[RESTORE_BOOTLOADER_VERIFY_FSTAB]="Verify /etc/fstab entries"
+MSG_EN[RESTORE_BOOTLOADER_RECOMMENDATIONS]="Manual verification steps recommended (only if restoring to different hardware/UUID):"
+MSG_EN[RESTORE_BOOTLOADER_CHROOT]="• Chroot into restored system (if on live environment)"
+MSG_EN[RESTORE_BOOTLOADER_UPDATE_GRUB]="• Update GRUB configuration: grub-mkconfig -o /boot/grub/grub.cfg"
+MSG_EN[RESTORE_BOOTLOADER_VERIFY_FSTAB]="• Verify /etc/fstab has correct device UUIDs (run 'blkid' to check)"
+MSG_EN[RESTORE_BOOTLOADER_TEST_BOOT]="• Reboot and test that system starts correctly"
+
+# Post-restore verification
+MSG_EN[RESTORE_POST_VERIFICATION_TITLE]="Post-Restore Verification & Bootloader Setup"
+MSG_EN[RESTORE_POST_VERIFICATION_INTRO]="This wizard helps verify and fix common issues after restore, especially when restoring to different hardware or UUIDs."
+MSG_EN[RESTORE_POST_VERIFICATION_TARGET_REQUIRED]="Target system root not configured. Run 'Setup Restore Environment' first."
+MSG_EN[RESTORE_POST_VERIFICATION_TARGET_NOT_FOUND]="Target system root not found: %s"
+
+MSG_EN[RESTORE_POST_VERIFICATION_STEP_1_TITLE]="Step 1/4: Hardware Change Detection"
+MSG_EN[RESTORE_POST_VERIFICATION_HARDWARE_CHECK]="Are you restoring to different hardware or disk (different UUIDs)?"
+MSG_EN[RESTORE_POST_VERIFICATION_SAME_HARDWARE]="Same hardware detected - UUID checks may not be necessary."
+MSG_EN[RESTORE_POST_VERIFICATION_CONTINUE_ANYWAY]="Continue with verification steps anyway?"
+MSG_EN[RESTORE_POST_VERIFICATION_SKIPPED]="Post-restore verification skipped."
+
+MSG_EN[RESTORE_POST_VERIFICATION_STEP_2_TITLE]="Step 2/4: Verify and Update /etc/fstab"
+MSG_EN[RESTORE_POST_VERIFICATION_CURRENT_UUIDS]="Current disk UUIDs on this system:"
+MSG_EN[RESTORE_POST_VERIFICATION_CURRENT_FSTAB]="Current /etc/fstab in restored system:"
+MSG_EN[RESTORE_POST_VERIFICATION_FSTAB_EDIT]="Open /etc/fstab in editor to update UUIDs?"
+MSG_EN[RESTORE_POST_VERIFICATION_FSTAB_OPENING]="Opening fstab in %s editor..."
+MSG_EN[RESTORE_POST_VERIFICATION_FSTAB_MANUAL]="Please verify and update device UUIDs to match current system."
+MSG_EN[RESTORE_POST_VERIFICATION_FSTAB_EDITOR_FAILED]="Failed to open editor for /etc/fstab"
+MSG_EN[RESTORE_POST_VERIFICATION_FSTAB_SKIPPED]="Skipped /etc/fstab verification."
+
+MSG_EN[RESTORE_POST_VERIFICATION_STEP_3_TITLE]="Step 3/4: Update GRUB Configuration"
+MSG_EN[RESTORE_POST_VERIFICATION_GRUB_UPDATE]="Update GRUB configuration in restored system?"
+MSG_EN[RESTORE_POST_VERIFICATION_GRUB_UPDATING]="Updating GRUB configuration..."
+MSG_EN[RESTORE_POST_VERIFICATION_GRUB_SUCCESS]="GRUB configuration updated successfully"
+MSG_EN[RESTORE_POST_VERIFICATION_GRUB_FAILED]="Failed to update GRUB configuration"
+MSG_EN[RESTORE_POST_VERIFICATION_GRUB_SKIPPED]="Skipped GRUB update."
+
+MSG_EN[RESTORE_POST_VERIFICATION_STEP_4_TITLE]="Step 4/4: Bootloader Configuration"
+MSG_EN[RESTORE_POST_VERIFICATION_BOOTLOADER_RUN]="Run bootloader configuration (set default subvolume, etc.)?"
+MSG_EN[RESTORE_POST_VERIFICATION_BOOTLOADER_RUNNING]="Running bootloader configuration..."
+MSG_EN[RESTORE_POST_VERIFICATION_BOOTLOADER_SKIPPED]="Skipped bootloader configuration."
+
+MSG_EN[RESTORE_POST_VERIFICATION_SUMMARY_TITLE]="Post-Restore Verification Summary"
+MSG_EN[RESTORE_POST_VERIFICATION_SUMMARY_FSTAB_UPDATED]="✓ /etc/fstab verified/updated"
+MSG_EN[RESTORE_POST_VERIFICATION_SUMMARY_FSTAB_SKIPPED]="○ /etc/fstab verification skipped"
+MSG_EN[RESTORE_POST_VERIFICATION_SUMMARY_GRUB_UPDATED]="✓ GRUB configuration updated"
+MSG_EN[RESTORE_POST_VERIFICATION_SUMMARY_GRUB_SKIPPED]="○ GRUB update skipped"
+MSG_EN[RESTORE_POST_VERIFICATION_SUMMARY_BOOTLOADER_COMPLETED]="✓ Bootloader configuration completed"
+MSG_EN[RESTORE_POST_VERIFICATION_SUMMARY_BOOTLOADER_SKIPPED]="○ Bootloader configuration skipped"
+
+MSG_EN[RESTORE_POST_VERIFICATION_NEXT_STEPS_TITLE]="Next Steps"
+MSG_EN[RESTORE_POST_VERIFICATION_NEXT_STEPS_UNMOUNT]="1. Unmount the target system (use Cleanup option)"
+MSG_EN[RESTORE_POST_VERIFICATION_NEXT_STEPS_REBOOT]="2. Reboot into the restored system"
+MSG_EN[RESTORE_POST_VERIFICATION_NEXT_STEPS_TEST]="3. Verify system boots correctly and all services start"
+MSG_EN[RESTORE_POST_VERIFICATION_COMPLETED]="Post-restore verification completed!"
 
 # Folder restore
 MSG_EN[RESTORE_FOLDER_FROM_SNAPSHOT]="Restore Individual Folder"
@@ -843,6 +914,9 @@ MSG_EN[RESTORE_MENU_SYSTEM_RESTORE]="System/Subvolume Restore"
 MSG_EN[RESTORE_MENU_FOLDER_RESTORE]="Individual Folder Restore"
 MSG_EN[RESTORE_MENU_DISK_INFO]="Show Disk Information"
 MSG_EN[RESTORE_MENU_SAFETY_CHECK]="Review Safety Information"
+MSG_EN[RESTORE_MENU_CLEANUP]="Cleanup Restore Artifacts"
+MSG_EN[RESTORE_MENU_RETRY_BOOTLOADER]="Retry Bootloader Configuration"
+MSG_EN[RESTORE_MENU_POST_VERIFICATION]="Post-Restore Verification & Bootloader Setup"
 MSG_EN[RESTORE_SETUP_REQUIRED]="Please run environment setup first (option 1)"
 
 # General messages
@@ -886,6 +960,7 @@ MSG_EN[RESTORE_CONFIRM_COMPLETE_ROLLBACK_BOOTLOADER]="Rollback complete system d
 MSG_EN[RESTORE_CONFIRM_DEFAULT_STRATEGY_CHANGES]="Proceed with default subvolume strategy changes?"
 MSG_EN[RESTORE_CONFIRM_KEEP_EXPLICIT_CONFIG]="Keep current explicit bootloader configuration?"
 MSG_EN[RESTORE_CONFIRM_ROLLBACK]="Confirm rollback of changes?"
+MSG_EN[RESTORE_CONFIRM_ROLLBACK_PARTIAL]="Confirm partial rollback of changes?"
 MSG_EN[RESTORE_CONFIRM_ROLLBACK_ROOT]="Rollback root subvolume changes?"
 MSG_EN[RESTORE_CONFIRM_SWITCH_TO_DEFAULT_STRATEGY]="Switch to default subvolume strategy instead?"
 MSG_EN[RESTORE_CONFIRM_UPDATE_DEFAULT_SUBVOL]="Update default BTRFS subvolume?"
@@ -1016,6 +1091,7 @@ MSG_EN[RESTORE_PARENT_CHAIN_INCOMPLETE]="Incomplete parent chain detected"
 MSG_EN[RESTORE_PARENT_CHAIN_INCOMPLETE_FOR]="Cannot validate parent chain for %s snapshot"
 
 # Partial operations
+MSG_EN[RESTORE_PARTIAL_FAILURE]="Partial failure during restore operation"
 MSG_EN[RESTORE_PARTIAL_SUCCESS_ROLLBACK]="Partial success detected - rollback recommended"
 MSG_EN[RESTORE_PARTIAL_SYSTEM_WARNING]="WARNING: System partially restored - manual attention required"
 
@@ -1037,6 +1113,9 @@ MSG_EN[RESTORE_ROLLBACK_PARTIAL_FAILURE]="Rollback completed with some failures"
 MSG_EN[RESTORE_ROLLBACK_ROOT]="Rolling back root subvolume"
 MSG_EN[RESTORE_ROLLBACK_ROOT_CRITICAL_FAILED]="CRITICAL: Failed to restore original root subvolume"
 MSG_EN[RESTORE_ROLLBACK_ROOT_SUCCESS]="Root subvolume rollback successful"
+MSG_EN[RESTORE_ROLLBACK_SUBVOLUME]="Rolling back subvolume: %s"
+MSG_EN[RESTORE_ROLLBACK_SUBVOLUME_FAILED]="Failed to rollback subvolume: %s"
+MSG_EN[RESTORE_ROLLBACK_SUBVOLUME_SUCCESS]="Subvolume rollback successful: %s"
 MSG_EN[RESTORE_ROLLBACK_SUCCESSFUL]="Rollback operation completed successfully"
 
 # Root snapshot validation

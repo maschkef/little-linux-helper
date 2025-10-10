@@ -29,6 +29,7 @@ LH_TAR_EXCLUDES_DEFAULT="" # Default TAR exclusions
 LH_DEBUG_LOG_LIMIT_DEFAULT=10 # Maximum number of backup candidates to show in debug logs (0 = unlimited, only affects verbose backup listing)
 LH_KEEP_SOURCE_SNAPSHOTS_DEFAULT="prompt" # Source snapshot preservation: "prompt", "true", "false"
 LH_SOURCE_SNAPSHOT_DIR_DEFAULT="/.snapshots_lh" # Directory for permanent source snapshots
+LH_SOURCE_SNAPSHOT_RETENTION_DEFAULT=1 # Number of preserved source snapshots per subvolume
 LH_BACKUP_SUBVOLUMES_DEFAULT="@ @home" # Default BTRFS subvolumes to backup (space-separated)
 LH_AUTO_DETECT_SUBVOLUMES_DEFAULT="true" # Enable automatic subvolume detection
 
@@ -53,6 +54,7 @@ LH_TAR_EXCLUDES="" # Active TAR exclusions
 LH_DEBUG_LOG_LIMIT="" # Maximum number of backup candidates to show in debug logs per backup session
 LH_KEEP_SOURCE_SNAPSHOTS="" # Source snapshot preservation setting
 LH_SOURCE_SNAPSHOT_DIR="" # Directory for permanent source snapshots
+LH_SOURCE_SNAPSHOT_RETENTION="" # Count of preserved source snapshots per subvolume
 LH_BACKUP_SUBVOLUMES="" # Active BTRFS subvolumes to backup (space-separated)
 LH_AUTO_DETECT_SUBVOLUMES="" # Active automatic subvolume detection setting
 
@@ -88,6 +90,7 @@ function lh_load_backup_config() {
     LH_DEBUG_LOG_LIMIT="$LH_DEBUG_LOG_LIMIT_DEFAULT"
     LH_KEEP_SOURCE_SNAPSHOTS="$LH_KEEP_SOURCE_SNAPSHOTS_DEFAULT"
     LH_SOURCE_SNAPSHOT_DIR="$LH_SOURCE_SNAPSHOT_DIR_DEFAULT"
+    LH_SOURCE_SNAPSHOT_RETENTION="$LH_SOURCE_SNAPSHOT_RETENTION_DEFAULT"
     LH_BACKUP_SUBVOLUMES="$LH_BACKUP_SUBVOLUMES_DEFAULT"
     LH_AUTO_DETECT_SUBVOLUMES="$LH_AUTO_DETECT_SUBVOLUMES_DEFAULT"
 
@@ -126,7 +129,12 @@ function lh_load_backup_config() {
         
         LH_SOURCE_SNAPSHOT_DIR="${CFG_LH_SOURCE_SNAPSHOT_DIR:-$LH_SOURCE_SNAPSHOT_DIR_DEFAULT}"
         [ -z "$LH_SOURCE_SNAPSHOT_DIR" ] && LH_SOURCE_SNAPSHOT_DIR="$LH_SOURCE_SNAPSHOT_DIR_DEFAULT"
-        
+
+        LH_SOURCE_SNAPSHOT_RETENTION="${CFG_LH_SOURCE_SNAPSHOT_RETENTION:-$LH_SOURCE_SNAPSHOT_RETENTION_DEFAULT}"
+        if [[ -z "$LH_SOURCE_SNAPSHOT_RETENTION" ]]; then
+            LH_SOURCE_SNAPSHOT_RETENTION="$LH_SOURCE_SNAPSHOT_RETENTION_DEFAULT"
+        fi
+
         LH_BACKUP_SUBVOLUMES="${CFG_LH_BACKUP_SUBVOLUMES:-$LH_BACKUP_SUBVOLUMES_DEFAULT}"
         [ -z "$LH_BACKUP_SUBVOLUMES" ] && LH_BACKUP_SUBVOLUMES="$LH_BACKUP_SUBVOLUMES_DEFAULT"
         
@@ -150,6 +158,7 @@ function lh_load_backup_config() {
 # Function to save backup configuration
 function lh_save_backup_config() {
     mkdir -p "$LH_CONFIG_DIR"
+    lh_fix_ownership "$LH_CONFIG_DIR"
     echo "# Little Linux Helper - Backup Configuration" > "$LH_BACKUP_CONFIG_FILE"
     
     # Only save non-empty values, otherwise use default values
@@ -187,6 +196,10 @@ function lh_save_backup_config() {
     
     if [ -n "$LH_SOURCE_SNAPSHOT_DIR" ]; then
         echo "CFG_LH_SOURCE_SNAPSHOT_DIR=\"$LH_SOURCE_SNAPSHOT_DIR\"" >> "$LH_BACKUP_CONFIG_FILE"
+    fi
+
+    if [ -n "$LH_SOURCE_SNAPSHOT_RETENTION" ]; then
+        echo "CFG_LH_SOURCE_SNAPSHOT_RETENTION=\"$LH_SOURCE_SNAPSHOT_RETENTION\"" >> "$LH_BACKUP_CONFIG_FILE"
     fi
     
     if [ -n "$LH_BACKUP_SUBVOLUMES" ]; then
@@ -285,6 +298,7 @@ function lh_load_general_config() {
 # Function to save general configuration
 function lh_save_general_config() {
     mkdir -p "$LH_CONFIG_DIR"
+    lh_fix_ownership "$LH_CONFIG_DIR"
     
     # Create new general.conf based on example file
     local example_file="$LH_CONFIG_DIR/general.conf.example"

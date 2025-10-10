@@ -56,6 +56,12 @@ CFG_LH_KEEP_SOURCE_SNAPSHOTS="prompt"
 # Script-created snapshots are marked with metadata for identification and cleanup.
 CFG_LH_SOURCE_SNAPSHOT_DIR="/.snapshots_lh"
 
+# CFG_LH_SOURCE_SNAPSHOT_RETENTION:
+# Number of preserved source snapshots per subvolume. Controls how many parent snapshots
+# remain available for incremental chains after each backup completes.
+# Set to 0 to disable preservation, 1 to keep only the latest parent, or higher for additional fallbacks.
+CFG_LH_SOURCE_SNAPSHOT_RETENTION="1"
+
 # CFG_LH_BACKUP_SUBVOLUMES:
 # List of BTRFS subvolumes to backup (space-separated).
 # Default: "@" "@home" (standard layout used by most distributions)

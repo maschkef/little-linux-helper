@@ -34,6 +34,9 @@ LH_SUDO_CMD=""
 # Detected package manager
 LH_PKG_MANAGER=""
 
+# Cached release identifier for metadata embedding (lazy initialization)
+LH_RELEASE_VERSION="${LH_RELEASE_VERSION:-}"
+
 # Array for detected alternative package managers
 declare -a LH_ALT_PKG_MANAGERS=()
 
@@ -54,12 +57,46 @@ source "$LH_ROOT_DIR/lib/lib_colors.sh"
 source "$LH_ROOT_DIR/lib/lib_package_mappings.sh"
 source "$LH_ROOT_DIR/lib/lib_config.sh"
 source "$LH_ROOT_DIR/lib/lib_logging.sh"
+source "$LH_ROOT_DIR/lib/lib_json.sh"
 source "$LH_ROOT_DIR/lib/lib_packages.sh"
 source "$LH_ROOT_DIR/lib/lib_system.sh"
 source "$LH_ROOT_DIR/lib/lib_filesystem.sh"
 source "$LH_ROOT_DIR/lib/lib_i18n.sh"
 source "$LH_ROOT_DIR/lib/lib_ui.sh"
 source "$LH_ROOT_DIR/lib/lib_notifications.sh"
+
+# Detect the currently running little-linux-helper release identifier.
+# Priority:
+#   1. Cached value (LH_RELEASE_VERSION already exported by caller)
+#   2. Configured tag from general.conf (CFG_LH_RELEASE_TAG)
+#   3. Git metadata (git describe --tags --dirty --always)
+#   4. Literal "unknown" fallback
+# The detected value is cached in LH_RELEASE_VERSION for subsequent calls.
+lh_detect_release_version() {
+    if [ -n "${LH_RELEASE_VERSION:-}" ]; then
+        export LH_RELEASE_VERSION
+        printf '%s\n' "$LH_RELEASE_VERSION"
+        return 0
+    fi
+
+    local detected_release=""
+
+    if [ -n "${CFG_LH_RELEASE_TAG:-}" ]; then
+        detected_release="$CFG_LH_RELEASE_TAG"
+    fi
+
+    if [ -z "$detected_release" ] && command -v git >/dev/null 2>&1; then
+        detected_release=$(git -C "$LH_ROOT_DIR" describe --tags --dirty --always 2>/dev/null || true)
+    fi
+
+    if [ -z "$detected_release" ]; then
+        detected_release="unknown"
+    fi
+
+    LH_RELEASE_VERSION="$detected_release"
+    export LH_RELEASE_VERSION
+    printf '%s\n' "$detected_release"
+}
 
 # Function to ensure configuration files exist
 function lh_ensure_config_files_exist() {
@@ -103,11 +140,14 @@ fi
 lh_session_registry_init() {
     # Ensure registry directories/files exist once logging is available
     mkdir -p "$LH_SESSION_REGISTRY_DIR"
+    lh_fix_ownership "$LH_SESSION_REGISTRY_DIR"
     if [ ! -f "$LH_SESSION_REGISTRY_FILE" ]; then
         : >"$LH_SESSION_REGISTRY_FILE"
+        lh_fix_ownership "$LH_SESSION_REGISTRY_FILE"
     fi
     if [ ! -f "$LH_SESSION_REGISTRY_LOCK" ]; then
         : >"$LH_SESSION_REGISTRY_LOCK"
+        lh_fix_ownership "$LH_SESSION_REGISTRY_LOCK"
     fi
 }
 
