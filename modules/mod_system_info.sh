@@ -29,6 +29,9 @@ if [[ -z "${MSG[SYSINFO_HEADER_OS_KERNEL]:-}" ]]; then
     lh_load_language_module "lib"
 fi
 
+lh_log_active_sessions_debug "$(lh_msg 'MENU_SYSTEM_INFO')"
+lh_begin_module_session "mod_system_info" "$(lh_msg 'MENU_SYSTEM_INFO')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
+
 # Function to display operating system and kernel information
 function system_os_kernel_info() {
     lh_print_header "$(lh_msg 'SYSINFO_HEADER_OS_KERNEL')"
@@ -239,6 +242,7 @@ function system_temperature_sensors() {
 # Main function of the module: show submenu and control actions
 function system_info_menu() {
     while true; do
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
         lh_print_header "$(lh_msg 'SYSINFO_MENU_TITLE')"
 
         lh_print_menu_item 1 "$(lh_msg 'SYSINFO_MENU_OS_KERNEL')"
@@ -253,34 +257,44 @@ function system_info_menu() {
         lh_print_menu_item 0 "$(lh_msg 'SYSINFO_MENU_BACK')"
         echo ""
 
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" option
 
         case $option in
             1)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_OS_KERNEL')")"
                 system_os_kernel_info
                 ;;
             2)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_CPU')")"
                 system_cpu_info
                 ;;
             3)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_RAM')")"
                 system_ram_info
                 ;;
             4)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_PCI')")"
                 system_pci_devices
                 ;;
             5)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_USB')")"
                 system_usb_devices
                 ;;
             6)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_DISK_OVERVIEW')")"
                 system_disk_overview
                 ;;
             7)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_TOP_PROCESSES')")"
                 system_top_processes
                 ;;
             8)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_NETWORK')")"
                 system_network_config
                 ;;
             9)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_SENSORS')")"
                 system_temperature_sensors
                 ;;
             0)
@@ -292,6 +306,8 @@ function system_info_menu() {
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'SYSINFO_INVALID_SELECTION_TRY_AGAIN')${LH_COLOR_RESET}"
                 ;;
         esac
+
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
 
         # Short pause so user can read the output
         echo ""

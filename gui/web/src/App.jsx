@@ -42,6 +42,7 @@ function AppContent() {
     const saved = localStorage.getItem('lh-gui-dev-controls');
     return saved === 'true';
   });
+  const [toolVersion, setToolVersion] = useState('');
   
   const { startNewSession, sessions, getActiveSession, activeSessionId } = useSession();
 
@@ -55,6 +56,24 @@ function AppContent() {
   useEffect(() => {
     // Load modules on component mount
     fetchModules();
+  }, []);
+
+  useEffect(() => {
+    const fetchVersion = async () => {
+      try {
+        const response = await fetch('/api/version');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.release) {
+            setToolVersion(data.release);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch release version:', error);
+      }
+    };
+
+    fetchVersion();
   }, []);
 
   useEffect(() => {
@@ -195,6 +214,11 @@ function AppContent() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             <h1>{t('app.title')}</h1>
+            {toolVersion && (
+              <span className="version-badge" title="Release version">
+                {toolVersion}
+              </span>
+            )}
             <img src="/header-logo.svg" alt="Little Linux Helper" className="header-logo" />
           </div>
           <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>

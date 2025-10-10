@@ -173,12 +173,10 @@ load_all_language_keys() {
     all_language_keys=()
     key_sources=()
     
-    # Dynamically discover and load all .sh files in the language directory
-    for lang_file in "$lang_dir"/*.sh; do
-        [[ -f "$lang_file" ]] || continue
-        
-        local filename="$(basename "$lang_file")"
-        echo -e "${COLOR_INFO}Loading language keys from $filename...${COLOR_RESET}"
+    # Dynamically discover and load all .sh files in the language directory (including subdirectories)
+    while IFS= read -r -d '' lang_file; do
+        local relative_path="${lang_file#$lang_dir/}"
+        echo -e "${COLOR_INFO}Loading language keys from $relative_path...${COLOR_RESET}"
         
         # Create a temporary array for this file's keys
         declare -A temp_keys=()
@@ -187,9 +185,9 @@ load_all_language_keys() {
         # Add keys to global array and track their source
         for key in "${!temp_keys[@]}"; do
             all_language_keys["$key"]=1
-            key_sources["$key"]="$filename"
+            key_sources["$key"]="$relative_path"
         done
-    done
+    done < <(find "$lang_dir" -type f -name "*.sh" -print0 | sort -z)
 }
 
 # Check if a key exists in the global language keys array

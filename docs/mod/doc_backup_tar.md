@@ -27,6 +27,7 @@ This specialized module provides comprehensive TAR archive-based backup function
     *   `lh_check_command`: For verifying TAR availability and installation
     *   `lh_send_notification`: For desktop notifications on completion
     *   Color variables for styled terminal output
+*   **Session Handling:** When run directly the module reports other active helpers (`lh_log_active_sessions_debug`), registers itself (`lh_begin_module_session`), and uses `lh_update_module_session` to publish status transitions (preparation, backup, cleanup) in the shared session registry.
 *   **Key System Commands:** `tar`, `du`, `df`, `date`, `mkdir`, `rm`, `find`, `stat`, `numfmt`
 *   **Dependencies:** TAR utilities must be available; module checks and offers installation if missing
 

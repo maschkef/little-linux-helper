@@ -14,10 +14,12 @@ This document describes the `mod_restarts.sh` module of the "Little Linux Helper
 ### 1. Purpose
 
 The `mod_restarts.sh` module provides functionality to restart various system services and user-session components. This includes:
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
 - Login/Display Manager
 - Sound System (PipeWire, PulseAudio, ALSA)
 - Desktop Environment (KDE Plasma, GNOME, XFCE, Cinnamon, MATE, LXDE, LXQt)
 - Network Services (NetworkManager, systemd-networkd, etc.)
+- Firewall Components (firewalld, UFW, nftables, netfilter-persistent, Shorewall)
 
 It aims to offer convenient restart options, especially for troubleshooting or applying certain configuration changes that require a service restart.
 
@@ -32,10 +34,13 @@ It aims to offer convenient restart options, especially for troubleshooting or a
 - `lh_confirm_action`: To ask for user confirmation before critical operations.
 - `lh_get_target_user_info`: To determine the active desktop user for context-specific commands.
 - `lh_run_command_as_target_user`: To execute commands within the target user's session (e.g., for desktop environment or user-level sound service restarts).
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
 - `lh_print_header`: For formatting section titles in the menu.
 - `lh_print_menu_item`: For formatting menu options.
 - Color variables (e.g., `LH_COLOR_WARNING`, `LH_COLOR_ERROR`, `LH_COLOR_SUCCESS`, `LH_COLOR_RESET`) for console output.
 - `LH_SUDO_CMD`: To prefix commands requiring root privileges.
+- `lh_log_active_sessions_debug`, `lh_begin_module_session`, `lh_update_module_session`: Used to publish which restart action is currently active so other modules (and the GUI) can react to potential conflicts.
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
 
 **System Command Dependencies:**
 - **Login Manager:** `systemctl`, `ps`, `readlink`, `basename`, `awk`, `grep`, `head`, `cat`, `service`, `/etc/init.d/*` scripts.
@@ -51,7 +56,7 @@ The module's primary entry point is `restart_module_menu()`, which displays a me
 *   `restart_module_menu()`
     *   **Purpose:** Displays the main menu for this module and handles user input to call specific action functions.
     *   **Workflow:**
-        1.  Presents options: Restart Login Manager, Sound System, Desktop Environment, Network Services.
+        1.  Presents options: Restart Login Manager, Sound System, Desktop Environment, Network Services, Firewall.
         2.  Reads user choice.
         3.  Calls the corresponding `_action` function.
         4.  Pauses for user to read output before re-displaying the menu.
@@ -65,9 +70,11 @@ The module's primary entry point is `restart_module_menu()`, which displays a me
             - Fallback: Reads `/etc/X11/default-display-manager`.
         3.  If no service is identified, it may attempt a fallback to a common name like `gdm.service` for systemd.
         4.  Warns the user that this action will terminate all user sessions.
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
         5.  Requires user confirmation via `lh_confirm_action`.
         6.  Restarts the identified service using the appropriate command for the detected init system (`systemctl restart`, `service restart`, `/etc/init.d/... restart`).
     *   **Side Effects:** Terminates all active graphical user sessions. Restarts the display manager service.
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
     *   **Special Considerations:** High impact operation. Relies on heuristics for DM detection which might not cover all configurations.
 
 *   `restart_sound_system_action()`
@@ -106,6 +113,7 @@ The module's primary entry point is `restart_module_menu()`, which displays a me
             - **GNOME:**
                 - Wayland (Soft): `dbus-send ... org.gnome.Shell.Eval string:"Meta.restart(...)"`.
                 - Wayland (Hard): `killall gnome-shell` (warns this usually ends the session).
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
                 - X11 (Soft): Tries `systemctl --user restart gnome-shell-x11.service`, then `pkill -HUP gnome-shell`.
                 - X11 (Hard): `killall gnome-shell` then `gnome-shell --replace`.
             - **XFCE:** `xfce4-panel --restart`, `xfwm4 --replace` (Soft) or `killall` then re-launch (Hard).
@@ -126,6 +134,25 @@ The module's primary entry point is `restart_module_menu()`, which displays a me
     *   **Side Effects:** Temporarily disconnects network connectivity.
     *   **Special Considerations:** Relies on `systemctl` for service management.
 
+*   `restart_firewall_services_action()`
+    *   **Purpose:** Reloads or restarts common firewall components.
+    *   **Detection:** Uses command presence and/or systemd unit files to detect:
+        - firewalld (`firewall-cmd`, `firewalld.service`)
+        - UFW (`ufw`, `ufw.service`)
+        - nftables (`nft`, `nftables.service`)
+        - netfilter-persistent (`netfilter-persistent`, `netfilter-persistent.service`)
+        - Shorewall (`shorewall`, `shorewall.service`)
+    *   **Workflow:**
+        1.  Lists detected components; user can pick one or all.
+        2.  Warns that traffic may briefly interrupt; asks for confirmation.
+        3.  Executes preferred reload where possible, with safe fallbacks:
+            - firewalld: `firewall-cmd --reload`, fallback `systemctl reload/restart`.
+            - UFW: `ufw reload`, fallback `systemctl restart ufw`.
+            - nftables: `systemctl reload/restart nftables`, fallback `nft -f /etc/nftables.conf`.
+            - netfilter-persistent: `systemctl reload/restart`, fallback `netfilter-persistent reload`.
+            - Shorewall: `shorewall reload`, fallback `systemctl reload/restart`.
+        4.  Summarizes success/failure across selected components.
+
 ### 4. Usage
 
 This module is intended to be called from `help_master.sh`. The user selects the "Restarts" option from the main menu, which then executes `bash /path/to/modules/mod_restarts.sh`. The `restart_module_menu()` function within `mod_restarts.sh` then takes over.
@@ -133,8 +160,10 @@ This module is intended to be called from `help_master.sh`. The user selects the
 ### 5. Special Considerations and Notes
 
 - **User Context:** Many actions, especially for sound and desktop environment restarts, critically depend on `lh_get_target_user_info` and `lh_run_command_as_target_user` to execute commands in the correct user session. Failures in determining the user or their environment variables can lead to restart failures.
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
 - **Service Detection:** The module uses heuristics (checking for running processes, systemd service states, common file paths) to identify active services/DEs. While comprehensive, these might not cover every possible Linux distribution or custom setup.
 - **Impact of Restarts:** Users are warned before performing actions that can lead to data loss or session termination (e.g., login manager restart, hard desktop restart).
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
 - **Error Handling:** Functions generally log errors and inform the user but may not always be able to recover from failed restart attempts. Return codes are used to indicate success/failure to the calling menu.
 - **Wayland vs. X11:** Restarting desktop environments, particularly GNOME, behaves differently and can be more restrictive under Wayland. The module attempts to handle some of these differences.
 - **`lh_run_command_as_target_user` Output Parsing:** In `restart_sound_system_action` and `restart_desktop_environment_action`, there's logic to parse the output of `lh_run_command_as_target_user` (e.g., to get `XDG_CURRENT_DESKTOP` or active PipeWire services). This can be brittle if the debug output format of `lh_run_command_as_target_user` changes. Using temporary files for command output is a common pattern.

@@ -29,6 +29,9 @@ if [[ -z "${MSG[DISK_HEADER_MOUNTED]:-}" ]]; then
     lh_load_language_module "lib"
 fi
 
+lh_log_active_sessions_debug "$(lh_msg 'MENU_DISK_TOOLS')"
+lh_begin_module_session "mod_disk" "$(lh_msg 'MENU_DISK_TOOLS')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
+
 # Function to display mounted drives
 function disk_show_mounted() {
     lh_print_header "$(lh_msg 'DISK_HEADER_MOUNTED')"
@@ -159,6 +162,16 @@ function disk_check_usage() {
 
 # Function to test disk speed
 function disk_speed_test() {
+    # Check for blocking conflicts - disk speed tests are resource intensive
+    lh_check_blocking_conflicts "${LH_BLOCK_RESOURCE_INTENSIVE}" "mod_disk.sh:disk_speed_test"
+    local conflict_result=$?
+    if [[ $conflict_result -eq 1 ]]; then
+        return 1  # Operation cancelled or blocked
+    elif [[ $conflict_result -eq 2 ]]; then
+        lh_log_msg "WARN" "User forced disk speed test despite active resource-intensive operations"
+    fi
+
+    lh_update_module_session "$(lh_msg 'DISK_HEADER_SPEED_TEST')" "running" "${LH_BLOCK_RESOURCE_INTENSIVE}" "MEDIUM"
     lh_print_header "$(lh_msg 'DISK_HEADER_SPEED_TEST')"
 
     if ! lh_check_command "hdparm" true; then
@@ -467,6 +480,7 @@ function disk_show_largest_files() {
 # Main function of the module: display submenu and control actions
 function disk_tools_menu() {
     while true; do
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
         lh_print_header "$(lh_msg 'DISK_MENU_TITLE')"
 
         lh_print_menu_item 1 "$(lh_msg 'DISK_MENU_MOUNTED')"
@@ -480,31 +494,40 @@ function disk_tools_menu() {
         lh_print_menu_item 0 "$(lh_msg 'DISK_MENU_BACK')"
         echo ""
 
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" option
 
         case $option in
             1)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_MOUNTED')")"
                 disk_show_mounted
                 ;;
             2)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_SMART')")"
                 disk_smart_values
                 ;;
             3)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_FILE_ACCESS')")"
                 disk_check_file_access
                 ;;
             4)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_USAGE')")"
                 disk_check_usage
                 ;;
             5)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_SPEED_TEST')")"
                 disk_speed_test
                 ;;
             6)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_FILESYSTEM')")"
                 disk_check_filesystem
                 ;;
             7)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_HEALTH')")"
                 disk_check_health
                 ;;
             8)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_LARGEST_FILES')")"
                 disk_show_largest_files
                 ;;
             0)
@@ -516,6 +539,8 @@ function disk_tools_menu() {
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_INVALID_SELECTION_TRY_AGAIN')${LH_COLOR_RESET}"
                 ;;
         esac
+
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
 
         # Short pause so user can read the output
         echo ""

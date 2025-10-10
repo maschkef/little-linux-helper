@@ -29,6 +29,9 @@ if [[ -z "${MSG[DOCKER_MENU_TITLE]:-}" ]]; then
     lh_load_language_module "lib"
 fi
 
+lh_log_active_sessions_debug "$(lh_msg 'MENU_DOCKER')"
+lh_begin_module_session "mod_docker" "$(lh_msg 'MENU_DOCKER')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')" "${LH_BLOCK_SYSTEM_CRITICAL}" "MEDIUM"
+
 # Docker configuration variables
 LH_DOCKER_CONFIG_FILE="$LH_CONFIG_DIR/docker.conf"
 
@@ -264,6 +267,7 @@ function manage_docker_config() {
 # Main menu function
 function docker_functions_menu() {
     while true; do
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
         lh_print_header "$(lh_msg 'DOCKER_FUNCTIONS')"
         
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_MANAGEMENT_SUBTITLE')${LH_COLOR_RESET}"
@@ -277,6 +281,7 @@ function docker_functions_menu() {
         echo ""
         
         lh_log_msg "DEBUG" "Waiting for user input in Docker menu"
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" choice
         
         # Check for empty input which could indicate input stream issues
@@ -297,20 +302,24 @@ function docker_functions_menu() {
         
         case $choice in
             1)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DOCKER_MENU_SHOW_CONTAINERS')")"
                 lh_log_msg "DEBUG" "Start displaying running containers"
                 show_running_containers
                 lh_log_msg "DEBUG" "Finished displaying running containers"
                 ;;
             2)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DOCKER_MENU_MANAGE_CONFIG')")"
                 lh_log_msg "DEBUG" "Start Docker configuration management"
                 manage_docker_config
                 lh_log_msg "DEBUG" "Docker configuration management finished"
                 ;;
             3)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'DOCKER_MENU_SETUP')")"
                 lh_log_msg "INFO" "Start Docker setup module"
                 bash "$(dirname "$0")/mod_docker_setup.sh"
                 ;;
             4)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'DOCKER_MENU_SECURITY')")"
                 lh_log_msg "INFO" "Start Docker security module"
                 # Source the security module and call its function directly to avoid input buffer issues
                 source "$(dirname "$0")/mod_docker_security.sh"
@@ -330,7 +339,9 @@ function docker_functions_menu() {
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_INVALID_CHOICE')${LH_COLOR_RESET}"
                 ;;
         esac
-        
+
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
+
         if [ "$choice" != "0" ]; then
             echo ""
             lh_log_msg "DEBUG" "Waiting for key press to continue"

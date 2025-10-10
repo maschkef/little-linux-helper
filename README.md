@@ -19,6 +19,7 @@ My environment is typically Arch (main system) or Debian (various services on my
 > - **GUI Interface**: Full internationalization (English/German) with error-resilient translation system and comprehensive help content
 > - **BTRFS Modules**: Advanced BTRFS backup and restore modules with atomic operations, incremental backup chains, and comprehensive safety features
 > - **Modular Architecture**: Clean separation of backup types into specialized modules (BTRFS, TAR, RSYNC) with unified dispatcher interface
+> - **Session Awareness**: Enhanced session registry with intelligent conflict detection and blocking categories to prevent dangerous concurrent operations
 > - **Testing Status**: Backup functions are well-tested and stable; restore functions are implemented but require comprehensive testing before production use
 > - **Update**: the btrfs backup module needs testing (again)
 
@@ -130,6 +131,8 @@ Both interfaces provide access to the following modules:
 * Restart the sound system (PipeWire, PulseAudio, ALSA).
 * Restart the desktop environment (KDE, GNOME, XFCE, Cinnamon, MATE, LXDE, LXQt).
 * Restart network services (NetworkManager, systemd-networkd, dhcpcd, systemd-resolved).
+* Restart firewall services (firewalld, UFW, nftables, netfilter-persistent, Shorewall).
+* **Session Awareness**: Registers with blocking categories (`SYSTEM_CRITICAL`) and checks for conflicts before critical operations.
 
 </details>
 
@@ -140,6 +143,7 @@ Both interfaces provide access to the following modules:
     * Central dispatcher providing unified interface for all backup types
     * Shared configuration management and status reporting across all backup methods
     * Comprehensive status overview covering BTRFS, TAR, and RSYNC backups
+    * **Session Awareness**: Registers with blocking categories (`FILESYSTEM_WRITE`, `SYSTEM_CRITICAL`) to prevent conflicts
 
 * **BTRFS Snapshot Backup & Restore** (`modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`):
     * **Advanced Features**: Atomic backup operations, received_uuid protection, incremental chain validation
@@ -148,6 +152,7 @@ Both interfaces provide access to the following modules:
     * **Incremental Backups**: Intelligent parent detection, automatic fallback, and comprehensive chain integrity validation
     * **Restore Capabilities**: Complete system restore, individual subvolume restore, folder-level restoration, and bootloader integration *(Note: Restore functions are implemented but require comprehensive testing)*
     * **Safety Features**: Live environment detection, filesystem health checking, rollback capabilities, and dry-run support
+    * **Maintenance Submenu**: Dedicated maintenance section with deletion tools, problematic backup cleanup, source snapshot management, incremental chain inspection, and orphan `.receiving_*` staging snapshot cleanup
     * **Detailed Documentation**: See `docs/mod/doc_btrfs_backup.md`, `docs/mod/doc_btrfs_restore.md`, and `docs/lib/doc_btrfs.md`
 
 * **TAR Archive Backup & Restore** (`modules/backup/mod_backup_tar.sh`, `modules/backup/mod_restore_tar.sh`):
@@ -155,6 +160,7 @@ Both interfaces provide access to the following modules:
     * **Intelligent Exclusions**: Built-in system exclusions, user-configurable patterns, and interactive exclusion management
     * **Archive Management**: Compressed `.tar.gz` archives with automatic cleanup and retention policies
     * **Safe Restoration**: Multiple destination options with safety warnings and confirmation prompts
+    * **Session Awareness**: Backup and restore operations register with appropriate blocking categories
     * **Documentation**: See `docs/mod/doc_backup_tar.md` and `docs/mod/doc_restore_tar.md`
 
 * **RSYNC Incremental Backup & Restore** (`modules/backup/mod_backup_rsync.sh`, `modules/backup/mod_restore_rsync.sh`):
@@ -162,6 +168,7 @@ Both interfaces provide access to the following modules:
     * **Backup Types**: Full backups and incremental backups with automatic parent detection
     * **Advanced Options**: Comprehensive RSYNC configuration with atomic operations and progress monitoring
     * **Flexible Restoration**: Real-time progress monitoring and complete directory tree restoration
+    * **Session Awareness**: Backup and restore operations register with appropriate blocking categories
     * **Documentation**: See `docs/mod/doc_backup_rsync.md` and `docs/mod/doc_restore_rsync.md`
 
 </details>
@@ -187,6 +194,7 @@ Both interfaces provide access to the following modules:
     * File system verification (requires `fsck`).
     * Checking disk health status (requires `smartmontools`).
     * Display of largest files in a directory.
+    * **Session Awareness**: Resource-intensive operations register with blocking categories (`RESOURCE_INTENSIVE`).
 * **Log Analysis Tools (`mod_logs.sh`)**:
     * Display of logs from the last X minutes (current and previous boot, may require `journalctl`).
     * Display logs of a specific systemd service (requires `journalctl`).
@@ -216,6 +224,7 @@ Both interfaces provide access to the following modules:
     * Search and installation of packages.
     * Display of installed packages (including alternative sources).
     * Display of package manager logs.
+    * **Session Awareness**: Critical operations check for conflicts with backup processes.
 * **Security Checks (`mod_security.sh`)**:
     * Display of open network ports (requires `ss`, optionally `nmap`).
     * Display of failed login attempts.
@@ -241,6 +250,7 @@ Both interfaces provide access to the following modules:
             * Direct embedding of sensitive data (e.g., API keys, tokens) instead of environment variables. (currently not working properly)
         * Optionally displays a list of currently running Docker containers. (Disabled by default in `config/docker.conf.example`.)
         * Provides a summary of found potential issues with recommendations.
+    * **Session Awareness**: Rootkit scans register with blocking categories (`RESOURCE_INTENSIVE`) to prevent interference.
 
 </details>
 
@@ -252,11 +262,13 @@ Both interfaces provide access to the following modules:
     * Docker system information and resource usage.
     * Container log access and analysis.
     * Network and volume management.
+    * **Session Awareness**: Registers with blocking categories to coordinate with system operations.
 * **Docker Setup & Installation (`mod_docker_setup.sh`)**:
     * Automated Docker installation across distributions.
     * Docker Compose setup and configuration.
     * User permission configuration for Docker access.
     * System service configuration and startup.
+    * **Session Awareness**: Installation operations register with blocking categories (`SYSTEM_CRITICAL`).
 
 </details>
 
@@ -268,6 +280,7 @@ Both interfaces provide access to the following modules:
     * Sleep/suspend control with timed inhibit functionality.
     * Screen brightness control.
     * Quick actions for restoring sleep functionality.
+    * **Session Awareness**: Registers with session registry to coordinate with other system operations.
 
 </details>
 
@@ -470,6 +483,62 @@ cd gui/
 
 </details>
 
+## Running with Sudo
+
+<details>
+<summary>🔐 Sudo Usage and File Ownership</summary>
+
+Little Linux Helper automatically handles file ownership issues when run with `sudo`. This ensures that log files, configuration files, and build artifacts maintain correct ownership even when elevated privileges are used.
+
+**Automatic Ownership Correction:**
+When the tool is run with `sudo`, the system automatically:
+- Detects the original user (via `SUDO_USER` environment variable)
+- Creates files and directories with root ownership initially (as expected with sudo)
+- Immediately corrects ownership back to the original user
+- Applies recursively to directories and all their contents
+
+**What Gets Fixed:**
+- **Log files** in `logs/` directory
+- **Log directories** including monthly subdirectories
+- **Session registry** files in `logs/sessions/`
+- **Configuration directories** and files in `config/`
+- **GUI build artifacts** when building with `sudo`
+- **JSON output files** in temporary directories
+
+**How It Works:**
+The `lh_fix_ownership()` function is automatically called after creating files or directories. It:
+1. Only acts when running as root via sudo (checks `EUID=0` and `SUDO_USER` is set)
+2. Determines the original user's UID and GID
+3. Changes ownership recursively using `chown`
+4. Logs the operation at DEBUG level for transparency
+5. Fails gracefully if ownership cannot be changed
+
+**User Experience:**
+- **Transparent**: No user action required
+- **Safe**: Only acts when appropriate (sudo context)
+- **Silent**: Normal operations show DEBUG logs only
+- **Compatible**: Works identically whether run with or without sudo
+
+**For Module Developers:**
+The ownership fix is applied automatically in core library functions. No special handling is needed in custom modules unless creating files outside standard paths. If needed, simply call:
+```bash
+mkdir -p "$my_directory"
+lh_fix_ownership "$my_directory"
+```
+
+**Example:**
+```bash
+# Running with sudo - files will be owned by the original user
+sudo ./help_master.sh
+# Log files in logs/ are automatically owned by your user, not root
+
+# Building GUI with sudo - artifacts owned by original user  
+sudo ./gui/build.sh
+# The little-linux-helper-gui binary and web/build/ are owned by your user
+```
+
+</details>
+
 ## Configuration
 
 <details>
@@ -520,6 +589,7 @@ The project is divided into modules to organize functionality:
     * Management of colored terminal output for better readability.
     * Complex logic for determining the active desktop user.
     * The ability to send **desktop notifications** to the user.
+    * **Enhanced Session Registry**: Intelligent session tracking with blocking categories for conflict detection and prevention.
     * **Core Library System**: Automatically loads specialized library components (`lib_colors.sh`, `lib_i18n.sh`, `lib_ui.sh`, etc.).
 * **`lib/lib_btrfs.sh`**: **Specialized BTRFS library** (not part of core library system). Provides advanced BTRFS-specific functions for atomic backup operations, incremental chain validation, and comprehensive BTRFS safety mechanisms. Used exclusively by BTRFS modules and must be explicitly sourced.
 * **`modules/mod_restarts.sh`**: Provides options for restarting services and the desktop environment.

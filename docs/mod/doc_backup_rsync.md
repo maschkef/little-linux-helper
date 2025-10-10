@@ -27,6 +27,7 @@ This specialized module provides comprehensive RSYNC-based backup functionality 
     *   `lh_check_command`: For verifying RSYNC availability and installation
     *   `lh_send_notification`: For desktop notifications on completion
     *   Color variables for styled terminal output
+*   **Session Handling:** When launched directly it reports other active helpers (`lh_log_active_sessions_debug`), registers its own session (`lh_begin_module_session`), and pushes updates via `lh_update_module_session` as the backup progresses through preparation, transfer, and cleanup.
 *   **Key System Commands:** `rsync`, `du`, `df`, `date`, `mkdir`, `rm`, `find`, `ls`, `sort`
 *   **Dependencies:** RSYNC utilities must be available; module checks and offers installation if missing
 

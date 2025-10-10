@@ -24,6 +24,8 @@ This module provides a suite of tools for managing, analyzing, and diagnosing di
     *   `lh_check_command`: Used to verify the presence of essential external commands (e.g., `smartctl`, `lsof`, `hdparm`, `fsck`, `du`, `ncdu`), offering to install them if missing.
     *   Color variables (e.g., `LH_COLOR_INFO`, `LH_COLOR_ERROR`, `LH_COLOR_PROMPT`, `LH_COLOR_MENU_NUMBER`, `LH_COLOR_MENU_TEXT`): For styled terminal output.
     *   Global variables: Accesses `LH_SUDO_CMD` (for privileged operations).
+*   **Session Awareness:** The module logs currently running helpers via `lh_log_active_sessions_debug`, registers itself (`lh_begin_module_session`), and updates the shared session registry while the menu waits for input or executes a selected action (`lh_update_module_session`).
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
 *   **Key System Commands:** `df`, `lsblk`, `smartctl`, `awk`, `lsof`, `ncdu` (optional), `du`, `find`, `hdparm`, `dd` (optional), `fsck`, `mount`, `umount`, `grep`, `head`, `sort`.
 
 **3. Main Menu Function: `disk_tools_menu()`**

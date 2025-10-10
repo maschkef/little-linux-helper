@@ -1,0 +1,1837 @@
+#!/bin/bash
+#
+# lib/btrfs/10_core.sh
+# Copyright (c) 2025 maschkef
+# SPDX-License-Identifier: MIT
+#
+# This library is part of the 'little-linux-helper' collection.
+# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+#
+# BTRFS-specific functions for backup operations
+# Implements atomic backup patterns and advanced BTRFS features
+
+# Critical: Enable pipeline failure detection
+set -o pipefail
+
+# Re-enable pipefail after sourcing dependencies (may be disabled by other scripts)
+ensure_pipefail() {
+    local pipefail_status
+    pipefail_status=$(set -o | grep pipefail | awk '{print $2}' 2>/dev/null || echo "off")
+    if [[ "$pipefail_status" != "on" ]]; then
+        set -o pipefail
+    fi
+}
+ensure_pipefail
+
+btrfs_core_debug() {
+    if declare -f lh_log_msg >/dev/null 2>&1; then
+        lh_log_msg "DEBUG" "[btrfs-core] $*" >&2
+    fi
+}
+
+# =============================================================================
+# ATOMIC BACKUP OPERATIONS
+# =============================================================================
+
+#
+# atomic_receive_with_validation()
+# 
+# Implements atomic backup pattern for BTRFS snapshots ensuring backup integrity.
+# The btrfs receive process is NOT atomic by default, so this function provides
+# a true atomic implementation to prevent incomplete snapshots from being 
+# considered valid backups.
+#
+# IMPLEMENTED SOLUTION: Four-step atomic workflow:
+# 1. Receive into temporary directory
+# 2. Validate operation success (exit code check)
+# 3. Atomic rename using mv (atomic for BTRFS subvolumes)
+# 4. Clean up temporary directory regardless of outcome
+#
+# This ensures only complete, valid backups are marked as official,
+# preventing the critical issue of incomplete backups being considered valid.
+#
+# CRITICAL REQUIREMENTS:
+# - btrfs receive is NOT atomic by default
+# - Must use temporary naming with .receiving suffix
+# - Must handle both full and incremental backups
+# - Must validate successful completion before renaming
+# - Must clean up temporary files on failure
+#
+# Parameters:
+#   $1: source_snapshot     - Path to source snapshot (temporary snapshot)
+#   $2: final_destination   - Final backup destination path
+#   $3: parent_snapshot     - Parent snapshot path (optional, for incremental)
+#
+# Returns:
+#   0: Success - backup completed and validated
+#   1: General failure
+#   2: Parent snapshot validation failed (suggests fallback to full backup)
+#   3: Space exhaustion
+#   4: Filesystem corruption detected
+#
+# Usage:
+#   atomic_receive_with_validation "/mnt/sys/.snapshots/home_temp" "/mnt/backup/snapshots/home_2025-07-06" "/mnt/backup/snapshots/home_2025-07-05"
+#
+atomic_receive_with_validation() {
+    local source_snapshot="$1"
+    local final_destination="$2"
+    local parent_snapshot="$3"  # optional for incremental
+    
+    # Input validation
+    if [[ -z "$source_snapshot" || -z "$final_destination" ]]; then
+        lh_log_msg "ERROR" "atomic_receive_with_validation: Missing required parameters"
+        return 1
+    fi
+    
+    if [[ ! -d "$source_snapshot" ]]; then
+        lh_log_msg "ERROR" "atomic_receive_with_validation: Source snapshot does not exist: $source_snapshot"
+        return 1
+    fi
+    
+    # Verify source snapshot is read-only (required for btrfs send)
+    local ro_property
+    ro_property=$($LH_SUDO_CMD btrfs property get "$source_snapshot" ro 2>/dev/null | cut -d'=' -f2)
+    if [[ "$ro_property" != "true" ]]; then
+        lh_log_msg "ERROR" "atomic_receive_with_validation: Source snapshot must be read-only: $source_snapshot"
+        return 1
+    fi
+    
+    # Ensure bundle directory exists within snapshots root (starting point for staging)
+    local final_parent
+    final_parent=$(dirname "$final_destination")
+    if [[ ! -d "$final_parent" ]]; then
+        if ! $LH_SUDO_CMD mkdir -p "$final_parent"; then
+            lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot create bundle directory: $final_parent"
+            return 1
+        fi
+    fi
+
+    # Stage inside the same bundle directory to allow atomic rename
+    local backup_base_dir="$final_parent"
+    
+    # Check if final destination already exists and handle collision
+    if [[ -d "$final_destination" ]]; then
+        lh_log_msg "WARN" "atomic_receive_with_validation: Final destination already exists: $final_destination"
+        
+        # Check if this is a received snapshot (has received_uuid) - CRITICAL: Never modify these
+        local has_received_uuid
+        has_received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$final_destination" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+        
+        if [[ -n "$has_received_uuid" && "$has_received_uuid" != "-" ]]; then
+            lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot overwrite received snapshot - this would break incremental chains"
+            lh_log_msg "ERROR" "Received snapshot detected with UUID: $has_received_uuid"
+            lh_log_msg "ERROR" "Manual intervention required to resolve naming conflict: $final_destination"
+            return 1
+        fi
+        
+        # Safe to delete - this is not a received snapshot
+        lh_log_msg "DEBUG" "atomic_receive_with_validation: Removing existing non-received snapshot: $final_destination"
+        if ! $LH_SUDO_CMD btrfs subvolume delete "$final_destination" 2>/dev/null; then
+            # If deletion fails, try removing read-only flag (only for non-received snapshots)
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Attempting to remove read-only flag for deletion"
+            if $LH_SUDO_CMD btrfs property set "$final_destination" ro false 2>/dev/null; then
+                if ! $LH_SUDO_CMD btrfs subvolume delete "$final_destination" 2>/dev/null; then
+                    lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot remove existing destination: $final_destination"
+                    return 1
+                fi
+            else
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Cannot remove existing destination: $final_destination"
+                return 1
+            fi
+        fi
+    fi
+    
+    # Implement atomic pattern with four-step workflow:
+    # 1. Receive into temporary location with .receiving suffix
+    # 2. Validate operation success (exit code check)
+    # 3. Atomic rename using mv (atomic for BTRFS subvolumes)
+    # 4. Clean up temporary files on failure
+    
+    lh_log_msg "DEBUG" "atomic_receive_with_validation: Implementing atomic backup pattern"
+    lh_log_msg "DEBUG" "  Pattern: receive -> validate -> atomic rename"
+    lh_log_msg "DEBUG" "  Final destination: $final_destination"
+    
+    local send_result=0
+    local source_snapshot_name=$(basename "$source_snapshot")
+    local staging_suffix=".receiving_$$"
+    local staging_snapshot_name="${source_snapshot_name}${staging_suffix}"
+    local staging_snapshot_path="${backup_base_dir}/${staging_snapshot_name}"
+    local initial_received_path="${backup_base_dir}/${source_snapshot_name}"
+
+    # Clean up any leftover staging snapshot from previous runs
+    if [[ -d "$staging_snapshot_path" ]]; then
+        lh_log_msg "WARN" "atomic_receive_with_validation: Found leftover staging snapshot: $staging_snapshot_path"
+        if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$staging_snapshot_path")" "y"; then
+            if ! $LH_SUDO_CMD btrfs subvolume delete "$staging_snapshot_path" 2>/dev/null; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Unable to remove staging snapshot: $staging_snapshot_path"
+                return 1
+            fi
+        else
+            lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$staging_snapshot_path")"
+            return 1
+        fi
+    fi
+
+    
+    if [[ -n "$parent_snapshot" ]]; then
+        lh_log_msg "DEBUG" "atomic_receive_with_validation: Performing atomic incremental send/receive"
+        lh_log_msg "DEBUG" "  Source: $source_snapshot"
+        lh_log_msg "DEBUG" "  Parent: $parent_snapshot"
+
+        if [[ ! -d "$parent_snapshot" ]]; then
+            lh_log_msg "WARN" "atomic_receive_with_validation: Parent snapshot not found: $parent_snapshot"
+            return 2  # Special code for parent validation failure
+        fi
+
+        # Step 1 - Receive snapshot into destination directory on backup filesystem
+        if $LH_SUDO_CMD btrfs send -p "$parent_snapshot" "$source_snapshot" | $LH_SUDO_CMD btrfs receive "$backup_base_dir"; then
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Incremental receive complete, staging snapshot for validation"
+
+            if [[ ! -d "$initial_received_path" ]]; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Received snapshot not found at expected path: $initial_received_path"
+                return 1
+            fi
+
+            # Step 2 - Stage snapshot with .receiving suffix and perform validation checks
+            local stage_output
+            stage_output=$($LH_SUDO_CMD mv "$initial_received_path" "$staging_snapshot_path" 2>&1)
+            local stage_exit_code=$?
+            if [[ $stage_exit_code -ne 0 ]]; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Failed to stage received snapshot (exit code: $stage_exit_code)"
+                lh_log_msg "ERROR" "mv error output: $stage_output"
+                if [[ -d "$initial_received_path" ]]; then
+                    if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$initial_received_path")" "y"; then
+                        $LH_SUDO_CMD btrfs subvolume delete "$initial_received_path" 2>/dev/null || true
+                    else
+                        lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$initial_received_path")"
+                    fi
+                fi
+                return 1
+            fi
+
+            if ! $LH_SUDO_CMD btrfs subvolume show "$staging_snapshot_path" >/dev/null 2>&1; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Received snapshot is not a valid BTRFS subvolume: $staging_snapshot_path"
+                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$staging_snapshot_path")" "y"; then
+                    $LH_SUDO_CMD btrfs subvolume delete "$staging_snapshot_path" 2>/dev/null || true
+                else
+                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$staging_snapshot_path")"
+                fi
+                return 1
+            fi
+
+            local recv_uuid
+            recv_uuid=$($LH_SUDO_CMD btrfs subvolume show "$staging_snapshot_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+            local recv_ro
+            recv_ro=$($LH_SUDO_CMD btrfs property get "$staging_snapshot_path" ro 2>/dev/null | cut -d'=' -f2)
+            if [[ -z "$recv_uuid" || "$recv_uuid" == "-" || "$recv_ro" != "true" ]]; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Post-receive validation failed (received_uuid/ro) for $staging_snapshot_path"
+                lh_log_msg "DEBUG" "  Received UUID: ${recv_uuid:-none}"
+                lh_log_msg "DEBUG" "  Read-only: ${recv_ro:-unknown}"
+                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$staging_snapshot_path")" "y"; then
+                    $LH_SUDO_CMD btrfs subvolume delete "$staging_snapshot_path" 2>/dev/null || true
+                else
+                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$staging_snapshot_path")"
+                fi
+                return 1
+            fi
+
+            # Step 3 - Atomic rename within same parent to reveal final snapshot name
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Performing final atomic rename to $final_destination"
+            local mv_error_output
+            mv_error_output=$($LH_SUDO_CMD mv "$staging_snapshot_path" "$final_destination" 2>&1)
+            local mv_exit_code=$?
+            if [[ $mv_exit_code -eq 0 ]]; then
+                lh_log_msg "INFO" "atomic_receive_with_validation: Incremental backup completed successfully at: $final_destination"
+                return 0
+            fi
+
+            lh_log_msg "ERROR" "atomic_receive_with_validation: Atomic rename failed with exit code: $mv_exit_code"
+            lh_log_msg "ERROR" "mv error output: $mv_error_output"
+
+            lh_log_msg "DEBUG" "Source subvolume info:"
+            $LH_SUDO_CMD btrfs subvolume show "$staging_snapshot_path" 2>/dev/null | head -10 | while IFS= read -r line; do
+                lh_log_msg "DEBUG" "  $line"
+            done
+
+            lh_log_msg "DEBUG" "Filesystem information:"
+            lh_log_msg "DEBUG" "  Destination filesystem: $($LH_SUDO_CMD stat -f -c '%T' "$(dirname "$final_destination")" 2>/dev/null || echo "unknown")"
+            lh_log_msg "DEBUG" "  Destination parent permissions: $($LH_SUDO_CMD ls -ld "$(dirname "$final_destination")" 2>/dev/null || echo "unknown")"
+
+            # Step 4 - Cleanup staging artifact if atomic rename failed
+            if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$staging_snapshot_path")" "y"; then
+                $LH_SUDO_CMD btrfs subvolume delete "$staging_snapshot_path" 2>/dev/null || true
+            else
+                lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$staging_snapshot_path")"
+            fi
+            return 1
+        else
+            send_result=$?
+            lh_log_msg "ERROR" "atomic_receive_with_validation: Incremental send/receive failed with exit code: $send_result"
+
+            # Step 4 - Cleanup staging artifacts created before failure
+            if [[ -d "$initial_received_path" ]]; then
+                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$initial_received_path")" "y"; then
+                    $LH_SUDO_CMD btrfs subvolume delete "$initial_received_path" 2>/dev/null || true
+                else
+                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$initial_received_path")"
+                fi
+            fi
+
+            local error_details
+            error_details=$($LH_SUDO_CMD dmesg | tail -10 | grep -i "btrfs\|error" || echo "No specific BTRFS errors in dmesg")
+
+            local error_analysis_result
+            error_analysis_result=$(handle_btrfs_error "$error_details" "incremental send/receive" "$send_result")
+            local error_code=$?
+
+            case $error_code in
+                2)
+                    lh_log_msg "WARN" "Parent validation failed - incremental chain broken"
+                    return 2  # Caller can attempt fallback
+                    ;;
+                3)
+                    lh_log_msg "ERROR" "Metadata exhaustion detected"
+                    return 3  # Requires manual intervention
+                    ;;
+                4)
+                    lh_log_msg "ERROR" "Filesystem corruption detected"
+                    return 4  # Requires manual intervention
+                    ;;
+                *)
+                    lh_log_msg "ERROR" "General incremental backup failure"
+                    return 2  # Allow fallback attempt
+                    ;;
+            esac
+        fi
+    else
+        lh_log_msg "DEBUG" "atomic_receive_with_validation: Performing atomic full send/receive"
+        lh_log_msg "DEBUG" "  Source: $source_snapshot"
+
+        local error_log
+        error_log=$(mktemp)
+
+        # Step 1 - Receive snapshot into destination directory on backup filesystem
+        if $LH_SUDO_CMD btrfs send "$source_snapshot" 2>"$error_log" | $LH_SUDO_CMD btrfs receive "$backup_base_dir" 2>>"$error_log"; then
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Full receive complete, staging snapshot for validation"
+            $LH_SUDO_CMD rm -f "$error_log"
+
+            if [[ ! -d "$initial_received_path" ]]; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Received snapshot not found at expected path: $initial_received_path"
+                return 1
+            fi
+
+            # Step 2 - Stage snapshot with .receiving suffix and perform validation checks
+            local stage_output
+            stage_output=$($LH_SUDO_CMD mv "$initial_received_path" "$staging_snapshot_path" 2>&1)
+            local stage_exit_code=$?
+            if [[ $stage_exit_code -ne 0 ]]; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Failed to stage received snapshot (exit code: $stage_exit_code)"
+                lh_log_msg "ERROR" "mv error output: $stage_output"
+                if [[ -d "$initial_received_path" ]]; then
+                    if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$initial_received_path")" "y"; then
+                        $LH_SUDO_CMD btrfs subvolume delete "$initial_received_path" 2>/dev/null || true
+                    else
+                        lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$initial_received_path")"
+                    fi
+                fi
+                return 1
+            fi
+
+            if ! $LH_SUDO_CMD btrfs subvolume show "$staging_snapshot_path" >/dev/null 2>&1; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Received snapshot is not a valid BTRFS subvolume: $staging_snapshot_path"
+                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$staging_snapshot_path")" "y"; then
+                    $LH_SUDO_CMD btrfs subvolume delete "$staging_snapshot_path" 2>/dev/null || true
+                else
+                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$staging_snapshot_path")"
+                fi
+                return 1
+            fi
+
+            local recv_uuid
+            recv_uuid=$($LH_SUDO_CMD btrfs subvolume show "$staging_snapshot_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+            local recv_ro
+            recv_ro=$($LH_SUDO_CMD btrfs property get "$staging_snapshot_path" ro 2>/dev/null | cut -d'=' -f2)
+            if [[ -z "$recv_uuid" || "$recv_uuid" == "-" || "$recv_ro" != "true" ]]; then
+                lh_log_msg "ERROR" "atomic_receive_with_validation: Post-receive validation failed (received_uuid/ro) for $staging_snapshot_path"
+                lh_log_msg "DEBUG" "  Received UUID: ${recv_uuid:-none}"
+                lh_log_msg "DEBUG" "  Read-only: ${recv_ro:-unknown}"
+                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$staging_snapshot_path")" "y"; then
+                    $LH_SUDO_CMD btrfs subvolume delete "$staging_snapshot_path" 2>/dev/null || true
+                else
+                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$staging_snapshot_path")"
+                fi
+                return 1
+            fi
+
+            # Step 3 - Atomic rename within same parent to reveal final snapshot name
+            lh_log_msg "DEBUG" "atomic_receive_with_validation: Performing final atomic rename to $final_destination"
+            local mv_error_output
+            mv_error_output=$($LH_SUDO_CMD mv "$staging_snapshot_path" "$final_destination" 2>&1)
+            local mv_exit_code=$?
+            if [[ $mv_exit_code -eq 0 ]]; then
+                lh_log_msg "INFO" "atomic_receive_with_validation: Full backup completed successfully at: $final_destination"
+                return 0
+            fi
+
+            lh_log_msg "ERROR" "atomic_receive_with_validation: Atomic rename failed with exit code: $mv_exit_code"
+            lh_log_msg "ERROR" "mv error output: $mv_error_output"
+
+            lh_log_msg "DEBUG" "Source subvolume info:"
+            $LH_SUDO_CMD btrfs subvolume show "$staging_snapshot_path" 2>/dev/null | head -10 | while IFS= read -r line; do
+                lh_log_msg "DEBUG" "  $line"
+            done
+
+            lh_log_msg "DEBUG" "Filesystem information:"
+            lh_log_msg "DEBUG" "  Destination filesystem: $($LH_SUDO_CMD stat -f -c '%T' "$(dirname "$final_destination")" 2>/dev/null || echo "unknown")"
+            lh_log_msg "DEBUG" "  Destination parent permissions: $($LH_SUDO_CMD ls -ld "$(dirname "$final_destination")" 2>/dev/null || echo "unknown")"
+
+            # Step 4 - Cleanup staging artifact if atomic rename failed
+            if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$staging_snapshot_path")" "y"; then
+                $LH_SUDO_CMD btrfs subvolume delete "$staging_snapshot_path" 2>/dev/null || true
+            else
+                lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$staging_snapshot_path")"
+            fi
+            return 1
+        else
+            send_result=$?
+            lh_log_msg "ERROR" "atomic_receive_with_validation: Full send/receive failed with exit code: $send_result"
+
+            # Step 4 - Cleanup staging artifacts created before failure
+            if [[ -d "$initial_received_path" ]]; then
+                if lh_confirm_action "$(lh_msg 'BTRFS_PROMPT_REMOVE_RECEIVING_NOW' "$initial_received_path")" "y"; then
+                    $LH_SUDO_CMD btrfs subvolume delete "$initial_received_path" 2>/dev/null || true
+                else
+                    lh_log_msg "WARN" "$(lh_msg 'BTRFS_KEEP_RECEIVING_DIR' "$initial_received_path")"
+                fi
+            fi
+
+            if [[ -s "$error_log" ]]; then
+                while IFS= read -r line; do
+                    lh_log_msg "ERROR" "btrfs receive: $line"
+                done < "$error_log"
+            fi
+
+            $LH_SUDO_CMD rm -f "$error_log"
+            local partial_snapshot="$staging_snapshot_path"
+            [[ -d "$partial_snapshot" ]] && $LH_SUDO_CMD btrfs subvolume delete "$partial_snapshot" 2>/dev/null || true
+            return 1
+        fi
+    fi
+}
+
+# =============================================================================
+# BACKUP CHAIN VALIDATION
+# =============================================================================
+
+#
+# validate_parent_snapshot_chain()
+#
+# Validates the integrity of incremental backup chains to ensure that
+# incremental backups can be performed safely without corruption.
+#
+# CRITICAL REQUIREMENTS:
+# - Must verify both source and destination parents exist
+# - Must validate UUID consistency between source and destination
+# - Must check generation numbers for proper sequencing
+# - Must verify received_uuid integrity on destination
+# - Must return proper exit codes for fallback logic
+#
+# Parameters:
+#   $1: source_parent       - Source parent snapshot path
+#   $2: dest_parent         - Destination parent snapshot path  
+#   $3: current_snapshot    - Current snapshot path (for generation check)
+#
+# Returns:
+#   0: Chain validation passed
+#   1: Chain validation failed - fallback to full backup recommended
+#
+# Usage:
+#   validate_parent_snapshot_chain "/mnt/sys/.snapshots/home_parent" "/mnt/backup/snapshots/home_parent" "/mnt/sys/.snapshots/home_current"
+#
+validate_parent_snapshot_chain() {
+    local source_parent="$1"
+    local dest_parent="$2"
+    local current_snapshot="$3"
+    
+    # Input validation
+    if [[ -z "$source_parent" || -z "$dest_parent" || -z "$current_snapshot" ]]; then
+        lh_log_msg "ERROR" "validate_parent_snapshot_chain: Missing required parameters"
+        return 1
+    fi
+    
+    lh_log_msg "DEBUG" "validate_parent_snapshot_chain: Validating chain integrity"
+    lh_log_msg "DEBUG" "  Source parent: $source_parent"
+    lh_log_msg "DEBUG" "  Dest parent: $dest_parent"
+    lh_log_msg "DEBUG" "  Current snapshot: $current_snapshot"
+    
+    # Step 1: Verify source parent exists and is valid BTRFS subvolume
+    if [[ ! -d "$source_parent" ]]; then
+        lh_log_msg "WARN" "validate_parent_snapshot_chain: Source parent does not exist: $source_parent"
+        return 1
+    fi
+    
+    if ! $LH_SUDO_CMD btrfs subvolume show "$source_parent" >/dev/null 2>&1; then
+        lh_log_msg "WARN" "validate_parent_snapshot_chain: Source parent is not a valid BTRFS subvolume: $source_parent"
+        return 1
+    fi
+    
+    # Step 2: Verify destination parent exists and has valid received_uuid
+    if [[ ! -d "$dest_parent" ]]; then
+        lh_log_msg "WARN" "validate_parent_snapshot_chain: Destination parent does not exist: $dest_parent"
+        return 1
+    fi
+    
+    if ! $LH_SUDO_CMD btrfs subvolume show "$dest_parent" >/dev/null 2>&1; then
+        lh_log_msg "WARN" "validate_parent_snapshot_chain: Destination parent is not a valid BTRFS subvolume: $dest_parent"
+        return 1
+    fi
+    
+    # Check received_uuid on destination parent (critical for incremental chain)
+    local dest_received_uuid
+    dest_received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$dest_parent" | grep "Received UUID:" | awk '{print $3}' || echo "")
+    if [[ -z "$dest_received_uuid" || "$dest_received_uuid" == "-" ]]; then
+        lh_log_msg "WARN" "validate_parent_snapshot_chain: Destination parent missing received_uuid: $dest_parent"
+        lh_log_msg "WARN" "This indicates the parent was modified after receive, breaking incremental chain"
+        return 1
+    fi
+    
+    # Step 3: Compare UUIDs between source and destination parents
+    local source_uuid dest_uuid
+    source_uuid=$($LH_SUDO_CMD btrfs subvolume show "$source_parent" | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
+    dest_uuid=$($LH_SUDO_CMD btrfs subvolume show "$dest_parent" | grep "UUID:" | head -n1 | awk '{print $2}' || echo "")
+    
+    if [[ -z "$source_uuid" || -z "$dest_uuid" ]]; then
+        lh_log_msg "WARN" "validate_parent_snapshot_chain: Cannot retrieve UUIDs for comparison"
+        return 1
+    fi
+    
+    # For proper incremental chain, the destination's received_uuid should match source's uuid
+    if [[ "$dest_received_uuid" != "$source_uuid" ]]; then
+        lh_log_msg "WARN" "validate_parent_snapshot_chain: UUID mismatch between source and destination parents"
+        lh_log_msg "DEBUG" "  Source UUID: $source_uuid"
+        lh_log_msg "DEBUG" "  Dest received UUID: $dest_received_uuid"
+        return 1
+    fi
+    
+    # Step 4: Check generation numbers for proper sequence
+    local source_gen dest_gen current_gen
+    source_gen=$(btrfs subvolume show "$source_parent" | grep "Generation:" | awk '{print $2}' || echo "0")
+    dest_gen=$(btrfs subvolume show "$dest_parent" | grep "Generation:" | awk '{print $2}' || echo "0")
+    current_gen=$(btrfs subvolume show "$current_snapshot" | grep "Generation:" | awk '{print $2}' || echo "0")
+    
+    # Validate generation sequence (current should be newer than parent)
+    if [[ "$current_gen" -le "$source_gen" ]]; then
+        lh_log_msg "WARN" "validate_parent_snapshot_chain: Invalid generation sequence"
+        lh_log_msg "DEBUG" "  Parent generation: $source_gen"
+        lh_log_msg "DEBUG" "  Current generation: $current_gen"
+        return 1
+    fi
+    
+    # Step 5: Additional validation - check that current snapshot can build on parent
+    # This is done by verifying they belong to the same subvolume lineage
+    local source_parent_uuid current_parent_uuid
+    source_parent_uuid=$(btrfs subvolume show "$source_parent" | grep "Parent UUID:" | awk '{print $3}' || echo "")
+    current_parent_uuid=$(btrfs subvolume show "$current_snapshot" | grep "Parent UUID:" | awk '{print $3}' || echo "")
+    
+    # Both should have the same parent UUID or one should be parent of the other
+    if [[ -n "$source_parent_uuid" && -n "$current_parent_uuid" && "$source_parent_uuid" != "$current_parent_uuid" ]]; then
+        # Additional check: see if source_parent is actually the parent of current
+        local current_parent_uuid_check
+        current_parent_uuid_check=$(btrfs subvolume show "$current_snapshot" | grep "Parent UUID:" | awk '{print $3}' || echo "")
+        if [[ "$current_parent_uuid_check" != "$source_uuid" ]]; then
+            lh_log_msg "DEBUG" "validate_parent_snapshot_chain: Parent lineage check inconclusive, but other validations passed"
+        fi
+    fi
+    
+    lh_log_msg "DEBUG" "validate_parent_snapshot_chain: All validation checks passed"
+    return 0
+}
+
+# =============================================================================
+# INTELLIGENT BACKUP CLEANUP
+# =============================================================================
+
+#
+# intelligent_cleanup()
+#
+# Implements smart backup rotation that respects incremental chains.
+# This prevents breaking incremental backup sequences while maintaining
+# the configured retention policy.
+#
+# CRITICAL REQUIREMENTS:
+# - Must respect LH_RETENTION_BACKUP setting
+# - Must NOT break incremental backup chains
+# - Must identify which snapshots can be safely deleted
+# - Must preserve parent snapshots that are still needed
+# - Must handle received_uuid protection
+#
+# Parameters:
+#   $1: subvolume_name          - Subvolume name (@ or @home)
+#   $2: backup_subvol_dir       - Backup subvolume directory path
+#
+# Returns:
+#   0: Cleanup completed successfully
+#   1: Cleanup failed
+#
+# Usage:
+#   intelligent_cleanup "@home" "/mnt/backup/snapshots"
+#
+intelligent_cleanup() {
+    local subvolume_name="$1"
+    local snapshot_root="${2:-$(btrfs_backup_snapshot_root)}"
+
+    if [[ -z "$subvolume_name" ]]; then
+        lh_log_msg "ERROR" "intelligent_cleanup: Missing subvolume name"
+        return 1
+    fi
+
+    if [[ -z "$snapshot_root" || ! -d "$snapshot_root" ]]; then
+        lh_log_msg "DEBUG" "intelligent_cleanup: Snapshot root unavailable: ${snapshot_root:-<unset>}"
+        return 0
+    fi
+
+    local retention_count
+    if [[ -z "${LH_RETENTION_BACKUP:-}" ]]; then
+        lh_log_msg "WARN" "intelligent_cleanup: LH_RETENTION_BACKUP not set, using default value 7"
+        retention_count=7
+    else
+        retention_count="$LH_RETENTION_BACKUP"
+    fi
+
+    if [[ ! "$retention_count" =~ ^[0-9]+$ ]] || [[ "$retention_count" -lt 1 ]]; then
+        lh_log_msg "WARN" "intelligent_cleanup: Invalid retention count, using default value 7"
+        retention_count=7
+    fi
+
+    lh_log_msg "DEBUG" "intelligent_cleanup: Starting cleanup for $subvolume_name"
+    lh_log_msg "DEBUG" "  Snapshot root: $snapshot_root"
+    lh_log_msg "DEBUG" "  Retention count: $retention_count"
+    btrfs_core_debug "Cleanup invoked for subvolume=$subvolume_name root=$snapshot_root retention=$retention_count"
+
+    local -a snapshots=()
+    readarray -t snapshots < <(btrfs_list_subvol_backups_desc "$subvolume_name")
+
+    local total_snapshots=${#snapshots[@]}
+    btrfs_core_debug "Found $total_snapshots snapshot candidates for $subvolume_name"
+
+    if [[ "$total_snapshots" -le "$retention_count" ]]; then
+        lh_log_msg "DEBUG" "intelligent_cleanup: Only $total_snapshots snapshots found, retention allows $retention_count - no cleanup needed"
+        return 0
+    fi
+
+    lh_log_msg "INFO" "intelligent_cleanup: Found $total_snapshots snapshots for $subvolume_name, retention allows $retention_count"
+
+    declare -A parent_relationships=()
+    declare -A child_relationships=()
+    declare -A snapshot_uuids=()
+    declare -A received_uuids=()
+
+    lh_log_msg "DEBUG" "intelligent_cleanup: Building parent-child relationship map"
+
+    local snapshot_path
+    for snapshot_path in "${snapshots[@]}"; do
+        [[ -d "$snapshot_path" ]] || continue
+
+        local uuid received_uuid
+        uuid=$(btrfs subvolume show "$snapshot_path" | grep "UUID:" | head -n1 | awk '{print $2}' 2>/dev/null || echo "")
+        received_uuid=$(btrfs subvolume show "$snapshot_path" | grep "Received UUID:" | awk '{print $3}' 2>/dev/null || echo "")
+
+        if [[ -n "$uuid" ]]; then
+            snapshot_uuids["$snapshot_path"]="$uuid"
+        fi
+
+        if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
+            received_uuids["$snapshot_path"]="$received_uuid"
+            parent_relationships["$snapshot_path"]="$received_uuid"
+
+            if [[ -n "${child_relationships[$received_uuid]:-}" ]]; then
+                child_relationships["$received_uuid"]+=" $snapshot_path"
+            else
+                child_relationships["$received_uuid"]="$snapshot_path"
+            fi
+        fi
+    done
+    btrfs_core_debug "Parent map built for $subvolume_name (entries=${#parent_relationships[@]})"
+
+    local candidates_for_deletion=()
+    local snapshots_to_keep=("${snapshots[@]:0:$retention_count}")
+
+    lh_log_msg "DEBUG" "intelligent_cleanup: Keeping newest $retention_count snapshots by policy"
+
+    for ((i=retention_count; i<total_snapshots; i++)); do
+        snapshot_path="${snapshots[$i]}"
+        local snapshot_uuid="${snapshot_uuids[$snapshot_path]:-}"
+
+        if [[ -z "$snapshot_uuid" ]]; then
+            lh_log_msg "DEBUG" "intelligent_cleanup: Skipping snapshot with unknown UUID: $snapshot_path"
+            continue
+        fi
+
+        local is_needed_parent=false
+        local kept_snapshot
+        for kept_snapshot in "${snapshots_to_keep[@]}"; do
+            local kept_received_uuid="${received_uuids[$kept_snapshot]:-}"
+            if [[ -n "$kept_received_uuid" && "$kept_received_uuid" == "$snapshot_uuid" ]]; then
+                lh_log_msg "DEBUG" "intelligent_cleanup: Preserving parent snapshot: $(basename "$snapshot_path")"
+                is_needed_parent=true
+                break
+            fi
+        done
+
+        if [[ "$is_needed_parent" == "false" ]]; then
+            candidates_for_deletion+=("$snapshot_path")
+        else
+            snapshots_to_keep+=("$snapshot_path")
+        fi
+    done
+
+    local deleted_count=0
+    local snapshot_to_delete
+    for snapshot_to_delete in "${candidates_for_deletion[@]}"; do
+        btrfs_core_debug "Attempting delete for snapshot: $snapshot_to_delete"
+        lh_log_msg "INFO" "intelligent_cleanup: Deleting old snapshot: $(basename "$(dirname "$snapshot_to_delete")")/$(basename "$snapshot_to_delete")"
+
+        if btrfs property get "$snapshot_to_delete" ro 2>/dev/null | grep -q "ro=true"; then
+            if ! btrfs property set "$snapshot_to_delete" ro false 2>/dev/null; then
+                lh_log_msg "WARN" "intelligent_cleanup: Could not remove read-only flag from: $snapshot_to_delete"
+                btrfs_core_debug "Failed to unset RO property for $snapshot_to_delete"
+            fi
+        fi
+
+        if btrfs subvolume delete "$snapshot_to_delete" 2>/dev/null; then
+            ((deleted_count++))
+            lh_log_msg "DEBUG" "intelligent_cleanup: Successfully deleted: $snapshot_to_delete"
+            btrfs_core_debug "Deleted snapshot: $snapshot_to_delete"
+
+            if declare -f delete_source_snapshot_for_bundle >/dev/null 2>&1; then
+                local cleanup_bundle cleanup_subvol
+                cleanup_bundle=$(basename "$(dirname "$snapshot_to_delete")")
+                cleanup_subvol=$(basename "$snapshot_to_delete")
+                delete_source_snapshot_for_bundle "$cleanup_bundle" "$cleanup_subvol" "retention"
+            fi
+        else
+            lh_log_msg "WARN" "intelligent_cleanup: Failed to delete snapshot: $snapshot_to_delete"
+            btrfs_core_debug "Deletion failed for snapshot: $snapshot_to_delete"
+        fi
+    done
+
+    if [[ "$deleted_count" -gt 0 ]]; then
+        lh_log_msg "INFO" "intelligent_cleanup: Deleted $deleted_count old snapshots for $subvolume_name"
+        btrfs_core_debug "Cleanup removed $deleted_count snapshots for $subvolume_name"
+    else
+        lh_log_msg "DEBUG" "intelligent_cleanup: No snapshots were safe to delete (all preserved due to incremental chain dependencies)"
+        btrfs_core_debug "Cleanup kept all snapshots for $subvolume_name"
+    fi
+
+    return 0
+}
+
+# =============================================================================
+# RECEIVING ARTIFACT MANAGEMENT (.receiving_*)
+# =============================================================================
+
+#
+# btrfs_list_receiving_dirs()
+#
+# Lists .receiving_* directories under a given base directory, using an age
+# filter in minutes to avoid in-flight operations. Outputs NUL-separated paths
+# to stdout for robust parsing.
+#
+# Parameters:
+#   $1: base_dir             - Base path to scan (e.g., $LH_BACKUP_ROOT$LH_BACKUP_DIR)
+#   $2: min_age_minutes      - Minimum age in minutes (default: 30)
+#
+# Output:
+#   NUL-separated list of matching directory paths
+#
+btrfs_list_receiving_dirs() {
+    local base_dir="$1"
+    local min_age_minutes="${2:-30}"
+
+    if [[ -z "$base_dir" || ! -d "$base_dir" ]]; then
+        lh_log_msg "DEBUG" "btrfs_list_receiving_dirs: base_dir missing or not a directory: $base_dir"
+        return 0
+    fi
+
+    # Limit search to one sublevel below backup base where subvolume dirs live
+    find "$base_dir" -mindepth 2 -maxdepth 2 -type d \( -name ".receiving_*" -o -name "*.receiving_*" \) -mmin +"$min_age_minutes" -print0 2>/dev/null || true
+}
+
+#
+# btrfs_cleanup_receiving_dir()
+#
+# Deletes a single .receiving_* directory and any subvolumes created within it.
+#
+# Parameters:
+#   $1: receiving_dir        - Path to a .receiving_* directory
+#
+# Returns:
+#   0 on success, 1 on failure
+#
+btrfs_cleanup_receiving_dir() {
+    local receiving_dir="$1"
+    if [[ -z "$receiving_dir" || ! -d "$receiving_dir" ]]; then
+        lh_log_msg "WARN" "btrfs_cleanup_receiving_dir: Not a directory: $receiving_dir"
+        return 1
+    fi
+
+    local had_error=false
+
+    if $LH_SUDO_CMD btrfs subvolume show "$receiving_dir" >/dev/null 2>&1; then
+        # Path itself is a subvolume (new staging pattern)
+        if ! $LH_SUDO_CMD btrfs subvolume delete "$receiving_dir" >/dev/null 2>&1; then
+            had_error=true
+        fi
+    else
+        # Delete any BTRFS subvolumes inside first (legacy directory pattern)
+        for s in "$receiving_dir"/*; do
+            [[ -d "$s" ]] || continue
+            if $LH_SUDO_CMD btrfs subvolume show "$s" >/dev/null 2>&1; then
+                $LH_SUDO_CMD btrfs subvolume delete "$s" >/dev/null 2>&1 || had_error=true
+            else
+                $LH_SUDO_CMD rm -rf "$s" >/dev/null 2>&1 || had_error=true
+            fi
+        done
+        # Remove the receiving directory itself
+        $LH_SUDO_CMD rmdir "$receiving_dir" >/dev/null 2>&1 || $LH_SUDO_CMD rm -rf "$receiving_dir" >/dev/null 2>&1 || had_error=true
+    fi
+
+    if [[ "$had_error" == true ]]; then
+        lh_log_msg "ERROR" "btrfs_cleanup_receiving_dir: Failed to fully remove: $receiving_dir"
+        return 1
+    fi
+    lh_log_msg "INFO" "btrfs_cleanup_receiving_dir: Removed: $receiving_dir"
+    return 0
+}
+
+# =============================================================================
+# BTRFS SPACE CHECKING
+# =============================================================================
+
+#
+# check_btrfs_space()
+#
+# BTRFS-specific space checking that accounts for metadata chunk allocation,
+# compression, and other BTRFS-specific factors that differ from traditional
+# filesystem space checking.
+#
+# CRITICAL REQUIREMENTS:
+# - Must use btrfs filesystem usage instead of df
+# - Must account for BTRFS compression and deduplication  
+# - Must detect metadata chunk exhaustion
+# - Must return proper exit codes
+#
+# Parameters:
+#   $1: filesystem_path     - BTRFS filesystem path to check
+#
+# Returns:
+#   0: Sufficient space available
+#   1: Insufficient space or error
+#   2: Metadata exhaustion detected
+#
+# Usage:
+#   check_btrfs_space "/mnt/backup"
+#
+check_btrfs_space() {
+    local filesystem_path="$1"
+    
+    # Input validation
+    if [[ -z "$filesystem_path" ]]; then
+        lh_log_msg "ERROR" "check_btrfs_space: Missing filesystem path parameter"
+        return 1
+    fi
+    
+    if [[ ! -d "$filesystem_path" ]]; then
+        lh_log_msg "ERROR" "check_btrfs_space: Filesystem path does not exist: $filesystem_path"
+        return 1
+    fi
+    
+    # Verify it's a BTRFS filesystem
+    local fstype
+    fstype=$(findmnt -n -o FSTYPE -T "$filesystem_path" 2>/dev/null)
+    if [[ "$fstype" != "btrfs" ]]; then
+        lh_log_msg "ERROR" "check_btrfs_space: Path is not on a BTRFS filesystem: $filesystem_path (detected: $fstype)"
+        return 1
+    fi
+    
+    lh_log_msg "DEBUG" "check_btrfs_space: Checking BTRFS space for: $filesystem_path"
+    
+    # Use btrfs filesystem usage for accurate BTRFS space analysis
+    local usage_output
+    if ! usage_output=$(btrfs filesystem usage "$filesystem_path" 2>&1); then
+        lh_log_msg "ERROR" "check_btrfs_space: Failed to get BTRFS filesystem usage: $usage_output"
+        return 1
+    fi
+    
+    lh_log_msg "DEBUG" "check_btrfs_space: BTRFS filesystem usage output:"
+    lh_log_msg "DEBUG" "$usage_output"
+    
+    # Parse filesystem usage for critical metrics
+    local device_size device_allocated unallocated data_free metadata_free
+    
+    # Extract device size and allocated space
+    device_size=$(echo "$usage_output" | grep "Device size:" | awk '{print $3}' | sed 's/[^0-9.]//g')
+    device_allocated=$(echo "$usage_output" | grep "Device allocated:" | awk '{print $3}' | sed 's/[^0-9.]//g')
+    unallocated=$(echo "$usage_output" | grep "Device unallocated:" | awk '{print $3}' | sed 's/[^0-9.]//g')
+    
+    # Extract free space for data and metadata
+    data_free=$(echo "$usage_output" | grep -A1 "Data," | grep "Free" | awk '{print $2}' | sed 's/[^0-9.]//g')
+    metadata_free=$(echo "$usage_output" | grep -A1 "Metadata," | grep "Free" | awk '{print $2}' | sed 's/[^0-9.]//g')
+    
+    # Convert to bytes if possible (basic conversion for common units)
+    convert_to_bytes() {
+        local value="$1"
+        local unit
+        
+        if [[ "$value" =~ ([0-9.]+)([KMGTPE]?)(i?B?)$ ]]; then
+            local number="${BASH_REMATCH[1]}"
+            unit="${BASH_REMATCH[2]}"
+            
+            case "$unit" in
+                K|Ki) echo "$number * 1024" | bc -l 2>/dev/null | cut -d. -f1 ;;
+                M|Mi) echo "$number * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 ;;
+                G|Gi) echo "$number * 1024 * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 ;;
+                T|Ti) echo "$number * 1024 * 1024 * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 ;;
+                *) echo "$number" | cut -d. -f1 ;;
+            esac
+        else
+            echo "0"
+        fi
+    }
+    
+    # Critical check: Metadata space availability
+    if [[ -n "$metadata_free" ]]; then
+        local metadata_free_bytes
+        metadata_free_bytes=$(convert_to_bytes "$metadata_free")
+        
+        lh_log_msg "DEBUG" "check_btrfs_space: Metadata free space: $metadata_free ($metadata_free_bytes bytes)"
+        
+        # Critical threshold: Less than 100MB free metadata space is dangerous for BTRFS
+        if [[ "$metadata_free_bytes" -lt $((100 * 1024 * 1024)) ]]; then  # Less than 100MB metadata free
+            lh_log_msg "ERROR" "check_btrfs_space: CRITICAL - Metadata space exhaustion detected"
+            lh_log_msg "ERROR" "Free metadata: $metadata_free (critical threshold: 100MB)"
+            lh_log_msg "ERROR" "This condition causes 'No space left on device' even with free data space"
+            lh_log_msg "ERROR" "REQUIRED: Manual 'btrfs balance' operation needed immediately"
+            lh_log_msg "ERROR" "Command: btrfs balance start -musage=0 <filesystem>"
+            return 2  # Special code for metadata exhaustion
+        elif [[ "$metadata_free_bytes" -lt $((500 * 1024 * 1024)) ]]; then  # Less than 500MB metadata free
+            lh_log_msg "WARN" "check_btrfs_space: Low metadata space warning"
+            lh_log_msg "WARN" "Free metadata: $metadata_free (warning threshold: 500MB)"
+            lh_log_msg "WARN" "Consider running 'btrfs balance' soon to prevent exhaustion"
+        fi
+    fi
+    
+    # Check overall unallocated space (Critical for new chunk allocation)
+    if [[ -n "$unallocated" ]]; then
+        local unallocated_bytes
+        unallocated_bytes=$(convert_to_bytes "$unallocated")
+        
+        lh_log_msg "DEBUG" "check_btrfs_space: Unallocated space: $unallocated ($unallocated_bytes bytes)"
+        
+        # Critical: Less than 1GB unallocated can prevent new chunk allocation
+        if [[ "$unallocated_bytes" -lt $((1024 * 1024 * 1024)) ]]; then  # Less than 1GB
+            lh_log_msg "WARN" "check_btrfs_space: Low unallocated space: $unallocated"
+            lh_log_msg "WARN" "This may prevent new metadata chunk allocation"
+            lh_log_msg "INFO" "Consider running 'btrfs balance' to reclaim fragmented space"
+        fi
+    fi
+    
+    # Check data space availability
+    if [[ -n "$data_free" ]]; then
+        local data_free_bytes
+        data_free_bytes=$(convert_to_bytes "$data_free")
+        
+        # Require at least 1GB free data space for backup operations
+        local min_data_required=$((1 * 1024 * 1024 * 1024))
+        if [[ "$data_free_bytes" -lt "$min_data_required" ]]; then
+            lh_log_msg "WARN" "check_btrfs_space: Low data space detected (free: $data_free)"
+        fi
+    fi
+    
+    lh_log_msg "DEBUG" "check_btrfs_space: Space check completed successfully"
+    return 0
+}
+
+#
+# get_btrfs_available_space()
+#
+# Returns accurate available space in bytes for BTRFS filesystem,
+# accounting for BTRFS-specific factors like compression and metadata overhead.
+#
+# CRITICAL REQUIREMENTS:
+# - Must return space in bytes as integer
+# - Must account for BTRFS metadata overhead
+# - Must handle compression ratios
+# - Must work with RAID configurations
+#
+# Parameters:
+#   $1: filesystem_path     - BTRFS filesystem path
+#
+# Returns:
+#   Prints available space in bytes to stdout
+#   Exit code: 0 on success, 1 on error
+#
+# Usage:
+#   available_bytes=$(get_btrfs_available_space "/mnt/backup")
+#
+get_btrfs_available_space() {
+    local filesystem_path="$1"
+    
+    # Input validation
+    if [[ -z "$filesystem_path" ]]; then
+        lh_log_msg "ERROR" "get_btrfs_available_space: Missing filesystem path parameter" >&2
+        return 1
+    fi
+    
+    if [[ ! -d "$filesystem_path" ]]; then
+        lh_log_msg "ERROR" "get_btrfs_available_space: Filesystem path does not exist: $filesystem_path" >&2
+        return 1
+    fi
+    
+    # Get BTRFS filesystem usage
+    local usage_output
+    if ! usage_output=$(btrfs filesystem usage "$filesystem_path" 2>/dev/null); then
+        lh_log_msg "ERROR" "get_btrfs_available_space: Failed to get BTRFS filesystem usage" >&2
+        return 1
+    fi
+    
+    # Extract "Free (estimated)" which represents the actual available space
+    # This is the most accurate measure of free space in BTRFS
+    local free_space
+    free_space=$(echo "$usage_output" | grep "Free (estimated):" | awk '{print $3}')
+    
+    # Convert to bytes
+    local free_space_bytes=0
+    if [[ -n "$free_space" ]]; then
+        # Use sed to extract number and unit parts
+        local number=$(echo "$free_space" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\1/p')
+        local unit=$(echo "$free_space" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\2/p')
+        
+        if [[ -n "$number" && -n "$unit" ]]; then
+            case "$unit" in
+                K|KB|Ki|KiB) free_space_bytes=$(echo "$number * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1024" | awk '{print int($1 * $2)}') ;;
+                M|MB|Mi|MiB) free_space_bytes=$(echo "$number * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1048576" | awk '{print int($1 * $2)}') ;;
+                G|GB|Gi|GiB) free_space_bytes=$(echo "$number * 1024 * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1073741824" | awk '{print int($1 * $2)}') ;;
+                T|TB|Ti|TiB) free_space_bytes=$(echo "$number * 1024 * 1024 * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1099511627776" | awk '{print int($1 * $2)}') ;;
+                *) free_space_bytes=$(echo "$number" | cut -d. -f1) ;;
+            esac
+        fi
+    fi
+    
+    # Fallback to device unallocated space if Free (estimated) is not found or zero
+    if [[ "$free_space_bytes" -eq 0 ]]; then
+        local unallocated
+        unallocated=$(echo "$usage_output" | grep "Device unallocated:" | awk '{print $3}')
+        
+        if [[ -n "$unallocated" ]]; then
+            # Use sed to extract number and unit parts
+            local number=$(echo "$unallocated" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\1/p')
+            local unit=$(echo "$unallocated" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\2/p')
+            
+            if [[ -n "$number" && -n "$unit" ]]; then
+                case "$unit" in
+                    K|KB|Ki|KiB) free_space_bytes=$(echo "$number * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1024" | awk '{print int($1 * $2)}') ;;
+                    M|MB|Mi|MiB) free_space_bytes=$(echo "$number * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1048576" | awk '{print int($1 * $2)}') ;;
+                    G|GB|Gi|GiB) free_space_bytes=$(echo "$number * 1024 * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1073741824" | awk '{print int($1 * $2)}') ;;
+                    T|TB|Ti|TiB) free_space_bytes=$(echo "$number * 1024 * 1024 * 1024 * 1024" | bc -l 2>/dev/null | cut -d. -f1 || echo "$number 1099511627776" | awk '{print int($1 * $2)}') ;;
+                    *) free_space_bytes=$(echo "$number" | cut -d. -f1) ;;
+                esac
+            fi
+        fi
+    fi
+    
+    # Ensure we return a valid number
+    if [[ ! "$free_space_bytes" =~ ^[0-9]+$ ]]; then
+        free_space_bytes=0
+    fi
+    
+    echo "$free_space_bytes"
+    return 0
+}
+
+# =============================================================================
+# FILESYSTEM HEALTH CHECKING
+# =============================================================================
+
+#
+# check_filesystem_health()
+#
+# Validates BTRFS filesystem health before backup operations to prevent
+# backup corruption and ensure reliable operations.
+#
+# CRITICAL REQUIREMENTS:
+# - Must run btrfs scrub status if available
+# - Must check for filesystem errors
+# - Must validate mount options
+# - Must detect read-only mode issues
+#
+# Parameters:
+#   $1: filesystem_path     - Filesystem path to check
+#
+# Returns:
+#   0: Filesystem healthy
+#   1: Health issues detected
+#   2: Filesystem read-only or corrupted
+#
+# Usage:
+#   check_filesystem_health "/mnt/backup"
+#
+check_filesystem_health() {
+    local filesystem_path="$1"
+    
+    # Input validation
+    if [[ -z "$filesystem_path" ]]; then
+        lh_log_msg "ERROR" "check_filesystem_health: Missing filesystem path parameter"
+        return 1
+    fi
+    
+    if [[ ! -d "$filesystem_path" ]]; then
+        lh_log_msg "ERROR" "check_filesystem_health: Filesystem path does not exist: $filesystem_path"
+        return 1
+    fi
+    
+    lh_log_msg "DEBUG" "check_filesystem_health: Starting health check for: $filesystem_path"
+    
+    # Verify it's a BTRFS filesystem
+    local fstype
+    fstype=$(findmnt -n -o FSTYPE -T "$filesystem_path" 2>/dev/null)
+    if [[ "$fstype" != "btrfs" ]]; then
+        lh_log_msg "ERROR" "check_filesystem_health: Path is not on a BTRFS filesystem: $filesystem_path (detected: $fstype)"
+        return 1
+    fi
+    
+    # Check mount options for read-only state
+    local mount_opts
+    mount_opts=$(findmnt -n -o OPTIONS -T "$filesystem_path" 2>/dev/null)
+    if [[ "$mount_opts" =~ ro(,|$) ]]; then
+        lh_log_msg "ERROR" "check_filesystem_health: Filesystem mounted read-only: $filesystem_path"
+        lh_log_msg "ERROR" "Mount options: $mount_opts"
+        return 2
+    fi
+    
+    # Test write access with a simple test
+    local test_file="${filesystem_path}/.btrfs_health_check_$$"
+    if ! $LH_SUDO_CMD touch "$test_file" 2>/dev/null; then
+        lh_log_msg "ERROR" "check_filesystem_health: Cannot write to filesystem: $filesystem_path"
+        return 2
+    else
+        $LH_SUDO_CMD rm -f "$test_file" 2>/dev/null
+    fi
+    
+    # Check for BTRFS errors in recent dmesg
+    local recent_errors
+    recent_errors=$($LH_SUDO_CMD dmesg | tail -50 | grep -i "btrfs.*error\|btrfs.*corrupt\|btrfs.*abort\|btrfs.*csum\|parent transid verify failed" || true)
+    if [[ -n "$recent_errors" ]]; then
+        lh_log_msg "WARN" "check_filesystem_health: Recent BTRFS errors found in dmesg:"
+        while IFS= read -r error_line; do
+            lh_log_msg "WARN" "  $error_line"
+            
+            # Check for critical corruption indicators
+            if echo "$error_line" | grep -qi "parent transid verify failed\|csum.*error\|abort"; then
+                lh_log_msg "ERROR" "check_filesystem_health: Critical filesystem corruption detected"
+                return 4  # Filesystem corruption
+            fi
+        done <<< "$recent_errors"
+    fi
+    
+    # BTRFS scrub status check
+    local scrub_status
+    if scrub_status=$($LH_SUDO_CMD btrfs scrub status "$filesystem_path" 2>/dev/null); then
+        lh_log_msg "DEBUG" "check_filesystem_health: BTRFS scrub status retrieved"
+        
+        # Check for active scrub
+        if echo "$scrub_status" | grep -q "running"; then
+            lh_log_msg "INFO" "check_filesystem_health: BTRFS scrub is currently running"
+        fi
+        
+        # Check for errors in last scrub
+        if echo "$scrub_status" | grep -qE "with [1-9][0-9]* errors|[1-9][0-9]* errors found"; then
+            local error_count
+            error_count=$(echo "$scrub_status" | grep -oE "[0-9]+ errors" | head -n1 | awk '{print $1}')
+            lh_log_msg "WARN" "check_filesystem_health: BTRFS scrub found $error_count errors"
+            lh_log_msg "WARN" "Consider running 'btrfs scrub start $filesystem_path' to fix correctable errors"
+        fi
+        
+        # Check for uncorrectable errors (critical)
+        if echo "$scrub_status" | grep -qi "uncorrectable"; then
+            lh_log_msg "ERROR" "check_filesystem_health: BTRFS scrub found uncorrectable errors"
+            lh_log_msg "ERROR" "This indicates serious data corruption requiring manual intervention"
+            return 4  # Filesystem corruption detected
+        fi
+    else
+        lh_log_msg "DEBUG" "check_filesystem_health: Could not get BTRFS scrub status (may be normal)"
+    fi
+    
+    # Additional proactive check: Verify BTRFS operations work
+    local temp_subvol="${filesystem_path}/.health_check_subvol_$$"
+    if ! $LH_SUDO_CMD btrfs subvolume create "$temp_subvol" >/dev/null 2>&1; then
+        lh_log_msg "ERROR" "check_filesystem_health: Cannot create test subvolume - filesystem may be corrupted"
+        return 2
+    else
+        # Clean up test subvolume
+        $LH_SUDO_CMD btrfs subvolume delete "$temp_subvol" >/dev/null 2>&1 || true
+    fi
+    
+    lh_log_msg "DEBUG" "check_filesystem_health: Health check completed successfully"
+    return 0
+}
+
+# =============================================================================
+# ENHANCED ERROR HANDLING
+# =============================================================================
+
+#
+# handle_btrfs_error()
+#
+# Analyzes BTRFS-specific error patterns and provides appropriate responses
+# based on common BTRFS error scenarios.
+#
+# CRITICAL REQUIREMENTS:
+# - Must detect "cannot find parent subvolume" for fallback logic
+# - Must identify metadata exhaustion vs general space issues
+# - Must detect filesystem corruption patterns
+# - Must provide specific guidance for each error type
+#
+# Parameters:
+#   $1: error_output        - Error message/output from failed BTRFS command
+#   $2: operation          - Description of the operation that failed
+#   $3: exit_code          - Exit code from the failed command
+#
+# Returns:
+#   0: Error handled, operation can continue
+#   1: Fatal error, operation should abort
+#   2: Parent validation failed, fallback to full backup recommended
+#   3: Metadata exhaustion detected
+#   4: Filesystem corruption detected
+#
+# Usage:
+#   handle_btrfs_error "$error_msg" "send/receive" "$?"
+#
+handle_btrfs_error() {
+    local error_output="$1"
+    local operation="$2"
+    local exit_code="$3"
+    
+    lh_log_msg "DEBUG" "handle_btrfs_error: Analyzing BTRFS error"
+    lh_log_msg "DEBUG" "  Operation: $operation"
+    lh_log_msg "DEBUG" "  Exit code: $exit_code"
+    lh_log_msg "DEBUG" "  Error output: $error_output"
+    
+    # Critical error patterns from BTRFS operations
+    if echo "$error_output" | grep -qi "cannot find parent subvolume"; then
+        lh_log_msg "WARN" "BTRFS ERROR: Parent subvolume not found on destination"
+        lh_log_msg "WARN" "The parent snapshot specified for incremental backup does not exist on destination"
+        lh_log_msg "WARN" "This indicates broken incremental backup chain - often caused by rotation logic"
+        lh_log_msg "INFO" "RECOVERY: Automatic fallback to full backup recommended"
+        lh_log_msg "INFO" "Diagnostic command: btrfs subvolume list <destination-path>"
+        return 2  # Special code for parent not found - allows fallback
+        
+    elif echo "$error_output" | grep -qi "no space left on device"; then
+        # Critical: Distinguish between metadata exhaustion and general space issues
+        local recent_dmesg filesystem_usage
+        recent_dmesg=$(dmesg | tail -20 | grep -i "btrfs.*metadata\|btrfs.*ENOSPC\|btrfs.*chunk" || echo "")
+        
+        # Check for metadata-specific exhaustion patterns
+        if echo "$recent_dmesg" | grep -qi "metadata.*chunk\|metadata.*ENOSPC\|unable to find space.*metadata"; then
+            lh_log_msg "ERROR" "BTRFS CRITICAL: Metadata chunk exhaustion detected"
+            lh_log_msg "ERROR" "This is often not a lack of total storage, but a shortage of metadata chunks"
+            lh_log_msg "ERROR" "This is NOT a simple disk full condition"
+            lh_log_msg "ERROR" "REQUIRED: Manual intervention with 'btrfs balance' needed"
+            lh_log_msg "ERROR" "Command: btrfs balance start -musage=0 <filesystem>"
+            lh_log_msg "ERROR" "Diagnosis: btrfs filesystem usage <filesystem>"
+            return 3  # Metadata exhaustion requires manual intervention
+        else
+            lh_log_msg "ERROR" "BTRFS ERROR: General space exhaustion"
+            lh_log_msg "INFO" "Check available space and cleanup if needed"
+            lh_log_msg "INFO" "Diagnosis: df -h <filesystem> && btrfs filesystem usage <filesystem>"
+            return 1  # General space issue
+        fi
+        
+    elif echo "$error_output" | grep -qi "read-only file system"; then
+        # Check mount options and filesystem status
+        lh_log_msg "ERROR" "BTRFS ERROR: Filesystem is read-only"
+        lh_log_msg "WARN" "Possible causes:"
+        lh_log_msg "WARN" "  1) Explicitly mounted read-only"
+        lh_log_msg "WARN" "  2) BTRFS detected corruption and switched to read-only mode"
+        lh_log_msg "INFO" "DIAGNOSIS: Check 'grep <filesystem> /proc/mounts' for mount options"
+        lh_log_msg "INFO" "DIAGNOSIS: Check 'dmesg | grep btrfs' for corruption messages"
+        lh_log_msg "INFO" "Command: mountpoint -q <filesystem-path>"
+        return 2  # Read-only requires investigation
+        
+    elif echo "$error_output" | grep -qi "destination.*not a mountpoint\|not.*mountpoint"; then
+        lh_log_msg "ERROR" "BTRFS ERROR: Backup destination not mounted"
+        lh_log_msg "INFO" "External backup medium not properly mounted"
+        lh_log_msg "INFO" "DIAGNOSIS: Check if external backup medium is properly mounted"
+        lh_log_msg "INFO" "COMMAND: mountpoint -q <destination_path>"
+        lh_log_msg "INFO" "COMMAND: findmnt -T <destination_path>"
+        return 1  # Configuration/setup issue
+        
+    elif echo "$error_output" | grep -qi "permission denied\|operation not permitted"; then
+        lh_log_msg "ERROR" "BTRFS ERROR: Insufficient permissions"
+        lh_log_msg "INFO" "BTRFS operations typically require root privileges"
+        lh_log_msg "INFO" "DIAGNOSIS: COMMAND: whoami (should show 'root')"
+        lh_log_msg "INFO" "DIAGNOSIS: Check EUID: echo \$EUID (should be 0)"
+        return 1  # Permission issue
+        
+    elif echo "$error_output" | grep -qi "parent transid verify failed"; then
+        lh_log_msg "ERROR" "BTRFS CRITICAL: Parent transaction ID verification failed"
+        lh_log_msg "ERROR" "This indicates serious metadata corruption in filesystem tree"
+        lh_log_msg "ERROR" "Severe metadata error that often indicates inconsistency in filesystem tree"
+        lh_log_msg "ERROR" "MANUAL INTERVENTION REQUIRED - Do NOT continue automated operations"
+        lh_log_msg "ERROR" "RECOVERY: Consider 'mount -o usebackuproot' for emergency access"
+        lh_log_msg "ERROR" "RECOVERY: Run 'btrfs check --readonly <device>' for detailed analysis"
+        lh_log_msg "ERROR" "DIAGNOSIS: dmesg | grep -i btrfs"
+        return 4  # Filesystem corruption - requires manual intervention
+        
+    elif echo "$error_output" | grep -qi "checksum.*error\|csum.*error\|crc.*error"; then
+        lh_log_msg "ERROR" "BTRFS CRITICAL: Data checksum error detected"
+        lh_log_msg "ERROR" "This indicates data corruption or hardware issues"
+        lh_log_msg "WARN" "HARDWARE: Check storage device health with smartctl"
+        lh_log_msg "INFO" "RECOVERY: 'btrfs scrub start <filesystem>' may fix correctable errors"
+        lh_log_msg "INFO" "DIAGNOSIS: smartctl -a <device>"
+        lh_log_msg "INFO" "DIAGNOSIS: btrfs scrub status <filesystem>"
+        return 4  # Data corruption detected
+        
+    elif echo "$error_output" | grep -qi "operation not supported"; then
+        lh_log_msg "WARN" "BTRFS WARNING: Operation not supported"
+        lh_log_msg "INFO" "Possible kernel version or feature compatibility issue"
+        lh_log_msg "INFO" "DIAGNOSIS: uname -r (check kernel version)"
+        lh_log_msg "INFO" "DIAGNOSIS: btrfs version"
+        return 1  # Compatibility issue
+        
+    elif echo "$error_output" | grep -qi "invalid argument\|invalid option"; then
+        lh_log_msg "ERROR" "BTRFS ERROR: Invalid argument or option"
+        lh_log_msg "INFO" "Possible command syntax error or feature not supported"
+        lh_log_msg "INFO" "DIAGNOSIS: Check command syntax and BTRFS version compatibility"
+        return 1  # Syntax or compatibility issue
+        
+    elif echo "$error_output" | grep -qi "device or resource busy"; then
+        lh_log_msg "ERROR" "BTRFS ERROR: Device or resource busy"
+        lh_log_msg "INFO" "Subvolume may be in use or mounted elsewhere"
+        lh_log_msg "INFO" "DIAGNOSIS: lsof +D <subvolume_path>"
+        lh_log_msg "INFO" "DIAGNOSIS: fuser -vm <subvolume_path>"
+        return 1  # Resource busy issue
+        
+    elif echo "$error_output" | grep -qi "not a btrfs\|wrong fs type"; then
+        lh_log_msg "ERROR" "BTRFS ERROR: Not a BTRFS filesystem"
+        lh_log_msg "INFO" "Target path is not on a BTRFS filesystem"
+        lh_log_msg "INFO" "DIAGNOSIS: findmnt -T <path>"
+        lh_log_msg "INFO" "DIAGNOSIS: btrfs filesystem show"
+        return 1  # Wrong filesystem type
+        
+    else
+        # Generic error - log for analysis but don't make assumptions
+        lh_log_msg "WARN" "BTRFS ERROR: Unrecognized error pattern in operation '$operation'"
+        lh_log_msg "WARN" "Exit code: $exit_code"
+        lh_log_msg "DEBUG" "Full error output: $error_output"
+        lh_log_msg "INFO" "Consider checking system logs: dmesg | tail -20"
+        return 1  # Generic error
+    fi
+}
+
+# =============================================================================
+# RECEIVED_UUID PROTECTION (Critical for incremental backup chains)
+# =============================================================================
+
+#
+# verify_received_uuid_integrity()
+#
+# CRITICAL FUNCTION: Verifies received snapshot integrity
+# When read-only protection is removed from a received snapshot with 
+# 'btrfs property set ... ro false', the received_uuid is irreversibly deleted.
+# This breaks the incremental backup chain.
+#
+# This function verifies that received snapshots maintain their received_uuid and prevents
+# any operations that would break incremental backup chains.
+#
+# Parameters:
+#   $1: snapshot_path    - Path to snapshot to verify
+#
+# Returns:
+#   0: Snapshot has valid received_uuid or is not a received snapshot
+#   1: Snapshot has lost received_uuid (chain is broken)
+#   2: Snapshot path invalid
+#
+# Usage:
+#   verify_received_uuid_integrity "/mnt/backup/snapshots/home_2025-07-06"
+#
+verify_received_uuid_integrity() {
+    local snapshot_path="$1"
+    
+    if [[ -z "$snapshot_path" ]]; then
+        lh_log_msg "ERROR" "verify_received_uuid_integrity: Missing snapshot path parameter"
+        return 2
+    fi
+    
+    if [[ ! -d "$snapshot_path" ]]; then
+        lh_log_msg "ERROR" "verify_received_uuid_integrity: Snapshot path does not exist: $snapshot_path"
+        return 2
+    fi
+    
+    # Check if this is a received snapshot by looking for received_uuid
+    local received_uuid
+    received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+    
+    # If there's no received_uuid or it's "-", this is either:
+    # 1. A locally created snapshot (not received) - this is OK
+    # 2. A received snapshot that lost its received_uuid - this is BAD
+    if [[ -z "$received_uuid" || "$received_uuid" == "-" ]]; then
+        # Check if this snapshot was ever received by looking for .backup_complete marker
+        local marker_file="${snapshot_path}.backup_complete"
+        if [[ -f "$marker_file" ]]; then
+            # This snapshot was created by our backup system but lost its received_uuid
+            lh_log_msg "ERROR" "verify_received_uuid_integrity: CRITICAL - Received snapshot lost received_uuid!"
+            lh_log_msg "ERROR" "Snapshot: $snapshot_path"
+            lh_log_msg "ERROR" "This breaks incremental backup chains"
+            lh_log_msg "ERROR" "Cause: Someone modified this snapshot with 'btrfs property set ... ro false'"
+            lh_log_msg "WARN" "Recovery: Full backup required to re-establish chain"
+            return 1
+        else
+            # This is likely a locally created snapshot, which is fine
+            lh_log_msg "DEBUG" "verify_received_uuid_integrity: Local snapshot (no received_uuid expected): $snapshot_path"
+            return 0
+        fi
+    else
+        # Valid received snapshot with proper received_uuid
+        lh_log_msg "DEBUG" "verify_received_uuid_integrity: Valid received snapshot with UUID: $received_uuid"
+        return 0
+    fi
+}
+
+#
+# protect_received_snapshots()
+#
+# Scans backup directory and identifies any received snapshots that have lost their
+# received_uuid, warning about broken incremental chains.
+#
+# Parameters:
+#   $1: backup_directory    - Directory containing backup snapshots
+#
+# Returns:
+#   0: All received snapshots intact
+#   1: One or more received snapshots have broken chains
+#
+# Usage:
+#   protect_received_snapshots "/mnt/backup/snapshots"
+#
+protect_received_snapshots() {
+    local backup_directory="$1"
+    
+    if [[ -z "$backup_directory" ]]; then
+        lh_log_msg "ERROR" "protect_received_snapshots: Missing backup directory parameter"
+        return 1
+    fi
+    
+    if [[ ! -d "$backup_directory" ]]; then
+        lh_log_msg "DEBUG" "protect_received_snapshots: Backup directory does not exist: $backup_directory"
+        return 0
+    fi
+    
+    lh_log_msg "DEBUG" "protect_received_snapshots: Scanning for received_uuid integrity in: $backup_directory"
+    
+    local broken_chains=0
+    local total_received_snapshots=0
+    
+    # Find all snapshots with .backup_complete markers (these should be received snapshots)
+    while IFS= read -r -d '' marker_file; do
+        local snapshot_path="${marker_file%.backup_complete}"
+        
+        if [[ -d "$snapshot_path" ]]; then
+            ((total_received_snapshots++))
+            
+            if ! verify_received_uuid_integrity "$snapshot_path"; then
+                local exit_code=$?
+                if [[ "$exit_code" -eq 1 ]]; then
+                    ((broken_chains++))
+                    lh_log_msg "WARN" "protect_received_snapshots: Broken chain detected: $(basename "$snapshot_path")"
+                fi
+            fi
+        fi
+    done < <(find "$backup_directory" -name "*.backup_complete" -print0 2>/dev/null)
+    
+    if [[ "$broken_chains" -gt 0 ]]; then
+        lh_log_msg "WARN" "protect_received_snapshots: Found $broken_chains broken incremental chains out of $total_received_snapshots received snapshots"
+        lh_log_msg "WARN" "This requires fallback to full backup to re-establish chains"
+        return 1
+    else
+        lh_log_msg "DEBUG" "protect_received_snapshots: All $total_received_snapshots received snapshots have intact chains"
+        return 0
+    fi
+}
+
+# =============================================================================
+# COMPREHENSIVE VALIDATION
+# =============================================================================
+
+#
+# validate_btrfs_implementation()
+#
+# COMPREHENSIVE VALIDATION: Tests all critical BTRFS functions
+# This function verifies that the implementation follows all mandatory patterns.
+#
+# Parameters: None
+#
+# Returns:
+#   0: All validations passed
+#   1: One or more critical issues found
+#
+# Usage:
+#   validate_btrfs_implementation
+#
+validate_btrfs_implementation() {
+    # Ensure pipefail is set for this validation
+    ensure_pipefail
+    
+    lh_log_msg "INFO" "validate_btrfs_implementation: Starting comprehensive BTRFS implementation validation"
+    
+    local validation_errors=0
+    local validation_warnings=0
+    
+    # Test 1: Verify atomic_receive_with_validation function exists and is exported
+    if ! declare -f atomic_receive_with_validation >/dev/null 2>&1; then
+        lh_log_msg "ERROR" "CRITICAL: atomic_receive_with_validation function not found"
+        ((validation_errors++))
+    else
+        lh_log_msg "DEBUG" "✓ atomic_receive_with_validation function available"
+    fi
+    
+    # Test 2: Verify validate_parent_snapshot_chain function exists and is exported
+    if ! declare -f validate_parent_snapshot_chain >/dev/null 2>&1; then
+        lh_log_msg "ERROR" "CRITICAL: validate_parent_snapshot_chain function not found"
+        ((validation_errors++))
+    else
+        lh_log_msg "DEBUG" "✓ validate_parent_snapshot_chain function available"
+    fi
+    
+    # Test 3: Verify intelligent_cleanup function exists and is exported
+    if ! declare -f intelligent_cleanup >/dev/null 2>&1; then
+        lh_log_msg "ERROR" "CRITICAL: intelligent_cleanup function not found"
+        ((validation_errors++))
+    else
+        lh_log_msg "DEBUG" "✓ intelligent_cleanup function available"
+    fi
+    
+    # Test 4: Verify handle_btrfs_error function exists and handles critical patterns
+    if ! declare -f handle_btrfs_error >/dev/null 2>&1; then
+        lh_log_msg "ERROR" "CRITICAL: handle_btrfs_error function not found"
+        ((validation_errors++))
+    else
+        # Test critical error pattern recognition with proper isolation
+        local test_exit_code
+        # Use a subshell to isolate the test and capture only the exit code
+        (handle_btrfs_error "ERROR: cannot find parent subvolume" "test" "1" >/dev/null 2>&1)
+        test_exit_code=$?
+        
+        if [[ "$test_exit_code" -eq 2 ]]; then
+            lh_log_msg "DEBUG" "✓ handle_btrfs_error correctly identifies parent subvolume errors"
+        else
+            lh_log_msg "WARN" "handle_btrfs_error may not correctly handle parent subvolume errors (exit code: $test_exit_code)"
+            ((validation_warnings++))
+        fi
+    fi
+    
+    # Test 5: Verify received_uuid protection functions
+    if ! declare -f verify_received_uuid_integrity >/dev/null 2>&1; then
+        lh_log_msg "ERROR" "CRITICAL: verify_received_uuid_integrity function not found"
+        ((validation_errors++))
+    else
+        lh_log_msg "DEBUG" "✓ verify_received_uuid_integrity function available"
+    fi
+    
+    if ! declare -f protect_received_snapshots >/dev/null 2>&1; then
+        lh_log_msg "ERROR" "CRITICAL: protect_received_snapshots function not found"
+        ((validation_errors++))
+    else
+        lh_log_msg "DEBUG" "✓ protect_received_snapshots function available"
+    fi
+    
+    # Test 6: Verify BTRFS space checking functions
+    if ! declare -f check_btrfs_space >/dev/null 2>&1; then
+        lh_log_msg "ERROR" "CRITICAL: check_btrfs_space function not found"
+        ((validation_errors++))
+    else
+        lh_log_msg "DEBUG" "✓ check_btrfs_space function available"
+    fi
+    
+    # Test 7: Verify filesystem health checking
+    if ! declare -f check_filesystem_health >/dev/null 2>&1; then
+        lh_log_msg "ERROR" "CRITICAL: check_filesystem_health function not found"
+        ((validation_errors++))
+    else
+        lh_log_msg "DEBUG" "✓ check_filesystem_health function available"
+    fi
+    
+    # Test 8: Verify btrfs command availability
+    if ! command -v btrfs >/dev/null 2>&1; then
+        lh_log_msg "ERROR" "CRITICAL: btrfs command not available in PATH"
+        ((validation_errors++))
+    else
+        local btrfs_version
+        btrfs_version=$(btrfs version 2>/dev/null | head -n1 || echo "unknown")
+        lh_log_msg "DEBUG" "✓ btrfs command available: $btrfs_version"
+    fi
+    
+    # Test 9: Check if set -o pipefail is active (critical)
+    # Ensure pipefail is set before checking
+    ensure_pipefail
+    lh_log_msg "DEBUG" "Current bash options: $-"
+    
+    # Check pipefail using set -o instead of $- which only shows short options
+    local pipefail_status
+    pipefail_status=$(set -o | grep pipefail | awk '{print $2}')
+    
+    if [[ "$pipefail_status" != "on" ]]; then
+        lh_log_msg "WARN" "pipefail not set - this may cause issues with pipe error detection"
+        lh_log_msg "DEBUG" "Attempting to set pipefail again"
+        set -o pipefail
+        pipefail_status=$(set -o | grep pipefail | awk '{print $2}')
+        if [[ "$pipefail_status" != "on" ]]; then
+            lh_log_msg "WARN" "Unable to enable pipefail - may be a shell limitation"
+        else
+            lh_log_msg "DEBUG" "pipefail successfully enabled on retry"
+        fi
+        ((validation_warnings++))
+    else
+        lh_log_msg "DEBUG" "✓ pipefail is properly set for pipe error detection"
+    fi
+    
+    # Test 10: Verify atomic backup pattern implementation (hybrid check)
+    # This validates both the function existence AND its documentation
+    lh_log_msg "DEBUG" "Atomic pattern validation: checking function and documentation"
+    
+    # Step 1: Check if the critical atomic function exists
+    if ! declare -f atomic_receive_with_validation >/dev/null 2>&1; then
+        lh_log_msg "ERROR" "Critical function missing: atomic_receive_with_validation"
+        lh_log_msg "ERROR" "  This function is required for atomic backup operations"
+        lh_log_msg "ERROR" "  Expected location: lib/btrfs/10_core.sh"
+        ((validation_errors++))
+    else
+        lh_log_msg "DEBUG" "✓ atomic_receive_with_validation function is available"
+        
+        # Step 2: Verify the atomic pattern is documented
+        local atomic_function_path="${LH_ROOT_DIR:-.}/lib/lib_btrfs.sh"
+        if [[ -f "$atomic_function_path" ]]; then
+            lh_log_msg "DEBUG" "Atomic pattern documentation check: scanning $atomic_function_path"
+            
+            # Check for documentation using flexible pattern matching
+            local doc_patterns=(
+                "Step 1.*Receive"
+                "Step 2.*Stage"
+                "Step 3.*Atomic"
+                "Step 4.*Cleanup"
+            )
+            
+            local missing_docs=()
+            for pattern in "${doc_patterns[@]}"; do
+                if grep -E -q "$pattern" "$atomic_function_path"; then
+                    lh_log_msg "DEBUG" "  Found documentation for: $pattern"
+                else
+                    missing_docs+=("$pattern")
+                fi
+            done
+            
+            if [[ ${#missing_docs[@]} -eq 0 ]]; then
+                lh_log_msg "DEBUG" "✓ Atomic backup pattern is properly implemented and documented"
+            else
+                lh_log_msg "WARN" "Atomic function exists but documentation may be incomplete"
+                lh_log_msg "WARN" "  Missing documentation for ${#missing_docs[@]} step(s)"
+                for doc in "${missing_docs[@]}"; do
+                    lh_log_msg "WARN" "    - $doc"
+                done
+                lh_log_msg "INFO" "  Consider adding complete 4-step documentation to: $atomic_function_path"
+                ((validation_warnings++))
+            fi
+        else
+            lh_log_msg "WARN" "Documentation check skipped: file not found at $atomic_function_path"
+            ((validation_warnings++))
+        fi
+    fi
+    
+    # Summary
+    lh_log_msg "INFO" "BTRFS Implementation Validation Complete:"
+    lh_log_msg "INFO" "  Errors: $validation_errors"
+    lh_log_msg "INFO" "  Warnings: $validation_warnings"
+    
+    if [[ "$validation_errors" -eq 0 ]]; then
+        lh_log_msg "INFO" "✓ BTRFS implementation validation PASSED - all critical functions available"
+        if [[ "$validation_warnings" -gt 0 ]]; then
+            lh_log_msg "WARN" "⚠ $validation_warnings warnings found - check logs for details"
+        fi
+        return 0
+    else
+        lh_log_msg "ERROR" "✗ BTRFS implementation validation FAILED - $validation_errors critical issues found"
+        return 1
+    fi
+}
+
+# =============================================================================
+# SUBVOLUME DETECTION AND MANAGEMENT
+# =============================================================================
+
+#
+# detect_btrfs_subvolumes()
+#
+# Automatically detects BTRFS subvolumes from system configuration files and active mounts.
+# This function is used by both backup and restore operations.
+#
+# MECHANISM:
+# - Scans /etc/fstab for BTRFS entries with subvol= options
+# - Parses /proc/mounts for active BTRFS subvolumes
+# - Filters for @-prefixed subvolumes commonly used for system organization
+# - Removes duplicates and returns unique subvolume names
+#
+# RETURNS:
+# - Array of detected subvolume names (e.g., "@", "@home", "@var")
+#
+# USAGE:
+# readarray -t detected_subvolumes < <(detect_btrfs_subvolumes)
+#
+detect_btrfs_subvolumes() {
+    lh_log_msg "DEBUG" "Starting automatic BTRFS subvolume detection" >&2
+    local detected_subvolumes=()
+    declare -A seen_subvols
+    
+    # Parse /etc/fstab for subvol= entries
+    if [[ -r "/etc/fstab" ]]; then
+        lh_log_msg "DEBUG" "Scanning /etc/fstab for BTRFS subvolume entries" >&2
+        while IFS= read -r line; do
+            # Skip comments and empty lines
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line// }" ]] && continue
+            
+            # Look for BTRFS entries with subvol= option
+            if [[ "$line" =~ btrfs ]] && [[ "$line" =~ subvol= ]]; then
+                local subvol_name
+                subvol_name=$(echo "$line" | sed -n 's/.*subvol=\([^,[:space:]]*\).*/\1/p')
+                if [[ -n "$subvol_name" && "$subvol_name" =~ ^/@ ]]; then
+                    # Remove the leading / to get just the subvolume name
+                    subvol_name="${subvol_name#/}"
+                    lh_log_msg "DEBUG" "Found subvolume in /etc/fstab: $subvol_name" >&2
+                    detected_subvolumes+=("$subvol_name")
+                    seen_subvols["$subvol_name"]=1
+                fi
+            fi
+        done < "/etc/fstab"
+    fi
+    
+    # Parse /proc/mounts for active BTRFS subvolumes
+    if [[ -r "/proc/mounts" ]]; then
+        lh_log_msg "DEBUG" "Scanning /proc/mounts for active BTRFS subvolumes" >&2
+        while IFS= read -r line; do
+            # Look for BTRFS entries with subvol= option
+            if [[ "$line" =~ btrfs ]] && [[ "$line" =~ subvol= ]]; then
+                local subvol_name
+                subvol_name=$(echo "$line" | sed -n 's/.*subvol=\([^,[:space:]]*\).*/\1/p')
+                if [[ -n "$subvol_name" && "$subvol_name" =~ ^/@ ]]; then
+                    # Remove the leading / to get just the subvolume name
+                    subvol_name="${subvol_name#/}"
+                    if [[ -z "${seen_subvols[$subvol_name]}" ]]; then
+                        lh_log_msg "DEBUG" "Found active subvolume in /proc/mounts: $subvol_name" >&2
+                        detected_subvolumes+=("$subvol_name")
+                        seen_subvols["$subvol_name"]=1
+                    fi
+                fi
+            fi
+        done < "/proc/mounts"
+    fi
+    
+    # Sort and remove duplicates
+    if [[ ${#detected_subvolumes[@]} -gt 0 ]]; then
+        IFS=$'\n' detected_subvolumes=($(sort -u <<<"${detected_subvolumes[*]}"))
+        unset IFS
+        lh_log_msg "INFO" "Auto-detected subvolumes: ${detected_subvolumes[*]}" >&2
+        printf '%s\n' "${detected_subvolumes[@]}"
+    else
+        lh_log_msg "WARN" "No BTRFS subvolumes auto-detected" >&2
+    fi
+}
+
+#
+# get_btrfs_subvolumes()
+#
+# Determines the final list of BTRFS subvolumes by combining configured and auto-detected subvolumes.
+# This unified function replaces the separate get_backup_subvolumes() and get_restore_subvolumes() functions.
+#
+# MECHANISM:
+# - Parses manually configured subvolumes from LH_BACKUP_SUBVOLUMES variable
+# - If LH_AUTO_DETECT_SUBVOLUMES is enabled, calls detect_btrfs_subvolumes() and merges results
+# - Removes duplicates and sorts the final list alphabetically
+# - Falls back to default "@" and "@home" if no subvolumes are configured or detected
+#
+# PARAMETERS:
+# $1 (optional) - operation_type: "backup" or "restore" (used for logging context)
+#
+# RETURNS:
+# - Sorted array of unique subvolume names to process
+#
+# USAGE:
+# readarray -t subvolumes < <(get_btrfs_subvolumes "backup")
+# readarray -t subvolumes < <(get_btrfs_subvolumes "restore")
+#
+get_btrfs_subvolumes() {
+    local operation_type="${1:-general}"
+    lh_log_msg "DEBUG" "Determining final list of subvolumes for $operation_type operations" >&2
+    local configured_subvolumes=()
+    local final_subvolumes=()
+    declare -A seen_subvols
+    
+    # Parse configured subvolumes from LH_BACKUP_SUBVOLUMES
+    if [[ -n "$LH_BACKUP_SUBVOLUMES" ]]; then
+        lh_log_msg "DEBUG" "Configured subvolumes: $LH_BACKUP_SUBVOLUMES" >&2
+        read -ra configured_subvolumes <<<"$LH_BACKUP_SUBVOLUMES"
+        for subvol in "${configured_subvolumes[@]}"; do
+            if [[ -n "$subvol" ]]; then
+                final_subvolumes+=("$subvol")
+                seen_subvols["$subvol"]=1
+            fi
+        done
+    fi
+    
+    # Add auto-detected subvolumes if enabled
+    if [[ "$LH_AUTO_DETECT_SUBVOLUMES" == "true" ]]; then
+        lh_log_msg "DEBUG" "Auto-detection enabled, detecting additional subvolumes" >&2
+        local detected_subvolumes
+        readarray -t detected_subvolumes < <(detect_btrfs_subvolumes)
+        
+        for subvol in "${detected_subvolumes[@]}"; do
+            if [[ -n "$subvol" && -z "${seen_subvols[$subvol]}" ]]; then
+                lh_log_msg "DEBUG" "Adding auto-detected subvolume: $subvol" >&2
+                final_subvolumes+=("$subvol")
+                seen_subvols["$subvol"]=1
+            fi
+        done
+    fi
+    
+    # Sort the final list
+    if [[ ${#final_subvolumes[@]} -gt 0 ]]; then
+        IFS=$'\n' final_subvolumes=($(sort <<<"${final_subvolumes[*]}"))
+        unset IFS
+        lh_log_msg "INFO" "Final subvolumes for $operation_type: ${final_subvolumes[*]}" >&2
+        printf '%s\n' "${final_subvolumes[@]}"
+    else
+        # Fallback to default if nothing configured
+        lh_log_msg "WARN" "No subvolumes configured or detected, using default: @ @home" >&2
+        echo "@"
+        echo "@home"
+    fi
+}
+
+# =============================================================================
+# INITIALIZATION AND EXPORT
+# =============================================================================
+
+# Export functions for use by other modules
+export -f atomic_receive_with_validation
+export -f validate_parent_snapshot_chain
+export -f intelligent_cleanup
+export -f check_btrfs_space
+export -f get_btrfs_available_space
+export -f check_filesystem_health
+export -f handle_btrfs_error
+export -f verify_received_uuid_integrity
+export -f protect_received_snapshots
+export -f validate_btrfs_implementation
+export -f detect_btrfs_subvolumes
+export -f get_btrfs_subvolumes
+
+lh_log_msg "DEBUG" "lib_btrfs.sh: BTRFS library loaded successfully"

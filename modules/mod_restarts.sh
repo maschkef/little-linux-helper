@@ -29,8 +29,21 @@ if [[ -z "${MSG[RESTART_LOGIN_MANAGER_STARTING]:-}" ]]; then
     lh_load_language_module "lib"
 fi
 
+lh_log_active_sessions_debug "$(lh_msg 'MENU_RESTARTS')"
+lh_begin_module_session "mod_restarts" "$(lh_msg 'MENU_RESTARTS')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
+
 # Function to restart the login manager
 function restart_login_manager_action() {
+    # Check for blocking conflicts before proceeding
+    lh_check_blocking_conflicts "${LH_BLOCK_SYSTEM_CRITICAL}" "mod_restarts.sh:restart_login_manager_action"
+    local conflict_result=$?
+    if [[ $conflict_result -eq 1 ]]; then
+        return 1  # Operation cancelled or blocked
+    elif [[ $conflict_result -eq 2 ]]; then
+        lh_log_msg "WARN" "User forced restart despite active system-critical operations"
+    fi
+
+    lh_update_module_session "$(lh_msg 'RESTART_LOGIN_MANAGER_STARTING')" "running" "${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"
     lh_log_msg "INFO" "$(lh_msg 'RESTART_LOGIN_MANAGER_STARTING')"
     local DM_SERVICE=""
     local INIT_SYSTEM=""
@@ -383,6 +396,16 @@ function restart_sound_system_action() {
 
 # Function to restart the desktop environment
 function restart_desktop_environment_action() {
+    # Check for blocking conflicts before proceeding
+    lh_check_blocking_conflicts "${LH_BLOCK_SYSTEM_CRITICAL}" "mod_restarts.sh:restart_desktop_environment_action"
+    local conflict_result=$?
+    if [[ $conflict_result -eq 1 ]]; then
+        return 1  # Operation cancelled or blocked
+    elif [[ $conflict_result -eq 2 ]]; then
+        lh_log_msg "WARN" "User forced desktop environment restart despite active system-critical operations"
+    fi
+
+    lh_update_module_session "$(lh_msg 'RESTART_DE_STARTING')" "running" "${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"
     lh_log_msg "INFO" "$(lh_msg 'RESTART_DE_STARTING')"
 
     # Get user info
@@ -861,6 +884,214 @@ function restart_network_services_action() {
     fi
 }
 
+# Function to restart firewall services
+function restart_firewall_services_action() {
+    lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_CHECKING')"
+
+    local fw_display_names=()
+    local fw_types=()
+    local fw_services=()
+
+    # firewalld
+    if command -v firewall-cmd >/dev/null 2>&1 || systemctl is-active --quiet firewalld.service; then
+        fw_display_names+=("firewalld")
+        fw_types+=("firewalld")
+        fw_services+=("firewalld.service")
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_FIREWALLD_DETECTED')"
+    fi
+
+    # UFW (can be active as a oneshot/exit service)
+    if command -v ufw >/dev/null 2>&1 || systemctl list-unit-files --type=service | grep -q "^ufw\.service"; then
+        fw_display_names+=("UFW")
+        fw_types+=("ufw")
+        fw_services+=("ufw.service")
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_UFW_DETECTED')"
+    fi
+
+    # nftables
+    if systemctl list-unit-files --type=service | grep -q "^nftables\.service" || command -v nft >/dev/null 2>&1; then
+        fw_display_names+=("nftables")
+        fw_types+=("nftables")
+        fw_services+=("nftables.service")
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_NFTABLES_DETECTED')"
+    fi
+
+    # netfilter-persistent (Debian/Ubuntu)
+    if systemctl list-unit-files --type=service | grep -q "^netfilter-persistent\.service" || command -v netfilter-persistent >/dev/null 2>&1; then
+        fw_display_names+=("netfilter-persistent")
+        fw_types+=("netfilter-persistent")
+        fw_services+=("netfilter-persistent.service")
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_NETFILTER_PERSISTENT_DETECTED')"
+    fi
+
+    # Shorewall
+    if systemctl list-unit-files --type=service | grep -q "^shorewall\.service" || command -v shorewall >/dev/null 2>&1; then
+        fw_display_names+=("Shorewall")
+        fw_types+=("shorewall")
+        fw_services+=("shorewall.service")
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_SHOREWALL_DETECTED')"
+    fi
+
+    if [ ${#fw_types[@]} -eq 0 ]; then
+        lh_log_msg "WARN" "$(lh_msg 'RESTART_FW_NONE_DETECTED')"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_FW_NONE_DETECTED')${LH_COLOR_RESET}"
+        return 0
+    fi
+
+    lh_print_header "$(lh_msg 'RESTART_FW_DETECTED_SERVICES')"
+    for i in "${!fw_display_names[@]}"; do
+        lh_print_menu_item $((i+1)) "${fw_display_names[$i]}"
+    done
+    lh_print_menu_item $(( ${#fw_display_names[@]} + 1 )) "$(lh_msg 'RESTART_FW_ALL_SERVICES')"
+    lh_print_menu_item 0 "$(lh_msg 'CANCEL')"
+    echo ""
+
+    local fw_choice
+    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTART_FW_CHOOSE_SERVICE' "$(( ${#fw_display_names[@]} + 1 ))")${LH_COLOR_RESET}")" fw_choice
+
+    if ! [[ "$fw_choice" =~ ^[0-9]+$ ]]; then
+        lh_log_msg "WARN" "$(lh_msg 'RESTART_FW_INVALID_SELECTION')"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTART_FW_INVALID_SELECTION')${LH_COLOR_RESET}"
+        return 0
+    fi
+
+    if [ "$fw_choice" -eq 0 ]; then
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_CANCELLED')"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_FW_CANCELLED')${LH_COLOR_RESET}"
+        return 0
+    fi
+
+    # Build list to operate on
+    local sel_types=()
+    local sel_services=()
+    local sel_names=()
+    if [ "$fw_choice" -eq $(( ${#fw_display_names[@]} + 1 )) ]; then
+        sel_types=("${fw_types[@]}")
+        sel_services=("${fw_services[@]}")
+        sel_names=("${fw_display_names[@]}")
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_ALL_RESTARTING')"
+    elif [ "$fw_choice" -ge 1 ] && [ "$fw_choice" -le ${#fw_display_names[@]} ]; then
+        local idx=$((fw_choice-1))
+        sel_types+=("${fw_types[$idx]}")
+        sel_services+=("${fw_services[$idx]}")
+        sel_names+=("${fw_display_names[$idx]}")
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_SERVICE_RESTARTING' "${fw_display_names[$idx]}")"
+    else
+        lh_log_msg "WARN" "$(lh_msg 'RESTART_FW_INVALID_SELECTION')"
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTART_FW_INVALID_SELECTION')${LH_COLOR_RESET}"
+        return 0
+    fi
+
+    # Warning and confirmation
+    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_FW_WARNING_INTERRUPTION')${LH_COLOR_RESET}"
+    if ! lh_confirm_action "$(lh_msg 'RESTART_FW_CONFIRM_CONTINUE')" "n"; then
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_CANCELLED')"
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_FW_CANCELLED')${LH_COLOR_RESET}"
+        return 0
+    fi
+
+    local all_successful=true
+    local i
+    for i in "${!sel_types[@]}"; do
+        local t="${sel_types[$i]}"
+        local svc="${sel_services[$i]}"
+        local name="${sel_names[$i]}"
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_RELOADING_SERVICE' "$name")"
+
+        case "$t" in
+            firewalld)
+                if command -v firewall-cmd >/dev/null 2>&1; then
+                    if $LH_SUDO_CMD firewall-cmd --reload; then
+                        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_SERVICE_SUCCESS' "$name")"
+                        continue
+                    fi
+                fi
+                if $LH_SUDO_CMD systemctl reload "$svc" || $LH_SUDO_CMD systemctl restart "$svc"; then
+                    lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_SERVICE_SUCCESS' "$name")"
+                else
+                    lh_log_msg "ERROR" "$(lh_msg 'RESTART_FW_SERVICE_ERROR' "$name")"
+                    all_successful=false
+                fi
+                ;;
+            ufw)
+                if command -v ufw >/dev/null 2>&1; then
+                    if $LH_SUDO_CMD ufw reload; then
+                        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_SERVICE_SUCCESS' "$name")"
+                        continue
+                    fi
+                fi
+                if $LH_SUDO_CMD systemctl restart "$svc"; then
+                    lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_SERVICE_SUCCESS' "$name")"
+                else
+                    lh_log_msg "ERROR" "$(lh_msg 'RESTART_FW_SERVICE_ERROR' "$name")"
+                    all_successful=false
+                fi
+                ;;
+            nftables)
+                if $LH_SUDO_CMD systemctl reload "$svc" || $LH_SUDO_CMD systemctl restart "$svc"; then
+                    lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_SERVICE_SUCCESS' "$name")"
+                else
+                    # As a fallback try to load the default config
+                    if command -v nft >/dev/null 2>&1 && [ -f /etc/nftables.conf ]; then
+                        if $LH_SUDO_CMD nft -f /etc/nftables.conf; then
+                            lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_SERVICE_SUCCESS' "$name")"
+                        else
+                            lh_log_msg "ERROR" "$(lh_msg 'RESTART_FW_SERVICE_ERROR' "$name")"
+                            all_successful=false
+                        fi
+                    else
+                        lh_log_msg "ERROR" "$(lh_msg 'RESTART_FW_SERVICE_ERROR' "$name")"
+                        all_successful=false
+                    fi
+                fi
+                ;;
+            netfilter-persistent)
+                if $LH_SUDO_CMD systemctl reload "$svc" || $LH_SUDO_CMD systemctl restart "$svc"; then
+                    lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_SERVICE_SUCCESS' "$name")"
+                else
+                    if command -v netfilter-persistent >/dev/null 2>&1 && $LH_SUDO_CMD netfilter-persistent reload; then
+                        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_SERVICE_SUCCESS' "$name")"
+                    else
+                        lh_log_msg "ERROR" "$(lh_msg 'RESTART_FW_SERVICE_ERROR' "$name")"
+                        all_successful=false
+                    fi
+                fi
+                ;;
+            shorewall)
+                if command -v shorewall >/dev/null 2>&1; then
+                    if $LH_SUDO_CMD shorewall reload; then
+                        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_SERVICE_SUCCESS' "$name")"
+                        continue
+                    fi
+                fi
+                if $LH_SUDO_CMD systemctl reload "$svc" || $LH_SUDO_CMD systemctl restart "$svc"; then
+                    lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_SERVICE_SUCCESS' "$name")"
+                else
+                    lh_log_msg "ERROR" "$(lh_msg 'RESTART_FW_SERVICE_ERROR' "$name")"
+                    all_successful=false
+                fi
+                ;;
+            *)
+                # Unknown type: attempt systemctl reload/restart
+                if $LH_SUDO_CMD systemctl reload "$svc" || $LH_SUDO_CMD systemctl restart "$svc"; then
+                    lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_SERVICE_SUCCESS' "$name")"
+                else
+                    lh_log_msg "ERROR" "$(lh_msg 'RESTART_FW_SERVICE_ERROR' "$name")"
+                    all_successful=false
+                fi
+                ;;
+        esac
+    done
+
+    if $all_successful; then
+        lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_ALL_SUCCESS')"
+        echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTART_FW_ALL_SUCCESS')${LH_COLOR_RESET}"
+    else
+        lh_log_msg "WARN" "$(lh_msg 'RESTART_FW_SOME_FAILED')"
+        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_FW_SOME_FAILED')${LH_COLOR_RESET}"
+    fi
+}
+
 # Function to restart Bluetooth services
 function restart_bluetooth_services_action() {
     lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_STARTING')"
@@ -1271,40 +1502,54 @@ function power_management_action() {
 # Main function of the module: show submenu and control actions
 function restart_module_menu() {
     while true; do
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
         lh_print_header "$(lh_msg 'RESTART_MODULE_TITLE')"
 
         lh_print_menu_item 1 "$(lh_msg 'RESTART_LOGIN_MANAGER')"
         lh_print_menu_item 2 "$(lh_msg 'RESTART_SOUND_SYSTEM')"
         lh_print_menu_item 3 "$(lh_msg 'RESTART_DESKTOP_ENVIRONMENT')"
         lh_print_menu_item 4 "$(lh_msg 'RESTART_NETWORK_SERVICES')"
-        lh_print_menu_item 5 "$(lh_msg 'RESTART_BLUETOOTH_SERVICES')"
-        lh_print_menu_item 6 "$(lh_msg 'RESTART_GRAPHICS_SYSTEM')"
-        lh_print_menu_item 7 "$(lh_msg 'POWER_MANAGEMENT')"
+        lh_print_menu_item 5 "$(lh_msg 'RESTART_FIREWALL')"
+        lh_print_menu_item 6 "$(lh_msg 'RESTART_BLUETOOTH_SERVICES')"
+        lh_print_menu_item 7 "$(lh_msg 'RESTART_GRAPHICS_SYSTEM')"
+        lh_print_menu_item 8 "$(lh_msg 'POWER_MANAGEMENT')"
         lh_print_menu_item 0 "$(lh_msg 'RESTART_BACK_TO_MAIN')"
         echo ""
 
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTART_CHOOSE_OPTION_PROMPT')${LH_COLOR_RESET}")" option
 
         case $option in
             1)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_LOGIN_MANAGER')")"
                 restart_login_manager_action
                 ;;
             2)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_SOUND_SYSTEM')")"
                 restart_sound_system_action
                 ;;
             3)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_DESKTOP_ENVIRONMENT')")"
                 restart_desktop_environment_action
                 ;;
             4)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_NETWORK_SERVICES')")"
                 restart_network_services_action
                 ;;
             5)
-                restart_bluetooth_services_action
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_FIREWALL')")"
+                restart_firewall_services_action
                 ;;
             6)
-                restart_graphics_system_action
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_BLUETOOTH_SERVICES')")"
+                restart_bluetooth_services_action
                 ;;
             7)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_GRAPHICS_SYSTEM')")"
+                restart_graphics_system_action
+                ;;
+            8)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'POWER_MANAGEMENT')")"
                 power_management_action
                 ;;
             0)
@@ -1316,6 +1561,8 @@ function restart_module_menu() {
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTART_INVALID_SELECTION')${LH_COLOR_RESET}"
                 ;;
         esac
+
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
 
         # Short pause so the user can read the output
         echo ""

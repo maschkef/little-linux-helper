@@ -25,6 +25,8 @@ This module provides a unified interface for managing system packages across var
     *   `lh_ask_for_input`: For prompting the user for text input.
     *   Color variables (e.g., `LH_COLOR_INFO`, `LH_COLOR_ERROR`, `LH_COLOR_PROMPT`, `LH_COLOR_SUCCESS`, `LH_COLOR_WARNING`, `LH_COLOR_MENU_NUMBER`, `LH_COLOR_MENU_TEXT`, `LH_COLOR_SEPARATOR`): For styled terminal output.
     *   Global variables: Accesses `LH_PKG_MANAGER`, `LH_SUDO_CMD`, and `LH_ALT_PKG_MANAGERS`.
+*   **Session Awareness:** On start the module logs any other running helpers (`lh_log_active_sessions_debug`), registers its own session (`lh_begin_module_session`), and updates the shared registry via `lh_update_module_session` when the menu waits for input or performs long-running package operations.
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
 *   **Key System Commands (Primary Package Managers):**
     *   **pacman:** `pacman -Syu`, `pacman -S`, `pacman -Qdtq`, `pacman -Rns`, `pacman -Sc`, `pacman -Scc`, `paccache -r`, `pacman -Ss`, `pacman -Q`, `expac`.
     *   **apt:** `apt update`, `apt upgrade`, `apt autoremove`, `apt clean`, `apt autoclean`, `apt search`, `apt install`, `dpkg-query -l`, `grep` (on `/var/log/dpkg.log`).

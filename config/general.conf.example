@@ -147,3 +147,11 @@ CFG_LH_GUI_FIREWALL_RESTRICTION="local"
 # =============================================================================
 # Additional general settings can be added here as the project grows
 # Examples: notification preferences, UI themes, default timeouts, etc.
+
+# =============================================================================
+# RELEASE TAG (OPTIONAL)
+# =============================================================================
+# If set, this release tag will be embedded into backup metadata files so that
+# troubleshooting can correlate sessions with published versions. When unset,
+# the tooling attempts to derive a tag automatically via `git describe`.
+CFG_LH_RELEASE_TAG=""

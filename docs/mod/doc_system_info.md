@@ -24,6 +24,7 @@ The `mod_system_info.sh` module provides a menu-driven interface to display a co
     *   `lh_check_command`: Used to verify the presence of essential external commands (e.g., `lspci`, `lsusb`, `sensors`, `ss`), offering to install them if missing.
     *   Color variables (e.g., `LH_COLOR_INFO`, `LH_COLOR_ERROR`, `LH_COLOR_PROMPT`): For styled terminal output.
     *   Global variables: Accesses `LH_SUDO_CMD`.
+*   **Session Awareness:** Logs currently running modules via `lh_log_active_sessions_debug` and registers a session entry with `lh_begin_module_session`. While the menu loop executes it updates the shared registry (`lh_update_module_session`) so other tooling can see whether the module is waiting for input or generating a report.
 *   **Key System Commands**: `/etc/os-release`, `uname`, `uptime`, `lscpu`, `/proc/cpuinfo`, `free`, `vmstat`, `/proc/meminfo`, `lspci`, `lsusb`, `lsblk`, `df`, `ps`, `top`, `ip`, `ss`, `hostname`, `/etc/resolv.conf`, `sensors`, `/sys/class/thermal/thermal_zone*`, `bc`.
 
 

@@ -29,6 +29,9 @@ if [[ -z "${MSG[LOG_HEADER_LAST_MINUTES_CURRENT]:-}" ]]; then
     lh_load_language_module "lib"
 fi
 
+lh_log_active_sessions_debug "$(lh_msg 'MENU_LOG_ANALYSIS')"
+lh_begin_module_session "mod_logs" "$(lh_msg 'MENU_LOG_ANALYSIS')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
+
 # Function to retrieve the last X minutes of logs (current boot)
 function logs_last_minutes_current() {
     lh_print_header "$(lh_msg 'LOG_HEADER_LAST_MINUTES_CURRENT')"
@@ -943,6 +946,7 @@ function logs_advanced_analysis() {
 # Main function of the module: show submenu and control actions
 function log_analyzer_menu() {
     while true; do
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
         lh_print_header "$(lh_msg 'LOG_HEADER_MENU')"
 
         lh_print_menu_item 1 "$(lh_msg 'LOG_MENU_ITEM_1')"
@@ -957,28 +961,36 @@ function log_analyzer_menu() {
 
         local option_prompt
         option_prompt="$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET} ")"
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$option_prompt" option
 
         case $option in
             1)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'LOG_MENU_ITEM_1')")"
                 logs_last_minutes_current
                 ;;
             2)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'LOG_MENU_ITEM_2')")"
                 logs_last_minutes_previous
                 ;;
             3)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'LOG_MENU_ITEM_3')")"
                 logs_specific_service
                 ;;
             4)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'LOG_MENU_ITEM_4')")"
                 logs_show_xorg
                 ;;
             5)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'LOG_MENU_ITEM_5')")"
                 logs_show_dmesg
                 ;;
             6)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'LOG_MENU_ITEM_6')")"
                 logs_show_package_manager
                 ;;
             7)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'LOG_MENU_ITEM_7')")"
                 logs_advanced_analysis
                 ;;
             0)
@@ -990,6 +1002,8 @@ function log_analyzer_menu() {
                 echo -e "${LH_COLOR_WARNING}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
                 ;;
         esac
+
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
 
         # Short pause so user can read the output
         echo ""

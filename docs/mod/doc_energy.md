@@ -30,6 +30,7 @@ The `mod_energy.sh` module provides comprehensive power and energy management ca
   * `lh_send_notification`: For desktop notifications.
   * Color variables (e.g., `LH_COLOR_INFO`, `LH_COLOR_ERROR`, `LH_COLOR_PROMPT`): For styled terminal output.
   * Global variables: Accesses `LH_SUDO_CMD`.
+* **Session Awareness:** Emits a DEBUG summary of concurrent sessions (`lh_log_active_sessions_debug`), registers itself via `lh_begin_module_session`, and updates the shared registry (`lh_update_module_session`) while waiting for menu input or while an energy action is in progress.
 * **Key System Commands**: `systemd-inhibit`, `cpupower`, `brightnessctl`, `xbacklight`, `/sys/class/backlight/*`, `/sys/devices/system/cpu/*/cpufreq/*`, `/sys/class/power_supply/*`, `/sys/class/thermal/*`.
 
 ## Main Menu

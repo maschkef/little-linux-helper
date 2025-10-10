@@ -25,8 +25,10 @@ This specialized module provides comprehensive TAR archive restoration functiona
     *   `lh_confirm_action`: For user confirmations and safety warnings
     *   `lh_ask_for_input`: For interactive archive and destination selection
     *   Color variables for styled terminal output
+    *   `lh_log_active_sessions_debug`, `lh_begin_module_session`, `lh_update_module_session`: Provide session visibility and real-time status updates when the module is invoked directly.
 *   **Key System Commands:** `tar`, `du`, `ls`, `sort`, `mkdir`, `date`
 *   **Dependencies:** TAR utilities must be available; assumes archives were created by compatible TAR backup module
+*   **Session Registration:** Registers with blocking categories `FILESYSTEM_WRITE,SYSTEM_CRITICAL` at HIGH severity and checks for conflicts before restore operations to prevent interference from other system operations
 
 **3. Core Functions:**
 

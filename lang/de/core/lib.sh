@@ -69,6 +69,12 @@ MSG_DE[LIB_SUDO_REEXECUTE]="Führe Skript mit sudo-Berechtigungen neu aus"
 MSG_DE[LIB_SUDO_DENIED_ELEVATION]="Benutzer verweigerte sudo-Erhöhung"
 MSG_DE[LIB_SUDO_GUI_MODE_INDIVIDUAL]="GUI-Modus: Verwende individuelle Befehls-Erhöhung anstatt Skript-Neuausführung"
 
+# Ownership fix messages
+MSG_DE[LIB_FIX_OWNERSHIP_NO_PATH]="lh_fix_ownership: Kein Pfad angegeben"
+MSG_DE[LIB_FIX_OWNERSHIP_SUCCESS]="Besitzrechte von %s für Benutzer %s korrigiert"
+MSG_DE[LIB_FIX_OWNERSHIP_FAILED]="Konnte Besitzrechte nicht korrigieren für: %s"
+MSG_DE[LIB_FIX_OWNERSHIP_NO_UID]="Konnte UID/GID für Benutzer nicht ermitteln: %s"
+
 # ...existing messages...
 
 # General warnings
@@ -76,6 +82,49 @@ MSG_DE[LIB_WARNING_INITIAL_LOG_DIR]="WARNUNG: Konnte initiales Log-Verzeichnis n
 
 # UI-specific messages
 MSG_DE[LIB_UI_INVALID_INPUT]="Ungültige Eingabe. Bitte versuchen Sie es erneut."
+
+# Session registry messages
+MSG_DE[LIB_SESSION_ACTIVITY_INITIALIZING]="Initialisierung läuft"
+MSG_DE[LIB_SESSION_ACTIVITY_MENU]="Menü wird angezeigt"
+MSG_DE[LIB_SESSION_ACTIVITY_WAITING]="Warte auf Nutzereingabe"
+MSG_DE[LIB_SESSION_ACTIVITY_SECTION]="Bearbeite: %s"
+MSG_DE[LIB_SESSION_ACTIVITY_ACTION]="Führe aus: %s"
+MSG_DE[LIB_SESSION_ACTIVITY_PREP]="Vorbereitung: %s"
+MSG_DE[LIB_SESSION_ACTIVITY_BACKUP]="Sichere: %s"
+MSG_DE[LIB_SESSION_ACTIVITY_RESTORE]="Stelle wieder her: %s"
+MSG_DE[LIB_SESSION_ACTIVITY_CLEANUP]="Bereinige: %s"
+MSG_DE[LIB_SESSION_ACTIVITY_COMPLETED]="Abgeschlossen: %s"
+MSG_DE[LIB_SESSION_ACTIVITY_BACKUP_FINISHED]="Backup beendet: %s"
+MSG_DE[LIB_SESSION_ACTIVITY_RESTORE_FINISHED]="Wiederherstellung beendet: %s"
+MSG_DE[LIB_SESSION_ACTIVITY_FAILED]="Fehlgeschlagen: %s"
+MSG_DE[LIB_SESSION_LOCK_TIMEOUT]="Sitzungsregister belegt, Aktualisierung übersprungen."
+MSG_DE[LIB_SESSION_REGISTERED]="Sitzung gestartet: %s (%s)"
+MSG_DE[LIB_SESSION_UPDATED]="Sitzung aktualisiert: %s -> %s"
+MSG_DE[LIB_SESSION_UNREGISTERED]="Sitzung beendet: %s"
+MSG_DE[LIB_SESSION_DEBUG_NONE]="Keine weiteren Sitzungen aktiv (Modul: %s)"
+MSG_DE[LIB_SESSION_DEBUG_LIST_HEADER]="Aktive Sitzungen vor Start von %s (%d insgesamt):"
+MSG_DE[LIB_SESSION_DEBUG_ENTRY]="%s [%s] %s (%s)"
+
+# Blocking categories and conflict management
+MSG_DE[LIB_BLOCK_FILESYSTEM_WRITE]="Dateioperationen die laufende I/O-Vorgänge stören könnten"
+MSG_DE[LIB_BLOCK_SYSTEM_CRITICAL]="Operationen die das System neu starten oder destabilisieren könnten"
+MSG_DE[LIB_BLOCK_RESOURCE_INTENSIVE]="Ressourcenintensive Operationen die um CPU/Festplatte konkurrieren"
+MSG_DE[LIB_BLOCK_NETWORK_DEPENDENT]="Operationen die stabile Netzwerkverbindung benötigen"
+
+# Session conflict management
+MSG_DE[LIB_CONFLICT_WARNING_HEADER]="⚠️  WARNUNG: %s Operationen sind derzeit blockiert!"
+MSG_DE[LIB_CONFLICT_ACTIVE_SESSIONS]="Aktive konfliktverursachende Sitzungen:"
+MSG_DE[LIB_CONFLICT_SESSION_ENTRY]="  - %s: %s (%s)"
+MSG_DE[LIB_CONFLICT_RISKS_HEADER]="⚠️  ERZWINGEN dieser Operation könnte verursachen:"
+MSG_DE[LIB_CONFLICT_RISK_DATA_CORRUPTION]="  - Datenverlust während Backup"
+MSG_DE[LIB_CONFLICT_RISK_SYSTEM_INSTABILITY]="  - Systeminstabilität"
+MSG_DE[LIB_CONFLICT_RISK_FAILED_INSTALLATIONS]="  - Fehlgeschlagene Installationen"
+MSG_DE[LIB_CONFLICT_OVERRIDE_PROMPT]="Tippen Sie 'FORCE' um trotzdem fortzufahren (andere Eingabe bricht ab): "
+MSG_DE[LIB_CONFLICT_PROCEEDING_WITH_OVERRIDE]="⚠️  FAHRE MIT ÜBERSCHREIBUNG FORT - NUTZUNG AUF EIGENE GEFAHR"
+MSG_DE[LIB_CONFLICT_OPERATION_CANCELLED]="Operation vom Benutzer abgebrochen."
+MSG_DE[LIB_CONFLICT_OPERATION_BLOCKED]="Operation wegen Konflikten blockiert."
+MSG_DE[LIB_CONFLICT_WAIT_MESSAGE]="Warte auf Beendigung konfliktverursachender Operationen..."
+MSG_DE[LIB_CONFLICT_WAIT_PROMPT]="Warten... (SKIP zum Überschreiben, CTRL+C zum Abbrechen): "
 
 # Notification messages
 MSG_DE[LIB_NOTIFICATION_INCOMPLETE_PARAMS]="lh_send_notification: Unvollständige Parameter (type, title, message erforderlich)"

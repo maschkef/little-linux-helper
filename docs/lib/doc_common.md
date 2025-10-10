@@ -125,6 +125,38 @@ Executes final initialization steps and exports variables/functions for module u
 lh_finalize_initialization  # Called at end of main script initialization
 ```
 
+### Enhanced Session Registry with Blocking Categories
+
+`lib_common.sh` maintains an intelligent session registry with selective conflict detection. Modules can register with blocking categories to prevent dangerous concurrent operations and coordinate system activities. The registry stores session metadata, blocking categories, severity levels, and provides conflict resolution with user override capabilities.
+
+#### Core Session Functions
+
+- `lh_log_active_sessions_debug module_name` – Logs a DEBUG summary of all currently registered sessions (excluding the caller). Modules typically call this once at startup.
+- `lh_begin_module_session module_id module_name [activity] [blocks] [severity]` – Registers the current module with optional blocking categories and severity level. Installs an EXIT trap for automatic cleanup via `lh_session_exit_handler`.
+- `lh_update_module_session activity [status] [blocks] [severity]` – Updates activity, status, blocking categories, and/or severity. Standard activity strings: `LIB_SESSION_ACTIVITY_MENU`, `LIB_SESSION_ACTIVITY_WAITING`, `LIB_SESSION_ACTIVITY_PREP`, `LIB_SESSION_ACTIVITY_BACKUP`, `LIB_SESSION_ACTIVITY_RESTORE`, `LIB_SESSION_ACTIVITY_CLEANUP`, etc.
+- `lh_end_module_session [status]` – Explicitly marks the session as completed/failed and removes the registry entry. Usually invoked via the EXIT trap.
+- `lh_get_active_sessions [include_self]` – Returns registry rows (tab separated: session_id, module_id, module_name, status, activity, context, started, blocks, severity) for advanced inspection.
+
+#### Blocking Categories and Conflict Detection
+
+**Available Blocking Categories:**
+- `LH_BLOCK_FILESYSTEM_WRITE` – File operations that could interfere with ongoing I/O
+- `LH_BLOCK_SYSTEM_CRITICAL` – Operations that could restart or destabilize the system
+- `LH_BLOCK_RESOURCE_INTENSIVE` – Resource-heavy operations competing for CPU/disk
+- `LH_BLOCK_NETWORK_DEPENDENT` – Operations requiring stable network connectivity
+
+**Severity Levels:** `HIGH`, `MEDIUM`, `LOW` – determines override difficulty and warning prominence
+
+**Conflict Detection Functions:**
+- `lh_check_blocking_conflicts required_categories calling_location [allow_override]` – Checks for conflicts and shows detailed warnings. Returns: 0=proceed, 1=blocked/cancelled, 2=user override.
+- `lh_wait_for_clear_with_override required_categories calling_location [wait_message] [override_prompt]` – Waits for conflicts to clear with periodic checks and override capability.
+
+#### Registry Storage and Management
+
+The registry is stored in `logs/sessions/registry.tsv` with enhanced metadata including blocking categories and severity. A lock file coordinates concurrent updates. All overrides are logged with format: `OVERRIDE: module.sh:function_name forced CATEGORY despite conflicts`.
+
+Modules with custom EXIT traps should chain the session handler: `trap 'custom_cleanup; lh_session_exit_handler' EXIT`.
+
 ## Global Variables
 
 ### Directory and File Paths

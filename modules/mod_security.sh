@@ -29,6 +29,9 @@ if [[ -z "${MSG[SECURITY_OPEN_PORTS_TITLE]:-}" ]]; then
     lh_load_language_module "lib"
 fi
 
+lh_log_active_sessions_debug "$(lh_msg 'MENU_SECURITY')"
+lh_begin_module_session "mod_security" "$(lh_msg 'MENU_SECURITY')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
+
 # Function to display open network ports
 function security_show_open_ports() {
     lh_print_header "$(lh_msg 'SECURITY_OPEN_PORTS_TITLE')"
@@ -160,6 +163,16 @@ function security_show_failed_logins() {
 
 # Function to check for rootkits
 function security_check_rootkits() {
+    # Check for blocking conflicts - rootkit scans are resource intensive
+    lh_check_blocking_conflicts "${LH_BLOCK_RESOURCE_INTENSIVE}" "mod_security.sh:security_check_rootkits"
+    local conflict_result=$?
+    if [[ $conflict_result -eq 1 ]]; then
+        return 1  # Operation cancelled or blocked
+    elif [[ $conflict_result -eq 2 ]]; then
+        lh_log_msg "WARN" "User forced rootkit scan despite active resource-intensive operations"
+    fi
+
+    lh_update_module_session "$(lh_msg 'SECURITY_ROOTKIT_TITLE')" "running" "${LH_BLOCK_RESOURCE_INTENSIVE}" "MEDIUM"
     lh_print_header "$(lh_msg 'SECURITY_ROOTKIT_TITLE')"
 
     if ! lh_check_command "rkhunter" true; then
@@ -487,6 +500,7 @@ function security_check_password_policy() {
 # Main function of the module: Show submenu and control actions  
 function security_checks_menu() {
     while true; do
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
         lh_print_header "$(lh_msg 'SECURITY_TITLE')"
 
         lh_print_menu_item 1 "$(lh_msg 'SECURITY_MENU_OPEN_PORTS')"
@@ -499,28 +513,36 @@ function security_checks_menu() {
         lh_print_menu_item 0 "$(lh_msg 'SECURITY_MENU_BACK')"
         echo ""
 
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'SECURITY_CHOOSE_OPTION')${LH_COLOR_RESET}")" option
 
         case $option in
             1)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SECURITY_MENU_OPEN_PORTS')")"
                 security_show_open_ports
                 ;;
             2)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SECURITY_MENU_FAILED_LOGINS')")"
                 security_show_failed_logins
                 ;;
             3)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SECURITY_MENU_ROOTKITS')")"
                 security_check_rootkits
                 ;;
             4)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SECURITY_MENU_FIREWALL')")"
                 security_check_firewall
                 ;;
             5)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SECURITY_MENU_UPDATES')")"
                 security_check_updates
                 ;;
             6)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SECURITY_MENU_PASSWORDS')")"
                 security_check_password_policy
                 ;;
             7)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'SECURITY_MENU_DOCKER')")"
                 bash "$LH_ROOT_DIR/modules/mod_docker_security.sh"
                 ;;
             0)
@@ -532,6 +554,8 @@ function security_checks_menu() {
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
                 ;;
         esac
+
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
 
         # Short pause to allow the user to read the output
         echo ""

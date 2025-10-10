@@ -18,6 +18,7 @@ MSG_EN[RESTART_LOGIN_MANAGER]="Restart Login Manager (All user processes will be
 MSG_EN[RESTART_SOUND_SYSTEM]="Restart Sound System"
 MSG_EN[RESTART_DESKTOP_ENVIRONMENT]="Restart Desktop Environment"
 MSG_EN[RESTART_NETWORK_SERVICES]="Restart Network Services"
+MSG_EN[RESTART_FIREWALL]="Restart Firewall"
 
 # Login Manager restart
 MSG_EN[RESTART_LOGIN_MANAGER_STARTING]="Login Manager is being restarted..."
@@ -203,6 +204,29 @@ MSG_EN[RESTART_NET_SERVICE_SUCCESS]="Successfully restarted %s."
 MSG_EN[RESTART_NET_SERVICE_ERROR]="ERROR restarting %s."
 MSG_EN[RESTART_NET_ALL_SUCCESS]="Selected network services successfully restarted."
 MSG_EN[RESTART_NET_SOME_FAILED]="At least one network service could not be successfully restarted."
+
+# Firewall restart
+MSG_EN[RESTART_FW_CHECKING]="Checking firewall components..."
+MSG_EN[RESTART_FW_FIREWALLD_DETECTED]="firewalld detected"
+MSG_EN[RESTART_FW_UFW_DETECTED]="UFW detected"
+MSG_EN[RESTART_FW_NFTABLES_DETECTED]="nftables detected"
+MSG_EN[RESTART_FW_NETFILTER_PERSISTENT_DETECTED]="netfilter-persistent detected"
+MSG_EN[RESTART_FW_SHOREWALL_DETECTED]="Shorewall detected"
+MSG_EN[RESTART_FW_NONE_DETECTED]="No firewall component detected that can be restarted."
+MSG_EN[RESTART_FW_DETECTED_SERVICES]="Detected firewall components"
+MSG_EN[RESTART_FW_ALL_SERVICES]="Reload/restart all above"
+MSG_EN[RESTART_FW_CHOOSE_SERVICE]="Choose a firewall to reload/restart (1-%d, 0 cancel): "
+MSG_EN[RESTART_FW_INVALID_SELECTION]="Invalid selection."
+MSG_EN[RESTART_FW_CANCELLED]="Firewall reload/restart cancelled."
+MSG_EN[RESTART_FW_ALL_RESTARTING]="Reloading/restarting all detected firewall components..."
+MSG_EN[RESTART_FW_SERVICE_RESTARTING]="Reloading/restarting %s..."
+MSG_EN[RESTART_FW_WARNING_INTERRUPTION]="WARNING: Reloading/restarting firewall may temporarily interrupt network traffic."
+MSG_EN[RESTART_FW_CONFIRM_CONTINUE]="Do you want to continue?"
+MSG_EN[RESTART_FW_RELOADING_SERVICE]="Reloading/restarting %s..."
+MSG_EN[RESTART_FW_SERVICE_SUCCESS]="Successfully reloaded/restarted %s."
+MSG_EN[RESTART_FW_SERVICE_ERROR]="Failed to reload/restart %s."
+MSG_EN[RESTART_FW_ALL_SUCCESS]="Firewall components successfully reloaded/restarted."
+MSG_EN[RESTART_FW_SOME_FAILED]="At least one firewall component failed to reload/restart."
 
 # Restarting individual services
 MSG_EN[RESTART_SOUND_RESTARTING_SERVICE]="Restarting %s..."

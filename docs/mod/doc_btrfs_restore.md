@@ -44,6 +44,8 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
     *   `lh_ask_for_input`: For interactive configuration and selections
     *   Color variables: For styled terminal output and safety warnings
     *   `lh_load_language_module`: For internationalization support
+    *   `lh_log_active_sessions_debug`, `lh_begin_module_session`, `lh_update_module_session`: Provide session visibility and continuous status updates while navigation or restore steps run.
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
 *   **Key System Commands:** `btrfs`, `mount`, `find`, `mv`, `mkdir`, `date`.
 *   **Critical Dependencies:** BTRFS utilities must be available; module exits if `btrfs` command is not found.
 
@@ -53,18 +55,33 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
 *   **`TARGET_ROOT`**: Path to target system mount point (configured interactively)  
 *   **`TEMP_SNAPSHOT_DIR`**: Temporary directory for restoration operations (`${TARGET_ROOT}/.snapshots_recovery`)
 *   **`DRY_RUN`**: Boolean flag for dry-run mode (user configurable)
-*   **`LH_RESTORE_LOG`**: Path to restore-specific log file with timestamp
+*   **`LH_RESTORE_LOG`**: Path to restore-specific log file; created lazily once the main logging system is initialised so sourcing the module from other scripts doesn’t leave stray files
+*   **`RESTORE_LIVE_ENV_STATUS`**: Cached result of the live-environment detection ("true"/"false") to avoid repeated probing
+*   **`RESTORE_LIVE_MESSAGE_SHOWN`**: Tracks whether the "live environment detected" notice has already been displayed for the current session
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
+*   **`RESTORE_NON_LIVE_OVERRIDE`**: Tracks whether the user acknowledged running on a non-live system so subsequent operations don’t prompt again
+*   **`RESTORE_NON_LIVE_NOTICE_SHOWN`**: Ensures the informational reminder about running non-live is printed only once after override
 
 **4. Core Safety and Validation Functions:**
 
-*   **`check_live_environment()`**
-    *   **Purpose:** Detects if running in a live environment and warns users about risks of running on active systems.
+*   **`detect_live_environment()`**
+    *   **Purpose:** Performs heuristic live-environment detection and returns "true"/"false".
     *   **Mechanism:**
-        *   Checks for live environment indicators: `/run/archiso`, `/etc/calamares`, `/live`, `/rofs`, `/casper`
-        *   Provides clear warnings and recommendations if not in live environment
-        *   Allows user override with explicit confirmation for non-live environments
-    *   **Safety Features:** Prevents accidental execution on running systems
-    *   **Dependencies (internal):** `lh_print_header`, `lh_confirm_action`, `restore_log_msg`
+        *   Looks for common live-image artefacts (e.g. `/run/archiso`, `/run/initramfs/live`, `/live`, `/rofs`, `/casper`, `/usr/lib/live`, `/var/lib/live`)
+        *   Examines `findmnt /` to identify overlay/squashfs/loop-based roots or read-only mounts
+        *   Parses `/proc/cmdline` for live boot parameters (`boot=live`, `casper`, `archiso`, `toram`, etc.)
+        *   Respects the override environment variable `LH_RESTORE_ASSUME_LIVE=true` for scripted usage or unusual live setups
+
+*   **`check_live_environment()`**
+    *   **Purpose:** Warns about destructive operations when the module is not running from a detected live environment.
+    *   **Mechanism:**
+        *   Uses the cached result from `detect_live_environment()` and logs the detection decision
+        *   Displays the success banner only once when a live environment is confirmed
+        *   If not live, prints a warning/recommendation and requires an explicit confirmation before proceeding
+        *   Remembers the user’s override so later operations in the same session do not ask again, while still showing a single informational reminder
+*   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
+    *   **Safety Features:** Prevents accidental execution on running systems while avoiding repeated prompts once the user has consciously overridden the warning
+    *   **Dependencies (internal):** `lh_print_header`, `lh_confirm_action`, `restore_log_msg`, `detect_live_environment`
 
 *   **`validate_filesystem_health()`**
     *   **Purpose:** Validates BTRFS filesystem health using comprehensive library functions before operations.
@@ -149,41 +166,50 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
     *   **Purpose:** Validates BTRFS subvolumes for restore operations with comprehensive integrity checks.
     *   **Mechanism:**
         *   Performs basic BTRFS subvolume validation using `btrfs subvolume show`
-        *   Validates snapshot integrity for restore operations
+        *   Validates snapshot integrity for restore operations and caches successful `received_uuid` checks in `RESTORE_VERIFIED_RECEIVED_UUID`
         *   Provides context-aware logging for debugging
     *   **Parameters:** `snapshot_path`, `context` (description for logging)
     *   **Return Codes:** 0 for valid snapshots, 1 for invalid subvolumes
     *   **Dependencies (system):** `btrfs subvolume show`
 
 *   **`list_available_snapshots()`**
-    *   **Purpose:** Lists and validates available snapshots for a specific subvolume with date sorting.
+    *   **Purpose:** Lists and validates available snapshots for a specific subvolume with metadata-enriched output (newest first).
     *   **Mechanism:**
-        *   Searches backup directories for subvolume snapshots
-        *   Validates each snapshot using `validate_restore_snapshot()`
-        *   Sorts snapshots by date (newest first) for easy selection
-        *   Displays snapshot creation dates for user reference
+        *   Consumes the shared bundle inventory produced by `btrfs_collect_bundle_inventory()` via `btrfs_restore_load_bundle_inventory` (single filesystem scan)
+        *   Filters per-subvolume records and enriches each entry with metadata sizes/status flags before presenting the menu
+        *   Performs lightweight validation (presence + `btrfs subvolume show`) and defers deeper checks until the user selects a snapshot
+        *   Caches inventory data so repeated menu visits do not re-run `find`/`jq` pipelines
     *   **Parameters:** `subvolume` (e.g., "@", "@home", "@var", "@opt" - any detected/configured subvolume)
     *   **Return Codes:** 0 for success with valid snapshots, 1 for no valid snapshots found
-    *   **Dependencies (internal):** `validate_restore_snapshot`, `restore_log_msg`
+    *   **Dependencies (internal):** `btrfs_restore_load_bundle_inventory`, `btrfs_restore_format_size`, `validate_restore_snapshot`, `restore_log_msg`
 
 *   **`select_restore_type_and_snapshot()`**
     *   **Purpose:** Interactive selection of restore type and matching snapshot pairs.
     *   **Mechanism:**
         *   Provides three restore options: Complete System, Root Only, Home Only
-        *   For complete system restore: finds matching subvolume snapshots by timestamp across available backups
-        *   Validates selected snapshots and parent chain integrity
-        *   Handles incremental snapshot validation using received UUID checks
+        *   Reuses the cached bundle inventory to pair subvolumes by timestamp without re-scanning the filesystem
+        *   Validates selected snapshots and parent chain integrity (see caching notes below)
+        *   Handles incremental snapshot validation using received UUID checks with parent UUID discovery via `btrfs_restore_find_subvol_path_by_uuid()`
         *   Provides coordinated restore execution with rollback capabilities
     *   **Restore Options:**
         1. Complete System: Restores multiple subvolumes with matching timestamps (based on available backups)
         2. Individual Subvolume: Restores specific subvolumes (@ for root, @home for user data, @var for variable data, etc.)
         3. Selective Restore: Allows choosing specific subvolumes from available backups
     *   **Advanced Features:**
-        *   Timestamp-based snapshot pairing for complete system restores
-        *   Incremental backup chain validation before restore
+        *   Timestamp-based snapshot pairing for complete system restores (inventory-driven)
+        *   Incremental backup chain validation before restore with received/parent UUID caching (`RESTORE_VERIFIED_RECEIVED_UUID`)
         *   Atomic rollback on partial restore failures
         *   Bootloader configuration detection and handling
     *   **Dependencies (internal):** `list_available_snapshots`, `validate_restore_snapshot`, `perform_subvolume_restore`, `detect_boot_configuration`, `perform_complete_system_rollback`
+
+    The helper functions `btrfs_restore_load_bundle_inventory()`, `btrfs_restore_format_size()`, `btrfs_restore_find_subvol_path_by_uuid()`, `btrfs_restore_refresh_subvol_identifiers()`, and the `RESTORE_VERIFIED_RECEIVED_UUID` cache were added to eliminate repeated `find`/`btrfs subvolume show` loops. Parent chains are resolved through the shared bundle inventory first, with direct `btrfs subvolume show` lookups performed only when UUID metadata is missing. Successfully validated chains are cached so later restore phases do not prompt the user again.
+
+    **Helper Summary:**
+    * `btrfs_restore_load_bundle_inventory()` – refreshes the shared bundle/subvolume records (optionally for an external backup root).
+    * `btrfs_restore_refresh_subvol_identifiers()` – lazily fetches subvolume UUID and received UUID (with sudo fallback when available) and stores them in the global caches.
+    * `btrfs_restore_find_subvol_path_by_uuid(uuid, subvol)` – resolves a parent snapshot path by UUID using the cached inventory data.
+    * `btrfs_restore_format_size(bytes)` – converts raw byte counters into human readable sizes without re-running `du`.
+    * `RESTORE_VERIFIED_RECEIVED_UUID` – tracks parent chains already validated so later phases skip redundant confirmations.
 
 **8. Subvolume Management and Safety:**
 
@@ -236,53 +262,130 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
 **10. Bootloader Configuration Management:**
 
 *   **`detect_boot_configuration()`**
-    *   **Purpose:** Analyzes current boot configuration to determine safe bootloader update strategies.
+    *   **Purpose:** Analyzes boot configuration to determine safe bootloader update strategies using marker files or filesystem inspection.
     *   **Mechanism:**
-        *   Analyzes `/etc/fstab` for subvolume-specific mount options
-        *   Examines GRUB configuration for subvolume references
-        *   Checks systemd-boot configuration for subvolume usage
-        *   Determines current default subvolume settings
+        *   **Marker File Method (Preferred):**
+            *   Parses the `filesystem_config` field from JSON marker file
+            *   Extracts FSTAB entries and analyzes for `subvol=` patterns
+            *   Works perfectly in dry-run mode without requiring filesystem access
+            *   Provides accurate detection based on backup-time configuration
+        *   **Filesystem Analysis Method (Fallback):**
+            *   Validates target_root parameter and handles empty/invalid paths
+            *   Analyzes `/etc/fstab` for subvolume-specific mount options
+            *   Examines GRUB configuration for subvolume references (multiple path patterns)
+            *   Checks systemd mount units for subvolume usage
+            *   Determines current default subvolume settings
+        *   **Critical Implementation Detail:**
+            *   Uses **global variables** (`DETECTED_BOOT_STRATEGY`, `DETECTED_BOOT_CONFIG_RESULT`) to avoid subshell scope issues
+            *   Function is called **directly without output redirection** to preserve variable assignments
+            *   See "Variable Scope and Subshell Pitfalls" in CLI_DEVELOPER_GUIDE.md for detailed explanation
+        *   Implements multiple safety fallbacks to ensure strategy is never empty
     *   **Detection Results:**
-        *   `explicit_subvol`: Safe configuration using explicit subvolume paths
-        *   `default_subvol`: Configuration relying on default subvolume (requires updates)
-        *   `mixed`: Mixed configuration requiring careful handling
-    *   **Output:** Comprehensive boot configuration analysis and recommended strategy
-    *   **Dependencies (system):** `/etc/fstab`, GRUB config files, `btrfs subvolume get-default`
-
-*   **`backup_bootloader_files()`**
-    *   **Purpose:** Creates timestamped backups of critical bootloader configuration files.
-    *   **Mechanism:**
-        *   Backs up `/etc/fstab` with timestamp
-        *   Creates copies of GRUB configuration files
-        *   Handles systemd-boot configuration backup if present
-        *   Logs all backup operations for recovery purposes
-    *   **Backup Files:** `/etc/fstab`, `/etc/default/grub`, `/boot/grub/grub.cfg`, systemd-boot configs
-    *   **Dependencies (internal):** `restore_log_msg`
+        *   `explicit_subvol`: Safe configuration using explicit subvolume paths (`subvol=/@`)
+        *   `default_subvol`: Configuration relying on default subvolume (requires `btrfs subvolume set-default`)
+        *   Defaults to `default_subvol` if configuration is unclear (safety fallback)
+    *   **Dry-Run Handling:**
+        *   Marker file method works perfectly in dry-run (no filesystem access needed)
+        *   Filesystem method gracefully handles non-existent target paths
+        *   Provides informative messages about dry-run limitations
+        *   Never fails fatally during dry-run detection phase
+    *   **Output:** 
+        *   Sets global variables: `DETECTED_BOOT_STRATEGY`, `DETECTED_FSTAB_USES_SUBVOL`, `DETECTED_GRUB_USES_SUBVOL`, `DETECTED_BOOT_CONFIG_RESULT`
+        *   Returns comprehensive boot configuration analysis text
+    *   **Known Issue (Fixed):**
+        *   Initial implementation used output redirection which created subshells
+        *   Variables set inside subshells were lost, causing empty strategy detection
+        *   **Fix:** Changed to global variable pattern - function sets globals directly, calling code accesses them
+        *   See `/temp/SUBSHELL_SCOPE_FIX_COMPLETE.md` for complete fix documentation
+    *   **Dependencies (system):** `jq` (for marker file parsing), `/etc/fstab`, GRUB config files, `btrfs subvolume get-default`
 
 *   **`choose_boot_strategy()`**
-    *   **Purpose:** Interactive selection of bootloader update strategy based on system analysis.
+    *   **Purpose:** Interactive method selection for bootloader detection and strategy execution.
     *   **Mechanism:**
-        *   Presents detected boot configuration analysis
-        *   Offers strategy options: explicit subvolume paths vs. default subvolume updates
+        *   **Offers three detection methods:**
+            1. Marker file - Use boot config from backup (recommended, works in dry-run)
+            2. Filesystem - Detect from current filesystem (fallback if marker unavailable)
+            3. Auto - Try marker first, automatically fallback to filesystem if needed
+        *   Calls `detect_boot_configuration()` with appropriate parameters
+        *   **Intelligent Fallback:** If marker detection fails, automatically offers filesystem detection
+        *   Implements safety checks to ensure `DETECTED_BOOT_STRATEGY` is never empty
+        *   Displays comprehensive analysis results to user
+        *   Offers strategy execution options based on detected configuration
         *   Provides detailed explanations of each strategy's implications
         *   Allows user override of recommended strategy
+        *   Handles empty/unknown strategies gracefully with error messages
+    *   **Detection Method Selection:**
+        *   User can force a specific method or use auto-fallback
+        *   Marker file method provides most accurate results (based on backup-time config)
+        *   Filesystem method useful when marker is unavailable or for verification
     *   **Strategies:**
-        1. `explicit_subvol`: Use explicit subvolume paths (safer, no bootloader changes)
-        2. `default_subvol`: Update default subvolume (simpler, requires bootloader updates)
-    *   **Dependencies (internal):** `detect_boot_configuration`, `backup_bootloader_files`
+        1. `explicit_subvol`: Use explicit subvolume paths (safer, no bootloader changes needed)
+        2. `default_subvol`: Update default subvolume (simpler, requires `btrfs subvolume set-default`)
+    *   **Error Handling:**
+        *   Empty strategy: Displays error and requests manual intervention
+        *   Unknown strategy: Logs error with strategy value for debugging
+        *   Failed detection: Offers alternative detection method
+        *   All cases ensure user is informed and given appropriate guidance
+    *   **Dependencies (internal):** `detect_boot_configuration`, `execute_explicit_subvol_strategy`, `execute_default_subvol_strategy`
+
+*   **`backup_bootloader_files()`**
+    *   **Purpose:** Creates timestamped backups of critical bootloader configuration files before any modifications.
+    *   **Mechanism:**
+        *   Backs up `/etc/fstab` with timestamp suffix
+        *   Creates copies of GRUB configuration files (`/etc/default/grub`, `/boot/grub/grub.cfg`)
+        *   Handles systemd-boot configuration backup if present
+        *   Logs all backup operations for recovery purposes
+        *   Only backs up files that exist (gracefully handles missing configs)
+    *   **Backup Files:** 
+        *   `/etc/fstab_pre_restore_<timestamp>`
+        *   `/etc/default/grub_pre_restore_<timestamp>`
+        *   `/boot/grub/grub.cfg_pre_restore_<timestamp>`
+        *   systemd-boot loader entries (if present)
+    *   **Use Case:** Called before any bootloader strategy execution to ensure rollback capability
+    *   **Dependencies (internal):** `restore_log_msg`
+    *   **Dependencies (system):** `cp`, `date`
+
+*   **`execute_explicit_subvol_strategy()`**
+    *   **Purpose:** Executes the explicit subvolume strategy (no bootloader changes needed).
+    *   **Mechanism:**
+        *   Confirms that explicit subvol= references are already in place
+        *   No filesystem modifications required
+        *   Provides informational messages about the strategy
+    *   **Safety:** Safest strategy as it avoids any bootloader modifications
+
+*   **`execute_default_subvol_strategy()`**
+    *   **Purpose:** Updates the BTRFS default subvolume to point to the restored root.
+    *   **Mechanism:**
+        *   Handles dry-run mode with simulation messages (no actual changes)
+        *   Creates backups of bootloader configuration files
+        *   Determines subvolume ID of the restored root subvolume
+        *   Uses `btrfs subvolume set-default` to update the default
+        *   Verifies the change after execution
+        *   Offers rollback on failure
+    *   **Dry-Run Handling:**
+        *   Detects dry-run mode or non-existent target paths
+        *   Provides simulation messages for all operations
+        *   Returns success without attempting actual filesystem changes
+    *   **Safety Features:**
+        *   Pre-operation backups
+        *   Post-operation verification
+        *   Rollback capability on failure
+    *   **Dependencies (internal):** `backup_bootloader_files`, `rollback_bootloader_changes`
+    *   **Dependencies (system):** `btrfs subvolume list`, `btrfs subvolume set-default`, `btrfs subvolume get-default`
 
 *   **`handle_bootloader_configuration()`**
-    *   **Purpose:** Executes selected bootloader update strategy with comprehensive safety measures.
+    *   **Purpose:** Orchestrates bootloader configuration with comprehensive safety measures.
     *   **Mechanism:**
-        *   Executes strategy-specific bootloader updates
-        *   Handles both explicit subvolume and default subvolume strategies
-        *   Provides detailed logging and error handling for bootloader operations
-        *   Includes rollback capabilities for failed bootloader updates
+        *   Initializes global bootloader detection variables
+        *   Determines root subvolume dynamically from available subvolumes
+        *   Calls `choose_boot_strategy()` to detect and execute appropriate strategy
+        *   Displays manual checkpoint for user verification
+        *   Provides recommendations for manual verification steps
     *   **Safety Features:**
-        *   Pre-operation backup of bootloader files
-        *   Strategy-specific validation and error handling
-        *   Detailed logging of all bootloader modifications
-    *   **Dependencies (internal):** `execute_explicit_subvol_strategy`, `execute_default_subvol_strategy`, `backup_bootloader_files`
+        *   Never executes without user confirmation
+        *   Provides detailed manual intervention guidance
+        *   Creates checkpoint for system state inspection
+    *   **Dependencies (internal):** `choose_boot_strategy`, `get_restore_subvolumes`, `create_manual_checkpoint`
 
 **10. System Rollback and Recovery:**
 
@@ -441,8 +544,9 @@ The module's integration with `lib_btrfs.sh` provides enterprise-grade atomic re
 
 *   **`check_btrfs_space()` and `get_btrfs_available_space()` - Advanced Space Management:**
     *   Detects BTRFS metadata exhaustion conditions that can cause restore failures
-    *   Provides accurate space calculations considering BTRFS-specific overhead
+    *   Provides accurate space calculations using BTRFS's "Free (estimated)" metric, which properly accounts for RAID profiles, metadata overhead, and compression
     *   Intelligently estimates space requirements for different restore scenarios
+    *   Uses actual usable free space rather than raw unallocated device space for accurate capacity planning
 
 *   **`handle_btrfs_error()` - Intelligent Error Management:**
     *   Classifies BTRFS-specific errors and provides automated recovery strategies
@@ -494,6 +598,75 @@ This integration transforms the restore module from a standard BTRFS restore scr
     *   Includes all validation and checkpoint mechanisms
     *   Creates comprehensive audit trails
 
+**18.5. Post-Restore Verification and Bootloader Setup:**
+
+The module includes an advanced post-restore verification wizard designed to guide users through critical verification steps, especially important when restoring to different hardware or when UUIDs have changed.
+
+*   **`post_restore_verification()` - Interactive Verification Wizard**
+    *   **Purpose:** Automates and guides users through post-restore verification and configuration tasks that are critical for system bootability
+    *   **Ideal Use Cases:**
+        *   Restoring to different hardware (different disk, computer, or partition layout)
+        *   UUID changes (new partitions, replaced disks)
+        *   Migration scenarios (moving system to new hardware)
+        *   Live environment restores requiring chroot operations
+    *   **Four-Step Interactive Process:**
+        1. **Hardware Change Detection:**
+            *   Asks user if restoring to different hardware/UUID
+            *   If same hardware detected, offers to skip remaining verification steps
+            *   Provides early exit option for unnecessary verifications
+        2. **fstab Verification and Update:**
+            *   Displays current disk UUIDs using `blkid` output
+            *   Shows current `/etc/fstab` content from restored system
+            *   Opens fstab in system editor ($EDITOR, nano, or vi) for interactive editing
+            *   Allows user to update device UUIDs to match current system
+            *   Validates that fstab file exists and is accessible
+        3. **GRUB Configuration Update:**
+            *   Updates GRUB configuration via chroot into restored system
+            *   Executes `grub-mkconfig -o /boot/grub/grub.cfg` in target environment
+            *   Ensures GRUB configuration reflects new UUIDs and hardware
+            *   Validates target root is properly mounted before chroot
+            *   Provides error feedback for failed GRUB updates
+        4. **Bootloader Configuration:**
+            *   Calls existing `retry_bootloader_configuration()` function
+            *   Sets default BTRFS subvolume for boot
+            *   Ensures bootloader knows which subvolume to boot from
+    *   **Verification Summary:**
+        *   Displays formatted summary box showing completed (✓) vs skipped (○) steps
+        *   Lists next steps: unmount target system, reboot, verify boot
+        *   Provides clear visual feedback of verification status
+    *   **Safety Features:**
+        *   User confirmation required at each step
+        *   All steps are optional and can be skipped
+        *   Validates TARGET_ROOT is configured and exists
+        *   Checks mountpoint status before chroot operations
+        *   Handles missing editor gracefully (fallback to vi)
+    *   **Translation Support:**
+        *   Fully translatable with dedicated message keys (35+ keys)
+        *   Available in English and German
+        *   Consistent terminology with rest of restore module
+    *   **Integration:**
+        *   Accessible via main menu option 8
+        *   Can be run after any restore operation
+        *   Works independently of restore type (full system, single subvolume, etc.)
+        *   Complementary to `retry_bootloader_configuration()` (option 7)
+    *   **Error Handling:**
+        *   Validates TARGET_ROOT configuration
+        *   Checks file system accessibility
+        *   Provides informative error messages
+        *   Allows graceful recovery from editor or chroot failures
+
+*   **`retry_bootloader_configuration()` - Manual Bootloader Retry**
+    *   **Purpose:** Re-runs bootloader configuration detection and setup
+    *   **Use Cases:**
+        *   First bootloader configuration attempt failed
+        *   User wants to try different bootloader strategy
+        *   Need to reset default BTRFS subvolume
+    *   **Relationship to post_restore_verification():**
+        *   Simpler, focused only on bootloader (no fstab or GRUB updates)
+        *   Called as Step 4 within post_restore_verification()
+        *   Can be used standalone for quick bootloader fixes
+        *   Option 7 vs Option 8 in menu
+
 **19. Integration with Main System:**
 
 *   **Module Loading:** Can be run standalone or integrated with main helper system
@@ -520,16 +693,18 @@ This integration transforms the restore module from a standard BTRFS restore scr
 The module provides an interactive menu-driven interface with the following main options:
 
 1. **Setup Restore Environment:** Interactive configuration of backup source, target system, and operation modes with dynamic subvolume detection capabilities
-2. **Restore Snapshots:** Advanced snapshot selection and restoration with support for:
+2. **System/Subvolume Restore:** Advanced snapshot selection and restoration with support for:
    - Complete System Restore (coordinated restore of multiple subvolumes with matching timestamps)
    - Individual Subvolume Restore (any available subvolume: @, @home, @var, @opt, etc.)
    - Selective Restore (choose specific subvolumes from available backups)
    - Intelligent bootloader handling with multiple strategies
-3. **Restore Folder from Snapshot:** Granular folder-level restore without full subvolume replacement
+3. **Individual Folder Restore:** Granular folder-level restore without full subvolume replacement
 4. **Show Disk Information:** Comprehensive disk and filesystem analysis for restore planning
-5. **Show Safety Warnings:** Display critical safety information and live environment detection
-6. **Cleanup Old Restore Artifacts:** Intelligent cleanup of temporary files and failed restore artifacts
-7. **Exit:** Safe exit with operation summary
+5. **Review Safety Information:** Display critical safety information and live environment detection
+6. **Cleanup Restore Artifacts:** Intelligent cleanup of temporary files and failed restore artifacts
+7. **Retry Bootloader Configuration:** Re-run bootloader configuration detection and setup
+8. **Post-Restore Verification & Bootloader Setup:** Interactive wizard for post-restore verification (NEW)
+0. **Back to Main Menu / Exit:** Safe exit with operation summary
 
 **Advanced Features:**
 - **Real-time Progress Monitoring:** Live status updates during restore operations

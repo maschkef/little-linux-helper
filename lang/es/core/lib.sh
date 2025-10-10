@@ -61,6 +61,24 @@ MSG_ES[LIB_WARNING_INITIAL_LOG_DIR]="ADVERTENCIA: No se pudo crear el directorio
 # UI-specific messages
 MSG_ES[LIB_UI_INVALID_INPUT]="Entrada inválida. Por favor intente de nuevo."
 
+# Session registry messages
+MSG_ES[LIB_SESSION_ACTIVITY_INITIALIZING]="Inicializando"
+MSG_ES[LIB_SESSION_ACTIVITY_MENU]="Mostrando menú"
+MSG_ES[LIB_SESSION_ACTIVITY_WAITING]="Esperando entrada del usuario"
+MSG_ES[LIB_SESSION_ACTIVITY_SECTION]="Procesando: %s"
+MSG_ES[LIB_SESSION_ACTIVITY_ACTION]="Ejecutando: %s"
+MSG_ES[LIB_SESSION_ACTIVITY_PREP]="Preparando: %s"
+MSG_ES[LIB_SESSION_ACTIVITY_BACKUP]="Haciendo copia de seguridad: %s"
+MSG_ES[LIB_SESSION_ACTIVITY_RESTORE]="Restaurando: %s"
+MSG_ES[LIB_SESSION_ACTIVITY_CLEANUP]="Limpiando: %s"
+MSG_ES[LIB_SESSION_LOCK_TIMEOUT]="Registro de sesiones ocupado, se omite la actualización."
+MSG_ES[LIB_SESSION_REGISTERED]="Sesión iniciada: %s (%s)"
+MSG_ES[LIB_SESSION_UPDATED]="Sesión actualizada: %s -> %s"
+MSG_ES[LIB_SESSION_UNREGISTERED]="Sesión finalizada: %s"
+MSG_ES[LIB_SESSION_DEBUG_NONE]="No hay otras sesiones activas (módulo: %s)"
+MSG_ES[LIB_SESSION_DEBUG_LIST_HEADER]="Sesiones activas antes de iniciar %s (%d en total):"
+MSG_ES[LIB_SESSION_DEBUG_ENTRY]="%s [%s] %s (%s)"
+
 # Notification messages
 MSG_ES[LIB_NOTIFICATION_INCOMPLETE_PARAMS]="lh_send_notification: Parámetros incompletos (type, title, message requeridos)"
 MSG_ES[LIB_NOTIFICATION_TRYING_SEND]="Intentando enviar notificación de escritorio: [%s] %s - %s"

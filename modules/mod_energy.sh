@@ -34,6 +34,9 @@ if [[ -z "${MSG[ENERGY_MENU_TITLE]:-}" ]]; then
     lh_load_language_module "lib"
 fi
 
+lh_log_active_sessions_debug "$(lh_msg 'MENU_ENERGY')"
+lh_begin_module_session "mod_energy" "$(lh_msg 'MENU_ENERGY')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
+
 # Global variables for temporary settings
 ENERGY_TEMP_INHIBIT_ACTIVE=false
 
@@ -663,6 +666,7 @@ function energy_main_menu() {
     lh_log_msg "DEBUG" "Starting energy management module"
     
     while true; do
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
         lh_print_header "$(lh_msg 'ENERGY_MENU_TITLE')"
 
         lh_print_menu_item 1 "$(lh_msg 'ENERGY_MENU_DISABLE_SLEEP')"
@@ -674,19 +678,24 @@ function energy_main_menu() {
         echo ""
 
         local choice
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET} ")" choice
 
         case $choice in
             1)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'ENERGY_MENU_DISABLE_SLEEP')")"
                 energy_disable_sleep
                 ;;
             2)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'ENERGY_MENU_CPU_GOVERNOR')")"
                 energy_cpu_governor
                 ;;
             3)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'ENERGY_MENU_SCREEN_BRIGHTNESS')")"
                 energy_screen_brightness
                 ;;
             4)
+                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'ENERGY_MENU_POWER_STATS')")"
                 energy_power_stats
                 ;;
             0)
@@ -698,6 +707,8 @@ function energy_main_menu() {
                 echo -e "${LH_COLOR_WARNING}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
                 ;;
         esac
+
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
 
         # Short pause so user can read the output
         if [[ "$choice" != "0" ]]; then
