@@ -137,7 +137,7 @@
     "options": [
       "1. Laufende Container anzeigen - Alle aktiven Docker-Container mit Ressourcenverbrauch und Status anzeigen",
       "2. Konfiguration verwalten - Docker-Sicherheitsscanning-Einstellungen und -Parameter konfigurieren",
-      "3. Installation & Setup - Docker und Docker Compose automatisch auf Ihrem System installieren", 
+      "3. Installation & Setup - Docker und Docker Compose automatisch auf Ihrem System installieren",
       "4. Sicherheits-Audit - Umfassende Sicherheitsprüfung von Containern, Images und Docker-Konfiguration"
     ],
     "notes": [
@@ -154,7 +154,7 @@
       "2. TAR-Backup - Komprimierte Archiv-Backups von Verzeichnissen erstellen (kompatibel mit allen Systemen)",
       "3. RSYNC-Backup - Schnelle inkrementelle Backups, die nur geänderte Dateien kopieren",
       "4. Wiederherstellungsvorgänge - Spezialisierte Wiederherstellungstools für jeden Backup-Typ aufrufen",
-      "6. Backup-Status - Umfassenden Status aller Ihrer Backups und Festplattenplatz-Nutzung anzeigen", 
+      "6. Backup-Status - Umfassenden Status aller Ihrer Backups und Festplattenplatz-Nutzung anzeigen",
       "7. Backup konfigurieren - Backup-Ziele, Aufbewahrungsrichtlinien und andere Einstellungen festlegen"
     ],
     "notes": [
@@ -169,47 +169,48 @@
     ]
   },
   "btrfs_backup": {
-    "overview": "Erweiterte BTRFS-Snapshot-basierte Backup-System mit dynamischer Subvolume-Erkennung. Erstellt atomische Backups konfigurierbarer BTRFS-Subvolumes mit btrfs send/receive mit umfassender Integritätsprüfung und automatischen inkrementellen Backup-Ketten.",
+    "overview": "Erstellt bundle-basierte BTRFS-Snapshots mit dynamischer Subvolume-Erkennung, Laufzeit-Metadaten und atomischem send/receive, damit jede Sicherung wiederherstellbereit bleibt.",
     "options": [
-      "1. BTRFS-Backup erstellen - Erstellt Snapshots konfigurierter und automatisch erkannter Subvolumes und überträgt sie zum Backup-Ziel",
-      "2. Konfiguration anzeigen/ändern - Backup-Einstellungen anzeigen und ändern (Subvolumes, Pfade, Aufbewahrung, Auto-Erkennung)",
-      "3. Backup-Status anzeigen - Backup-Historie, Speicherplatzverbrauch und erkannte Subvolume-Informationen anzeigen", 
-      "4. BTRFS-Backups löschen - Alte Backups mit Optionen für selektives oder automatisches Löschen entfernen",
-      "5. Problematische Backups bereinigen - Beschädigte oder unvollständige Backup-Operationen reparieren",
-      "6. Skript-erstellte Quell-Snapshots bereinigen - Temporäre Snapshots entfernen und bewahrte Snapshots verwalten",
-      "7. BTRFS-Backup wiederherstellen - Erweiterte Wiederherstellung mit Bootloader-Integration und set-default-Fähigkeit"
+      "1. Backup jetzt starten - Alle konfigurierten und automatisch erkannten Subvolumes in ein gemeinsames Zeitstempel-Bundle sichern",
+      "2. Bundle-Inventar prüfen - Sicherungshistorie, Marker-Status und Laufzeit-Metadaten anzeigen",
+      "3. Backup-Einstellungen anpassen - Ziele, Aufbewahrung, Auto-Erkennung und Subvolume-Liste konfigurieren",
+      "4. Quell-Snapshots verwalten - Skript-erstellte Quell-Snapshots bereinigen oder für inkrementelle Ketten beibehalten",
+      "5. Problem-Bundles bereinigen - Unterbrochene Backups reparieren und Bundle-Marker erneut validieren",
+      "6. Backup-Bundles löschen - Ausgewählte oder automatisch vorgeschlagene Bundles entfernen und Ketten intakt halten",
+      "7. Restore-Helfer öffnen - Wiederherstellungs-Workflow mit dem ausgewählten Bundle starten"
     ],
     "notes": [
       "⚠️ BETA-SOFTWARE: Auf begrenzten Systemen getestet - mit Vorsicht verwenden",
-      "Unterstützt flexible BTRFS-Subvolume-Layouts (@ @home @var @opt @tmp @srv, etc.)",
-      "Erkennt automatisch Subvolumes aus /etc/fstab und /proc/mounts wenn aktiviert",
-      "Konfigurierbare Subvolume-Liste über LH_BACKUP_SUBVOLUMES-Einstellung", 
-      "Backup-Ziel muss auf einem BTRFS-Dateisystem sein",
-      "Verwendet umfassende atomische Operationen mit gründlicher Validierung",
-      "Erstellt automatisch platzsparende inkrementelle Backups wenn möglich",
-      "Quell-Snapshot-Bewahrung zur Aufrechterhaltung inkrementeller Backup-Ketten"
+      "Erstellt ein bundle-basiertes Backup-Layout, bei dem jeder Lauf Snapshots, Marker und Metadaten mit identischem Zeitstempel schreibt",
+      "Unterstützt flexible BTRFS-Subvolume-Layouts (@, @home, @var, benutzerdefinierte Namen) mit dynamischer Auto-Erkennung",
+      "Markerdateien (.backup_complete) liegen neben jedem Subvolume-Snapshot und speichern Status-, Dauer- und Größeninformationen",
+      "Laufzeit-Metadaten liegen in meta/<timestamp>.json und speisen das gemeinsame Bundle-Inventar in Backup-/Restore-Menüs",
+      "📁 Bundle-Layout-Ansicht (ein Zeitstempel pro Lauf):\n```\n${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/\n├── snapshots/                        # Alle Backup-Bundles\n│   ├── 2025-10-06_150226/            # Bundle: Zeitstempel-Verzeichnis\n│   │   ├── @/                        # Subvolume-Snapshot (BTRFS-Subvolume)\n│   │   ├── @.backup_complete         # Markerdatei (neben dem Snapshot)\n│   │   ├── @home/                    # Subvolume-Snapshot (BTRFS-Subvolume)\n│   │   ├── @home.backup_complete     # Markerdatei (neben dem Snapshot)\n│   │   ├── @var/                     # Subvolume-Snapshot (BTRFS-Subvolume)\n│   │   ├── @var.backup_complete      # Markerdatei (neben dem Snapshot)\n│   │   ├── <subvol>/                 # Weitere Subvolume-Snapshots (optional)\n│   │   └── <subvol>.backup_complete  # Passende Markerdatei für optionale Subvolumes\n│   ├── 2025-10-07_083015/            # Weiteres Bundle\n│   │   ├── @/                        # Snapshot\n│   │   ├── @.backup_complete         # Marker\n│   │   ├── @home/                    # Zusätzlicher Snapshot\n│   │   ├── @home.backup_complete     # Marker für zusätzlichen Snapshot\n│   │   ├── <subvol>/                 # Weitere Snapshots bei Konfiguration\n│   │   └── <subvol>.backup_complete  # Passende Markerdateien für optionale Subvolumes\n│   └── 2025-10-08_120145/            # Aktuellstes Bundle\n│       ├── @/                        # Snapshot\n│       ├── @.backup_complete         # Marker\n│       ├── @home/                    # Snapshot\n│       ├── @home.backup_complete     # Marker\n│       ├── @var/                     # Snapshot\n│       ├── @var.backup_complete      # Marker\n│       ├── <subvol>/                 # Weitere Subvolume-Snapshots (optional)\n│       └── <subvol>.backup_complete  # Passende Markerdatei für optionale Subvolumes\n└── meta/                             # Metadaten-Verzeichnis\n    ├── 2025-10-06_150226.json        # Metadaten für erstes Bundle\n    ├── 2025-10-07_083015.json        # Metadaten für zweites Bundle\n    └── 2025-10-08_120145.json        # Metadaten für aktuelles Bundle\n```",
+      "Backup-Ziel muss ein BTRFS-Dateisystem mit ausreichend freiem Speicher für Snapshots und Metadaten sein",
+      "Erstellt automatisch inkrementelle Backups, wenn passende Eltern-Snapshots verfügbar sind",
+      "Die Beibehaltung von Quell-Snapshots erhält inkrementelle Ketten; Aufbewahrung passend konfigurieren, um unerwartete Löschungen zu vermeiden"
     ]
   },
   "btrfs_restore": {
-    "overview": "⚠️ DESTRUKTIV: Erweiterte BTRFS-Disaster-Recovery-System mit dynamischer Subvolume-Erkennung. Entwickelt für den Betrieb aus Live-Umgebung zur Wiederherstellung von Systemen aus BTRFS-Backups mit atomischen Operationen, Bootloader-Integration und umfassender Sicherheitsvalidierung.",
+    "overview": "⚠️ DESTRUKTIV: Live-Umgebungs-Wiederherstellungs-Workflow, der bundle-basierte Backups mit atomischer Validierung, Bootloader-Integration und received-UUID-Schutz zurückspielt.",
     "options": [
-      "1. Wiederherstellungsumgebung einrichten - Zielsystem, Backup-Quelle konfigurieren und verfügbare Subvolumes automatisch erkennen",
-      "2. System-/Subvolume-Wiederherstellung - Beliebige erkannte Subvolumes (@, @home, @var, @opt, etc.) mit Zeitstempel-Matching wiederherstellen",
-      "3. Individuelle Ordner-Wiederherstellung - Spezifische Dateien/Ordner aus beliebigen verfügbaren Subvolume-Snapshots wiederherstellen", 
-      "4. Festplatten-Informationen anzeigen - Zielsystem-Festplattenlayout, BTRFS-Struktur und erkannte Subvolumes anzeigen",
-      "5. Sicherheitsinformationen überprüfen - Kritische Sicherheitswarnungen, Live-Umgebungs-Erkennung und Wiederherstellungsverfahren anzeigen",
-      "6. Wiederherstellungsumgebung bereinigen - Temporäre Dateien, Mount-Punkte und Wiederherstellungsartefakte aufräumen"
+      "1. Wiederherstellungsumgebung vorbereiten - Backup-/Ziel-Laufwerke erkennen, Mount-Punkte setzen und Live-Sicherheitsprüfungen bestätigen",
+      "2. Wiederherstellungsumfang wählen - Gesamtsystem oder einzelne Subvolumes mit zeitstempel-abgeglichenen Bundles zurückspielen",
+      "3. Backup-Inhalte durchsuchen - Bundles schreibgeschützt einhängen, um einzelne Dateien oder Ordner herauszuholen",
+      "4. Festplatten- & Bundle-Layout prüfen - Ziel-Festplattenlayout, erkannte Subvolumes, Marker und Metadaten-Dateien anzeigen",
+      "5. Sicherheits-Checkliste ansehen - Kritische Warnungen, Live-Umgebungs-Erkennung und den dokumentierten 4-Schritte-Workflow lesen",
+      "6. Wiederherstellungssitzung bereinigen - Ziele aushängen, temporäre Verzeichnisse entfernen und Wiederherstellungsartefakte aufräumen"
     ],
     "notes": [
       "🚨 GEFAHR: ERFORDERT TESTS - NICHT in Produktion verwenden! Nur zum Debuggen/Testen!",
-      "🚨 Nur verwenden, wenn Sie BTRFS-Wiederherstellungsverfahren und potentiellen Datenverlust vollständig verstehen",
-      "⚠️ KRITISCH: Nur aus Live-Umgebung ausführen, niemals auf laufendem System",
-      "⚠️ Wird bestehende Daten auf Ziel-Subvolumes während vollständiger Wiederherstellung zerstören",
-      "Erkennt automatisch verfügbare Subvolumes aus Backup-Struktur und Systemkonfiguration",
-      "Unterstützt flexible BTRFS-Layouts mit beliebigen @-präfixierten Subvolumes",
-      "Koordinierte Multi-Subvolume-Wiederherstellung mit zeitstempel-basiertem Snapshot-Pairing", 
-      "Erweiterte Bootloader-Integration mit mehreren Update-Strategien",
-      "Verwendet robusten 4-Schritt-atomischen Wiederherstellungsprozess mit umfassender Validierung und Rollback"
+      "🚨 Nur fortfahren, wenn Sie BTRFS-Wiederherstellungsabläufe und möglichen Datenverlust vollständig verstehen",
+      "⚠️ Muss aus einer Live-Umgebung ausgeführt werden; das Modul überschreibt Ziel-Subvolumes destruktiv",
+      "⚠️ Vollständige Wiederherstellungen entfernen bestehende Daten auf Ziel-Subvolumes, bevor neue Snapshots empfangen werden",
+      "Verwendet dasselbe Bundle-Layout wie das Backup-Modul (snapshots/<timestamp>/<subvolume>, Marker-Dateien, meta/<timestamp>.json)",
+      "📂 Bundle-Schnellreferenz (identisch zum Backup):\n```\n${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/\n├── snapshots/<timestamp>/               # Bundle, das wiederhergestellt wird\n│   ├── @/                               # Snapshot, der im System wiederhergestellt wird\n│   ├── @.backup_complete                # Marker, der vor Start geprüft wird\n│   ├── @home/                           # Snapshot-Beispiel für Restore\n│   ├── @home.backup_complete            # Passender Marker vor dem Restore\n│   ├── <subvol>/                        # Zusätzliche Subvolume-Snapshots (optional)\n│   └── <subvol>.backup_complete         # Markerdatei für optionale Subvolumes\n└── meta/<timestamp>.json                # Metadaten für Validierung und Protokolle\n```",
+      "Bundle-Inventar sorgt für passende Zeitstempel bei Multi-Subvolume-Wiederherstellungen",
+      "Schützt inkrementelle Ketten durch received-UUID-Validierung und fehlerschonende atomare receive-Operationen",
+      "Bootloader-Aktualisierung bietet Neuinstallation, Konfigurationsaktualisierung oder Überspringen, falls extern verwaltet"
     ]
   },
   "backup_tar": {
@@ -248,7 +249,7 @@
     "overview": "RSYNC-basiertes Backup-System für effiziente inkrementelle Backups. Verwendet rsync zur Erstellung platzsparender Backups, die nur geänderte Dateien kopieren, ideal für regelmäßige Backup-Zeitpläne.",
     "options": [
       "1. Nur /home - Benutzer-Verzeichnisse und persönliche Daten sichern",
-      "2. Vollsystem (außer temporäre Dateien) - Komplettes System-Backup unter Ausschluss temporärer Verzeichnisse", 
+      "2. Vollsystem (außer temporäre Dateien) - Komplettes System-Backup unter Ausschluss temporärer Verzeichnisse",
       "3. Benutzerdefinierte Verzeichnisse - Spezifische Pfade zum Sichern angeben",
       "Nach Verzeichnisauswahl:",
       "• Vollbackup (alles kopieren) - Komplette Kopie aller ausgewählten Dateien",
@@ -257,7 +258,7 @@
     "notes": [
       "Inkrementelle Backups sind viel schneller und verbrauchen weniger Platz als Vollbackups",
       "Erstes Backup ist immer vollständig, nachfolgende Backups können inkrementell sein",
-      "Behält Datei-Berechtigungen, Besitz und Zeitstempel bei", 
+      "Behält Datei-Berechtigungen, Besitz und Zeitstempel bei",
       "Bietet Dry-Run-Modus zur Vorschau von Operationen ohne Änderungen",
       "Backup-Ziel ist in backup.conf konfigurierbar",
       "Erfordert rsync-Befehl (wird installiert falls fehlend)"
@@ -267,7 +268,7 @@
     "overview": "Dateien und Verzeichnisse aus RSYNC-Backups wiederherstellen. Bietet flexible Wiederherstellungsoptionen mit der Effizienz und Zuverlässigkeit von rsync.",
     "options": [
       "1. An ursprünglichen Ort (überschreibt bestehende Dateien) - Direkte Wiederherstellung, die aktuelle Dateien ersetzt",
-      "2. In temporäres Verzeichnis (/tmp/restore_rsync) - Sichere Extraktion zum Durchsuchen von Dateien und selektiver Wiederherstellung", 
+      "2. In temporäres Verzeichnis (/tmp/restore_rsync) - Sichere Extraktion zum Durchsuchen von Dateien und selektiver Wiederherstellung",
       "3. Benutzerdefinierter Pfad - In ein vom Benutzer angegebenes Verzeichnis wiederherstellen"
     ],
     "notes": [
@@ -305,7 +306,7 @@
       "1. Docker-Sicherheitsprüfung - Führt komplettes Sicherheitsaudit durch einschließlich:",
       "• Container-Sicherheitskonfigurationsanalyse",
       "• Image-Schwachstellen-Scanning",
-      "• Docker-Daemon-Sicherheitseinstellungen-Review", 
+      "• Docker-Daemon-Sicherheitseinstellungen-Review",
       "• Netzwerk-Sicherheitskonfigurationsprüfung",
       "• Volume- und Mount-Sicherheitsanalyse",
       "• Berechtigungseskalations-Erkennung",

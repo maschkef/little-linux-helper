@@ -164,6 +164,7 @@ var moduleDocMap = map[string]string{
 - **Functionality Changes**: Update `overview` description
 - **New Requirements**: Add to `notes` array
 - **Safety Changes**: Update warning information in `notes`
+- **Structured Notes**: Wrap directory trees or command blocks in triple backticks so the GUI help panel renders them as monospace code blocks
 
 **Example Update**:
 ```json
@@ -199,6 +200,8 @@ var moduleDocMap = map[string]string{
   }
 }
 ```
+
+> **Reminder:** When you add structured notes (like the BTRFS bundle tree), mirror the fenced-code formatting in every language file. The React help panel auto-detects triple backticks and preserves whitespace for those entries.
 
 ### Help Content Display Logic
 

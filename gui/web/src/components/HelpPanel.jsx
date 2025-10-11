@@ -78,6 +78,58 @@ function HelpPanel({ module }) {
 
   const help = getModuleHelp(module.id);
 
+  const renderNoteContent = (note, index) => {
+    if (typeof note !== 'string') {
+      return <span>{`[Invalid note format: ${JSON.stringify(note)}]`}</span>;
+    }
+
+    if (!note.includes('```')) {
+      return <span style={{ whiteSpace: 'pre-wrap' }}>{note}</span>;
+    }
+
+    const segments = note.split('```');
+
+    return (
+      <>
+        {segments.map((segment, segIndex) => {
+          const key = `${index}-seg-${segIndex}`;
+          const isCodeBlock = segIndex % 2 === 1;
+
+          if (isCodeBlock) {
+            const codeContent = segment.replace(/^\n+/, '').replace(/\n+$/, '');
+            return (
+              <pre
+                key={key}
+                style={{
+                  backgroundColor: '#1e1e1e22',
+                  borderRadius: '4px',
+                  padding: '0.5rem',
+                  margin: '0.35rem 0',
+                  whiteSpace: 'pre',
+                  overflowX: 'auto',
+                  fontSize: '0.85rem',
+                  fontFamily: '"Fira Code", "Source Code Pro", monospace'
+                }}
+              >
+                {codeContent}
+              </pre>
+            );
+          }
+
+          if (segment.trim().length === 0) {
+            return null;
+          }
+
+          return (
+            <span key={key} style={{ whiteSpace: 'pre-wrap' }}>
+              {segment}
+            </span>
+          );
+        })}
+      </>
+    );
+  };
+
   return (
     <div className="help-panel">
       <div className="panel-header">{t('app.moduleHelp')}: {module.name}</div>
@@ -107,8 +159,15 @@ function HelpPanel({ module }) {
           <h4 style={{ margin: '0 0 0.5rem 0', color: '#5e97cfff' }}>{t('help.importantNotes', { defaultValue: 'Important Notes' })}</h4>
           <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.9rem' }}>
             {help.notes.map((note, index) => (
-              <li key={index} style={{ marginBottom: '0.3rem', color: '#bb9900ff' }}>
-                {typeof note === 'string' ? note : `[Invalid note format: ${JSON.stringify(note)}]`}
+              <li
+                key={index}
+                style={{
+                  marginBottom: '0.45rem',
+                  color: '#bb9900ff',
+                  whiteSpace: 'pre-wrap'
+                }}
+              >
+                {renderNoteContent(note, index)}
               </li>
             ))}
           </ul>

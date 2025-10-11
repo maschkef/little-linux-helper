@@ -14,7 +14,7 @@ This document provides comprehensive information about developing and extending 
 ## Frontend Architecture Overview
 
 **Technology Stack:**
-- **React 19.1.1** - Modern functional components with hooks
+- **React 19.x** (currently 19.2.0, see `gui/web/package.json`) - Modern functional components with hooks
 - **Vite** - Fast build tool and development server  
 - **React i18next** - Internationalization framework
 - **ansi-to-html** - ANSI terminal color conversion
@@ -310,6 +310,61 @@ function ModuleList({ groupedModules, selectedModule, onModuleSelect, onModuleSt
   );
 }
 ```
+
+### HelpPanel.jsx - Context-Sensitive Module Guidance
+
+**Purpose:** Provides the translated quick reference for the currently selected module so users understand the workflow before starting it.
+
+**Key behaviours:**
+- Reads module-specific copy from the `help` namespace (see `help.json`)
+- Falls back gracefully if a translation key is missing
+- Preserves whitespace in standard notes and converts fenced code blocks into formatted `<pre>` sections (ideal for directory trees like the BTRFS bundle layout)
+
+**Code-block rendering helper:**
+```jsx
+const renderNoteContent = (note, index) => {
+  if (typeof note !== 'string') {
+    return <span>{`[Invalid note format: ${JSON.stringify(note)}]`}</span>;
+  }
+
+  if (!note.includes('```')) {
+    return <span style={{ whiteSpace: 'pre-wrap' }}>{note}</span>;
+  }
+
+  const segments = note.split('```');
+
+  return (
+    <>
+      {segments.map((segment, segIndex) => {
+        const isCodeBlock = segIndex % 2 === 1;
+
+        if (isCodeBlock) {
+          const codeContent = segment.trim();
+          return (
+            <pre key={segIndex} className="help-note-code">
+              {codeContent}
+            </pre>
+          );
+        }
+
+        if (segment.trim().length === 0) {
+          return null;
+        }
+
+        return (
+          <span key={segIndex} style={{ whiteSpace: 'pre-wrap' }}>
+            {segment}
+          </span>
+        );
+      })}
+    </>
+  );
+};
+```
+
+> **Tip:** Wrap tree diagrams or command examples in triple backticks inside `help.json`. The helper automatically renders them in a monospace block with preserved spacing.
+
+**Styling hint:** Help-panel list items enable `white-space: pre-wrap`, so manual line breaks added in translations remain visible without additional markup.
 
 ### Terminal.jsx - Real-time Terminal Display
 

@@ -86,22 +86,26 @@ Categories are automatically translated using the GUI's internationalization sys
 
 ### Environment Variable Setup
 
-**Critical Variables for GUI-CLI Integration:**
+The backend currently constructs the execution environment directly inside `startModule` rather than delegating to a helper. The relevant snippet looks like this:
+
 ```go
-func setupModuleEnvironment(moduleID, language string) []string {
-    env := os.Environ()
-    
-    // Essential GUI-CLI integration variables
-    env = append(env,
-        "LH_ROOT_DIR="+lhRootDir,           // Project root directory
-        "LH_GUI_MODE=true",                 // GUI execution mode flag
-        "LH_LANG="+language,                // Dynamic language inheritance
-        "PATH="+os.Getenv("PATH"),          // Preserve system PATH
-    )
-    
-    return env
-}
+cmd := exec.Command("stdbuf", "-i0", "-o0", "-e0", "bash", scriptPath)
+cmd.Dir = lhRootDir
+
+cmd.Env = append(os.Environ(),
+    "LH_ROOT_DIR="+lhRootDir,
+    "LH_GUI_MODE=true",
+    "LH_LANG="+req.Language,
+    "TERM=xterm-256color",
+    "FORCE_COLOR=1",
+    "COLUMNS=120",
+    "LINES=40",
+    "LANG="+os.Getenv("LANG"),
+    "PS1=$ ",
+)
 ```
+
+This ensures every module receives the same variables the CLI provides while adding a few GUI conveniences (fixed terminal size, forced colour output).
 
 **Environment Variable Explanation:**
 
@@ -186,20 +190,9 @@ chmod +x modules/networking/mod_network_info.sh
     Category:       "Network Tools",
     SubmoduleCount: 0,
 },
-    
-    return modules
-}
 
-// Add to getModules() function
-func getModules() []ModuleInfo {
-    // ... existing discovery code ...
-    
-    // Add networking modules discovery
-    networkingModules := discoverNetworkingModules(lhRootDir)
-    allModules = append(allModules, networkingModules...)
-    
-    return allModules
-}
+// getModules currently returns a hard-coded slice, so every new
+// module is added manually like the struct above.
 ```
 
 **3. Add Category Translations:**
@@ -270,11 +263,11 @@ EOF
 **Documentation Discovery:**
 ```go
 var moduleDocMap = map[string]string{
-    "backup":        "mod_backup.md",
-    "btrfs_backup":  "mod_btrfs_backup.md",
-    "disk":          "mod_disk.md", 
-    "docker":        "mod_docker.md",
-    "network_info":  "mod_network_info.md",  // New module docs
+    "backup":        "mod/doc_backup.md",
+    "btrfs_backup":  "mod/doc_btrfs_backup.md",
+    "disk":          "mod/doc_disk.md",
+    "docker":        "mod/doc_docker.md",
+    "network_info":  "mod/doc_network_info.md", // New module docs
 }
 
 func getModuleDocumentation(moduleID string) (string, error) {
@@ -282,13 +275,13 @@ func getModuleDocumentation(moduleID string) (string, error) {
     if !exists {
         return "No documentation available", nil
     }
-    
-    docPath := filepath.Join(lhRootDir, "docs", "mod", docFile)
-    content, err := ioutil.ReadFile(docPath)
+
+    docPath := filepath.Join(lhRootDir, "docs", docFile)
+    content, err := os.ReadFile(docPath)
     if err != nil {
         return "Documentation file not found", err
     }
-    
+
     return string(content), nil
 }
 ```
@@ -349,8 +342,9 @@ To add a new module category, you must modify the hardcoded module list in `gui/
 - "Docker & Containers"
 - "Backup & Recovery"
 
-**Note**: The current implementation does not automatically scan the file system for modules. All module information is predefined in the backend code for stable, consistent categorization and metadata.
+**Note**: The current implementation does not automatically scan the file system for modules. Everything is predefined inside `getModules`, which keeps ordering and descriptions under tight control.
 
+> **Future improvement idea:** A discovery helper could walk `modules/` at startup, parse metadata comments, and populate the slice dynamically. Implementing it would involve directory scanning plus validation, after which new modules could ship without touching the Go code.
 
 ### Module Metadata Enhancement
 

@@ -96,24 +96,28 @@ type ModuleSession struct {
 **Response Format:**
 ```json
 {
-    "content": "# Module Documentation\n\nMarkdown content here...",
-    "found": true
+    "content": "# Module Documentation\n\nMarkdown content here..."
 }
 ```
 
 **Documentation Mapping:**
 ```go
 var moduleDocMap = map[string]string{
-    "backup":        "mod_backup.md",
-    "btrfs_backup":  "mod_btrfs_backup.md",
-    "disk":          "mod_disk.md",
-    "docker":        "mod_docker.md",
-    "energy":        "mod_energy.md",
-    "logs":          "mod_logs.md",
-    "packages":      "mod_packages.md",
-    "restarts":      "mod_restarts.md",
-    "security":      "mod_security.md",
-    "system_info":   "mod_system_info.md",
+    // Module docs live in docs/mod/
+    "backup":        "mod/doc_backup.md",
+    "btrfs_backup":  "mod/doc_btrfs_backup.md",
+    "disk":          "mod/doc_disk.md",
+    "docker":        "mod/doc_docker.md",
+    "energy":        "mod/doc_energy.md",
+    "logs":          "mod/doc_logs.md",
+    "packages":      "mod/doc_packages.md",
+    "restarts":      "mod/doc_restarts.md",
+    "security":      "mod/doc_security.md",
+    "system_info":   "mod/doc_system_info.md",
+
+    // Library docs live in docs/lib/
+    "lib_common":    "lib/doc_common.md",
+    // ...additional entries omitted
 }
 ```
 
@@ -123,15 +127,14 @@ var moduleDocMap = map[string]string{
 **Request Body:**
 ```json
 {
-    "language": "en"  // Optional: de, en, es, fr
+    "language": "en"  // Optional: "en" or "de" (defaults to "en")
 }
 ```
 
 **Response Format:**
 ```json
 {
-    "session_id": "uuid-string",
-    "success": true
+    "sessionId": "backup_1739023512"
 }
 ```
 
@@ -151,17 +154,15 @@ var moduleDocMap = map[string]string{
 
 **Response Format:**
 ```json
-{
-    "sessions": [
-        {
-            "id": "session-uuid",
-            "module": "system_info",
-            "module_name": "System Information",
-            "created_at": "2025-08-17T10:30:00Z",
-            "status": "running"
-        }
-    ]
-}
+[
+    {
+        "id": "system_info_1739023512",
+        "module": "system_info",
+        "module_name": "Display System Information",
+        "created_at": "2025-02-11T12:45:50Z",
+        "status": "running"
+    }
+]
 ```
 
 #### `POST /api/sessions/:sessionId/input`
@@ -177,7 +178,7 @@ var moduleDocMap = map[string]string{
 **Response Format:**
 ```json
 {
-    "success": true
+    "status": "sent"
 }
 ```
 
@@ -187,8 +188,7 @@ var moduleDocMap = map[string]string{
 **Response Format:**
 ```json
 {
-    "success": true,
-    "message": "Session stopped"
+    "status": "stopped"
 }
 ```
 
@@ -198,28 +198,28 @@ var moduleDocMap = map[string]string{
 **Query Parameters:**
 - `force` (optional, boolean): If `true`, forces shutdown even with active sessions
 
-**Response Format (no active sessions):**
-```json
-{
-    "activeSessions": [],
-    "message": "Server shutdown initiated"
-}
-```
-
-**Response Format (with active sessions, force=false):**
+**Response (force=false):**
 ```json
 {
     "activeSessions": [
         {
-            "id": "restarts_1234567890",
+            "id": "restarts_1739023512",
             "module": "restarts",
             "moduleName": "Services & Desktop Restart Options",
-            "createdAt": "2025-08-27T22:06:00.000Z",
+            "createdAt": "2025-02-11T12:45:50Z",
             "status": "running"
         }
     ],
     "message": "Server shutdown initiated",
     "warning": "Active sessions will be terminated"
+}
+```
+
+**Response (force=true or no active sessions):**
+```json
+{
+    "activeSessions": [],
+    "message": "Server shutdown initiated"
 }
 ```
 
@@ -264,29 +264,20 @@ curl -X POST "http://localhost:3000/api/shutdown?force=true"
 
 **Response Format:**
 ```json
-{
-    "categories": {
-        "GUI Development": [
-            {
-                "name": "Backend API",
-                "path": "gui/doc_backend_api.md",
-                "description": "Go backend development reference"
-            },
-            {
-                "name": "Frontend React",
-                "path": "gui/doc_frontend_react.md", 
-                "description": "React component development guide"
-            }
-        ],
-        "CLI Development": [
-            {
-                "name": "Developer Guide",
-                "path": "CLI_DEVELOPER_GUIDE.md",
-                "description": "Core CLI development guide"
-            }
-        ]
+[
+    {
+        "id": "mod_system_info",
+        "name": "System Information",
+        "description": "Show comprehensive system information and hardware details",
+        "filename": "mod/doc_system_info.md"
+    },
+    {
+        "id": "gui_backend_api",
+        "name": "GUI Backend API",
+        "description": "Go backend development, API endpoints, and data structures",
+        "filename": "gui/doc_backend_api.md"
     }
-}
+]
 ```
 
 ## WebSocket Communication
@@ -300,8 +291,7 @@ curl -X POST "http://localhost:3000/api/shutdown?force=true"
 ```json
 {
     "type": "output",
-    "session_id": "uuid-string",
-    "content": "Terminal output content with ANSI codes"
+    "content": "Terminal output chunk with ANSI codes"
 }
 ```
 
@@ -309,8 +299,7 @@ curl -X POST "http://localhost:3000/api/shutdown?force=true"
 ```json
 {
     "type": "session_ended",
-    "session_id": "uuid-string",
-    "exit_code": 0
+    "content": "system_info_1739023512"
 }
 ```
 

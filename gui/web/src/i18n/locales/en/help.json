@@ -137,7 +137,7 @@
     "options": [
       "1. Show Running Containers - See all active Docker containers with resource usage and status",
       "2. Manage Configuration - Configure Docker security scanning settings and parameters",
-      "3. Installation & Setup - Automatically install Docker and Docker Compose on your system", 
+      "3. Installation & Setup - Automatically install Docker and Docker Compose on your system",
       "4. Security Audit - Comprehensive security scan of containers, images, and Docker configuration"
     ],
     "notes": [
@@ -154,7 +154,7 @@
       "2. TAR Backup - Create compressed archive backups of directories (compatible with all systems)",
       "3. RSYNC Backup - Fast incremental backups that only copy changed files",
       "4. Restore Operations - Access specialized restore tools for each backup type",
-      "6. Backup Status - View comprehensive status of all your backups and disk space usage", 
+      "6. Backup Status - View comprehensive status of all your backups and disk space usage",
       "7. Configure Backup - Set backup destinations, retention policies, and other settings"
     ],
     "notes": [
@@ -169,47 +169,48 @@
     ]
   },
   "btrfs_backup": {
-    "overview": "Advanced BTRFS snapshot-based backup system with dynamic subvolume detection. Creates atomic backups of configurable BTRFS subvolumes using btrfs send/receive with comprehensive integrity checking and automatic incremental backup chains.",
+    "overview": "Create bundle-based BTRFS snapshots with dynamic subvolume detection, per-run metadata, and atomic send/receive safeguards so every backup stays restore-ready.",
     "options": [
-      "1. Create BTRFS Backup - Creates snapshots of configured and auto-detected subvolumes and transfers to backup destination",
-      "2. Show/Change Configuration - View and modify backup settings (subvolumes, paths, retention, auto-detection)",
-      "3. Show Backup Status - Display backup history, space usage, and detected subvolumes information", 
-      "4. Delete BTRFS Backups - Remove old backups with options for selective or automatic deletion",
-      "5. Cleanup Problematic Backups - Fix corrupted or incomplete backup operations",
-      "6. Clean up script-created source snapshots - Remove temporary snapshots and manage preserved snapshots",
-      "7. Restore BTRFS Backup - Enhanced restore with bootloader integration and set-default capability"
+      "1. Run Backup Now - Capture all configured and auto-detected subvolumes into one timestamped bundle",
+      "2. Review Bundle Inventory - View backup history, marker status, and per-run metadata details",
+      "3. Adjust Backup Settings - Configure destinations, retention, auto-detection, and subvolume lists",
+      "4. Manage Source Snapshots - Clean up script-created source snapshots or preserve them for incremental chains",
+      "5. Clean Up Problem Bundles - Repair interrupted backups and re-validate bundle markers",
+      "6. Delete Backup Bundles - Remove selected or auto-pruned bundles while keeping chain integrity",
+      "7. Open Restore Helper - Jump into the restore workflow with the selected bundle context"
     ],
     "notes": [
       "⚠️ BETA SOFTWARE: Tested on limited systems - use with caution",
-      "Supports flexible BTRFS subvolume layouts (@ @home @var @opt @tmp @srv, etc.)",
-      "Auto-detects subvolumes from /etc/fstab and /proc/mounts when enabled",
-      "Configurable subvolume list via LH_BACKUP_SUBVOLUMES setting", 
-      "Backup destination must be on a BTRFS filesystem",
-      "Uses comprehensive atomic operations with thorough validation",
-      "Automatically creates space-efficient incremental backups when possible",
-      "Source snapshot preservation for maintaining incremental backup chains"
+      "Creates bundle-based backup layout where every run writes snapshots, markers, and metadata under the same timestamp",
+      "Supports flexible BTRFS subvolume layouts (@, @home, @var, custom names) with dynamic auto-detection",
+      "Marker files (.backup_complete) sit next to each subvolume snapshot and store status, duration, and size information",
+      "Per-run metadata JSON lives in meta/<timestamp>.json and powers the shared bundle inventory across backup/restore menus",
+      "📁 Backup bundle layout (one timestamp per run):\n```\n${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/\n├── snapshots/                        # All backup bundles\n│   ├── 2025-10-06_150226/            # Bundle: timestamp directory\n│   │   ├── @/                        # Subvolume snapshot\n│   │   ├── @.backup_complete         # Marker file (next to snapshot)\n│   │   ├── @home/                    # Subvolume snapshot\n│   │   ├── @home.backup_complete     # Marker file (next to snapshot)\n│   │   ├── @var/                     # Subvolume snapshot\n│   │   ├── @var.backup_complete      # Marker file (next to snapshot)\n│   │   ├── <subvol>/                 # Additional subvolume snapshot(s) (optional)\n│   │   └── <subvol>.backup_complete  # Matching marker for optional subvolumes\n│   ├── 2025-10-07_083015/            # Another bundle\n│   │   ├── @/                        # Snapshot\n│   │   ├── @.backup_complete         # Marker\n│   │   ├── @home/                    # Additional snapshot\n│   │   ├── @home.backup_complete     # Marker for additional snapshot\n│   │   ├── <subvol>/                 # More snapshots if configured\n│   │   └── <subvol>.backup_complete  # Matching markers for optional subvolumes\n│   └── 2025-10-08_120145/            # Most recent bundle\n│       ├── @/                        # Snapshot\n│       ├── @.backup_complete         # Marker\n│       ├── @home/                    # Snapshot\n│       ├── @home.backup_complete     # Marker\n│       ├── @var/                     # Snapshot\n│       ├── @var.backup_complete      # Marker\n│       ├── <subvol>/                 # Additional subvolume snapshot(s) (optional)\n│       └── <subvol>.backup_complete  # Matching marker for optional subvolumes\n└── meta/                             # Metadata directory\n    ├── 2025-10-06_150226.json        # Metadata for first bundle\n    ├── 2025-10-07_083015.json        # Metadata for second bundle\n    └── 2025-10-08_120145.json        # Metadata for latest bundle\n```",
+      "Backup destination must be a BTRFS filesystem with enough free space for snapshots and metadata",
+      "Automatically creates incremental backups when compatible parent snapshots are available",
+      "Source snapshot preservation keeps incremental chains intact; adjust retention policies to avoid unintended deletions"
     ]
   },
   "btrfs_restore": {
-    "overview": "⚠️ DESTRUCTIVE: Advanced BTRFS disaster recovery system with dynamic subvolume detection. Designed to run from live environment to restore systems from BTRFS backups with atomic operations, bootloader integration, and comprehensive safety validation.",
+    "overview": "⚠️ DESTRUCTIVE: Live-environment restore workflow that replays bundle-based backups with atomic validation, bootloader integration, and received UUID protection.",
     "options": [
-      "1. Setup Restore Environment - Configure target system, backup source, and detect available subvolumes automatically",
-      "2. System/Subvolume Restore - Restore any detected subvolumes (@, @home, @var, @opt, etc.) with timestamp matching",
-      "3. Individual Folder Restore - Restore specific files/folders from any available subvolume snapshots", 
-      "4. Show Disk Information - Display target system disk layout, BTRFS structure, and detected subvolumes",
-      "5. Review Safety Information - Show critical safety warnings, live environment detection, and restore procedures",
-      "6. Cleanup Restore Environment - Clean up temporary files, mount points, and restore artifacts"
+      "1. Prepare Restore Environment - Detect backup/target drives, mount points, and confirm live-session safety checks",
+      "2. Choose Restore Scope - Restore complete systems or selected subvolumes using timestamp-matched bundles",
+      "3. Browse Backup Contents - Mount bundles read-only to recover individual files or folders",
+      "4. Inspect Disk & Bundle Layout - Review target disk layout, detected subvolumes, markers, and metadata JSON files",
+      "5. Review Safety & Checklist - Read critical warnings, live-environment detection results, and the documented 4-step workflow",
+      "6. Clean Up Restore Session - Unmount targets, remove temporary directories, and clear restore artifacts"
     ],
     "notes": [
       "🚨 DANGER: REQUIRES TESTING - Do NOT use in production! For debugging/testing only!",
-      "🚨 Use only if you fully understand BTRFS restore procedures and potential data loss",
-      "⚠️ CRITICAL: Only run from live environment, never on running system",
-      "⚠️ Will destroy existing data on target subvolumes during full restore",
-      "Auto-detects available subvolumes from backup structure and system configuration",
-      "Supports flexible BTRFS layouts with any @-prefixed subvolumes",
-      "Coordinated multi-subvolume restore with timestamp-based snapshot pairing", 
-      "Advanced bootloader integration with multiple update strategies",
-      "Uses robust 4-step atomic restore process with comprehensive validation and rollback"
+      "🚨 Proceed only if you fully understand BTRFS restore procedures and potential data loss",
+      "⚠️ Must be executed from a live environment; the module destructively rewrites target subvolumes",
+      "⚠️ Full restores remove existing data on target subvolumes before receiving new snapshots",
+      "Reads the same bundle layout created by the backup module (snapshots/<timestamp>/<subvolume>, marker files, meta/<timestamp>.json)",
+      "📂 Bundle quick reference (matching backup view):\n```\n${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/\n├── snapshots/<timestamp>/               # Bundle chosen for restore\n│   ├── @/                               # Snapshot received during system restore\n│   ├── @.backup_complete                # Marker validated before restore starts\n│   ├── @home/                           # Additional snapshot selected (example)\n│   ├── @home.backup_complete            # Matching marker checked pre-restore\n│   ├── <subvol>/                        # Further subvolume snapshot(s) (optional)\n│   └── <subvol>.backup_complete         # Marker for optional subvolumes\n└── meta/<timestamp>.json                # Metadata driving safety checks\n```",
+      "Bundle inventory ensures matching timestamps when restoring multi-subvolume systems",
+      "Protects incremental chains with received UUID validation and rollback-safe atomic receive operations",
+      "Bootloader update options cover reinstall, configuration refresh, or skipping when external boot handling is preferred"
     ]
   },
   "backup_tar": {
@@ -248,7 +249,7 @@
     "overview": "RSYNC-based backup system for efficient incremental backups. Uses rsync to create space-efficient backups that only copy changed files, making it ideal for regular backup schedules.",
     "options": [
       "1. Only /home - Backup user directories and personal data",
-      "2. Full system (except temporary files) - Complete system backup excluding temporary directories", 
+      "2. Full system (except temporary files) - Complete system backup excluding temporary directories",
       "3. Custom directories - Specify custom paths to backup",
       "After selecting directories:",
       "• Full backup (copy everything) - Complete copy of all selected files",
@@ -257,7 +258,7 @@
     "notes": [
       "Incremental backups are much faster and use less space than full backups",
       "First backup is always full, subsequent backups can be incremental",
-      "Preserves file permissions, ownership, and timestamps", 
+      "Preserves file permissions, ownership, and timestamps",
       "Offers dry-run mode to preview operations without making changes",
       "Backup destination is configurable in backup.conf",
       "Requires rsync command (will be installed if missing)"
@@ -267,7 +268,7 @@
     "overview": "Restore files and directories from RSYNC backups. Provides flexible restoration options with the efficiency and reliability of rsync.",
     "options": [
       "1. To original location (overwrites existing files) - Direct restore that replaces current files",
-      "2. To temporary directory (/tmp/restore_rsync) - Safe extraction for file browsing and selective recovery", 
+      "2. To temporary directory (/tmp/restore_rsync) - Safe extraction for file browsing and selective recovery",
       "3. Custom path - Restore to a user-specified directory"
     ],
     "notes": [
@@ -305,7 +306,7 @@
       "1. Docker Security Check - Runs complete security audit including:",
       "• Container security configuration analysis",
       "• Image vulnerability scanning",
-      "• Docker daemon security settings review", 
+      "• Docker daemon security settings review",
       "• Network security configuration check",
       "• Volume and mount security analysis",
       "• Privilege escalation detection",

@@ -254,6 +254,24 @@ src/i18n/locales/
 }
 ```
 
+#### Advanced Help Formatting
+
+- `notes` entries support manual line breaks. They are rendered with `white-space: pre-wrap`, so newline characters (`\n`) appear as expected.
+- Wrap structured content (directory trees, command snippets) in triple backticks. The React help panel detects fenced blocks and renders them inside a styled `<pre>` element with preserved spacing.
+
+**Example with tree layout:**
+```json
+{
+  "btrfs_backup": {
+    "notes": [
+      "📁 Backup bundle layout:\n```\n${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/\n├── snapshots/\n│   ├── <timestamp>/\n│   │   ├── @/\n│   │   ├── @.backup_complete\n│   │   ├── <subvol>/\n│   │   └── <subvol>.backup_complete\n└── meta/<timestamp>.json\n```"
+    ]
+  }
+}
+```
+
+> Remember to add the same formatting to every supported language file so the help panel renders consistently.
+
 ### Usage in React Components
 
 **Basic Translation Usage:**

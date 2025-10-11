@@ -193,11 +193,10 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 
 *   **Security & Access Control:**
     *   **Secure by default:** Localhost-only binding prevents network exposure
-    *   **Configurable network access:** Optional `-network` flag for controlled network access
-    *   **Automatic firewall management:** `-f/--open-firewall` flag automatically opens/closes firewall ports (supports ufw, firewalld, iptables)
-    *   **Firewall cleanup:** Automatic port closure when GUI stops (Ctrl+C, normal exit, termination signals)
+    *   **Configurable network access:** Optional `-network` flag for controlled network access (direct binary) or `-n/--network` when using the launcher
+    *   **Firewall assistance via launcher:** `gui_launcher.sh -f/--open-firewall` can add temporary rules for ufw/firewalld/iptables when network mode is enabled
     *   **Port configuration:** Configurable via `config/general.conf` or command line
-    *   **Security warnings:** Clear warnings when network mode is enabled
+    *   **Security warnings:** Launcher prints explicit warnings when network mode is enabled (especially with sudo)
     *   **Same security context:** Maintains CLI-equivalent security permissions
     *   **WebSocket restrictions:** Connections limited by host binding configuration
     *   **CORS:** Disabled in production (same-origin). In development, the Vite dev server proxies `/api` to avoid cross-origin.
@@ -275,23 +274,19 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 *   **Command Line Usage:**
 
     **Via GUI Launcher (Recommended):**
-    *   `./gui_launcher.sh` - Start with default settings (localhost, auto-detect port)
-    *   `./gui_launcher.sh -p 8080` - Use custom port (short form)
-    *   `./gui_launcher.sh --port 8080` - Use custom port (long form)
+    *   Run from the project root: `./gui_launcher.sh` - Start with default settings (localhost, auto-detect port)
+    *   `./gui_launcher.sh -p 8080` / `--port 8080` - Use custom port
     *   `./gui_launcher.sh -n` - Enable network access (0.0.0.0 binding)
-    *   `./gui_launcher.sh -n -p 80` - Network access on port 80
+    *   `./gui_launcher.sh -n -p 80 -f` - Network access on port 80 and add a firewall rule for that session
     *   `./gui_launcher.sh -b -n` - Build and run with network access
     *   `./gui_launcher.sh -h` - Show comprehensive help information
 
     **Direct Binary Execution (Advanced Users):**
     *   `./gui/little-linux-helper-gui` - Start with default settings (localhost:3000)
-    *   `./gui/little-linux-helper-gui -p 8080` - Use custom port (short form)
-    *   `./gui/little-linux-helper-gui --port 8080` - Use custom port (long form)
-    *   `./gui/little-linux-helper-gui -n` - Enable network access (short form)
-    *   `./gui/little-linux-helper-gui --network` - Enable network access (long form)
-    *   `./gui/little-linux-helper-gui -n -p 80` - Network access on port 80
-    *   `./gui/little-linux-helper-gui -h` - Show usage information (short form)
-    *   `./gui/little-linux-helper-gui --help` - Show usage information (long form)
+    *   `./gui/little-linux-helper-gui -p 8080` / `--port 8080` - Use custom port
+    *   `./gui/little-linux-helper-gui -n` / `--network` - Enable network access
+    *   `./gui/little-linux-helper-gui -h` / `--help` - Show usage information
+    *   (Firewall helpers are not built into the binary—use the launcher if you need automated rules)
 
     **CLI GUI Mode Testing:**
     *   `./help_master.sh` - Normal CLI mode with "Any Key" prompts
@@ -323,7 +318,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 *   **Security Considerations:**
     *   **Default secure:** GUI only accessible from localhost by default
     *   **Network mode warnings:** Clear warnings displayed when network access enabled
-    *   **Automatic firewall management:** Optional firewall port opening/closing with cleanup on exit
+    *   **Launcher-managed firewall rules:** Optional firewall port opening/closing with cleanup on exit when `gui_launcher.sh -f` is used
     *   **Same privileges:** GUI runs with same user permissions as CLI
 
 **11. Help System & Error Resilience:**
