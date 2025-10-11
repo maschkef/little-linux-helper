@@ -6,11 +6,11 @@ This project is part of the 'little-linux-helper' collection.
 Licensed under the MIT License. See the LICENSE file in the project root for more information.
 */
 
-import { useState, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { useState, useEffect, useMemo } from 'react';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import { defaultSchema } from 'hast-util-sanitize';
+import MarkdownWithStatefulDetails from './MarkdownWithStatefulDetails';
 
 function DocumentBrowser() {
   const [allDocs, setAllDocs] = useState([]);
@@ -252,8 +252,7 @@ function DocumentBrowser() {
 
   const cleanContent = stripLicenseHeader(docContent);
 
-  // Custom sanitize schema to allow HTML elements used in README files
-  const customSanitizeSchema = {
+  const customSanitizeSchema = useMemo(() => ({
     ...defaultSchema,
     tagNames: [
       ...defaultSchema.tagNames,
@@ -263,12 +262,58 @@ function DocumentBrowser() {
     ],
     attributes: {
       ...defaultSchema.attributes,
-      img: ['src', 'alt', 'width', 'height', 'align', 'style'],
+      img: ['src', 'alt', 'width', 'height', 'align', 'style', 'loading'],
       details: ['open', 'style'],
       summary: ['style'],
-      '*': ['className', 'style'] // Allow style attributes for custom styling
+      '*': ['className', 'style']
     }
-  };
+  }), []);
+
+  const markdownRehypePlugins = useMemo(
+    () => [rehypeRaw, [rehypeSanitize, customSanitizeSchema]],
+    [customSanitizeSchema]
+  );
+
+  const markdownComponents = useMemo(() => ({
+    img: ({ node, ...props }) => {
+      let src = props.src;
+      if (src && !src.startsWith('http') && !src.startsWith('/')) {
+        if (src.includes('header-logo.svg')) {
+          src = '/header-logo.svg';
+        } else {
+          const normalized = src.replace(/^\.\//, '').replace(/^\/+/, '');
+          src = `/${normalized}`;
+        }
+      }
+
+      return (
+        <img
+          {...props}
+          src={src}
+          loading={props.loading || 'lazy'}
+          style={{
+            maxWidth: '100%',
+            height: 'auto',
+            ...props.style
+          }}
+        />
+      );
+    },
+    summary: ({ node, ...props }) => (
+      <summary
+        {...props}
+        style={{
+          padding: '8px 12px',
+          cursor: 'pointer',
+          fontWeight: 'bold',
+          backgroundColor: '#2c3e50',
+          borderRadius: '3px',
+          outline: 'none',
+          ...props.style
+        }}
+      />
+    )
+  }), []);
 
   return (
     <div className="document-browser" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -419,65 +464,12 @@ function DocumentBrowser() {
                   {documentNames[selectedDoc] || selectedDoc}
                 </h3>
               </div>
-              <ReactMarkdown 
-              key={selectedDoc} // Prevent unnecessary re-renders
-              rehypePlugins={[rehypeRaw, [rehypeSanitize, customSanitizeSchema]]}
-              components={{
-                img: ({node, ...props}) => {
-                  // Handle image paths for README files
-                  let src = props.src;
-                  if (src && !src.startsWith('http') && !src.startsWith('/')) {
-                    // Special handling for header logo in README files
-                    if (src.includes('header-logo.svg')) {
-                      src = '/header-logo.svg';
-                    } else {
-                      src = '/' + src;
-                    }
-                  }
-                  return (
-                    <img 
-                      {...props} 
-                      src={src}
-                      style={{
-                        maxWidth: '100%',
-                        height: 'auto',
-                        ...props.style
-                      }}
-                    />
-                  );
-                },
-                details: ({node, ...props}) => {
-                  // Use a controlled component approach to prevent auto-closing
-                  return (
-                    <details 
-                      {...props}
-                      style={{
-                        marginBottom: '10px',
-                        border: '1px solid #34495e',
-                        borderRadius: '4px',
-                        backgroundColor: '#34495e'
-                      }}
-                    />
-                  );
-                },
-                summary: ({node, ...props}) => (
-                  <summary 
-                    {...props}
-                    style={{
-                      padding: '8px 12px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      backgroundColor: '#2c3e50',
-                      borderRadius: '3px',
-                      outline: 'none',
-                      ...props.style
-                    }}
-                  />
-                )
-              }}
-            >
-              {cleanContent}
-            </ReactMarkdown>
+              <MarkdownWithStatefulDetails
+                docId={selectedDoc}
+                markdown={cleanContent}
+                rehypePlugins={markdownRehypePlugins}
+                components={markdownComponents}
+              />
             </div>
           ) : (
             <div className="no-selection" style={{

@@ -289,6 +289,17 @@ func main() {
 		Index: "index.html",
 	})
 
+	// Serve static documentation assets (e.g., screenshots referenced in Markdown)
+	screenshotDir := filepath.Join(lhRootDir, "screenshots")
+	if info, err := os.Stat(screenshotDir); err == nil && info.IsDir() {
+		app.Static("/screenshots", screenshotDir, fiber.Static{
+			Browse:        false,
+			CacheDuration: 24 * time.Hour,
+		})
+	} else {
+		log.Printf("Screenshot directory not available at %s: %v", screenshotDir, err)
+	}
+
 	// API routes
 	api := app.Group("/api")
 

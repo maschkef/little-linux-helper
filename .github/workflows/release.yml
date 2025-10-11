@@ -113,6 +113,7 @@ jobs:
           cp -r ../config "little-linux-helper-gui-$arch/"
           cp -r ../docs "little-linux-helper-gui-$arch/"
           cp -r ../scripts "little-linux-helper-gui-$arch/"
+          cp -r ../screenshots "little-linux-helper-gui-$arch/"
           
           # Copy gui/ development files (Go source, configs, etc.) - excluding build artifacts
           find ../gui -type f -name "*.go" -exec cp --parents {} "little-linux-helper-gui-$arch/" \;
