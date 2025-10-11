@@ -24,7 +24,11 @@ function DocsPanel({ content, selectedModule, onModuleSelect }) {
       { id: 'mod_backup_tar', name: 'TAR Backup', description: 'Archive-based backups' },
       { id: 'mod_restore_tar', name: 'TAR Restore', description: 'Restore from TAR archives' },
       { id: 'mod_backup_rsync', name: 'RSYNC Backup', description: 'Incremental file-based backups' },
-      { id: 'mod_restore_rsync', name: 'RSYNC Restore', description: 'Restore from RSYNC backups' }
+      { id: 'mod_restore_rsync', name: 'RSYNC Restore', description: 'Restore from RSYNC backups' },
+      { id: 'gui_module_maintenance_guide', name: 'GUI Module Maintenance', description: 'Keep module metadata in sync with the GUI' },
+      { id: 'doc_gui_launcher', name: 'GUI Launcher Guide', description: 'Starting the GUI via gui_launcher.sh options' },
+      { id: 'lib_btrfs_core', name: 'BTRFS Core Library', description: 'Core helper routines used by BTRFS backup/restore' },
+      { id: 'lib_btrfs_layout', name: 'BTRFS Layout Reference', description: 'Reference for BTRFS snapshot bundle layout' }
     ],
     docker: [
       { id: 'mod_docker_setup', name: 'Docker Setup', description: 'Install and configure Docker' },
@@ -32,6 +36,16 @@ function DocsPanel({ content, selectedModule, onModuleSelect }) {
     ],
     packages: [
       { id: 'advanced_log_analyzer', name: 'Advanced Log Analyzer', description: 'Python-based log analysis tool' }
+    ],
+    btrfs_backup: [
+      { id: 'gui_module_maintenance_guide', name: 'GUI Module Maintenance', description: 'Checklist for GUI/BTRFS integration' },
+      { id: 'lib_btrfs_core', name: 'BTRFS Core Library', description: 'Core helper routines used by this module' },
+      { id: 'lib_btrfs_layout', name: 'BTRFS Layout Reference', description: 'Snapshot and bundle layout reference' }
+    ],
+    btrfs_restore: [
+      { id: 'gui_module_maintenance_guide', name: 'GUI Module Maintenance', description: 'Checklist for GUI/BTRFS integration' },
+      { id: 'lib_btrfs_core', name: 'BTRFS Core Library', description: 'Core helper routines used by this module' },
+      { id: 'lib_btrfs_layout', name: 'BTRFS Layout Reference', description: 'Snapshot and bundle layout reference' }
     ]
   };
 

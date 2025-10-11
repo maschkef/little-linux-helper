@@ -14,6 +14,7 @@ import { defaultSchema } from 'hast-util-sanitize';
 
 function DocumentBrowser() {
   const [allDocs, setAllDocs] = useState([]);
+  const [unlinkedDocPaths, setUnlinkedDocPaths] = useState([]);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [docContent, setDocContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -25,8 +26,11 @@ function DocumentBrowser() {
     'Logs & Analysis': false,
     'System Maintenance': false,
     'Libraries': false,
+    'BTRFS Reference': false,
+    'GUI Documentation': false,
     'Development & Tools': false,
-    'Project Information': false
+    'Project Information': false,
+    'Unlinked Documents': true
   });
 
   // Document categorization mapping
@@ -48,15 +52,21 @@ function DocumentBrowser() {
       'mod_restarts'
     ],
     'Libraries': [
-      'lib_btrfs', 'lib_common', 'lib_colors', 'lib_config', 'lib_filesystem',
+      'lib_common', 'lib_colors', 'lib_config', 'lib_filesystem',
       'lib_i18n', 'lib_logging', 'lib_notifications', 'lib_package_mappings',
       'lib_packages', 'lib_system', 'lib_ui'
+    ],
+    'BTRFS Reference': [
+      'lib_btrfs', 'lib_btrfs_core', 'lib_btrfs_layout'
+    ],
+    'GUI Documentation': [
+      'gui_backend_api', 'gui_frontend_react', 'gui_i18n', 'gui_module_integration', 'gui_customization', 'gui_module_maintenance_guide'
     ],
     'Development & Tools': [
       'DEVELOPER_GUIDE', 'GUI_DEVELOPER_GUIDE'
     ],
     'Project Information': [
-      'gui', 'README', 'README_DE', 'gui_README'
+      'gui', 'README', 'README_DE', 'gui_README', 'doc_gui_launcher'
     ]
   };
 
@@ -92,16 +102,26 @@ function DocumentBrowser() {
     'lib_packages': 'Package Management Library',
     'lib_system': 'System Information Library',
     'lib_ui': 'User Interface Library',
+    'lib_btrfs_core': 'BTRFS Core Library',
+    'lib_btrfs_layout': 'BTRFS Layout Reference',
     'DEVELOPER_GUIDE': 'CLI Developer Guide',
     'GUI_DEVELOPER_GUIDE': 'GUI Developer Guide',
+    'gui_backend_api': 'GUI Backend API',
+    'gui_frontend_react': 'GUI React Frontend',
+    'gui_i18n': 'GUI Internationalization',
+    'gui_module_integration': 'GUI Module Integration',
+    'gui_customization': 'GUI Customization',
+    'gui_module_maintenance_guide': 'GUI Module Maintenance',
     'gui': 'GUI Documentation',
     'README': 'Project README',
     'README_DE': 'Project README (German)',
-    'gui_README': 'GUI README'
+    'gui_README': 'GUI README',
+    'doc_gui_launcher': 'GUI Launcher Guide'
   };
 
   useEffect(() => {
     fetchAllDocuments();
+    fetchUnlinkedDocuments();
   }, []);
 
   const fetchAllDocuments = async () => {
@@ -115,6 +135,24 @@ function DocumentBrowser() {
       }
     } catch (error) {
       console.error('Error fetching documents:', error);
+    }
+  };
+
+  const fetchUnlinkedDocuments = async () => {
+    try {
+      const response = await fetch('/api/docs/unlinked');
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          setUnlinkedDocPaths(data);
+        } else {
+          setUnlinkedDocPaths([]);
+        }
+      } else {
+        console.error('Failed to fetch unlinked documentation list');
+      }
+    } catch (error) {
+      console.error('Error fetching unlinked documents:', error);
     }
   };
 
@@ -151,37 +189,67 @@ function DocumentBrowser() {
 
   const getCategorizedDocuments = () => {
     const categorized = {};
-    
-    // Initialize categories
+
     Object.keys(documentCategories).forEach(category => {
       categorized[category] = [];
     });
 
-    // Categorize available documents
+    const uncategorized = [];
+
     allDocs.forEach(doc => {
+      const docId = doc.id || (doc.filename ? doc.filename.replace('.md', '') : '');
       let placed = false;
+
       for (const [category, docIds] of Object.entries(documentCategories)) {
-        // Check both doc.id and doc.filename (without .md extension) for matching
-        const docIdToCheck = doc.id || (doc.filename ? doc.filename.replace('.md', '') : '');
-        if (docIds.includes(docIdToCheck) || docIds.includes(doc.id)) {
+        if (docIds.includes(docId)) {
           categorized[category].push({
             ...doc,
-            id: docIdToCheck || doc.id // Ensure we have a consistent ID
+            id: docId,
+            selectable: true
           });
           placed = true;
           break;
         }
       }
-      // If not categorized, add to Project Information
+
       if (!placed) {
-        categorized['Project Information'].push(doc);
+        uncategorized.push({
+          ...doc,
+          id: docId,
+          selectable: Boolean(docId)
+        });
       }
     });
 
-    return categorized;
+    return { categorized, unlinked: uncategorized };
   };
 
-  const categorizedDocs = getCategorizedDocuments();
+  const { categorized, unlinked } = getCategorizedDocuments();
+
+  const unlinkedEntries = [...unlinked];
+  const seenFilenames = new Set(
+    unlinkedEntries
+      .map((doc) => doc?.filename)
+      .filter(Boolean)
+  );
+
+  unlinkedDocPaths.forEach((path) => {
+    if (!seenFilenames.has(path)) {
+      unlinkedEntries.push({
+        id: `file:${path}`,
+        name: path,
+        filename: path,
+        selectable: false,
+        isFileOnly: true
+      });
+    }
+  });
+
+  const categorizedDocs = { ...categorized };
+  if (unlinkedEntries.length > 0) {
+    categorizedDocs['Unlinked Documents'] = unlinkedEntries;
+  }
+
   const cleanContent = stripLicenseHeader(docContent);
 
   // Custom sanitize schema to allow HTML elements used in README files
@@ -271,29 +339,57 @@ function DocumentBrowser() {
                 
                 {expandedCategories[category] && (
                   <div style={{ marginLeft: '15px' }}>
-                    {docs.map((doc) => (
-                      <button
-                        key={doc.id}
-                        onClick={() => fetchDocument(doc.id)}
-                        style={{
-                          display: 'block',
-                          width: '100%',
-                          padding: '6px 8px',
-                          margin: '2px 0',
-                          fontSize: '11px',
-                          backgroundColor: selectedDoc === doc.id ? '#007bff' : '#3498db',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '3px',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          opacity: selectedDoc === doc.id ? 1 : 0.8
-                        }}
-                        title={doc.description || documentNames[doc.id] || doc.id}
-                      >
-                        {documentNames[doc.id] || doc.name || doc.id}
-                      </button>
-                    ))}
+                    {docs.map((doc) => {
+                      const displayName = documentNames[doc.id] || doc.name || doc.filename || doc.id;
+                      const docKey = doc.id || doc.filename || displayName;
+
+                      if (doc.selectable === false) {
+                        return (
+                          <div
+                            key={docKey}
+                            style={{
+                              padding: '6px 8px',
+                              margin: '2px 0',
+                              fontSize: '11px',
+                              backgroundColor: '#3a4a5a',
+                              color: '#f0f4f8',
+                              borderRadius: '3px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}
+                            title={`${displayName} (not linked in navigation)`}
+                          >
+                            <span>{displayName}</span>
+                            <span style={{ fontSize: '10px', opacity: 0.7 }}>Not linked yet</span>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={docKey}
+                          onClick={() => fetchDocument(doc.id)}
+                          style={{
+                            display: 'block',
+                            width: '100%',
+                            padding: '6px 8px',
+                            margin: '2px 0',
+                            fontSize: '11px',
+                            backgroundColor: selectedDoc === doc.id ? '#007bff' : '#3498db',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            opacity: selectedDoc === doc.id ? 1 : 0.85
+                          }}
+                          title={doc.description || documentNames[doc.id] || doc.id}
+                        >
+                          {displayName}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>

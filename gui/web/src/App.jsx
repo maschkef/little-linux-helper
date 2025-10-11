@@ -214,12 +214,12 @@ function AppContent() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             <h1>{t('app.title')}</h1>
+            <img src="/header-logo.svg" alt="Little Linux Helper" className="header-logo" />
             {toolVersion && (
               <span className="version-badge" title="Release version">
                 {toolVersion}
               </span>
             )}
-            <img src="/header-logo.svg" alt="Little Linux Helper" className="header-logo" />
           </div>
           <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
             <LanguageSelector />

@@ -14,10 +14,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -74,6 +76,13 @@ type Message struct {
 
 type StartModuleRequest struct {
 	Language string `json:"language"`
+}
+
+type DocMetadata struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Filename    string `json:"filename"`
 }
 
 var (
@@ -297,6 +306,7 @@ func main() {
 
 	// Get all available documentation
 	api.Get("/docs", getAllDocs)
+	api.Get("/docs/unlinked", getUnlinkedDocs)
 
 	// Configuration file management
 	api.Get("/config/files", getConfigFiles)
@@ -572,80 +582,147 @@ func getModules(c *fiber.Ctx) error {
 	return c.JSON(modules)
 }
 
+var documentationFiles = map[string]string{
+	// Main modules (both with and without mod_ prefix)
+	"restarts":        "mod/doc_restarts.md",
+	"mod_restarts":    "mod/doc_restarts.md",
+	"system_info":     "mod/doc_system_info.md",
+	"mod_system_info": "mod/doc_system_info.md",
+	"disk":            "mod/doc_disk.md",
+	"mod_disk":        "mod/doc_disk.md",
+	"logs":            "mod/doc_logs.md",
+	"mod_logs":        "mod/doc_logs.md",
+	"packages":        "mod/doc_packages.md",
+	"mod_packages":    "mod/doc_packages.md",
+	"security":        "mod/doc_security.md",
+	"mod_security":    "mod/doc_security.md",
+	"energy":          "mod/doc_energy.md",
+	"mod_energy":      "mod/doc_energy.md",
+
+	// Docker modules
+	"docker":              "mod/doc_docker.md",
+	"mod_docker":          "mod/doc_docker.md",
+	"mod_docker_setup":    "mod/doc_docker_setup.md",
+	"mod_docker_security": "mod/doc_docker_security.md",
+
+	// Backup modules
+	"backup":            "mod/doc_backup.md",
+	"mod_backup":        "mod/doc_backup.md",
+	"btrfs_backup":      "mod/doc_btrfs_backup.md",
+	"mod_btrfs_backup":  "mod/doc_btrfs_backup.md",
+	"btrfs_restore":     "mod/doc_btrfs_restore.md",
+	"mod_btrfs_restore": "mod/doc_btrfs_restore.md",
+	"mod_backup_tar":    "mod/doc_backup_tar.md",
+	"mod_restore_tar":   "mod/doc_restore_tar.md",
+	"mod_backup_rsync":  "mod/doc_backup_rsync.md",
+	"mod_restore_rsync": "mod/doc_restore_rsync.md",
+
+	// Other documentation
+	"advanced_log_analyzer": "tools/doc_advanced_log_analyzer.md",
+
+	// Library documentation
+	"lib_btrfs":            "lib/doc_btrfs.md",
+	"lib_common":           "lib/doc_common.md",
+	"lib_colors":           "lib/doc_colors.md",
+	"lib_config":           "lib/doc_config.md",
+	"lib_filesystem":       "lib/doc_filesystem.md",
+	"lib_i18n":             "lib/doc_i18n.md",
+	"lib_logging":          "lib/doc_logging.md",
+	"lib_notifications":    "lib/doc_notifications.md",
+	"lib_package_mappings": "lib/doc_package_mappings.md",
+	"lib_packages":         "lib/doc_packages.md",
+	"lib_system":           "lib/doc_system.md",
+	"lib_ui":               "lib/doc_ui.md",
+
+	// Project documentation
+	"DEVELOPER_GUIDE":     "CLI_DEVELOPER_GUIDE.md",
+	"GUI_DEVELOPER_GUIDE": "GUI_DEVELOPER_GUIDE.md",
+	"gui":                 "gui/doc_interface.md",
+
+	// GUI specialized documentation
+	"gui_backend_api":              "gui/doc_backend_api.md",
+	"gui_frontend_react":           "gui/doc_frontend_react.md",
+	"gui_i18n":                     "gui/doc_i18n.md",
+	"gui_module_integration":       "gui/doc_module_integration.md",
+	"gui_customization":            "gui/doc_customization.md",
+	"gui_module_maintenance_guide": "gui/doc_module_maintenance_guide.md",
+	"doc_gui_launcher":             "doc_gui_launcher.md",
+
+	"README":     "../README.md",
+	"README_DE":  "../README_DE.md",
+	"gui_README": "../gui/README.md",
+
+	"lib_btrfs_core":   "lib/doc_btrfs_core.md",
+	"lib_btrfs_layout": "lib/doc_btrfs_layout.md",
+}
+
+var docCatalog = []DocMetadata{
+	// System Administration
+	{ID: "mod_system_info", Name: "System Information", Description: "Show comprehensive system information and hardware details", Filename: "mod/doc_system_info.md"},
+	{ID: "mod_security", Name: "Security Analysis", Description: "Perform security audits and checks", Filename: "mod/doc_security.md"},
+	{ID: "mod_disk", Name: "Disk Management", Description: "Disk utilities and storage analysis tools", Filename: "mod/doc_disk.md"},
+	{ID: "mod_packages", Name: "Package Management", Description: "Manage packages and system updates", Filename: "mod/doc_packages.md"},
+	{ID: "mod_energy", Name: "Energy Management", Description: "Power management and energy optimization", Filename: "mod/doc_energy.md"},
+
+	// Backup & Recovery
+	{ID: "mod_backup", Name: "General Backup", Description: "Backup and restore operations", Filename: "mod/doc_backup.md"},
+	{ID: "mod_btrfs_backup", Name: "BTRFS Backup", Description: "Advanced BTRFS snapshot-based backup system", Filename: "mod/doc_btrfs_backup.md"},
+	{ID: "mod_btrfs_restore", Name: "BTRFS Restore", Description: "BTRFS snapshot restoration with dry-run support", Filename: "mod/doc_btrfs_restore.md"},
+	{ID: "mod_backup_tar", Name: "TAR Backup", Description: "Archive-based backups", Filename: "mod/doc_backup_tar.md"},
+	{ID: "mod_restore_tar", Name: "TAR Restore", Description: "Restore from TAR archives", Filename: "mod/doc_restore_tar.md"},
+	{ID: "mod_backup_rsync", Name: "RSYNC Backup", Description: "Incremental file-based backups", Filename: "mod/doc_backup_rsync.md"},
+	{ID: "mod_restore_rsync", Name: "RSYNC Restore", Description: "Restore from RSYNC backups", Filename: "mod/doc_restore_rsync.md"},
+
+	// Docker & Containers
+	{ID: "mod_docker", Name: "Docker Management", Description: "Docker management and security tools", Filename: "mod/doc_docker.md"},
+	{ID: "mod_docker_setup", Name: "Docker Setup", Description: "Install and configure Docker", Filename: "mod/doc_docker_setup.md"},
+	{ID: "mod_docker_security", Name: "Docker Security", Description: "Security audit for Docker containers", Filename: "mod/doc_docker_security.md"},
+
+	// Logs & Analysis
+	{ID: "mod_logs", Name: "Log Analysis", Description: "Analyze system logs and troubleshoot issues", Filename: "mod/doc_logs.md"},
+	{ID: "advanced_log_analyzer", Name: "Advanced Log Analyzer", Description: "Python-based log analysis tool", Filename: "tools/doc_advanced_log_analyzer.md"},
+
+	// System Maintenance
+	{ID: "mod_restarts", Name: "System Restarts", Description: "Restart system services and desktop environment components", Filename: "mod/doc_restarts.md"},
+
+	// Development & Libraries
+	{ID: "lib_btrfs", Name: "BTRFS Library", Description: "Advanced BTRFS operations and utilities", Filename: "lib/doc_btrfs.md"},
+	{ID: "lib_common", Name: "Common Functions Library", Description: "Core shared functions and utilities", Filename: "lib/doc_common.md"},
+	{ID: "lib_colors", Name: "Color Functions Library", Description: "Terminal color formatting and styling", Filename: "lib/doc_colors.md"},
+	{ID: "lib_config", Name: "Configuration Library", Description: "Configuration file handling and management", Filename: "lib/doc_config.md"},
+	{ID: "lib_filesystem", Name: "Filesystem Library", Description: "File system operations and utilities", Filename: "lib/doc_filesystem.md"},
+	{ID: "lib_i18n", Name: "Internationalization Library", Description: "Multi-language support and message handling", Filename: "lib/doc_i18n.md"},
+	{ID: "lib_logging", Name: "Logging Library", Description: "Structured logging and error handling", Filename: "lib/doc_logging.md"},
+	{ID: "lib_notifications", Name: "Notifications Library", Description: "Desktop notification system integration", Filename: "lib/doc_notifications.md"},
+	{ID: "lib_package_mappings", Name: "Package Mappings Library", Description: "Cross-distribution package name mappings", Filename: "lib/doc_package_mappings.md"},
+	{ID: "lib_packages", Name: "Package Management Library", Description: "Distribution-agnostic package management", Filename: "lib/doc_packages.md"},
+	{ID: "lib_system", Name: "System Information Library", Description: "System detection and hardware information", Filename: "lib/doc_system.md"},
+	{ID: "lib_ui", Name: "User Interface Library", Description: "User interface functions and input handling", Filename: "lib/doc_ui.md"},
+	{ID: "lib_btrfs_core", Name: "BTRFS Core Library", Description: "Core BTRFS helper functions and routines", Filename: "lib/doc_btrfs_core.md"},
+	{ID: "lib_btrfs_layout", Name: "BTRFS Layout Reference", Description: "Reference for BTRFS snapshot and bundle layout", Filename: "lib/doc_btrfs_layout.md"},
+	{ID: "DEVELOPER_GUIDE", Name: "CLI Developer Guide", Description: "CLI development guidelines and architecture documentation", Filename: "CLI_DEVELOPER_GUIDE.md"},
+	{ID: "GUI_DEVELOPER_GUIDE", Name: "GUI Developer Guide", Description: "GUI development guidelines and architecture documentation", Filename: "GUI_DEVELOPER_GUIDE.md"},
+
+	// GUI Specialized Documentation
+	{ID: "gui_backend_api", Name: "GUI Backend API", Description: "Go backend development, API endpoints, and data structures", Filename: "gui/doc_backend_api.md"},
+	{ID: "gui_frontend_react", Name: "GUI React Frontend", Description: "React component development and frontend architecture", Filename: "gui/doc_frontend_react.md"},
+	{ID: "gui_i18n", Name: "GUI Internationalization", Description: "Internationalization system for frontend and backend", Filename: "gui/doc_i18n.md"},
+	{ID: "gui_module_integration", Name: "GUI Module Integration", Description: "How CLI modules automatically integrate with GUI", Filename: "gui/doc_module_integration.md"},
+	{ID: "gui_customization", Name: "GUI Customization", Description: "Theme customization, extensions, and advanced modifications", Filename: "gui/doc_customization.md"},
+	{ID: "gui_module_maintenance_guide", Name: "GUI Module Maintenance", Description: "Checklist for keeping GUI module metadata in sync", Filename: "gui/doc_module_maintenance_guide.md"},
+
+	// Project Information
+	{ID: "gui", Name: "GUI Documentation", Description: "Web-based graphical interface documentation", Filename: "gui/doc_interface.md"},
+	{ID: "doc_gui_launcher", Name: "GUI Launcher Guide", Description: "Usage guide for the GUI launcher script", Filename: "doc_gui_launcher.md"},
+	{ID: "README", Name: "Project README", Description: "Main project overview, features, and usage guide", Filename: "../README.md"},
+	{ID: "README_DE", Name: "Project README (German)", Description: "German project overview, features, and usage guide", Filename: "../README_DE.md"},
+	{ID: "gui_README", Name: "GUI README", Description: "GUI-specific setup, development, and usage guide", Filename: "../gui/README.md"},
+}
+
 func getModuleDocs(c *fiber.Ctx) error {
 	moduleId := c.Params("id")
 
-	// Map module IDs to documentation files
-	docFiles := map[string]string{
-		// Main modules (both with and without mod_ prefix)
-		"restarts":        "mod/doc_restarts.md",
-		"mod_restarts":    "mod/doc_restarts.md",
-		"system_info":     "mod/doc_system_info.md",
-		"mod_system_info": "mod/doc_system_info.md",
-		"disk":            "mod/doc_disk.md",
-		"mod_disk":        "mod/doc_disk.md",
-		"logs":            "mod/doc_logs.md",
-		"mod_logs":        "mod/doc_logs.md",
-		"packages":        "mod/doc_packages.md",
-		"mod_packages":    "mod/doc_packages.md",
-		"security":        "mod/doc_security.md",
-		"mod_security":    "mod/doc_security.md",
-		"energy":          "mod/doc_energy.md",
-		"mod_energy":      "mod/doc_energy.md",
-
-		// Docker modules
-		"docker":              "mod/doc_docker.md",
-		"mod_docker":          "mod/doc_docker.md",
-		"mod_docker_setup":    "mod/doc_docker_setup.md",
-		"mod_docker_security": "mod/doc_docker_security.md",
-
-		// Backup modules
-		"backup":            "mod/doc_backup.md",
-		"mod_backup":        "mod/doc_backup.md",
-		"btrfs_backup":      "mod/doc_btrfs_backup.md",
-		"mod_btrfs_backup":  "mod/doc_btrfs_backup.md",
-		"btrfs_restore":     "mod/doc_btrfs_restore.md",
-		"mod_btrfs_restore": "mod/doc_btrfs_restore.md",
-		"mod_backup_tar":    "mod/doc_backup_tar.md",
-		"mod_restore_tar":   "mod/doc_restore_tar.md",
-		"mod_backup_rsync":  "mod/doc_backup_rsync.md",
-		"mod_restore_rsync": "mod/doc_restore_rsync.md",
-
-		// Other documentation
-		"advanced_log_analyzer": "tools/doc_advanced_log_analyzer.md",
-
-		// Library documentation
-		"lib_btrfs":            "lib/doc_btrfs.md",
-		"lib_common":           "lib/doc_common.md",
-		"lib_colors":           "lib/doc_colors.md",
-		"lib_config":           "lib/doc_config.md",
-		"lib_filesystem":       "lib/doc_filesystem.md",
-		"lib_i18n":             "lib/doc_i18n.md",
-		"lib_logging":          "lib/doc_logging.md",
-		"lib_notifications":    "lib/doc_notifications.md",
-		"lib_package_mappings": "lib/doc_package_mappings.md",
-		"lib_packages":         "lib/doc_packages.md",
-		"lib_system":           "lib/doc_system.md",
-		"lib_ui":               "lib/doc_ui.md",
-
-		// Project documentation
-		"DEVELOPER_GUIDE":     "CLI_DEVELOPER_GUIDE.md",
-		"GUI_DEVELOPER_GUIDE": "GUI_DEVELOPER_GUIDE.md",
-		"gui":                 "gui/doc_interface.md",
-
-		// GUI specialized documentation
-		"gui_backend_api":        "gui/doc_backend_api.md",
-		"gui_frontend_react":     "gui/doc_frontend_react.md",
-		"gui_i18n":               "gui/doc_i18n.md",
-		"gui_module_integration": "gui/doc_module_integration.md",
-		"gui_customization":      "gui/doc_customization.md",
-
-		"README":     "../README.md",
-		"README_DE":  "../README_DE.md",
-		"gui_README": "../gui/README.md",
-	}
-
-	docFile, exists := docFiles[moduleId]
+	docFile, exists := documentationFiles[moduleId]
 	if !exists {
 		return c.Status(404).JSON(fiber.Map{"error": "Documentation not found"})
 	}
@@ -660,76 +737,10 @@ func getModuleDocs(c *fiber.Ctx) error {
 }
 
 func getAllDocs(c *fiber.Ctx) error {
-	// Define all available documentation with metadata
-	allDocs := []struct {
-		ID          string `json:"id"`
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		Filename    string `json:"filename"`
-	}{
-		// System Administration
-		{ID: "mod_system_info", Name: "System Information", Description: "Show comprehensive system information and hardware details", Filename: "mod/doc_system_info.md"},
-		{ID: "mod_security", Name: "Security Analysis", Description: "Perform security audits and checks", Filename: "mod/doc_security.md"},
-		{ID: "mod_disk", Name: "Disk Management", Description: "Disk utilities and storage analysis tools", Filename: "mod/doc_disk.md"},
-		{ID: "mod_packages", Name: "Package Management", Description: "Manage packages and system updates", Filename: "mod/doc_packages.md"},
-		{ID: "mod_energy", Name: "Energy Management", Description: "Power management and energy optimization", Filename: "mod/doc_energy.md"},
-
-		// Backup & Recovery
-		{ID: "mod_backup", Name: "General Backup", Description: "Backup and restore operations", Filename: "mod/doc_backup.md"},
-		{ID: "mod_btrfs_backup", Name: "BTRFS Backup", Description: "Advanced BTRFS snapshot-based backup system", Filename: "mod/doc_btrfs_backup.md"},
-		{ID: "mod_btrfs_restore", Name: "BTRFS Restore", Description: "BTRFS snapshot restoration with dry-run support", Filename: "mod/doc_btrfs_restore.md"},
-		{ID: "mod_backup_tar", Name: "TAR Backup", Description: "Archive-based backups", Filename: "mod/doc_backup_tar.md"},
-		{ID: "mod_restore_tar", Name: "TAR Restore", Description: "Restore from TAR archives", Filename: "mod/doc_restore_tar.md"},
-		{ID: "mod_backup_rsync", Name: "RSYNC Backup", Description: "Incremental file-based backups", Filename: "mod/doc_backup_rsync.md"},
-		{ID: "mod_restore_rsync", Name: "RSYNC Restore", Description: "Restore from RSYNC backups", Filename: "mod/doc_restore_rsync.md"},
-
-		// Docker & Containers
-		{ID: "mod_docker", Name: "Docker Management", Description: "Docker management and security tools", Filename: "mod/doc_docker.md"},
-		{ID: "mod_docker_setup", Name: "Docker Setup", Description: "Install and configure Docker", Filename: "mod/doc_docker_setup.md"},
-		{ID: "mod_docker_security", Name: "Docker Security", Description: "Security audit for Docker containers", Filename: "mod/doc_docker_security.md"},
-
-		// Logs & Analysis
-		{ID: "mod_logs", Name: "Log Analysis", Description: "Analyze system logs and troubleshoot issues", Filename: "mod/doc_logs.md"},
-		{ID: "advanced_log_analyzer", Name: "Advanced Log Analyzer", Description: "Python-based log analysis tool", Filename: "tools/doc_advanced_log_analyzer.md"},
-
-		// System Maintenance
-		{ID: "mod_restarts", Name: "System Restarts", Description: "Restart system services and desktop environment components", Filename: "mod/doc_restarts.md"},
-
-		// Development & Libraries
-		{ID: "lib_btrfs", Name: "BTRFS Library", Description: "Advanced BTRFS operations and utilities", Filename: "lib/doc_btrfs.md"},
-		{ID: "lib_common", Name: "Common Functions Library", Description: "Core shared functions and utilities", Filename: "lib/doc_common.md"},
-		{ID: "lib_colors", Name: "Color Functions Library", Description: "Terminal color formatting and styling", Filename: "lib/doc_colors.md"},
-		{ID: "lib_config", Name: "Configuration Library", Description: "Configuration file handling and management", Filename: "lib/doc_config.md"},
-		{ID: "lib_filesystem", Name: "Filesystem Library", Description: "File system operations and utilities", Filename: "lib/doc_filesystem.md"},
-		{ID: "lib_i18n", Name: "Internationalization Library", Description: "Multi-language support and message handling", Filename: "lib/doc_i18n.md"},
-		{ID: "lib_logging", Name: "Logging Library", Description: "Structured logging and error handling", Filename: "lib/doc_logging.md"},
-		{ID: "lib_notifications", Name: "Notifications Library", Description: "Desktop notification system integration", Filename: "lib/doc_notifications.md"},
-		{ID: "lib_package_mappings", Name: "Package Mappings Library", Description: "Cross-distribution package name mappings", Filename: "lib/doc_package_mappings.md"},
-		{ID: "lib_packages", Name: "Package Management Library", Description: "Distribution-agnostic package management", Filename: "lib/doc_packages.md"},
-		{ID: "lib_system", Name: "System Information Library", Description: "System detection and hardware information", Filename: "lib/doc_system.md"},
-		{ID: "lib_ui", Name: "User Interface Library", Description: "User interface functions and input handling", Filename: "lib/doc_ui.md"},
-		{ID: "DEVELOPER_GUIDE", Name: "CLI Developer Guide", Description: "CLI development guidelines and architecture documentation", Filename: "CLI_DEVELOPER_GUIDE.md"},
-		{ID: "GUI_DEVELOPER_GUIDE", Name: "GUI Developer Guide", Description: "GUI development guidelines and architecture documentation", Filename: "GUI_DEVELOPER_GUIDE.md"},
-
-		// GUI Specialized Documentation
-		{ID: "gui_backend_api", Name: "GUI Backend API", Description: "Go backend development, API endpoints, and data structures", Filename: "gui/doc_backend_api.md"},
-		{ID: "gui_frontend_react", Name: "GUI React Frontend", Description: "React component development and frontend architecture", Filename: "gui/doc_frontend_react.md"},
-		{ID: "gui_i18n", Name: "GUI Internationalization", Description: "Internationalization system for frontend and backend", Filename: "gui/doc_i18n.md"},
-		{ID: "gui_module_integration", Name: "GUI Module Integration", Description: "How CLI modules automatically integrate with GUI", Filename: "gui/doc_module_integration.md"},
-		{ID: "gui_customization", Name: "GUI Customization", Description: "Theme customization, extensions, and advanced modifications", Filename: "gui/doc_customization.md"},
-
-		// Project Information
-		{ID: "gui", Name: "GUI Documentation", Description: "Web-based graphical interface documentation", Filename: "gui/doc_interface.md"},
-		{ID: "README", Name: "Project README", Description: "Main project overview, features, and usage guide", Filename: "../README.md"},
-		{ID: "README_DE", Name: "Project README (German)", Description: "German project overview, features, and usage guide", Filename: "../README_DE.md"},
-		{ID: "gui_README", Name: "GUI README", Description: "GUI-specific setup, development, and usage guide", Filename: "../gui/README.md"},
-	}
-
-	// Filter to only include documents that actually exist
-	var availableDocs []interface{}
 	docsDir := filepath.Join(lhRootDir, "docs")
+	availableDocs := make([]DocMetadata, 0, len(docCatalog))
 
-	for _, doc := range allDocs {
+	for _, doc := range docCatalog {
 		docPath := filepath.Join(docsDir, doc.Filename)
 		if _, err := os.Stat(docPath); err == nil {
 			availableDocs = append(availableDocs, doc)
@@ -737,6 +748,52 @@ func getAllDocs(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(availableDocs)
+}
+
+func getUnlinkedDocs(c *fiber.Ctx) error {
+	docsDir := filepath.Join(lhRootDir, "docs")
+	knownDocs := make(map[string]struct{})
+
+	for _, doc := range docCatalog {
+		knownDocs[filepath.ToSlash(filepath.Clean(doc.Filename))] = struct{}{}
+	}
+	for _, path := range documentationFiles {
+		knownDocs[filepath.ToSlash(filepath.Clean(path))] = struct{}{}
+	}
+
+	unlinked := make([]string, 0)
+
+	err := filepath.WalkDir(docsDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(strings.ToLower(d.Name()), ".md") {
+			return nil
+		}
+
+		rel, err := filepath.Rel(docsDir, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+
+		if _, exists := knownDocs[rel]; !exists {
+			unlinked = append(unlinked, rel)
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("Error scanning documentation directory: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to scan documentation"})
+	}
+
+	sort.Strings(unlinked)
+
+	return c.JSON(unlinked)
 }
 
 func getSessions(c *fiber.Ctx) error {

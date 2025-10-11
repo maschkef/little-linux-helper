@@ -4118,6 +4118,11 @@ main_menu() {
 
 # If the script is run directly, show menu by default
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    if [[ "$1" == "--maintenance" ]]; then
+        maintenance_menu
+        exit 0
+    fi
+
     while true; do
         main_menu
         echo ""
