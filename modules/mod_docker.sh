@@ -67,9 +67,26 @@ function _docker_load_config() {
         CFG_LH_DOCKER_SKIP_WARNINGS=""
         CFG_LH_DOCKER_CHECK_RUNNING="true"
         CFG_LH_DOCKER_DEFAULT_PATTERNS="PASSWORD=password,PASSWORD=123456,DB_PASSWORD=password"
-        CFG_LH_DOCKER_CHECK_MODE="normal"
+        CFG_LH_DOCKER_CHECK_MODE="running"
         CFG_LH_DOCKER_ACCEPTED_WARNINGS=""
     fi
+
+    case "${CFG_LH_DOCKER_CHECK_MODE}" in
+        normal)
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_MODE_NORMALIZED_NORMAL')"
+            CFG_LH_DOCKER_CHECK_MODE="running"
+            ;;
+        strict)
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_MODE_NORMALIZED_STRICT')"
+            CFG_LH_DOCKER_CHECK_MODE="all"
+            ;;
+        running|all)
+            ;;
+        *)
+            lh_log_msg "WARN" "$(printf "$(lh_msg 'DOCKER_CONFIG_MODE_UNKNOWN')" "${CFG_LH_DOCKER_CHECK_MODE}" "running")"
+            CFG_LH_DOCKER_CHECK_MODE="running"
+            ;;
+    esac
 }
 
 # Function to save the Docker configuration
@@ -98,7 +115,7 @@ CFG_LH_DOCKER_CHECK_RUNNING="$CFG_LH_DOCKER_CHECK_RUNNING"
 # Default password patterns (comma separated)
 CFG_LH_DOCKER_DEFAULT_PATTERNS="$CFG_LH_DOCKER_DEFAULT_PATTERNS"
 
-# Check mode (strict/normal)
+# Check mode (running/all)
 CFG_LH_DOCKER_CHECK_MODE="$CFG_LH_DOCKER_CHECK_MODE"
 
 # Accepted warnings (comma separated)
@@ -222,12 +239,12 @@ function manage_docker_config() {
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_MODE_NORMAL')${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_MODE_STRICT')${LH_COLOR_RESET}"
                 echo ""
-                echo "1) normal"
-                echo "2) strict"
+                echo "1) running"
+                echo "2) all"
                 read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DOCKER_CONFIG_MODE_CHOOSE') ${LH_COLOR_RESET}")" mode_choice
                 case $mode_choice in
-                    1) CFG_LH_DOCKER_CHECK_MODE="normal" ;;
-                    2) CFG_LH_DOCKER_CHECK_MODE="strict" ;;
+                    1) CFG_LH_DOCKER_CHECK_MODE="running" ;;
+                    2) CFG_LH_DOCKER_CHECK_MODE="all" ;;
                     *) echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_INVALID_CHOICE')${LH_COLOR_RESET}"; continue ;;
                 esac
                 _docker_save_config
@@ -246,6 +263,21 @@ function manage_docker_config() {
                 ;;
             6)
                 if lh_confirm_action "$(lh_msg 'DOCKER_CONFIG_RESET_CONFIRM')" "n"; then
+                    if [ -f "$LH_DOCKER_CONFIG_FILE" ]; then
+                        if lh_confirm_action "$(lh_msg 'DOCKER_CONFIG_BACKUP_PROMPT')" "y"; then
+                            local backup_path="${LH_DOCKER_CONFIG_FILE}.$(date +%Y%m%d%H%M%S).bak"
+                            if cp "$LH_DOCKER_CONFIG_FILE" "$backup_path"; then
+                                lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_CONFIG_BACKUP_SUCCESS')" "$backup_path")"
+                                echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'DOCKER_CONFIG_BACKUP_SUCCESS')" "$backup_path")${LH_COLOR_RESET}"
+                            else
+                                lh_log_msg "ERROR" "$(printf "$(lh_msg 'DOCKER_CONFIG_BACKUP_FAILED')" "$backup_path")"
+                                echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_CONFIG_BACKUP_FAILED')" "$backup_path")${LH_COLOR_RESET}"
+                            fi
+                        else
+                            lh_log_msg "INFO" "$(lh_msg 'DOCKER_CONFIG_BACKUP_SKIPPED')"
+                            echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_BACKUP_SKIPPED')${LH_COLOR_RESET}"
+                        fi
+                    fi
                     rm -f "$LH_DOCKER_CONFIG_FILE"
                     echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_CONFIG_RESET_SUCCESS')${LH_COLOR_RESET}"
                     return

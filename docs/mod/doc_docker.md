@@ -64,9 +64,9 @@ This is the entry point and main interactive loop of the module. It displays a s
         *   Search path for Docker Compose files
         *   Excluded directories for searches
         *   Maximum search depth
-        *   Security audit mode (normal/strict)
+        *   Security audit mode (running/all)
         *   Running container check toggle
-        *   Configuration reset functionality
+        *   Configuration reset functionality with optional timestamped backup of `docker.conf`
     *   **Dependencies (internal):** `lh_print_header`, `lh_ask_for_input`, `lh_confirm_action`, `_docker_load_config`, `_docker_save_config`.
 
 **5. Configuration Management:**
@@ -78,7 +78,7 @@ This is the entry point and main interactive loop of the module. It displays a s
 *   `CFG_LH_DOCKER_SKIP_WARNINGS`: Comma-separated list of warning types to suppress in security audits
 *   `CFG_LH_DOCKER_CHECK_RUNNING`: Boolean (`true`/`false`) to enable/disable checking running containers
 *   `CFG_LH_DOCKER_DEFAULT_PATTERNS`: Comma-separated list of `VARIABLE=value` patterns for default password checks
-*   `CFG_LH_DOCKER_CHECK_MODE`: Mode for security checks (`strict`/`normal`)
+*   `CFG_LH_DOCKER_CHECK_MODE`: Mode for security checks (`running`/`all`)
 *   `CFG_LH_DOCKER_ACCEPTED_WARNINGS`: List of warnings that have been acknowledged by the user
 
 **Configuration Functions:**

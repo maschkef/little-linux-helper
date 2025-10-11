@@ -368,7 +368,31 @@ function lh_load_docker_config() {
     fi
     
     lh_log_msg "DEBUG" "${MSG[DOCKER_CONFIG_SET_EFFECTIVE]:-Setting effective Docker configuration values}"
-    
+
+    case "${CFG_LH_DOCKER_CHECK_MODE:-}" in
+        normal)
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_MODE_NORMALIZED_NORMAL')"
+            CFG_LH_DOCKER_CHECK_MODE="running"
+            ;;
+        strict)
+            lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_CONFIG_MODE_NORMALIZED_STRICT')"
+            CFG_LH_DOCKER_CHECK_MODE="all"
+            ;;
+    esac
+
+    if [ -z "${CFG_LH_DOCKER_CHECK_MODE:-}" ]; then
+        CFG_LH_DOCKER_CHECK_MODE="$LH_DOCKER_CHECK_MODE_DEFAULT"
+    else
+        case "$CFG_LH_DOCKER_CHECK_MODE" in
+            running|all)
+                ;;
+            *)
+                lh_log_msg "WARN" "$(printf "$(lh_msg 'DOCKER_CONFIG_MODE_UNKNOWN')" "$CFG_LH_DOCKER_CHECK_MODE" "$LH_DOCKER_CHECK_MODE_DEFAULT")"
+                CFG_LH_DOCKER_CHECK_MODE="$LH_DOCKER_CHECK_MODE_DEFAULT"
+                ;;
+        esac
+    fi
+
     # Debug: Show sourced config values
     lh_log_msg "DEBUG" "CFG_LH_DOCKER_COMPOSE_ROOT='$CFG_LH_DOCKER_COMPOSE_ROOT'"
     lh_log_msg "DEBUG" "CFG_LH_DOCKER_CHECK_MODE='$CFG_LH_DOCKER_CHECK_MODE'"

@@ -511,8 +511,8 @@ function docker_check_host_volumes() {
         "/host"
     )
 
+    local found_critical=false
     for path in "${critical_paths[@]}"; do
-        local found_critical=false
         if grep -qE "^\s*-\s+[\"']?${path}[\"']?:" "$compose_file" || \
         grep -qE "^\s*-\s+[\"']?${path}[\"']?\s*$" "$compose_file" || \
         grep -qE "source:\s*[\"']?${path}[\"']?" "$compose_file"; then
@@ -828,7 +828,7 @@ function security_check_docker() {
     
     # Load configuration
     lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_LOAD_CONFIG')"
-    if ! _docker_load_config; then
+    if ! lh_load_docker_config; then
         lh_log_msg "ERROR" "$(lh_msg 'DOCKER_CONFIG_LOAD_FAILED')"
         return 1 # Abort if config could not be loaded
     fi
