@@ -143,23 +143,28 @@ lh_session_registry_init() {
     lh_fix_ownership "$LH_SESSION_REGISTRY_DIR"
     if [ ! -f "$LH_SESSION_REGISTRY_FILE" ]; then
         : >"$LH_SESSION_REGISTRY_FILE"
-        lh_fix_ownership "$LH_SESSION_REGISTRY_FILE"
     fi
+    lh_fix_ownership "$LH_SESSION_REGISTRY_FILE"
     if [ ! -f "$LH_SESSION_REGISTRY_LOCK" ]; then
         : >"$LH_SESSION_REGISTRY_LOCK"
-        lh_fix_ownership "$LH_SESSION_REGISTRY_LOCK"
     fi
+    lh_fix_ownership "$LH_SESSION_REGISTRY_LOCK"
 }
 
 lh__session_registry_cleanup_locked() {
     # Assumes caller holds lock descriptor 201
+    lh_fix_ownership "$LH_SESSION_REGISTRY_FILE" >/dev/null 2>&1 || true
     if [ ! -s "$LH_SESSION_REGISTRY_FILE" ]; then
         : >"$LH_SESSION_REGISTRY_FILE"
+        lh_fix_ownership "$LH_SESSION_REGISTRY_FILE"
         return
     fi
 
     local tmp_file="$LH_SESSION_REGISTRY_FILE.tmp.$$"
     local changed=false
+
+    # Pre-create tmp file so mv can succeed even when all stale entries get removed
+    : >"$tmp_file"
 
     while IFS=$'\t' read -r session_id module_id module_name pid started status activity context updated blocks severity; do
         [[ -z "$session_id" ]] && continue
@@ -177,7 +182,8 @@ lh__session_registry_cleanup_locked() {
     done <"$LH_SESSION_REGISTRY_FILE"
 
     if $changed; then
-        mv "$tmp_file" "$LH_SESSION_REGISTRY_FILE"
+        mv -f "$tmp_file" "$LH_SESSION_REGISTRY_FILE"
+        lh_fix_ownership "$LH_SESSION_REGISTRY_FILE"
     else
         rm -f "$tmp_file"
     fi
@@ -242,7 +248,8 @@ lh_register_session() {
     fi
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
         "$session_id" "$module_id" "$module_name" "$$" "$started" "$status" "$activity" "$context" "$started" "$blocks" "$severity" >>"$tmp_file"
-    mv "$tmp_file" "$LH_SESSION_REGISTRY_FILE"
+    mv -f "$tmp_file" "$LH_SESSION_REGISTRY_FILE"
+    lh_fix_ownership "$LH_SESSION_REGISTRY_FILE"
 
     flock -u 201
     exec 201>&-
@@ -311,7 +318,8 @@ lh_update_session() {
             "$session_id" "$module_id" "$module_name" "$pid" "$started" "$status" "$activity" "$context" "$updated" "$blocks" "$severity" >>"$tmp_file"
     done <"$LH_SESSION_REGISTRY_FILE"
 
-    mv "$tmp_file" "$LH_SESSION_REGISTRY_FILE"
+    mv -f "$tmp_file" "$LH_SESSION_REGISTRY_FILE"
+    lh_fix_ownership "$LH_SESSION_REGISTRY_FILE"
 
     flock -u 201
     exec 201>&-

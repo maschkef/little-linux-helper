@@ -80,42 +80,97 @@ function lh_elevate_privileges() {
 # This prevents files created by sudo from being owned by root
 function lh_fix_ownership() {
     local path="$1"
-    
-    # Validate input
+
     if [[ -z "$path" ]]; then
         lh_log_msg "WARN" "$(lh_msg 'LIB_FIX_OWNERSHIP_NO_PATH' 2>/dev/null || echo 'lh_fix_ownership: No path provided')"
         return 1
     fi
-    
-    # Only fix ownership if:
-    # 1. Running as root (EUID = 0)
-    # 2. Via sudo (SUDO_USER is set)
-    # 3. Path exists
-    if [[ $EUID -eq 0 ]] && [[ -n "${SUDO_USER:-}" ]] && [[ -e "$path" ]]; then
-        # Get the actual user's UID and GID
+
+    if [[ ! -e "$path" ]]; then
+        return 0
+    fi
+
+    if [[ $EUID -eq 0 ]] && [[ -n "${SUDO_USER:-}" ]]; then
         local user_uid
         local user_gid
-        
+
         user_uid=$(id -u "$SUDO_USER" 2>/dev/null)
         user_gid=$(id -g "$SUDO_USER" 2>/dev/null)
-        
+
         if [[ -n "$user_uid" ]] && [[ -n "$user_gid" ]]; then
-            # Fix ownership recursively
             if chown -R "$user_uid:$user_gid" "$path" 2>/dev/null; then
                 lh_log_msg "DEBUG" "$(lh_msg 'LIB_FIX_OWNERSHIP_SUCCESS' "$path" "$SUDO_USER" 2>/dev/null || echo "Fixed ownership of $path for user $SUDO_USER")"
                 return 0
-            else
-                lh_log_msg "WARN" "$(lh_msg 'LIB_FIX_OWNERSHIP_FAILED' "$path" 2>/dev/null || echo "Could not fix ownership for: $path")"
-                return 1
             fi
-        else
-            lh_log_msg "WARN" "$(lh_msg 'LIB_FIX_OWNERSHIP_NO_UID' "$SUDO_USER" 2>/dev/null || echo "Could not determine UID/GID for user: $SUDO_USER")"
+
+            lh_log_msg "WARN" "$(lh_msg 'LIB_FIX_OWNERSHIP_FAILED' "$path" 2>/dev/null || echo "Could not fix ownership for: $path")"
             return 1
         fi
+
+        lh_log_msg "WARN" "$(lh_msg 'LIB_FIX_OWNERSHIP_NO_UID' "$SUDO_USER" 2>/dev/null || echo "Could not determine UID/GID for user: $SUDO_USER")"
+        return 1
     fi
-    
-    # No action needed (not running as root via sudo, or path doesn't exist)
-    return 0
+
+    # For regular users, attempt recovery when the target path is not writable (likely owned by root).
+    local path_is_directory="false"
+    if [[ -d "$path" ]]; then
+        path_is_directory="true"
+        if [[ -w "$path" ]]; then
+            return 0
+        fi
+    else
+        if [[ -w "$path" ]]; then
+            return 0
+        fi
+    fi
+
+    local owner
+    owner=$(stat -c %U "$path" 2>/dev/null || echo "")
+    if [[ "$owner" == "$USER" || -z "$owner" ]]; then
+        return 0
+    fi
+
+    local target_user="$USER"
+    local target_group
+    target_group=$(id -gn "$target_user" 2>/dev/null || echo "")
+
+    if [[ -z "$target_group" ]]; then
+        lh_log_msg "WARN" "$(lh_msg 'LIB_FIX_OWNERSHIP_NO_UID' "$target_user" 2>/dev/null || echo "Could not determine UID/GID for user: $target_user")"
+        return 1
+    fi
+
+    local sudo_cmd="${LH_SUDO_CMD:-sudo}"
+    local chown_args=(chown -R "$target_user:$target_group" "$path")
+
+    if [[ "$sudo_cmd" == "lh_sudo_cmd" ]]; then
+        if lh_sudo_cmd "${chown_args[@]}" 2>/dev/null; then
+            lh_log_msg "DEBUG" "$(lh_msg 'LIB_FIX_OWNERSHIP_SUCCESS' "$path" "$target_user" 2>/dev/null || echo "Fixed ownership of $path for user $target_user")"
+            return 0
+        fi
+    elif command -v "$sudo_cmd" >/dev/null 2>&1; then
+        if "$sudo_cmd" "${chown_args[@]}" 2>/dev/null; then
+            lh_log_msg "DEBUG" "$(lh_msg 'LIB_FIX_OWNERSHIP_SUCCESS' "$path" "$target_user" 2>/dev/null || echo "Fixed ownership of $path for user $target_user")"
+            return 0
+        fi
+    fi
+
+    if command -v sudo >/dev/null 2>&1 && [[ "$sudo_cmd" != "sudo" ]]; then
+        if sudo "${chown_args[@]}" 2>/dev/null; then
+            lh_log_msg "DEBUG" "$(lh_msg 'LIB_FIX_OWNERSHIP_SUCCESS' "$path" "$target_user" 2>/dev/null || echo "Fixed ownership of $path for user $target_user")"
+            return 0
+        fi
+    fi
+
+    local hint
+    if [[ "$path_is_directory" == "true" ]]; then
+        hint="Directory $path not writable and owned by $owner."
+    else
+        hint="File $path not writable and owned by $owner."
+    fi
+    lh_log_msg "WARN" "$hint"
+    lh_log_msg "WARN" "$(lh_msg 'LIB_FIX_OWNERSHIP_FAILED' "$path" 2>/dev/null || echo "Could not fix ownership for: $path")"
+
+    return 1
 }
 
 # Helper function to determine user, display and session variables
