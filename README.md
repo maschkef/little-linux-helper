@@ -296,8 +296,74 @@ Both interfaces provide access to the following modules:
 <details>
 <summary>Browse GUI screenshots</summary>
 
+**Modules (menu order)**
+
 <details>
-   
+<summary>Display system information module</summary>
+
+![Display system information module](screenshots/gui/module_Display-System-Information.png)
+
+Comprehensive system overview including hardware, kernel, and network details.
+
+</details>
+
+<details>
+<summary>Disk tools module</summary>
+
+![Disk tools module](screenshots/gui/module_Disk-Tools.png)
+
+Disk diagnostics menu with SMART checks, usage analysis, and cleanup helpers.
+
+</details>
+
+<details>
+<summary>Log analysis tools module</summary>
+
+![Log analysis tools module](screenshots/gui/module_Log-Analysis-Tools.png)
+
+Centralized access to journal queries, Xorg logs, and the advanced log analyzer.
+
+</details>
+
+<details>
+<summary>BTRFS backup workflow</summary>
+
+![BTRFS backup workflow](screenshots/gui/submodule_BTRFS-Backup.png)
+
+Guided BTRFS backup wizard with snapshot selection and safety checks.
+
+</details>
+
+<details>
+<summary>BTRFS restore workflow</summary>
+
+![BTRFS restore workflow](screenshots/gui/submodule_BTRFS-Restore.png)
+
+Restore assistant covering full, subvolume, and folder-level recovery paths.
+
+</details>
+
+<details>
+<summary>Docker functions module</summary>
+
+![Docker functions module](screenshots/gui/module_Docker-Functions.png)
+
+Container management panel with service status, logs, and resource insights.
+
+</details>
+
+<details>
+<summary>Energy management module</summary>
+
+![Energy management module](screenshots/gui/module_Energy-Management.png)
+
+Controls for power profiles, sleep inhibit timers, and brightness adjustments.
+
+</details>
+
+**Additional interface views**
+
+<details>
 <summary>Start page (Dev Mode enabled at the top left)</summary>
 
 ![Start page with Dev Mode enabled](screenshots/gui/startpage_with_enabled_dev-mode.png)
@@ -321,69 +387,6 @@ Session switcher highlighting parallel CLI sessions with status indicators.
 ![Runtime configuration dialog](screenshots/gui/show-config.png)
 
 Quick access dialog for adjusting GUI host, port, and firewall options while running.
-
-</details>
-
-<details>
-<summary>BTRFS backup workflow</summary>
-
-![BTRFS backup workflow](screenshots/gui/submodule_BTRFS-Backup.png)
-
-Guided BTRFS backup wizard with snapshot selection and safety checks.
-
-</details>
-
-<details>
-<summary>BTRFS restore workflow</summary>
-
-![BTRFS restore workflow](screenshots/gui/submodule_BTRFS-Restore.png)
-
-Restore assistant covering full, subvolume, and folder-level recovery paths.
-
-</details>
-
-<details>
-<summary>Disk tools module</summary>
-
-![Disk tools module](screenshots/gui/module_Disk-Tools.png)
-
-Disk diagnostics menu with SMART checks, usage analysis, and cleanup helpers.
-
-</details>
-
-<details>
-<summary>Display system information module</summary>
-
-![Display system information module](screenshots/gui/module_Display-System-Information.png)
-
-Comprehensive system overview including hardware, kernel, and network details.
-
-</details>
-
-<details>
-<summary>Log analysis tools module</summary>
-
-![Log analysis tools module](screenshots/gui/module_Log-Analysis-Tools.png)
-
-Centralized access to journal queries, Xorg logs, and the advanced log analyzer.
-
-</details>
-
-<details>
-<summary>Docker functions module</summary>
-
-![Docker functions module](screenshots/gui/module_Docker-Functions.png)
-
-Container management panel with service status, logs, and resource insights.
-
-</details>
-
-<details>
-<summary>Energy management module</summary>
-
-![Energy management module](screenshots/gui/module_Energy-Management.png)
-
-Controls for power profiles, sleep inhibit timers, and brightness adjustments.
 
 </details>
 

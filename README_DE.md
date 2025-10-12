@@ -296,8 +296,74 @@ Beide Oberflächen bieten Zugriff auf die folgenden Module:
 <details>
 <summary>GUI-Screenshots durchsuchen</summary>
 
-<details>
+**Module (Menüreihenfolge)**
 
+<details>
+<summary>Systeminformationen-Modul</summary>
+
+![Systeminformationen-Modul](screenshots/gui/module_Display-System-Information.png)
+
+Umfassender Systemüberblick inklusive Hardware-, Kernel- und Netzwerkinformationen.
+
+</details>
+
+<details>
+<summary>Festplattenwerkzeuge-Modul</summary>
+
+![Festplattenwerkzeuge-Modul](screenshots/gui/module_Disk-Tools.png)
+
+Festplattendiagnose mit SMART-Checks, Belegungsanalyse und Aufräumhilfen.
+
+</details>
+
+<details>
+<summary>Log-Analyse-Tools-Modul</summary>
+
+![Log-Analyse-Tools-Modul](screenshots/gui/module_Log-Analysis-Tools.png)
+
+Zentraler Zugriff auf Journalabfragen, Xorg-Logs und den erweiterten Log-Analyzer.
+
+</details>
+
+<details>
+<summary>BTRFS-Backup-Workflow</summary>
+
+![BTRFS-Backup-Workflow](screenshots/gui/submodule_BTRFS-Backup.png)
+
+Geführter BTRFS-Backup-Assistent mit Snapshot-Auswahl und Sicherheitsprüfungen.
+
+</details>
+
+<details>
+<summary>BTRFS-Restore-Workflow</summary>
+
+![BTRFS-Restore-Workflow](screenshots/gui/submodule_BTRFS-Restore.png)
+
+Wiederherstellungsassistent für Komplett-, Subvolume- und Ordner-basierte Restores.
+
+</details>
+
+<details>
+<summary>Docker-Funktionen-Modul</summary>
+
+![Docker-Funktionen-Modul](screenshots/gui/module_Docker-Functions.png)
+
+Container-Verwaltungspanel mit Dienststatus, Logs und Ressourcenauswertung.
+
+</details>
+
+<details>
+<summary>Energieverwaltungs-Modul</summary>
+
+![Energieverwaltungs-Modul](screenshots/gui/module_Energy-Management.png)
+
+Steuerung von Energieprofilen, Sleep-Inhibit-Timern und Helligkeitseinstellungen.
+
+</details>
+
+**Weitere Ansichten**
+
+<details>
 <summary>Startseite (Dev-Modus oben links aktiviert)</summary>
 
 ![Startseite mit aktiviertem Dev-Modus](screenshots/gui/startpage_with_enabled_dev-mode.png)
@@ -321,69 +387,6 @@ Sitzungsumschalter mit parallelen CLI-Sitzungen und Statusindikatoren.
 ![Laufzeit-Konfigurationsdialog](screenshots/gui/show-config.png)
 
 Schnellzugriff auf GUI-Host, Port und Firewall-Optionen während des Betriebs.
-
-</details>
-
-<details>
-<summary>BTRFS-Backup-Workflow</summary>
-
-![BTRFS-Backup-Workflow](screenshots/gui/submodule_BTRFS-Backup.png)
-
-Geführter BTRFS-Backup-Assistent mit Snapshot-Auswahl und Sicherheitsprüfungen.
-
-</details>
-
-<details>
-<summary>BTRFS-Restore-Workflow</summary>
-
-![BTRFS-Restore-Workflow](screenshots/gui/submodule_BTRFS-Restore.png)
-
-Wiederherstellungsassistent für Komplett-, Subvolume- und Ordner-basierte Restores.
-
-</details>
-
-<details>
-<summary>Festplattenwerkzeuge-Modul</summary>
-
-![Festplattenwerkzeuge-Modul](screenshots/gui/module_Disk-Tools.png)
-
-Festplattendiagnose mit SMART-Checks, Belegungsanalyse und Aufräumhilfen.
-
-</details>
-
-<details>
-<summary>Systeminformationen-Modul</summary>
-
-![Systeminformationen-Modul](screenshots/gui/module_Display-System-Information.png)
-
-Umfassender Systemüberblick inklusive Hardware-, Kernel- und Netzwerkinformationen.
-
-</details>
-
-<details>
-<summary>Log-Analyse-Tools-Modul</summary>
-
-![Log-Analyse-Tools-Modul](screenshots/gui/module_Log-Analysis-Tools.png)
-
-Zentraler Zugriff auf Journalabfragen, Xorg-Logs und den erweiterten Log-Analyzer.
-
-</details>
-
-<details>
-<summary>Docker-Funktionen-Modul</summary>
-
-![Docker-Funktionen-Modul](screenshots/gui/module_Docker-Functions.png)
-
-Container-Verwaltungspanel mit Dienststatus, Logs und Ressourcenauswertung.
-
-</details>
-
-<details>
-<summary>Energieverwaltungs-Modul</summary>
-
-![Energieverwaltungs-Modul](screenshots/gui/module_Energy-Management.png)
-
-Steuerung von Energieprofilen, Sleep-Inhibit-Timern und Helligkeitseinstellungen.
 
 </details>
 
