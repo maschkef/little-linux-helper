@@ -76,7 +76,13 @@
       "docker": "Docker Functions",
       "backup": "Backup & Recovery",
       "btrfs_backup": "BTRFS Backup",
-      "btrfs_restore": "BTRFS Restore"
+      "btrfs_restore": "BTRFS Restore",
+      "backup_tar": "TAR Backup",
+      "backup_rsync": "RSYNC Backup",
+      "restore_tar": "TAR Restore",
+      "restore_rsync": "RSYNC Restore",
+      "docker_setup": "Docker Setup",
+      "docker_security": "Docker Security"
     },
     "descriptions": {
       "restarts": "Restart system services and desktop environment components",
@@ -97,7 +103,10 @@
     "overview": "Overview",
     "availableOptions": "Available Options",
     "importantNotes": "Important Notes",
-    "noHelpAvailable": "Help information not available for this module."
+    "noHelpAvailable": "Help information not available for this module.",
+    "helpSourceLabel": "Help Source",
+    "manualSelectionIndicator": "Manual override",
+    "automaticOption": "Automatic (follow selected module)"
   },
   "docs": {
     "notAvailable": "Documentation not available for this module.",
