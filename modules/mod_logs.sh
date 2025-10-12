@@ -956,7 +956,7 @@ function log_analyzer_menu() {
         lh_print_menu_item 5 "$(lh_msg 'LOG_MENU_ITEM_5')"
         lh_print_menu_item 6 "$(lh_msg 'LOG_MENU_ITEM_6')"
         lh_print_menu_item 7 "$(lh_msg 'LOG_MENU_ITEM_7')"
-        lh_print_menu_item 0 "$(lh_msg 'LOG_MENU_ITEM_0')"
+        lh_print_gui_hidden_menu_item 0 "$(lh_msg 'LOG_MENU_ITEM_0')"
         echo ""
 
         local option_prompt
@@ -994,6 +994,12 @@ function log_analyzer_menu() {
                 logs_advanced_analysis
                 ;;
             0)
+                if lh_gui_mode_active; then
+                    lh_log_msg "WARN" "$(lh_msg 'LOG_INVALID_SELECTION' "$option")"
+                    echo -e "${LH_COLOR_WARNING}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
+                    continue
+                fi
                 lh_log_msg "INFO" "$(lh_msg 'LOG_BACK_TO_MAIN')"
                 return 0
                 ;;

@@ -1513,7 +1513,7 @@ function restart_module_menu() {
         lh_print_menu_item 6 "$(lh_msg 'RESTART_BLUETOOTH_SERVICES')"
         lh_print_menu_item 7 "$(lh_msg 'RESTART_GRAPHICS_SYSTEM')"
         lh_print_menu_item 8 "$(lh_msg 'POWER_MANAGEMENT')"
-        lh_print_menu_item 0 "$(lh_msg 'RESTART_BACK_TO_MAIN')"
+        lh_print_gui_hidden_menu_item 0 "$(lh_msg 'RESTART_BACK_TO_MAIN')"
         echo ""
 
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
@@ -1553,6 +1553,12 @@ function restart_module_menu() {
                 power_management_action
                 ;;
             0)
+                if lh_gui_mode_active; then
+                    lh_log_msg "WARN" "$(lh_msg 'INVALID_SELECTION' "$option")"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTART_INVALID_SELECTION')${LH_COLOR_RESET}"
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
+                    continue
+                fi
                 lh_log_msg "INFO" "$(lh_msg 'RESTART_BACK_TO_MAIN_LOG')"
                 return 0
                 ;;

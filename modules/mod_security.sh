@@ -510,7 +510,7 @@ function security_checks_menu() {
         lh_print_menu_item 5 "$(lh_msg 'SECURITY_MENU_UPDATES')"
         lh_print_menu_item 6 "$(lh_msg 'SECURITY_MENU_PASSWORDS')"
         lh_print_menu_item 7 "$(lh_msg 'SECURITY_MENU_DOCKER')"
-        lh_print_menu_item 0 "$(lh_msg 'SECURITY_MENU_BACK')"
+        lh_print_gui_hidden_menu_item 0 "$(lh_msg 'SECURITY_MENU_BACK')"
         echo ""
 
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
@@ -546,6 +546,12 @@ function security_checks_menu() {
                 bash "$LH_ROOT_DIR/modules/mod_docker_security.sh"
                 ;;
             0)
+                if lh_gui_mode_active; then
+                    lh_log_msg "WARN" "$(lh_msg 'INVALID_SELECTION' "$option")"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
+                    continue
+                fi
                 lh_log_msg "INFO" "$(lh_msg 'SECURITY_MENU_BACK')"
                 return 0
                 ;;

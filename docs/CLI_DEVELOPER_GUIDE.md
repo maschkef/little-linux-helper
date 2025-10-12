@@ -120,8 +120,11 @@ The library system is split into the following specialized modules:
 **Contains:**
 - `lh_print_header()`
 - `lh_print_menu_item()`
+- `lh_gui_mode_active()`
+- `lh_print_gui_hidden_menu_item()`
 - `lh_confirm_action()`
 - `lh_ask_for_input()`
+- `lh_press_any_key()`
 
 ##### `lib/lib_notifications.sh` (215 lines)
 **Purpose:** Desktop notification functions

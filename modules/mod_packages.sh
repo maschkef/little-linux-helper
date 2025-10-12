@@ -1169,7 +1169,7 @@ function package_management_menu() {
         lh_print_menu_item 5 "$(lh_msg PKG_MENU_DOCKER_SETUP)"
         lh_print_menu_item 6 "$(lh_msg PKG_MENU_LIST_INSTALLED)"
         lh_print_menu_item 7 "$(lh_msg PKG_MENU_SHOW_LOGS)"
-        lh_print_menu_item 0 "$(lh_msg PKG_MENU_BACK)"
+        lh_print_gui_hidden_menu_item 0 "$(lh_msg PKG_MENU_BACK)"
         echo ""
 
         # Show detected alternative package managers
@@ -1211,6 +1211,12 @@ function package_management_menu() {
                 pkg_show_logs
                 ;;
             0)
+                if lh_gui_mode_active; then
+                    lh_log_msg "WARN" "$(lh_msg PKG_ERROR_INVALID_SELECTION "$option")"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_INVALID_SELECTION)${LH_COLOR_RESET}"
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
+                    continue
+                fi
                 lh_log_msg "INFO" "$(lh_msg PKG_MENU_BACK)"
                 return 0
                 ;;

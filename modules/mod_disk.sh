@@ -491,7 +491,7 @@ function disk_tools_menu() {
         lh_print_menu_item 6 "$(lh_msg 'DISK_MENU_FILESYSTEM')"
         lh_print_menu_item 7 "$(lh_msg 'DISK_MENU_HEALTH')"
         lh_print_menu_item 8 "$(lh_msg 'DISK_MENU_LARGEST_FILES')"
-        lh_print_menu_item 0 "$(lh_msg 'DISK_MENU_BACK')"
+        lh_print_gui_hidden_menu_item 0 "$(lh_msg 'DISK_MENU_BACK')"
         echo ""
 
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
@@ -531,6 +531,12 @@ function disk_tools_menu() {
                 disk_show_largest_files
                 ;;
             0)
+                if lh_gui_mode_active; then
+                    lh_log_msg "WARN" "$(lh_msg 'INVALID_SELECTION' "$option")"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_INVALID_SELECTION_TRY_AGAIN')${LH_COLOR_RESET}"
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
+                    continue
+                fi
                 lh_log_msg "INFO" "$(lh_msg 'DISK_BACK_TO_MAIN_MENU')"
                 return 0
                 ;;

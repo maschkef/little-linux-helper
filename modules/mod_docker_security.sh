@@ -1355,7 +1355,7 @@ function docker_security_menu() {
         lh_print_header "$(lh_msg 'DOCKER_MENU_TITLE_FUNCTIONS')"
 
         lh_print_menu_item 1 "$(lh_msg 'DOCKER_MENU_SECURITY_CHECK')"
-        lh_print_menu_item 0 "$(lh_msg 'DOCKER_MENU_BACK_MAIN')"
+        lh_print_gui_hidden_menu_item 0 "$(lh_msg 'DOCKER_MENU_BACK_MAIN')"
         echo ""
 
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DOCKER_MENU_CHOOSE_OPTION')${LH_COLOR_RESET}")" option
@@ -1380,6 +1380,11 @@ function docker_security_menu() {
                 security_check_docker
                 ;;
             0)
+                if lh_gui_mode_active; then
+                    lh_log_msg "WARN" "$(lh_msg 'DOCKER_INVALID_SELECTION' "$option")"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_INVALID_SELECTION_MESSAGE')${LH_COLOR_RESET}"
+                    continue
+                fi
                 lh_log_msg "INFO" "$(lh_msg 'DOCKER_RETURN_MAIN_MENU')"
                 return 0
                 ;;

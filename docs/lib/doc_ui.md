@@ -82,6 +82,99 @@ lh_print_menu_item "0" "$(lh_msg 'MENU_EXIT')"
 [0] Exit
 ```
 
+### `lh_gui_mode_active()`
+
+Helper function that checks if the system is running in GUI mode.
+
+**Parameters:**
+- None
+
+**Features:**
+- Returns success (0) if GUI mode is active
+- Returns failure (1) if running in CLI mode
+- Used internally by other UI functions
+
+**Return Values:**
+- `0`: GUI mode is active (`LH_GUI_MODE=true`)
+- `1`: CLI mode (default or `LH_GUI_MODE=false`)
+
+**Dependencies:**
+- `LH_GUI_MODE` environment variable
+
+**Usage:**
+```bash
+if lh_gui_mode_active; then
+    # GUI-specific logic
+    echo "Running in GUI mode"
+else
+    # CLI-specific logic
+    echo "Running in CLI mode"
+fi
+```
+
+### `lh_print_gui_hidden_menu_item(number, text)`
+
+Prints a menu item only in CLI mode, hiding it in GUI mode. This is specifically designed for "Back to Main Menu" options that are not meaningful in the GUI interface.
+
+**Parameters:**
+- `$1` (`number`): The number/identifier of the menu item (typically "0")
+- `$2` (`text`): The descriptive text of the menu item
+
+**Features:**
+- **GUI mode awareness**: Automatically hidden when `LH_GUI_MODE=true`
+- **Consistent formatting**: Uses `lh_print_menu_item` for formatting in CLI mode
+- **Menu optimization**: Prevents confusing menu options in GUI context
+- **Seamless integration**: No code changes needed when switching between CLI and GUI
+
+**Dependencies:**
+- `lh_gui_mode_active()` for mode detection
+- `lh_print_menu_item()` for actual rendering
+- `LH_GUI_MODE` environment variable
+
+**Usage:**
+```bash
+# In module menu functions
+lh_print_header "$(lh_msg 'MODULE_MENU_TITLE')"
+
+lh_print_menu_item "1" "$(lh_msg 'OPTION_ONE')"
+lh_print_menu_item "2" "$(lh_msg 'OPTION_TWO')"
+lh_print_menu_item "3" "$(lh_msg 'OPTION_THREE')"
+
+# Hidden in GUI, shown in CLI
+lh_print_gui_hidden_menu_item "0" "$(lh_msg 'BACK_TO_MAIN_MENU')"
+```
+
+**Behavior:**
+- **CLI mode**: Menu item is displayed normally using standard formatting
+- **GUI mode**: Function returns immediately without output, menu item is hidden
+
+**Corresponding Menu Logic:**
+When using this function, ensure your menu handling logic also accounts for GUI mode:
+
+```bash
+case $option in
+    1) action_one ;;
+    2) action_two ;;
+    3) action_three ;;
+    0)
+        # Check if in GUI mode - option 0 should not be available
+        if lh_gui_mode_active; then
+            lh_log_msg "DEBUG" "Invalid selection: '$option'"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
+            continue
+        fi
+        # In CLI mode, allow exit to main menu
+        return 0
+        ;;
+    *)
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
+        ;;
+esac
+```
+
+**Rationale:**
+In GUI mode, the back/exit functionality is provided by the GUI itself through dedicated interface elements. Displaying "Back to Main Menu" options would be redundant and potentially confusing to users who are already familiar with the GUI navigation patterns.
+
 ### `lh_confirm_action(prompt_message, default_choice)`
 
 Asks the user a yes/no question with language-aware input validation.

@@ -309,7 +309,7 @@ function docker_functions_menu() {
         lh_print_menu_item "2" "$(lh_msg 'DOCKER_MENU_MANAGE_CONFIG')"
         lh_print_menu_item "3" "$(lh_msg 'DOCKER_MENU_SETUP')"
         lh_print_menu_item "4" "$(lh_msg 'DOCKER_MENU_SECURITY')"
-        lh_print_menu_item "0" "$(lh_msg 'DOCKER_MENU_BACK')"
+        lh_print_gui_hidden_menu_item "0" "$(lh_msg 'DOCKER_MENU_BACK')"
         echo ""
         
         lh_log_msg "DEBUG" "Waiting for user input in Docker menu"
@@ -363,6 +363,12 @@ function docker_functions_menu() {
                 done
                 ;;
             0)
+                if lh_gui_mode_active; then
+                    lh_log_msg "DEBUG" "Invalid input: '$choice'"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_INVALID_CHOICE')${LH_COLOR_RESET}"
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
+                    continue
+                fi
                 lh_log_msg "INFO" "Exit Docker functions"
                 break
                 ;;

@@ -85,8 +85,51 @@ This starts:
 **Module Integration**:
 - Automatic discovery of `mod_*.sh` files
 - Environment variable inheritance (LH_ROOT_DIR, LH_GUI_MODE, LH_LANG)
-- GUI-aware behavior (skips interactive prompts)
+- GUI-aware behavior (skips interactive prompts and hides CLI-specific menu items)
 - Category-based organization
+
+### GUI Mode Behavior
+
+When modules run in GUI mode (`LH_GUI_MODE=true`), they automatically adapt their behavior:
+
+**Interactive Prompt Handling:**
+- **`lh_press_any_key()`**: Automatically skipped in GUI mode
+- **Rationale**: GUI provides its own navigation, "Press any key" prompts are redundant
+
+**Menu Item Visibility:**
+- **`lh_print_gui_hidden_menu_item()`**: Hides "Back to Main Menu" options in GUI
+- **Rationale**: GUI has dedicated navigation controls, these options would be confusing
+- **Example**: Option "0 - Back to Main Menu" is hidden in GUI but shown in CLI
+
+**Implementation:**
+```bash
+# In module menus
+lh_print_menu_item "1" "$(lh_msg 'OPTION_ONE')"
+lh_print_menu_item "2" "$(lh_msg 'OPTION_TWO')"
+
+# This menu item only appears in CLI mode
+lh_print_gui_hidden_menu_item "0" "$(lh_msg 'BACK_TO_MAIN_MENU')"
+
+# Menu handling with GUI mode check
+case $option in
+    1) action_one ;;
+    2) action_two ;;
+    0)
+        # Prevent invalid selection in GUI
+        if lh_gui_mode_active; then
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
+            continue
+        fi
+        return 0  # Exit to main menu in CLI
+        ;;
+esac
+```
+
+**Benefits:**
+- Seamless user experience in both CLI and GUI modes
+- No code duplication or mode-specific branches
+- Modules work identically in both interfaces
+- GUI provides appropriate navigation for its context
 
 ### Data Flow
 1. **Module Discovery**: Backend scans filesystem for modules

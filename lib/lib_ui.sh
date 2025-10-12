@@ -35,6 +35,25 @@ function lh_print_menu_item() {
     printf "  ${LH_COLOR_MENU_NUMBER}%2s.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}%s${LH_COLOR_RESET}\n" "$number" "$text"
 }
 
+# Returns success when the helper runs in GUI mode
+function lh_gui_mode_active() {
+    [[ "${LH_GUI_MODE:-false}" == "true" ]]
+}
+
+# Prints the "Back to Main Menu" entry only for CLI sessions
+# $1: Menu item number (usually 0)
+# $2: Display text for the menu entry
+function lh_print_gui_hidden_menu_item() {
+    local number="$1"
+    local text="$2"
+
+    if lh_gui_mode_active; then
+        return
+    fi
+
+    lh_print_menu_item "$number" "$text"
+}
+
 # Standard function for yes/no queries
 # $1: Prompt message
 # $2: (Optional) Default choice (y/n) - Default: n
@@ -125,7 +144,7 @@ function lh_press_any_key() {
     local message_key="${1:-PRESS_KEY_CONTINUE}"
     
     # Skip prompt entirely when running in GUI mode
-    if [[ "${LH_GUI_MODE:-false}" == "true" ]]; then
+    if lh_gui_mode_active; then
         lh_log_msg "DEBUG" "Skipping 'press any key' prompt in GUI mode"
         return 0
     fi

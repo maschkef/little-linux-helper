@@ -361,7 +361,7 @@ backup_menu() {
         lh_print_menu_item 5 "$(lh_msg "MENU_BACKUP_STATUS")"
         lh_print_menu_item 6 "$(lh_msg "MENU_BACKUP_CONFIG")"
         lh_print_menu_item 7 "$(lh_msg "BTRFS_MENU_MAINTENANCE")"
-        lh_print_menu_item 0 "$(lh_msg "BACK_TO_MAIN_MENU")"
+        lh_print_gui_hidden_menu_item 0 "$(lh_msg "BACK_TO_MAIN_MENU")"
         echo ""
         
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
@@ -405,6 +405,12 @@ backup_menu() {
                 bash "$LH_ROOT_DIR/modules/backup/mod_btrfs_backup.sh" --maintenance
                 ;;
             0)
+                if lh_gui_mode_active; then
+                    lh_log_msg "DEBUG" "Invalid selection: '$option'"
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
+                    continue
+                fi
                 lh_log_msg "DEBUG" "User chose to return to main menu"
                 lh_log_msg "DEBUG" "=== Exiting backup_menu function ==="
                 return 0

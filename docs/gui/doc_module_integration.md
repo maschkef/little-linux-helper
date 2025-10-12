@@ -143,6 +143,56 @@ lh_press_any_key() {
 }
 ```
 
+**Menu Item Visibility Control:**
+GUI mode also controls visibility of CLI-specific menu items:
+
+```bash
+# In lib_ui.sh (already implemented)
+lh_print_gui_hidden_menu_item() {
+    local number="$1"
+    local text="$2"
+    
+    if lh_gui_mode_active; then
+        return  # Hide menu item in GUI mode
+    fi
+    
+    lh_print_menu_item "$number" "$text"
+}
+```
+
+**Usage in Module Menus:**
+```bash
+# Module menu implementation
+lh_print_header "$(lh_msg 'MODULE_MENU_TITLE')"
+
+lh_print_menu_item "1" "$(lh_msg 'OPTION_ONE')"
+lh_print_menu_item "2" "$(lh_msg 'OPTION_TWO')"
+
+# This item only appears in CLI mode
+lh_print_gui_hidden_menu_item "0" "$(lh_msg 'BACK_TO_MAIN_MENU')"
+
+# Menu handling with GUI mode validation
+case $option in
+    1) action_one ;;
+    2) action_two ;;
+    0)
+        # Validate selection in GUI mode
+        if lh_gui_mode_active; then
+            lh_log_msg "DEBUG" "Invalid selection: '$option'"
+            echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
+            continue
+        fi
+        return 0  # Exit to main menu in CLI
+        ;;
+esac
+```
+
+**Rationale:**
+- GUI provides its own navigation controls and back buttons
+- "Back to Main Menu" options would be redundant and confusing in GUI
+- Modules remain fully functional in both CLI and GUI modes
+- Single codebase works seamlessly in both interfaces
+
 **Language Inheritance:**
 Modules automatically use GUI language setting:
 

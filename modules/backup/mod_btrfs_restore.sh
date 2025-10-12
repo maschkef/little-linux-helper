@@ -3654,7 +3654,7 @@ show_restore_menu() {
         lh_print_menu_item 6 "$(lh_msg 'RESTORE_MENU_CLEANUP')"
         lh_print_menu_item 7 "$(lh_msg 'RESTORE_MENU_RETRY_BOOTLOADER')"
         lh_print_menu_item 8 "$(lh_msg 'RESTORE_MENU_POST_VERIFICATION')"
-        lh_print_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
+        lh_print_gui_hidden_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
         echo ""
 
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
@@ -3722,6 +3722,11 @@ show_restore_menu() {
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             0)
+                if lh_gui_mode_active; then
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
+                    continue
+                fi
                 return 0
                 ;;
             *)

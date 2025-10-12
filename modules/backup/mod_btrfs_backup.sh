@@ -3917,7 +3917,7 @@ maintenance_menu() {
         lh_print_menu_item 3 "$(lh_msg 'BTRFS_MENU_CLEANUP_SOURCE')"
         lh_print_menu_item 4 "$(lh_msg 'BTRFS_MENU_CLEANUP_RECEIVING')"
         lh_print_menu_item 5 "$(lh_msg 'BTRFS_MENU_DEBUG_CHAIN')"
-        lh_print_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
+        lh_print_gui_hidden_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
         echo ""
 
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
@@ -3949,6 +3949,11 @@ maintenance_menu() {
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             0)
+                if lh_gui_mode_active; then
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
+                    continue
+                fi
                 return 0
                 ;;
             *)
@@ -4069,7 +4074,7 @@ main_menu() {
         lh_print_menu_item 3 "$(lh_msg 'BTRFS_MENU_STATUS_INFO')"
         lh_print_menu_item 4 "$(lh_msg 'BTRFS_MENU_CONFIG')"
         lh_print_menu_item 5 "$(lh_msg 'BTRFS_MENU_MAINTENANCE')"
-        lh_print_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
+        lh_print_gui_hidden_menu_item 0 "$(lh_msg 'BACK_TO_MAIN_MENU')"
         echo ""
 
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
@@ -4103,6 +4108,11 @@ main_menu() {
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             0)
+                if lh_gui_mode_active; then
+                    echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
+                    continue
+                fi
                 return 0
                 ;;
             *)
