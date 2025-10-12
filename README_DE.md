@@ -353,6 +353,24 @@ Führt Integritätsprüfungen durch, überprüft Sicherheits-Baselines und biete
 </details>
 
 <details>
+<summary>Energieverwaltungs-Modul</summary>
+
+![Energieverwaltungs-Modul](screenshots/gui/module_Energy-Management.png)
+
+Steuerung von Energieprofilen, Sleep-Inhibit-Timern und Helligkeitseinstellungen.
+
+</details>
+
+<details>
+<summary>Docker-Funktionen-Modul</summary>
+
+![Docker-Funktionen-Modul](screenshots/gui/module_Docker-Functions.png)
+
+Container-Verwaltungspanel mit Dienststatus, Logs und Ressourcenauswertung.
+
+</details>
+
+<details>
 <summary>Backup & Recovery Modul</summary>
 
 ![Backup & Recovery Modul](screenshots/gui/module_Backup-&-Recovery.png)
@@ -376,24 +394,6 @@ Geführter BTRFS-Backup-Assistent mit Snapshot-Auswahl und Sicherheitsprüfungen
 ![BTRFS-Restore-Workflow](screenshots/gui/submodule_BTRFS-Restore.png)
 
 Wiederherstellungsassistent für Komplett-, Subvolume- und Ordner-basierte Restores.
-
-</details>
-
-<details>
-<summary>Docker-Funktionen-Modul</summary>
-
-![Docker-Funktionen-Modul](screenshots/gui/module_Docker-Functions.png)
-
-Container-Verwaltungspanel mit Dienststatus, Logs und Ressourcenauswertung.
-
-</details>
-
-<details>
-<summary>Energieverwaltungs-Modul</summary>
-
-![Energieverwaltungs-Modul](screenshots/gui/module_Energy-Management.png)
-
-Steuerung von Energieprofilen, Sleep-Inhibit-Timern und Helligkeitseinstellungen.
 
 </details>
 

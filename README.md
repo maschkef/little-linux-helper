@@ -354,6 +354,24 @@ Run integrity scans, verify security baselines, and review hardening guidance.
 </details>
 
 <details>
+<summary>Energy management module</summary>
+
+![Energy management module](screenshots/gui/module_Energy-Management.png)
+
+Controls for power profiles, sleep inhibit timers, and brightness adjustments.
+
+</details>
+
+<details>
+<summary>Docker functions module</summary>
+
+![Docker functions module](screenshots/gui/module_Docker-Functions.png)
+
+Container management panel with service status, logs, and resource insights.
+
+</details>
+
+<details>
 <summary>Backup & recovery module</summary>
 
 ![Backup & recovery module](screenshots/gui/module_Backup-&-Recovery.png)
@@ -377,24 +395,6 @@ Guided BTRFS backup wizard with snapshot selection and safety checks.
 ![BTRFS restore workflow](screenshots/gui/submodule_BTRFS-Restore.png)
 
 Restore assistant covering full, subvolume, and folder-level recovery paths.
-
-</details>
-
-<details>
-<summary>Docker functions module</summary>
-
-![Docker functions module](screenshots/gui/module_Docker-Functions.png)
-
-Container management panel with service status, logs, and resource insights.
-
-</details>
-
-<details>
-<summary>Energy management module</summary>
-
-![Energy management module](screenshots/gui/module_Energy-Management.png)
-
-Controls for power profiles, sleep inhibit timers, and brightness adjustments.
 
 </details>
 
