@@ -444,6 +444,7 @@ Documentation hub listing every guide with filters for easier navigation.
 Context-aware module docs displayed alongside active sessions for quick reference.
 
 </details>
+</details>
 
 
 
