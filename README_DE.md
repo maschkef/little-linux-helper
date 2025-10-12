@@ -443,7 +443,7 @@ Dokumentations-Hub mit allen Guides und Filtern für eine einfachere Navigation.
 Kontextbezogene Moduldokumentation neben aktiven Sitzungen für schnellen Zugriff.
 
 </details>
-
+</details>
 
 
 ## Internationalisierung
