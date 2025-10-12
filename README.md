@@ -299,6 +299,15 @@ Both interfaces provide access to the following modules:
 **Modules (menu order)**
 
 <details>
+<summary>Services & desktop restart options module</summary>
+
+![Services & desktop restart options module](screenshots/gui/module_Services-&-Desktop-Restart-Options.png)
+
+Quick controls to restart desktop environments, display managers, and commonly used services.
+
+</details>
+
+<details>
 <summary>Display system information module</summary>
 
 ![Display system information module](screenshots/gui/module_Display-System-Information.png)
@@ -322,6 +331,33 @@ Disk diagnostics menu with SMART checks, usage analysis, and cleanup helpers.
 ![Log analysis tools module](screenshots/gui/module_Log-Analysis-Tools.png)
 
 Centralized access to journal queries, Xorg logs, and the advanced log analyzer.
+
+</details>
+
+<details>
+<summary>Package management & updates module</summary>
+
+![Package management & updates module](screenshots/gui/module_Package-Management-&-Updates.png)
+
+Keep system packages current with unified update checks and maintenance helpers.
+
+</details>
+
+<details>
+<summary>Security checks module</summary>
+
+![Security checks module](screenshots/gui/module_Security-Checks.png)
+
+Run integrity scans, verify security baselines, and review hardening guidance.
+
+</details>
+
+<details>
+<summary>Backup & recovery module</summary>
+
+![Backup & recovery module](screenshots/gui/module_Backup-&-Recovery.png)
+
+Single entry point for BTRFS, TAR, and RSYNC backup and restore workflows.
 
 </details>
 
@@ -408,7 +444,7 @@ Context-aware module docs displayed alongside active sessions for quick referenc
 
 </details>
 
-</details>
+
 
 ## Internationalization
 

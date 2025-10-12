@@ -299,6 +299,15 @@ Beide Oberflächen bieten Zugriff auf die folgenden Module:
 **Module (Menüreihenfolge)**
 
 <details>
+<summary>Dienst- & Desktop-Neustart-Optionen</summary>
+
+![Dienst- & Desktop-Neustart-Optionen](screenshots/gui/module_Services-&-Desktop-Restart-Options.png)
+
+Schneller Zugriff auf Neustarts von Desktop-Umgebungen, Display-Managern und wichtigen Systemdiensten.
+
+</details>
+
+<details>
 <summary>Systeminformationen-Modul</summary>
 
 ![Systeminformationen-Modul](screenshots/gui/module_Display-System-Information.png)
@@ -322,6 +331,33 @@ Festplattendiagnose mit SMART-Checks, Belegungsanalyse und Aufräumhilfen.
 ![Log-Analyse-Tools-Modul](screenshots/gui/module_Log-Analysis-Tools.png)
 
 Zentraler Zugriff auf Journalabfragen, Xorg-Logs und den erweiterten Log-Analyzer.
+
+</details>
+
+<details>
+<summary>Paketverwaltung & Updates</summary>
+
+![Paketverwaltung & Updates](screenshots/gui/module_Package-Management-&-Updates.png)
+
+Vereinheitlichte Aktualisierungsprüfungen und Wartungshilfen für Systempakete.
+
+</details>
+
+<details>
+<summary>Sicherheitsprüfungen-Modul</summary>
+
+![Sicherheitsprüfungen-Modul](screenshots/gui/module_Security-Checks.png)
+
+Führt Integritätsprüfungen durch, überprüft Sicherheits-Baselines und bietet Härtungshinweise.
+
+</details>
+
+<details>
+<summary>Backup & Recovery Modul</summary>
+
+![Backup & Recovery Modul](screenshots/gui/module_Backup-&-Recovery.png)
+
+Zentrale Steuerung für BTRFS-, TAR- und RSYNC-Backup- sowie Restore-Workflows.
 
 </details>
 
@@ -408,7 +444,7 @@ Kontextbezogene Moduldokumentation neben aktiven Sitzungen für schnellen Zugrif
 
 </details>
 
-</details>
+
 
 ## Internationalisierung
 
