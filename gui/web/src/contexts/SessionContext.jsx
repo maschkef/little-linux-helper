@@ -19,11 +19,12 @@ export const useSession = () => {
   return context;
 };
 
-export const SessionProvider = ({ children }) => {
+export const SessionProvider = ({ children, initialSessionId = null }) => {
   const { i18n } = useTranslation();
   const [sessions, setSessions] = useState(new Map());
   const [activeSessionId, setActiveSessionId] = useState(null);
   const wsConnections = useRef(new Map());
+  const initialActiveSessionRef = useRef(initialSessionId);
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -142,18 +143,6 @@ export const SessionProvider = ({ children }) => {
     }
   };
 
-  const switchToSession = (sessionId) => {
-    if (sessions.has(sessionId)) {
-      setActiveSessionId(sessionId);
-      
-      // Connect WebSocket if not already connected
-      const session = sessions.get(sessionId);
-      if (!session.wsConnected) {
-        connectWebSocket(sessionId);
-      }
-    }
-  };
-
   const sendInput = async (sessionId, input) => {
     try {
       const response = await fetch(`/api/sessions/${sessionId}/input`, {
@@ -173,7 +162,7 @@ export const SessionProvider = ({ children }) => {
     }
   };
 
-  const connectWebSocket = (sessionId) => {
+  const connectWebSocket = useCallback((sessionId) => {
     // Don't create multiple connections for the same session
     if (wsConnections.current.has(sessionId)) {
       return;
@@ -252,7 +241,36 @@ export const SessionProvider = ({ children }) => {
         return newSessions;
       });
     };
-  };
+  }, [activeSessionId]);
+
+  const switchToSession = useCallback((sessionId) => {
+    if (!sessions.has(sessionId)) {
+      return;
+    }
+
+    setActiveSessionId(sessionId);
+
+    const session = sessions.get(sessionId);
+    if (session && !session.wsConnected) {
+      connectWebSocket(sessionId);
+    }
+  }, [sessions, connectWebSocket]);
+
+  useEffect(() => {
+    const targetSession = initialActiveSessionRef.current;
+    if (!targetSession) {
+      return;
+    }
+
+    const session = sessions.get(targetSession);
+    if (session) {
+      setActiveSessionId(targetSession);
+      if (!session.wsConnected) {
+        connectWebSocket(targetSession);
+      }
+      initialActiveSessionRef.current = null;
+    }
+  }, [sessions, connectWebSocket]);
 
   const canCloseSession = (sessionId) => {
     // Can't close the last remaining session

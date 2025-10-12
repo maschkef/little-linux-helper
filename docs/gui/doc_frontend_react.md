@@ -132,6 +132,19 @@ const startModule = async (module) => {
   }
 };
 
+// Pop-out the current session into a standalone browser tab
+const handleOpenTTYTab = () => {
+  if (!activeSessionId) {
+    return;
+  }
+
+  const url = `/?ttySession=${encodeURIComponent(activeSessionId)}&standalone=1`;
+  const newTab = window.open(url, '_blank', 'noopener,noreferrer');
+  if (!newTab) {
+    alert(t('terminal.popupBlocked'));
+  }
+};
+
 // Group modules by category for display
 const groupedModules = modules.reduce((acc, module) => {
   if (!acc[module.category]) {
@@ -144,17 +157,26 @@ const groupedModules = modules.reduce((acc, module) => {
 
 **Layout Structure:**
 ```jsx
-// App wraps AppContent with SessionProvider
+// App reads query params and seeds SessionProvider so pop-out tabs can
+// hydrate directly into the correct session
 function App() {
+  const params = new URLSearchParams(window.location.search);
+  const standaloneSessionId = params.get('ttySession');
+  const standaloneParam = params.get('standalone');
+  const isStandalone = standaloneParam === '1' || standaloneParam === 'true';
+
   return (
-    <SessionProvider>
-      <AppContent />
+    <SessionProvider initialSessionId={standaloneSessionId}>
+      <AppContent
+        standaloneSessionId={standaloneSessionId}
+        isStandalone={isStandalone}
+      />
     </SessionProvider>
   );
 }
 
-// Main application layout
-function AppContent() {
+// Main application layout (renders StandaloneTerminalView when needed)
+function AppContent({ standaloneSessionId, isStandalone }) {
   return (
     <ErrorBoundary>
       <div className="app">
@@ -215,6 +237,27 @@ function AppContent() {
     </ErrorBoundary>
   );
 }
+
+// When AppContent runs in standalone mode it renders only the terminal
+function StandaloneTerminalView({ sessionId }) {
+  useEffect(() => {
+    // ensure the correct session is active and title reflects it
+  }, [sessionId]);
+
+  return (
+    <div className="standalone-terminal">
+      <header className="standalone-terminal__header">…</header>
+      <div className="standalone-terminal__body">
+        <Terminal />
+      </div>
+    </div>
+  );
+}
+
+**Standalone terminal mode highlights**
+- Triggered by visiting `/?ttySession=<id>&standalone=1` (the `Open PTY tab` button builds the URL automatically).
+- `SessionProvider` receives the session id via `initialSessionId`, ensuring the correct PTY subscription without a full page reload.
+- The React terminal renderer is reused unchanged, preserving ANSI colors and input handling in the pop-out tab.
 ```
 
 ### ModuleList.jsx - Hierarchical Module Navigation

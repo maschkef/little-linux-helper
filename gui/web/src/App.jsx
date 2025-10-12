@@ -24,7 +24,7 @@ const DocsPanel = lazy(() => import('./components/DocsPanel.jsx'));
 const DocumentBrowser = lazy(() => import('./components/DocumentBrowser.jsx'));
 const ConfigPanel = lazy(() => import('./components/ConfigPanel.jsx'));
 
-function AppContent() {
+function AppContent({ standaloneSessionId, isStandalone }) {
   const { t } = useTranslation('common');
   const [modules, setModules] = useState([]);
   const [selectedModule, setSelectedModule] = useState(null);
@@ -44,7 +44,7 @@ function AppContent() {
   });
   const [toolVersion, setToolVersion] = useState('');
   
-  const { startNewSession, sessions, getActiveSession, activeSessionId } = useSession();
+  const { startNewSession, sessions, getActiveSession, activeSessionId, switchToSession } = useSession();
 
   // Track when active session changes (user switched sessions)
   useEffect(() => {
@@ -151,6 +151,34 @@ function AppContent() {
       console.error('Error starting module:', error);
     }
   };
+
+  const handleOpenTTYTab = () => {
+    if (!activeSessionId) {
+      return;
+    }
+
+    const url = `/?ttySession=${encodeURIComponent(activeSessionId)}&standalone=1`;
+    const newTab = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!newTab) {
+      alert(t('terminal.popupBlocked'));
+    }
+  };
+
+  useEffect(() => {
+    if (!isStandalone || !standaloneSessionId) {
+      return;
+    }
+
+    if (activeSessionId !== standaloneSessionId && sessions.has(standaloneSessionId)) {
+      switchToSession(standaloneSessionId);
+    }
+  }, [isStandalone, standaloneSessionId, activeSessionId, sessions, switchToSession]);
+
+  if (isStandalone) {
+    return (
+      <StandaloneTerminalView sessionId={standaloneSessionId} />
+    );
+  }
 
   const toggleDevControls = (newValue) => {
     setShowDevControls(newValue);
@@ -261,6 +289,15 @@ function AppContent() {
                 title={t('session.startNewSessionTooltip')}
               >
 {t('session.newSession')}
+              </button>
+
+              <button
+                className="open-tty-btn primary"
+                onClick={handleOpenTTYTab}
+                disabled={!activeSessionId}
+                title={activeSessionId ? t('terminal.openInNewTabTooltip') : t('terminal.openInNewTabDisabledTooltip')}
+              >
+                ↗ {t('terminal.openInNewTab')}
               </button>
             </div>
             
@@ -500,10 +537,74 @@ function AppContent() {
 }
 
 // Main App component with SessionProvider
-function App() {
+function StandaloneTerminalView({ sessionId }) {
+  const { t } = useTranslation('common');
+  const { sessions, activeSessionId, switchToSession } = useSession();
+
+  useEffect(() => {
+    if (!sessionId) {
+      return;
+    }
+
+    if (activeSessionId !== sessionId && sessions.has(sessionId)) {
+      switchToSession(sessionId);
+    }
+  }, [sessionId, activeSessionId, sessions, switchToSession]);
+
+  const session = sessionId ? sessions.get(sessionId) : null;
+
+  useEffect(() => {
+    if (!sessionId || !session) {
+      return undefined;
+    }
+
+    const originalTitle = document.title;
+    const label = session.module_name || session.module || sessionId;
+    document.title = `${label} – Little Linux Helper`;
+    return () => {
+      document.title = originalTitle;
+    };
+  }, [sessionId, session?.module_name, session?.module]);
+
+  if (!sessionId) {
+    return (
+      <div className="standalone-terminal__empty">{t('session.selectModule')}</div>
+    );
+  }
+
+  if (!sessions.has(sessionId)) {
+    return (
+      <div className="standalone-terminal__empty">{t('general.loading')}</div>
+    );
+  }
+
+  const moduleLabel = session?.module_name || session?.module || t('session.activeModule');
+
   return (
-    <SessionProvider>
-      <AppContent />
+    <div className="standalone-terminal">
+      <header className="standalone-terminal__header">
+        <div className="standalone-terminal__meta">
+          <span className="standalone-terminal__module">{moduleLabel}</span>
+          <code className="standalone-terminal__id">{sessionId}</code>
+        </div>
+        <a href="/" className="standalone-terminal__link">{t('common.close')}</a>
+      </header>
+      <div className="standalone-terminal__body">
+        <Terminal />
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const standaloneSessionId = urlParams.get('ttySession');
+  const standaloneParam = urlParams.get('standalone');
+  const isStandalone = standaloneParam === '1' || standaloneParam === 'true';
+
+  return (
+    <SessionProvider initialSessionId={standaloneSessionId}>
+      <AppContent standaloneSessionId={standaloneSessionId} isStandalone={isStandalone} />
     </SessionProvider>
   );
 }

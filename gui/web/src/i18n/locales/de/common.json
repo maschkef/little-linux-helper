@@ -119,7 +119,11 @@
     "startModulePrompt": "Starten Sie ein Modul, um die Eingabe zu aktivieren",
     "send": "Senden",
     "stop": "Stoppen",
-    "stopTooltip": "Aktuelle Sitzung stoppen"
+    "stopTooltip": "Aktuelle Sitzung stoppen",
+    "openInNewTab": "PTY-Tab öffnen",
+    "openInNewTabTooltip": "Aktuelle Terminal-Sitzung in einem neuen Browser-Tab öffnen",
+    "openInNewTabDisabledTooltip": "Starten Sie eine Sitzung, um den Tab zu aktivieren",
+    "popupBlocked": "Neuer Tab konnte nicht geöffnet werden. Erlauben Sie Pop-ups für diese Seite und versuchen Sie es erneut."
   },
   "general": {
     "loading": "Lade...",

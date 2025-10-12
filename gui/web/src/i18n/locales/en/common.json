@@ -119,7 +119,11 @@
     "startModulePrompt": "Start a module to enable input",
     "send": "Send",
     "stop": "Stop",
-    "stopTooltip": "Stop current session"
+    "stopTooltip": "Stop current session",
+    "openInNewTab": "Open PTY tab",
+    "openInNewTabTooltip": "Open the current terminal session in a new browser tab",
+    "openInNewTabDisabledTooltip": "Start a session to enable the dedicated tab",
+    "popupBlocked": "Unable to open a new tab. Allow pop-ups for this site and try again."
   },
   "general": {
     "loading": "Loading...",

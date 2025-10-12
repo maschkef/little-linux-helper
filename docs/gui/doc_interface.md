@@ -157,6 +157,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   Click-to-focus: clicking anywhere in terminal automatically focuses input field
     *   Automatic "Any Key" prompt handling - modules continue without user intervention
     *   Direct session control with integrated "Stop" button
+    *   Standalone tab mode via `Open PTY tab`, opening the active session at `/?ttySession=<id>&standalone=1` while reusing the same React terminal renderer
     *   **Smart Documentation Tracking:** Documentation panel intelligently follows user's last action (module selection vs. session switching)
 
 *   **Advanced Documentation System:**
