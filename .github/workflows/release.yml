@@ -26,7 +26,7 @@ jobs:
       
     # Step 2: Install Node.js (latest LTS for build process)
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@v6
       with:
         node-version: '20'  # We can use latest Node.js for building
         cache: 'npm'
