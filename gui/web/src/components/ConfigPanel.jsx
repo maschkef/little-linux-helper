@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import ConfigFileEditor from './ConfigFileEditor.jsx';
 import ConfigFileList from './ConfigFileList.jsx';
 import ConfigBackupManager from './ConfigBackupManager.jsx';
+import { apiFetch } from '../utils/api.js';
 
 function ConfigPanel() {
   const { t } = useTranslation('common');
@@ -27,7 +28,7 @@ function ConfigPanel() {
   const fetchConfigFiles = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/config/files');
+      const response = await apiFetch('/api/config/files');
       if (response.ok) {
         const data = await response.json();
         setConfigFiles(data);

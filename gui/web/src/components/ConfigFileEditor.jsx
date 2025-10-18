@@ -8,6 +8,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { apiFetch } from '../utils/api.js';
 
 function ConfigFileEditor({ filename, onFileSaved }) {
   const { t } = useTranslation('common');
@@ -36,7 +37,7 @@ function ConfigFileEditor({ filename, onFileSaved }) {
       setIsDirty(false);
       
       // Load main config file
-      const response = await fetch(`/api/config/${filename}`);
+      const response = await apiFetch(`/api/config/${filename}`);
       if (response.ok) {
         const data = await response.json();
         setContent(data.content);
@@ -59,7 +60,7 @@ function ConfigFileEditor({ filename, onFileSaved }) {
 
   const loadExampleFile = async () => {
     try {
-      const response = await fetch(`/api/config/${filename}/example`);
+      const response = await apiFetch(`/api/config/${filename}/example`);
       if (response.ok) {
         const data = await response.json();
         setExampleContent(data.content);
@@ -82,7 +83,7 @@ function ConfigFileEditor({ filename, onFileSaved }) {
       setError('');
       setSuccess('');
       
-      const response = await fetch(`/api/config/${filename}`, {
+      const response = await apiFetch(`/api/config/${filename}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -103,8 +104,14 @@ function ConfigFileEditor({ filename, onFileSaved }) {
         setIsDirty(false);
         onFileSaved && onFileSaved();
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || t('config.errorSaving'));
+        let errorMessage = t('config.errorSaving');
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (_) {
+          // ignore JSON parse errors
+        }
+        setError(errorMessage);
       }
     } catch (err) {
       setError(t('config.errorSaving'));

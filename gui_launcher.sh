@@ -143,6 +143,141 @@ _determine_gui_port() {
     echo "$port"
 }
 
+_determine_gui_host() {
+    lh_log_msg "DEBUG" "Entering _determine_gui_host" >&2
+    local host="localhost"
+
+    if [[ " ${GUI_ARGS[*]} " =~ " -network " ]]; then
+        host="0.0.0.0"
+    elif [ -n "${CFG_LH_GUI_HOST:-}" ]; then
+        host="$CFG_LH_GUI_HOST"
+    fi
+
+    lh_log_msg "DEBUG" "Exiting _determine_gui_host with host='$host'" >&2
+    echo "$host"
+}
+
+_is_loopback_host() {
+    local host="${1:-}"
+    case "$host" in
+        ""|"localhost"|"127.0.0.1"|"::1"|"[::1]")
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+_prompt_for_auth_username() {
+    local input
+    echo
+    echo -e "${LH_COLOR_INFO}🔐 Authentication username required.${LH_COLOR_RESET}"
+    while true; do
+        read -rp "Enter GUI username [admin]: " input
+        input="${input:-admin}"
+        if [[ -n "$input" ]]; then
+            export LLH_GUI_USER="$input"
+            echo -e "${LH_COLOR_SUCCESS}✅ Using GUI username: ${LLH_COLOR_RESET}$LLH_GUI_USER"
+            break
+        fi
+        echo -e "${LH_COLOR_ERROR}Username cannot be empty.${LH_COLOR_RESET}"
+    done
+}
+
+_generate_bcrypt_hash() {
+    local password="$1"
+    local hash=""
+
+    if [ ! -x "$GUI_DIR/little-linux-helper-gui" ]; then
+        return 1
+    fi
+
+    # Suppress init logs from the binary and extract the hash
+    set +e
+    hash=$("$GUI_DIR/little-linux-helper-gui" --hash-password "$password" 2>/dev/null)
+    local status=$?
+    set -e
+
+    if [ $status -ne 0 ] || [[ -z "$hash" ]]; then
+        return 1
+    fi
+
+    printf '%s' "$hash"
+    return 0
+}
+
+_prompt_for_auth_hash() {
+    echo
+    echo -e "${LH_COLOR_INFO}🔐 Authentication password hash required.${LH_COLOR_RESET}"
+    echo "You can:"
+    echo "  1) Enter a password now (hash will be generated and kept for this session)"
+    echo "  2) Paste an existing bcrypt hash (beginning with \$2a/\$2b/\$2y)"
+    echo "  3) Show instructions and abort"
+
+    local choice
+    while true; do
+        read -rp "Choose option [1-3]: " choice
+        case "$choice" in
+            1)
+                local pass1=""
+                local pass2=""
+                while true; do
+                    read -rs -p "Enter new GUI password: " pass1; echo
+                    read -rs -p "Confirm password: " pass2; echo
+                    if [[ -z "$pass1" ]]; then
+                        echo -e "${LH_COLOR_ERROR}Password cannot be empty.${LH_COLOR_RESET}"
+                        continue
+                    fi
+                    if [[ "$pass1" != "$pass2" ]]; then
+                        echo -e "${LH_COLOR_ERROR}Passwords do not match. Try again.${LH_COLOR_RESET}"
+                        continue
+                    fi
+                    break
+                done
+                local computed_hash
+                if ! computed_hash="$(_generate_bcrypt_hash "$pass1")"; then
+                    echo -e "${LH_COLOR_ERROR}Failed to generate bcrypt hash automatically.${LH_COLOR_RESET}"
+                    echo "Please build the GUI (./gui_launcher.sh -b) and try again, or generate the hash manually."
+                    return 1
+                fi
+                unset pass1 pass2
+                export LLH_GUI_PASS_HASH="$computed_hash"
+                echo -e "${LH_COLOR_SUCCESS}✅ Password hash generated for this session.${LH_COLOR_RESET}"
+                echo "To persist this configuration, add the following lines to config/general.conf:"
+                echo "  export LLH_GUI_AUTH_MODE=\"${LLH_GUI_AUTH_MODE}\""
+                echo "  export LLH_GUI_USER=\"${LLH_GUI_USER}\""
+                echo "  export LLH_GUI_PASS_HASH=\"${LLH_GUI_PASS_HASH}\""
+                return 0
+                ;;
+            2)
+                local hash_input=""
+                read -rp "Paste bcrypt hash: " hash_input
+                if [[ "$hash_input" =~ ^\$2([aby])?\$ ]]; then
+                    export LLH_GUI_PASS_HASH="$hash_input"
+                    echo -e "${LH_COLOR_SUCCESS}✅ Using provided bcrypt hash.${LH_COLOR_RESET}"
+                    return 0
+                fi
+                echo -e "${LH_COLOR_ERROR}Input does not look like a valid bcrypt hash.${LH_COLOR_RESET}"
+                ;;
+            3)
+                echo
+                echo "Authentication is enabled, but no credentials are configured."
+                echo "Please either export the following variables or add them to config/general.conf:"
+                echo "  export LLH_GUI_AUTH_MODE=\"${LLH_GUI_AUTH_MODE}\""
+                echo "  export LLH_GUI_USER=\"your-username\""
+                echo "  export LLH_GUI_PASS_HASH=\"\$(./gui/little-linux-helper-gui --hash-password 'secret')\""
+                echo
+                echo "Rerun gui_launcher.sh after configuring the values."
+                return 1
+                ;;
+            *)
+                echo -e "${LH_COLOR_ERROR}Invalid selection. Choose 1, 2, or 3.${LH_COLOR_RESET}"
+                ;;
+        esac
+    done
+}
+
 # Function to check firewall status and port availability
 _check_security_status() {
     local port="${1:-3000}"
@@ -535,7 +670,7 @@ if [ "$BUILD_FLAG" = true ] || [ ! -f "$GUI_DIR/little-linux-helper-gui" ]; then
         echo -e "${LH_COLOR_INFO}🔧 $(lh_msg 'GUI_LAUNCHER_SETUP_RUNNING')${LH_COLOR_RESET}"
         lh_log_msg "DEBUG" "Executing setup script: ./setup.sh"
         if ! ./setup.sh; then
-            local exit_code=$?
+            exit_code=$?
             lh_log_msg "DEBUG" "Setup script failed with exit code: $exit_code"
             lh_log_msg "ERROR" "$(lh_msg 'GUI_LAUNCHER_SETUP_FAILED')"
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'GUI_LAUNCHER_SETUP_FAILED')${LH_COLOR_RESET}"
@@ -549,7 +684,7 @@ if [ "$BUILD_FLAG" = true ] || [ ! -f "$GUI_DIR/little-linux-helper-gui" ]; then
     # Run the build script
     lh_log_msg "DEBUG" "Executing build script: ./build.sh"
     if ! ./build.sh; then
-        local exit_code=$?
+        exit_code=$?
         lh_log_msg "DEBUG" "Build script failed with exit code: $exit_code"
         lh_log_msg "ERROR" "$(lh_msg 'GUI_LAUNCHER_BUILD_FAILED')"
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'GUI_LAUNCHER_BUILD_FAILED')${LH_COLOR_RESET}"
@@ -893,6 +1028,62 @@ if [[ " ${GUI_ARGS[*]} " =~ " -network " ]] && [ "$OPEN_FIREWALL_FLAG" = true ];
         # Set up cleanup trap
         trap cleanup_firewall EXIT INT TERM
         echo -e "${LH_COLOR_INFO}ℹ️  $(lh_msg 'GUI_LAUNCHER_FW_AUTO_REMOVE')${LH_COLOR_RESET}"
+    fi
+fi
+
+GUI_HOST=$(_determine_gui_host)
+lh_log_msg "DEBUG" "Resolved GUI host: $GUI_HOST"
+
+AUTH_MODE_RAW="${LLH_GUI_AUTH_MODE:-}"
+if [ -z "$AUTH_MODE_RAW" ]; then
+    AUTH_MODE_RAW="session"
+    lh_log_msg "DEBUG" "LLH_GUI_AUTH_MODE not set; defaulting to 'session'"
+fi
+AUTH_MODE="${AUTH_MODE_RAW,,}"
+
+case "$AUTH_MODE" in
+    none|session|basic)
+        ;;
+    *)
+        lh_log_msg "WARN" "Unknown LLH_GUI_AUTH_MODE='$AUTH_MODE_RAW'; defaulting to 'session'"
+        AUTH_MODE="session"
+        ;;
+esac
+
+export LLH_GUI_AUTH_MODE="$AUTH_MODE"
+export LLH_GUI_USER LLH_GUI_PASS_HASH LLH_GUI_PASS_PLAIN LLH_GUI_COOKIE_NAME LLH_GUI_COOKIE_SECURE LLH_GUI_ALLOWED_ORIGINS
+
+if [ "$AUTH_MODE" = "none" ]; then
+    if ! _is_loopback_host "$GUI_HOST"; then
+        lh_log_msg "ERROR" "Authentication disabled but GUI host '$GUI_HOST' is not loopback"
+        echo -e "${LH_COLOR_ERROR}❌ Authentication cannot be disabled when exposing the GUI on ${GUI_HOST}.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}❌ Set LLH_GUI_AUTH_MODE=session or basic before using network mode.${LH_COLOR_RESET}"
+        exit 1
+    fi
+    if [[ " ${GUI_ARGS[*]} " =~ " -network " ]]; then
+        lh_log_msg "ERROR" "Authentication disabled but --network flag requested"
+        echo -e "${LH_COLOR_ERROR}❌ Authentication cannot be disabled when using --network.${LH_COLOR_RESET}"
+        exit 1
+    fi
+else
+    if [ -z "${LLH_GUI_USER:-}" ]; then
+        _prompt_for_auth_username || exit 1
+    fi
+
+    if [ -z "${LLH_GUI_PASS_HASH:-}" ]; then
+        if [ -n "${LLH_GUI_PASS_PLAIN:-}" ]; then
+            lh_log_msg "WARN" "LLH_GUI_PASS_PLAIN detected; converting to hash for this session"
+            if hash_value="$(_generate_bcrypt_hash "$LLH_GUI_PASS_PLAIN")"; then
+                export LLH_GUI_PASS_HASH="$hash_value"
+                unset LLH_GUI_PASS_PLAIN
+                echo -e "${LH_COLOR_WARNING}⚠️  Derived bcrypt hash from LLH_GUI_PASS_PLAIN for this run. Update your configuration to store the hash instead.${LH_COLOR_RESET}"
+            else
+                echo -e "${LH_COLOR_ERROR}❌ Failed to generate hash from LLH_GUI_PASS_PLAIN. Please rebuild the GUI (-b) or supply LLH_GUI_PASS_HASH.${LH_COLOR_RESET}"
+                exit 1
+            fi
+        else
+            _prompt_for_auth_hash || exit 1
+        fi
     fi
 fi
 

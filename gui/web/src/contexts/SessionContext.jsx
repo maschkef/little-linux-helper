@@ -8,6 +8,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { apiFetch } from '../utils/api.js';
 
 const SessionContext = createContext();
 
@@ -28,7 +29,7 @@ export const SessionProvider = ({ children, initialSessionId = null }) => {
 
   const fetchSessions = useCallback(async () => {
     try {
-      const response = await fetch('/api/sessions');
+      const response = await apiFetch('/api/sessions');
       if (response.ok) {
         const sessionList = await response.json();
         
@@ -70,7 +71,7 @@ export const SessionProvider = ({ children, initialSessionId = null }) => {
 
   const startNewSession = async (module) => {
     try {
-      const response = await fetch(`/api/modules/${module.id}/start`, {
+      const response = await apiFetch(`/api/modules/${module.id}/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -110,7 +111,7 @@ export const SessionProvider = ({ children, initialSessionId = null }) => {
 
   const stopSession = async (sessionId) => {
     try {
-      await fetch(`/api/sessions/${sessionId}`, {
+      await apiFetch(`/api/sessions/${sessionId}`, {
         method: 'DELETE',
       });
       
@@ -145,7 +146,7 @@ export const SessionProvider = ({ children, initialSessionId = null }) => {
 
   const sendInput = async (sessionId, input) => {
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/input`, {
+      const response = await apiFetch(`/api/sessions/${sessionId}/input`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

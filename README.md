@@ -446,6 +446,26 @@ Context-aware module docs displayed alongside active sessions for quick referenc
 </details>
 </details>
 
+## GUI Authentication
+
+- **Session login is enabled by default.** When you launch the GUI, the browser redirects to `/login`. Enter the credentials configured via `LLH_GUI_USER` and `LLH_GUI_PASS_HASH` to obtain a session cookie (protected by CSRF and a rate-limited login endpoint).
+- **Alternative modes:** set `LLH_GUI_AUTH_MODE=basic` to use HTTP Basic Auth, or `LLH_GUI_AUTH_MODE=none` to disable authentication **only** for loopback usage. The launcher and backend refuse to start without auth when binding to anything beyond `127.0.0.1`/`localhost`.
+- **Configuration block** (place in `config/general.conf` or export as environment variables):
+
+```bash
+export LLH_GUI_AUTH_MODE="session"
+export LLH_GUI_USER="admin"
+export LLH_GUI_PASS_HASH="$(./gui/little-linux-helper-gui --hash-password 'MySecret')"
+export LLH_GUI_COOKIE_NAME="__Host-llh_sess"
+export LLH_GUI_COOKIE_SECURE="true"
+export LLH_GUI_ALLOWED_ORIGINS=""
+```
+
+Use the built-in `--hash-password` flag to generate bcrypt hashes without external tooling. During development you may set `LLH_GUI_PASS_PLAIN`, but the backend will log a warning and derive a hash at startup—remove it for production.
+
+- **Frontend helpers:** `utils/api.js` adds `credentials: 'same-origin'`, injects the `X-CSRF-Token` header for unsafe methods, and redirects to `/login` whenever a `401` is returned. The top-right toolbar now contains a `Logout` button that calls `POST /api/logout` and returns to the login page.
+- **Hardening:** Helmet security headers, CSRF enforcement, and login rate limiting ship enabled out of the box. You only need to provide credentials; the GUI handles the rest.
+
 
 
 ## Internationalization

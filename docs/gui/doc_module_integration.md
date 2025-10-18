@@ -124,6 +124,8 @@ This ensures every module receives the same variables the CLI provides while add
    - **Values**: `en`, `de`, `es`, `fr`
    - **Integration**: Automatically used by CLI internationalization system
 
+> **Authentication note:** All HTTP/WebSocket endpoints are secured by the GUI backend. Modules do not need to implement any authentication logic—the browser must already be logged in (session cookie or Basic Auth) before it can start a module.
+
 ### GUI-Aware Module Behavior
 
 **Automatic Prompt Skipping:**

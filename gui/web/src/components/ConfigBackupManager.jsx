@@ -8,6 +8,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { apiFetch } from '../utils/api.js';
 
 function ConfigBackupManager({ onBackupDeleted }) {
   const { t } = useTranslation('common');
@@ -24,7 +25,7 @@ function ConfigBackupManager({ onBackupDeleted }) {
     try {
       setLoading(true);
       setError('');
-      const response = await fetch('/api/config/backups');
+      const response = await apiFetch('/api/config/backups');
       if (response.ok) {
         const data = await response.json();
         // Sort backups by creation date, newest first
@@ -48,7 +49,7 @@ function ConfigBackupManager({ onBackupDeleted }) {
 
     try {
       setDeletingBackups(prev => new Set(prev).add(backupId));
-      const response = await fetch(`/api/config/backups/${backupId}`, {
+      const response = await apiFetch(`/api/config/backups/${backupId}`, {
         method: 'DELETE',
       });
       
@@ -56,8 +57,14 @@ function ConfigBackupManager({ onBackupDeleted }) {
         setBackups(prev => prev.filter(backup => backup.id !== backupId));
         onBackupDeleted && onBackupDeleted();
       } else {
-        const errorData = await response.json();
-        alert(t('config.errorDeletingBackup') + ': ' + (errorData.error || 'Unknown error'));
+        let errorMessage = t('config.errorDeletingBackup');
+        try {
+          const errorData = await response.json();
+          errorMessage += ': ' + (errorData.error || 'Unknown error');
+        } catch (_) {
+          // ignore parse errors
+        }
+        alert(errorMessage);
       }
     } catch (err) {
       console.error('Failed to delete backup:', err);

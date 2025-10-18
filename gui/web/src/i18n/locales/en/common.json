@@ -183,5 +183,19 @@
     "backupSize": "Size unknown",
     "backupInfo": "Backups are automatically created before saving configuration files when the backup option is enabled.",
     "backupWarning": "⚠️ Deleting backups is permanent and cannot be undone."
+  },
+  "auth": {
+    "title": "Sign in",
+    "subtitle": "Enter your Little Linux Helper credentials.",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign In",
+    "signingIn": "Signing in…",
+    "invalidCredentials": "Invalid username or password.",
+    "rateLimited": "Too many attempts. Please wait a moment and try again.",
+    "networkError": "Unable to reach the server. Check your connection and retry.",
+    "unknownError": "Login failed. Please try again.",
+    "footer": "Credentials are configured on the host system.",
+    "logout": "Logout"
   }
 }

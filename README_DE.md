@@ -445,6 +445,26 @@ Kontextbezogene Moduldokumentation neben aktiven Sitzungen für schnellen Zugrif
 </details>
 </details>
 
+## GUI-Authentifizierung
+
+- **Standardmäßig ist eine Sitzungsanmeldung aktiv.** Beim Start der GUI führt der Browser zur Seite `/login`. Melden Sie sich mit den in `LLH_GUI_USER` und `LLH_GUI_PASS_HASH` hinterlegten Zugangsdaten an, um ein geschütztes Sitzungscookie zu erhalten (CSRF-Schutz und Rate-Limit eingeschlossen).
+- **Alternative Modi:** Mit `LLH_GUI_AUTH_MODE=basic` wird HTTP Basic Auth genutzt. `LLH_GUI_AUTH_MODE=none` deaktiviert die Anmeldung **nur** für lokale Bindungen (`127.0.0.1`/`localhost`). Sobald `--network` oder eine andere Adresse verwendet wird, verweigern Launcher und Backend den Start ohne Authentifizierung.
+- **Konfigurationsblock** (in `config/general.conf` oder als Umgebungsvariablen setzen):
+
+```bash
+export LLH_GUI_AUTH_MODE="session"
+export LLH_GUI_USER="admin"
+export LLH_GUI_PASS_HASH="$(./gui/little-linux-helper-gui --hash-password 'MeinPasswort')"
+export LLH_GUI_COOKIE_NAME="__Host-llh_sess"
+export LLH_GUI_COOKIE_SECURE="true"
+export LLH_GUI_ALLOWED_ORIGINS=""
+```
+
+Mit `--hash-password` erzeugt das GUI-Binary direkt einen passenden bcrypt-Hash. `LLH_GUI_PASS_PLAIN` sollte nur zu Entwicklungszwecken gesetzt werden; der Server warnt beim Start und wandelt den Wert in einen Hash um.
+
+- **Frontend-Helfer:** `utils/api.js` ergänzt alle Fetch-Aufrufe um `credentials: 'same-origin'`, setzt bei unsicheren Methoden automatisch den `X-CSRF-Token`-Header und leitet bei `401`-Antworten nach `/login` um. In der Kopfzeile befindet sich außerdem ein `Logout`-Button, der `POST /api/logout` ausführt.
+- **Sicherheitsmaßnahmen:** Helmet-Sicherheitsheader, CSRF-Kontrolle und Login-Rate-Limiting sind standardmäßig aktiv. Sie müssen lediglich Benutzername und Hash hinterlegen – die GUI kümmert sich um den Rest.
+
 
 ## Internationalisierung
 

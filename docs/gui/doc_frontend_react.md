@@ -37,10 +37,13 @@ web/src/
 │   ├── ResizablePanels.jsx      # Panel layout system
 │   ├── SessionDropdown.jsx      # Session management dropdown
 │   ├── LanguageSelector.jsx     # EN/DE language switching
+│   ├── LogoutButton.jsx         # Ends GUI session and returns to login
 │   ├── ExitButton.jsx           # Application exit with session-aware confirmation
 │   └── ErrorBoundary.jsx        # Error handling wrapper
 ├── contexts/            # React contexts
 │   └── SessionContext.jsx      # Session and WebSocket management
+├── pages/
+│   └── Login.jsx               # Standalone login form rendered on /login
 └── i18n/               # Internationalization
     ├── index.js
     └── locales/
@@ -154,6 +157,14 @@ const groupedModules = modules.reduce((acc, module) => {
   return acc;
 }, {});
 ```
+
+### Authentication Workflow
+
+- The entry point (`index.jsx`) renders the SPA as usual unless the browser is on `/login`, where it mounts `pages/Login.jsx` instead. Successful logins (HTTP `204`) redirect users back to the root route.
+- All HTTP calls funnel through `utils/api.js`. The `apiFetch` helper automatically sets `credentials: 'same-origin'`, injects the `X-CSRF-Token` header for unsafe methods, and redirects to `/login` when the backend responds with `401`.
+- The top-right toolbar now includes `LogoutButton`, which issues `POST /api/logout` and returns the user to the login page without touching the running backend.
+- CSRF tokens are supplied via the server-set `csrf_` cookie; `Login.jsx` reads it via `getCookie()` before submitting credentials.
+- When the backend denies access (e.g., expired session), the helper redirects—no manual error plumbing is required in individual components.
 
 **Layout Structure:**
 ```jsx

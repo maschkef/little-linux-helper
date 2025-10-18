@@ -131,6 +131,45 @@ esac
 - Modules work identically in both interfaces
 - GUI provides appropriate navigation for its context
 
+## Security & Authentication
+
+The GUI ships with first-class authentication. By default the backend requires a session login and protects every HTTP API and WebSocket endpoint (with `/api/health` remaining public for liveness probes).
+
+### Supported Modes
+- **`session` (default)** – Username/password login with signed cookies, CSRF protection, and rate-limited `/api/login`.
+- **`basic`** – HTTP Basic Auth backed by bcrypt credentials for simple deployments.
+- **`none`** – Available **only** when the server binds to `127.0.0.1`/`localhost`. The launcher and backend abort if you attempt to combine `none` with `--network` or a non-loopback host.
+
+### Configuration Keys
+Set the following environment variables (or export them in `config/general.conf`) to adjust the authentication behaviour:
+
+```
+LLH_GUI_AUTH_MODE=session|basic|none
+LLH_GUI_USER=admin
+LLH_GUI_PASS_HASH=$2y$12$...
+LLH_GUI_PASS_PLAIN=dev-only
+LLH_GUI_COOKIE_NAME=__Host-llh_sess
+LLH_GUI_COOKIE_SECURE=true
+LLH_GUI_ALLOWED_ORIGINS=http://localhost:3001
+```
+
+- Prefer `LLH_GUI_PASS_HASH` with a bcrypt hash. For convenience the binary exposes `--hash-password "secret"` to print a ready-to-use hash. `LLH_GUI_PASS_PLAIN` should only be used during development; it is hashed in-memory at startup and triggers a prominent warning.
+- `LLH_GUI_COOKIE_SECURE` stays `true` by default. The launcher/back-end automatically relax it on localhost when you have not overridden the flag, ensuring cookies work in HTTP-only development environments without compromising secure deployments.
+- `LLH_GUI_ALLOWED_ORIGINS` accepts a comma-separated list of origins that are allowed to make authenticated cross-origin requests (handy for Vite or other tooling). Same-origin requests do not need to be listed.
+
+### Frontend Flow
+- unauthenticated users are redirected to `/login`, which posts to `/api/login`. On a `204` response the browser navigates back to `/` and the SPA loads.
+- The React app routes all API calls through a shared helper (`utils/api.js`) that automatically attaches the CSRF token, sends credentials, and redirects to `/login` when a `401` is returned.
+- A dedicated “Logout” button issues `POST /api/logout` and returns the user to the login page.
+
+### Middleware Stack
+- `helmet` adds security headers by default.
+- `csrf` issues a cookie + `X-CSRF-Token` validation for unsafe HTTP verbs.
+- `limiter` protects `/api/login` against brute-force attacks (10 attempts/minute per IP by default).
+- WebSocket upgrades validate the authenticated session before attaching to PTY streams—unauthenticated attempts yield `401`.
+
+These safeguards apply transparently to existing modules: no module code changes are required to benefit from authentication.
+
 ### Data Flow
 1. **Module Discovery**: Backend scans filesystem for modules
 2. **Frontend Request**: User selects module to start

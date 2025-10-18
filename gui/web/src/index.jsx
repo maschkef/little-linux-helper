@@ -10,10 +10,11 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App.jsx';
+import Login from './pages/Login.jsx';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <App />
+    {window.location.pathname === '/login' ? <Login /> : <App />}
   </React.StrictMode>
 );

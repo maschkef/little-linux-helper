@@ -61,6 +61,35 @@ type ModuleSession struct {
 
 ## RESTful API Endpoints
 
+### Authentication
+
+#### `POST /api/login`
+**Purpose:** Authenticate the user and issue a session cookie.
+
+**Request Body:**
+```json
+{
+    "user": "admin",
+    "pass": "secret"
+}
+```
+
+**Responses:**
+- `204 No Content` on success (session cookie set).
+- `401 Unauthorized` for invalid credentials.
+- `429 Too Many Requests` when the rate limiter (10 attempts/minute per IP) is triggered.
+
+**Notes:**
+- Requires the `X-CSRF-Token` header if CSRF protection is enabled (default in session mode). The frontend helper reads the `csrf_` cookie and injects the header automatically.
+
+#### `POST /api/logout`
+**Purpose:** Destroy the active session and remove the authentication cookie.
+
+**Responses:**
+- `204 No Content` regardless of state (idempotent).
+
+> All other `/api/*` routes return `401 Unauthorized` when accessed without a valid session or Basic Auth credentials.
+
 ### Module Management
 
 #### `GET /api/modules`
@@ -569,7 +598,11 @@ func (wsb *WebSocketBuffer) flush(conn *websocket.Conn) {
 ### Network Security
 - Default to localhost-only binding for security
 - Provide clear warnings when enabling network access
-- Consider implementing authentication for network deployments
+- Authentication is mandatory for network deployments: session login is enabled by default; HTTP Basic Auth is available for simpler setups.
+- `LLH_GUI_AUTH_MODE` controls the mode (`session` | `basic` | `none`). `none` is rejected if the server binds to anything other than `127.0.0.1`.
+- Credentials are configured via `LLH_GUI_USER` and `LLH_GUI_PASS_HASH` (bcrypt). The backend exposes `--hash-password` to generate hashes without external tools.
+- CSRF protection, secure cookie settings, and login rate limiting are enabled automatically in session mode.
+- `LLH_GUI_ALLOWED_ORIGINS` can be set to a comma-separated list when trusted tooling (e.g., Vite) needs cross-origin access; same-origin requests are always accepted.
 
 ---
 

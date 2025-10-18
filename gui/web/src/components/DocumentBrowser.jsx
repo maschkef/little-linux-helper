@@ -11,6 +11,7 @@ import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import { defaultSchema } from 'hast-util-sanitize';
 import MarkdownWithStatefulDetails from './MarkdownWithStatefulDetails';
+import { apiFetch } from '../utils/api.js';
 
 function DocumentBrowser() {
   const [allDocs, setAllDocs] = useState([]);
@@ -126,7 +127,7 @@ function DocumentBrowser() {
 
   const fetchAllDocuments = async () => {
     try {
-      const response = await fetch('/api/docs');
+    const response = await apiFetch('/api/docs');
       if (response.ok) {
         const data = await response.json();
         setAllDocs(data);
@@ -140,7 +141,7 @@ function DocumentBrowser() {
 
   const fetchUnlinkedDocuments = async () => {
     try {
-      const response = await fetch('/api/docs/unlinked');
+    const response = await apiFetch('/api/docs/unlinked');
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data)) {
@@ -159,7 +160,7 @@ function DocumentBrowser() {
   const fetchDocument = async (docId) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/modules/${docId}/docs`);
+      const response = await apiFetch(`/api/modules/${docId}/docs`);
       if (response.ok) {
         const data = await response.json();
         setDocContent(data.content);

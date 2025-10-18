@@ -10,12 +10,15 @@ package main
 
 import (
 	"bufio"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"io/fs"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,8 +30,13 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/csrf"
+	"github.com/gofiber/fiber/v2/middleware/helmet"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/session"
 	"github.com/gofiber/websocket/v2"
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/sys/unix"
 )
 
@@ -85,6 +93,21 @@ type DocMetadata struct {
 	Filename    string `json:"filename"`
 }
 
+const (
+	authModeNone    = "none"
+	authModeSession = "session"
+	authModeBasic   = "basic"
+)
+
+type AuthSettings struct {
+	Mode           string
+	User           string
+	PassHash       string
+	CookieName     string
+	CookieSecure   bool
+	AllowedOrigins []string
+}
+
 var (
 	sessionManager = &SessionManager{
 		sessions: make(map[string]*ModuleSession),
@@ -133,6 +156,9 @@ func loadConfig() *Config {
 		}
 
 		key := strings.TrimSpace(parts[0])
+		if strings.HasPrefix(key, "export ") {
+			key = strings.TrimSpace(strings.TrimPrefix(key, "export"))
+		}
 		value := strings.Trim(strings.TrimSpace(parts[1]), "\"")
 
 		switch key {
@@ -147,6 +173,18 @@ func loadConfig() *Config {
 		case "CFG_LH_RELEASE_TAG":
 			if value != "" {
 				config.ReleaseTag = value
+			}
+		case "LLH_GUI_AUTH_MODE",
+			"LLH_GUI_USER",
+			"LLH_GUI_PASS_HASH",
+			"LLH_GUI_PASS_PLAIN",
+			"LLH_GUI_COOKIE_NAME",
+			"LLH_GUI_COOKIE_SECURE",
+			"LLH_GUI_ALLOWED_ORIGINS":
+			if _, exists := os.LookupEnv(key); !exists && value != "" {
+				if err := os.Setenv(key, value); err != nil {
+					log.Printf("Warning: Could not set %s from config: %v", key, err)
+				}
 			}
 		}
 	}
@@ -209,7 +247,17 @@ func main() {
 	var portFlagShort = flag.String("p", "", "Port to run the server on (shorthand for --port)")
 	var helpFlag = flag.Bool("help", false, "Show help information")
 	var helpFlagShort = flag.Bool("h", false, "Show help information (shorthand for --help)")
+	var hashPasswordFlag = flag.String("hash-password", "", "Generate bcrypt hash for the provided password and exit")
 	flag.Parse()
+
+	if *hashPasswordFlag != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(*hashPasswordFlag), 12)
+		if err != nil {
+			log.Fatalf("Failed to generate bcrypt hash: %v", err)
+		}
+		fmt.Println(string(hash))
+		return
+	}
 
 	if *helpFlag || *helpFlagShort {
 		fmt.Println("Little Linux Helper GUI")
@@ -219,6 +267,7 @@ func main() {
 		fmt.Println("  -n, --network   Allow network access (bind to 0.0.0.0, use with caution)")
 		fmt.Println("  -p, --port      Port to run the server on (overrides config)")
 		fmt.Println("  -h, --help      Show this help information")
+		fmt.Println("      --hash-password <value>  Generate bcrypt hash for <value> and exit")
 		fmt.Println("\nConfiguration:")
 		fmt.Println("  Default settings are read from config/general.conf")
 		fmt.Println("  Default port: 3000")
@@ -249,8 +298,10 @@ func main() {
 		config.Port = portValue
 	}
 
+	networkFlagsEnabled := *networkMode || *networkModeShort
+
 	// Override host binding if network flag is set (either -network or -n)
-	if *networkMode || *networkModeShort {
+	if networkFlagsEnabled {
 		config.Host = "0.0.0.0"
 		log.Println("WARNING: Network mode enabled. GUI will be accessible from other machines.")
 		log.Println("WARNING: Ensure your firewall is properly configured.")
@@ -275,12 +326,84 @@ func main() {
 	}
 	log.Printf("Detected Little Linux Helper release: %s", releaseVersion)
 
+	authSettings, err := loadAuthSettings(config.Host, networkFlagsEnabled)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("Authentication mode: %s", authSettings.Mode)
+	if authSettings.Mode == authModeSession {
+		log.Printf("Session cookie: %s (secure=%t)", authSettings.CookieName, authSettings.CookieSecure)
+	}
+	if len(authSettings.AllowedOrigins) > 0 {
+		log.Printf("Allowed origins: %s", strings.Join(authSettings.AllowedOrigins, ", "))
+	}
+
 	app := fiber.New(fiber.Config{
 		AppName: "Little Linux Helper GUI",
 	})
 
 	// Middleware
 	app.Use(logger.New())
+	app.Use(helmet.New())
+
+	if len(authSettings.AllowedOrigins) > 0 {
+		originGuard := buildOriginGuard(authSettings.AllowedOrigins)
+		app.Use(originGuard)
+	}
+
+	var (
+		sessionStore   *session.Store
+		requireSession fiber.Handler
+	)
+
+	if authSettings.Mode == authModeSession {
+		sessionStore = session.New(session.Config{
+			KeyLookup:      fmt.Sprintf("cookie:%s", authSettings.CookieName),
+			CookieHTTPOnly: true,
+			CookieSecure:   authSettings.CookieSecure,
+			CookieSameSite: "Strict",
+			CookiePath:     "/",
+			Expiration:     24 * time.Hour,
+		})
+
+		requireSession = func(c *fiber.Ctx) error {
+			sess, sessErr := sessionStore.Get(c)
+			if sessErr != nil {
+				log.Printf("Session retrieval failed: %v", sessErr)
+				return respondUnauthorized(c)
+			}
+			user := sess.Get("user")
+			if user == nil {
+				return respondUnauthorized(c)
+			}
+			c.Locals("user", user)
+			return c.Next()
+		}
+
+		csrfMiddleware := csrf.New(csrf.Config{
+			CookieHTTPOnly: false,
+			CookieSecure:   authSettings.CookieSecure,
+			CookieSameSite: "Strict",
+			Expiration:     24 * time.Hour,
+		})
+		app.Use(csrfMiddleware)
+	}
+
+	if authSettings.Mode == authModeBasic {
+		passHash := []byte(authSettings.PassHash)
+		basicGuard := newBasicAuthMiddleware(authSettings.User, passHash)
+		app.Use(func(c *fiber.Ctx) error {
+			if c.Method() == fiber.MethodOptions {
+				return c.Next()
+			}
+			switch c.Path() {
+			case "/health", "/api/health":
+				return c.Next()
+			}
+			return basicGuard(c)
+		})
+	}
+
 	// Note: CORS intentionally not enabled in production since we serve the frontend from the same origin.
 	// For development, the Vite dev server proxies /api to this backend, avoiding cross-origin requests.
 
@@ -300,50 +423,97 @@ func main() {
 		log.Printf("Screenshot directory not available at %s: %v", screenshotDir, err)
 	}
 
+	// Frontend route fallback to support SPA paths like /login
+	app.Get("/", serveFrontendIndex)
+	app.Get("/login", serveFrontendIndex)
+
 	// API routes
 	api := app.Group("/api")
-
-	// Get available modules
-	api.Get("/modules", getModules)
 
 	// Health endpoint
 	api.Get("/health", getHealth)
 
+	protectedAPI := api
+	if authSettings.Mode == authModeSession && requireSession != nil {
+		loginLimiter := limiter.New(limiter.Config{
+			Max:        10,
+			Expiration: time.Minute,
+		})
+		api.Post("/login", loginLimiter, buildLoginHandler(sessionStore, authSettings))
+
+		protectedAPI = api.Group("", requireSession)
+		protectedAPI.Post("/logout", buildLogoutHandler(sessionStore))
+	}
+
+	// Get available modules
+	protectedAPI.Get("/modules", getModules)
+
 	// Release/version information
-	api.Get("/version", getVersion)
+	protectedAPI.Get("/version", getVersion)
 
 	// Get module documentation
-	api.Get("/modules/:id/docs", getModuleDocs)
+	protectedAPI.Get("/modules/:id/docs", getModuleDocs)
 
 	// Get all available documentation
-	api.Get("/docs", getAllDocs)
-	api.Get("/docs/unlinked", getUnlinkedDocs)
+	protectedAPI.Get("/docs", getAllDocs)
+	protectedAPI.Get("/docs/unlinked", getUnlinkedDocs)
 
 	// Configuration file management
-	api.Get("/config/files", getConfigFiles)
-	api.Get("/config/backups", getConfigBackups)
-	api.Delete("/config/backups/:backupId", deleteConfigBackup)
-	api.Get("/config/:filename", getConfigFile)
-	api.Put("/config/:filename", saveConfigFile)
-	api.Get("/config/:filename/example", getConfigExample)
+	protectedAPI.Get("/config/files", getConfigFiles)
+	protectedAPI.Get("/config/backups", getConfigBackups)
+	protectedAPI.Delete("/config/backups/:backupId", deleteConfigBackup)
+	protectedAPI.Get("/config/:filename", getConfigFile)
+	protectedAPI.Put("/config/:filename", saveConfigFile)
+	protectedAPI.Get("/config/:filename/example", getConfigExample)
 
 	// Start a module session
-	api.Post("/modules/:id/start", startModule)
+	protectedAPI.Post("/modules/:id/start", startModule)
 
 	// Get active sessions
-	api.Get("/sessions", getSessions)
+	protectedAPI.Get("/sessions", getSessions)
 
 	// Send input to module
-	api.Post("/sessions/:sessionId/input", sendInput)
+	protectedAPI.Post("/sessions/:sessionId/input", sendInput)
 
 	// Stop module session
-	api.Delete("/sessions/:sessionId", stopSession)
+	protectedAPI.Delete("/sessions/:sessionId", stopSession)
 
 	// Shutdown server gracefully
-	api.Post("/shutdown", shutdownServer)
+	protectedAPI.Post("/shutdown", shutdownServer)
+
+	app.Use("/ws", func(c *fiber.Ctx) error {
+		if !websocket.IsWebSocketUpgrade(c) {
+			return fiber.ErrUpgradeRequired
+		}
+
+		switch authSettings.Mode {
+		case authModeSession:
+			if sessionStore == nil {
+				return fiber.ErrUnauthorized
+			}
+			sess, sessErr := sessionStore.Get(c)
+			if sessErr != nil {
+				return fiber.ErrUnauthorized
+			}
+			user := sess.Get("user")
+			if user == nil {
+				return fiber.ErrUnauthorized
+			}
+			c.Locals("user", user)
+		case authModeBasic:
+			if c.Locals("user") == nil {
+				return fiber.ErrUnauthorized
+			}
+		}
+
+		return c.Next()
+	})
 
 	// WebSocket for real-time communication
 	app.Use("/ws", websocket.New(handleWebSocket))
+
+	// Fallback for other frontend routes
+	app.Get("/*", serveFrontendIndex)
 
 	// Build listen address
 	listenAddr := fmt.Sprintf("%s:%s", config.Host, config.Port)
@@ -1204,6 +1374,24 @@ func readPTYOutput(session *ModuleSession) {
 	log.Printf("PTY output reader finished for session %s", session.ID)
 }
 
+func serveFrontendIndex(c *fiber.Ctx) error {
+	if strings.HasPrefix(c.Path(), "/api") || strings.HasPrefix(c.Path(), "/ws") || strings.HasPrefix(c.Path(), "/screenshots") {
+		return fiber.ErrNotFound
+	}
+
+	indexPath := filepath.Join(lhRootDir, "gui", "web", "build", "index.html")
+	if _, err := os.Stat(indexPath); err != nil {
+		log.Printf("Frontend index not found at %s: %v", indexPath, err)
+		return fiber.ErrNotFound
+	}
+
+	if err := c.SendFile(indexPath); err != nil {
+		log.Printf("Failed to send frontend index: %v", err)
+		return fiber.ErrInternalServerError
+	}
+	return nil
+}
+
 func handleWebSocket(c *websocket.Conn) {
 	defer c.Close()
 
@@ -1622,6 +1810,278 @@ func deleteConfigBackup(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"status": "deleted", "backup_id": backupId})
+}
+
+func buildLoginHandler(store *session.Store, settings AuthSettings) fiber.Handler {
+	expectedUser := settings.User
+	passHash := []byte(settings.PassHash)
+
+	return func(c *fiber.Ctx) error {
+		var credentials struct {
+			User string `json:"user"`
+			Pass string `json:"pass"`
+		}
+
+		if err := c.BodyParser(&credentials); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request"})
+		}
+
+		if subtle.ConstantTimeCompare([]byte(credentials.User), []byte(expectedUser)) != 1 {
+			return respondUnauthorized(c)
+		}
+
+		if err := bcrypt.CompareHashAndPassword(passHash, []byte(credentials.Pass)); err != nil {
+			return respondUnauthorized(c)
+		}
+
+		sess, err := store.Get(c)
+		if err != nil {
+			log.Printf("Failed to obtain session: %v", err)
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+
+		sess.Set("user", expectedUser)
+		sess.Set("last_login", time.Now().UTC().Format(time.RFC3339))
+
+		if err := sess.Save(); err != nil {
+			log.Printf("Failed to persist session: %v", err)
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+
+		return c.SendStatus(fiber.StatusNoContent)
+	}
+}
+
+func buildLogoutHandler(store *session.Store) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		sess, err := store.Get(c)
+		if err != nil {
+			log.Printf("Failed to obtain session for logout: %v", err)
+			return c.SendStatus(fiber.StatusNoContent)
+		}
+
+		if err := sess.Destroy(); err != nil {
+			log.Printf("Failed to destroy session: %v", err)
+		}
+
+		return c.SendStatus(fiber.StatusNoContent)
+	}
+}
+
+func buildOriginGuard(allowed []string) fiber.Handler {
+	normalized := make(map[string]struct{}, len(allowed))
+	for _, origin := range allowed {
+		if origin == "" {
+			continue
+		}
+		normalized[normalizeOrigin(origin)] = struct{}{}
+	}
+
+	return func(c *fiber.Ctx) error {
+		originHeader := strings.TrimSpace(c.Get("Origin"))
+		if originHeader == "" {
+			return c.Next()
+		}
+
+		normalizedOrigin := normalizeOrigin(originHeader)
+
+		if _, ok := normalized[normalizedOrigin]; ok {
+			return c.Next()
+		}
+
+		baseOrigin := normalizeOrigin(c.BaseURL())
+		if baseOrigin != "" && strings.EqualFold(baseOrigin, normalizedOrigin) {
+			return c.Next()
+		}
+
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "origin not allowed"})
+	}
+}
+
+func respondUnauthorized(c *fiber.Ctx) error {
+	if strings.HasPrefix(c.Path(), "/api") {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthorized"})
+	}
+	return fiber.ErrUnauthorized
+}
+
+func newBasicAuthMiddleware(expectedUser string, passHash []byte) fiber.Handler {
+	const realm = `Basic realm="Little Linux Helper GUI"`
+
+	return func(c *fiber.Ctx) error {
+		authHeader := c.Get(fiber.HeaderAuthorization)
+		if !strings.HasPrefix(authHeader, "Basic ") {
+			c.Set("WWW-Authenticate", realm)
+			return fiber.ErrUnauthorized
+		}
+
+		decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(authHeader, "Basic "))
+		if err != nil {
+			c.Set("WWW-Authenticate", realm)
+			return fiber.ErrUnauthorized
+		}
+
+		credentials := string(decoded)
+		separatorIndex := strings.IndexByte(credentials, ':')
+		if separatorIndex < 0 {
+			c.Set("WWW-Authenticate", realm)
+			return fiber.ErrUnauthorized
+		}
+
+		user := credentials[:separatorIndex]
+		pass := credentials[separatorIndex+1:]
+
+		if subtle.ConstantTimeCompare([]byte(user), []byte(expectedUser)) != 1 {
+			c.Set("WWW-Authenticate", realm)
+			return fiber.ErrUnauthorized
+		}
+
+		if err := bcrypt.CompareHashAndPassword(passHash, []byte(pass)); err != nil {
+			c.Set("WWW-Authenticate", realm)
+			return fiber.ErrUnauthorized
+		}
+
+		c.Locals("user", expectedUser)
+		return c.Next()
+	}
+}
+
+func loadAuthSettings(host string, networkFlag bool) (AuthSettings, error) {
+	modeValue, modeSet := os.LookupEnv("LLH_GUI_AUTH_MODE")
+	modeValue = strings.TrimSpace(strings.ToLower(modeValue))
+	if !modeSet || modeValue == "" {
+		modeValue = authModeSession
+	}
+
+	switch modeValue {
+	case authModeSession, authModeBasic, authModeNone:
+	default:
+		log.Printf("Warning: unknown LLH_GUI_AUTH_MODE value %q, defaulting to 'session'", modeValue)
+		modeValue = authModeSession
+	}
+
+	user := strings.TrimSpace(os.Getenv("LLH_GUI_USER"))
+	passHash := strings.TrimSpace(os.Getenv("LLH_GUI_PASS_HASH"))
+	passPlain := os.Getenv("LLH_GUI_PASS_PLAIN")
+
+	cookieName := strings.TrimSpace(os.Getenv("LLH_GUI_COOKIE_NAME"))
+	if cookieName == "" {
+		cookieName = "__Host-llh_sess"
+	}
+
+	cookieSecure := true
+	if raw, ok := os.LookupEnv("LLH_GUI_COOKIE_SECURE"); ok {
+		parsed, err := parseBool(raw)
+		if err != nil {
+			log.Printf("Warning: invalid LLH_GUI_COOKIE_SECURE value %q, defaulting to true", raw)
+		} else {
+			cookieSecure = parsed
+		}
+	} else if isLoopbackHost(host) {
+		cookieSecure = false
+	}
+
+	allowedOrigins := parseAllowedOrigins(os.Getenv("LLH_GUI_ALLOWED_ORIGINS"))
+
+	settings := AuthSettings{
+		Mode:           modeValue,
+		User:           user,
+		PassHash:       passHash,
+		CookieName:     cookieName,
+		CookieSecure:   cookieSecure,
+		AllowedOrigins: allowedOrigins,
+	}
+
+	if !settings.CookieSecure && strings.HasPrefix(settings.CookieName, "__Host-") {
+		log.Println("Warning: LLH_GUI_COOKIE_SECURE is false but cookie name uses __Host- prefix; falling back to llh_sess.")
+		settings.CookieName = "llh_sess"
+	}
+
+	exposedHost := !isLoopbackHost(host)
+	if settings.Mode == authModeNone && (networkFlag || exposedHost) {
+		return settings, fmt.Errorf("refusing to start: non-localhost binding requires authentication (session|basic)")
+	}
+
+	if settings.Mode == authModeSession || settings.Mode == authModeBasic {
+		if settings.User == "" {
+			return settings, fmt.Errorf("authentication enabled but LLH_GUI_USER is not set")
+		}
+
+		if settings.PassHash == "" {
+			if passPlain == "" {
+				return settings, fmt.Errorf("authentication enabled but LLH_GUI_PASS_HASH is missing")
+			}
+
+			hash, err := bcrypt.GenerateFromPassword([]byte(passPlain), 12)
+			if err != nil {
+				return settings, fmt.Errorf("failed to derive password hash: %w", err)
+			}
+
+			settings.PassHash = string(hash)
+			log.Println("WARNING: Using LLH_GUI_PASS_PLAIN to derive password hash at startup. Remove LLH_GUI_PASS_PLAIN for production use.")
+			_ = os.Unsetenv("LLH_GUI_PASS_PLAIN")
+		} else if passPlain != "" {
+			log.Println("INFO: LLH_GUI_PASS_HASH provided; ignoring LLH_GUI_PASS_PLAIN.")
+		}
+	} else if passPlain != "" {
+		log.Println("INFO: LLH_GUI_PASS_PLAIN ignored because authentication mode is 'none'.")
+	}
+
+	return settings, nil
+}
+
+func parseAllowedOrigins(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		switch r {
+		case ',', ';', '\n', '\r', '\t':
+			return true
+		}
+		return false
+	})
+
+	var origins []string
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		origins = append(origins, normalizeOrigin(part))
+	}
+
+	return origins
+}
+
+func normalizeOrigin(origin string) string {
+	trimmed := strings.TrimSpace(origin)
+	return strings.TrimRight(trimmed, "/")
+}
+
+func parseBool(value string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on":
+		return true, nil
+	case "0", "false", "no", "off":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid boolean value: %s", value)
+	}
+}
+
+func isLoopbackHost(host string) bool {
+	if host == "" {
+		return true
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
 }
 
 // shellescape escapes a string for safe use in shell commands

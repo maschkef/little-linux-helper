@@ -15,8 +15,10 @@ import ResizablePanels from './components/ResizablePanels.jsx';
 import SessionDropdown from './components/SessionDropdown.jsx';
 import LanguageSelector from './components/LanguageSelector.jsx';
 import ExitButton from './components/ExitButton.jsx';
+import LogoutButton from './components/LogoutButton.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { SessionProvider, useSession } from './contexts/SessionContext.jsx';
+import { apiFetch } from './utils/api.js';
 import './i18n'; // Initialize i18n
 
 // Lazy load heavy components that are only used conditionally
@@ -54,14 +56,13 @@ function AppContent({ standaloneSessionId, isStandalone }) {
   }, [activeSessionId]);
 
   useEffect(() => {
-    // Load modules on component mount
     fetchModules();
   }, []);
 
   useEffect(() => {
     const fetchVersion = async () => {
       try {
-        const response = await fetch('/api/version');
+        const response = await apiFetch('/api/version');
         if (response.ok) {
           const data = await response.json();
           if (data.release) {
@@ -102,27 +103,25 @@ function AppContent({ standaloneSessionId, isStandalone }) {
 
   const fetchModules = async () => {
     try {
-      const response = await fetch('/api/modules');
-      const data = await response.json();
-      setModules(data);
+      const response = await apiFetch('/api/modules');
+      if (response.ok) {
+        const data = await response.json();
+        setModules(data);
+      } else if (response.status !== 401) {
+        console.error('Failed to fetch modules:', response.status);
+      }
     } catch (error) {
       console.error('Failed to fetch modules:', error);
     }
   };
 
   const fetchModuleDocs = async (moduleId) => {
-    console.log('fetchModuleDocs called with moduleId:', moduleId);
     try {
-      console.log('Making API call to:', `/api/modules/${moduleId}/docs`);
-      const response = await fetch(`/api/modules/${moduleId}/docs`);
-      console.log('API response status:', response.status, response.ok);
+      const response = await apiFetch(`/api/modules/${moduleId}/docs`);
       if (response.ok) {
         const data = await response.json();
-        console.log('API response data type:', typeof data, 'content length:', data.content?.length);
         setModuleDocs(data.content);
-        console.log('Successfully set module docs');
-      } else {
-        console.log('API response not OK, setting not available message');
+      } else if (response.status !== 401) {
         setModuleDocs(t('docs.notAvailable'));
       }
     } catch (error) {
@@ -249,8 +248,9 @@ function AppContent({ standaloneSessionId, isStandalone }) {
               </span>
             )}
           </div>
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
             <LanguageSelector />
+            <LogoutButton />
             <ExitButton />
           </div>
         </div>

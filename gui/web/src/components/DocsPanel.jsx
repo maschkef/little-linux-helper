@@ -11,6 +11,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import { defaultSchema } from 'hast-util-sanitize';
+import { apiFetch } from '../utils/api.js';
 
 function DocsPanel({ content, selectedModule, onModuleSelect }) {
   const [currentDoc, setCurrentDoc] = useState('');
@@ -52,7 +53,7 @@ function DocsPanel({ content, selectedModule, onModuleSelect }) {
   const fetchRelatedDoc = async (docId) => {
     setIsLoadingRelated(true);
     try {
-      const response = await fetch(`/api/modules/${docId}/docs`);
+      const response = await apiFetch(`/api/modules/${docId}/docs`);
       if (response.ok) {
         const data = await response.json();
         setCurrentDoc(data.content);

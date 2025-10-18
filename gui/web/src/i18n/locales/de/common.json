@@ -183,5 +183,19 @@
     "backupSize": "Größe unbekannt",
     "backupInfo": "Backups werden automatisch vor dem Speichern von Konfigurationsdateien erstellt, wenn die Backup-Option aktiviert ist.",
     "backupWarning": "⚠️ Das Löschen von Backups ist dauerhaft und kann nicht rückgängig gemacht werden."
+  },
+  "auth": {
+    "title": "Anmelden",
+    "subtitle": "Geben Sie Ihre Zugangsdaten ein.",
+    "username": "Benutzername",
+    "password": "Passwort",
+    "submit": "Anmelden",
+    "signingIn": "Anmeldung läuft…",
+    "invalidCredentials": "Ungültiger Benutzername oder Passwort.",
+    "rateLimited": "Zu viele Versuche. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+    "networkError": "Server nicht erreichbar. Verbindung prüfen und erneut versuchen.",
+    "unknownError": "Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
+    "footer": "Die Zugangsdaten werden auf dem Host verwaltet.",
+    "logout": "Abmelden"
   }
 }

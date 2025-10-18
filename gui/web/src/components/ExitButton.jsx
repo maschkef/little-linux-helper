@@ -9,6 +9,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSession } from '../contexts/SessionContext.jsx';
+import { apiFetch } from '../utils/api.js';
 
 const ExitButton = () => {
   const { t } = useTranslation('common');
@@ -31,26 +32,28 @@ const ExitButton = () => {
     
     try {
       const url = force ? '/api/shutdown?force=true' : '/api/shutdown';
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
       });
 
-      const result = await response.json();
-      setShutdownResponse(result);
+      if (response.ok) {
+        const result = await response.json();
+        setShutdownResponse(result);
 
-      // If no active sessions or force shutdown, close the window
-      if (result.activeSessions?.length === 0 || force) {
-        // Give user a moment to see the confirmation
-        setTimeout(() => {
-          window.close();
-          // If window.close() doesn't work (some browsers), show message
+        if (result.activeSessions?.length === 0 || force) {
           setTimeout(() => {
-            alert(t('exit.browserCloseMessage'));
-          }, 1000);
-        }, 1500);
+            window.close();
+            setTimeout(() => {
+              alert(t('exit.browserCloseMessage'));
+            }, 1000);
+          }, 1500);
+        }
+      } else if (response.status !== 401) {
+        alert(t('exit.shutdownError'));
+        setIsShuttingDown(false);
       }
     } catch (error) {
       console.error('Shutdown error:', error);

@@ -142,6 +142,36 @@ CFG_LH_GUI_HOST="localhost"
 # Leave empty to always prompt: CFG_LH_GUI_FIREWALL_RESTRICTION=""
 CFG_LH_GUI_FIREWALL_RESTRICTION="local"
 
+# GUI authentication settings
+#
+# Available modes:
+#   session - Cookie-based login with CSRF protection (default)
+#   basic   - HTTP Basic Auth
+#   none    - Only permitted when binding to localhost/127.0.0.1
+#
+# Credentials:
+#   - Set LLH_GUI_USER to the login username
+#   - Use LLH_GUI_PASS_HASH with a bcrypt hash (recommended)
+#   - LLH_GUI_PASS_PLAIN is for development only; when provided and PASS_HASH
+#     is empty, the GUI backend derives a bcrypt hash at startup and logs a warning
+#
+# Cookies:
+#   - LLH_GUI_COOKIE_NAME defaults to "__Host-llh_sess"
+#   - LLH_GUI_COOKIE_SECURE should stay "true" when serving over HTTPS
+#     (the launcher and backend automatically relax this on localhost when unset)
+#
+# Cross-origin support:
+#   - LLH_GUI_ALLOWED_ORIGINS accepts a comma-separated list of origins that are
+#     allowed to perform authenticated requests (useful for development tooling)
+#
+export LLH_GUI_AUTH_MODE="session"
+export LLH_GUI_USER=""
+export LLH_GUI_PASS_HASH=""
+export LLH_GUI_PASS_PLAIN=""
+export LLH_GUI_COOKIE_NAME="__Host-llh_sess"
+export LLH_GUI_COOKIE_SECURE="true"
+export LLH_GUI_ALLOWED_ORIGINS=""
+
 # =============================================================================
 # FUTURE SETTINGS
 # =============================================================================

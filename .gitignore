@@ -14,3 +14,5 @@ CLAUDE.md
 .vscode/
 # Backup configuration files
 config/backup.conf.gui_*
+
+gui/.gocache/*
