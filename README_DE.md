@@ -72,6 +72,7 @@ Eine moderne webbasierte GUI kann über `gui_launcher.sh` gestartet werden und b
 - **Weboberfläche**: Modernes React-Frontend mit responsivem Design, aufrufbar im Webbrowser
 - **Multi-Session-Unterstützung**: Unbegrenzte parallele Modulsitzungen mit Sitzungsverwaltung im Dropdown
 - **Echtzeit-Terminal**: Integrierte Terminalanzeige mit ANSI-Farbunterstützung und interaktiver Eingabeverarbeitung
+- **Pop-out-PTY-Ansicht**: Ein Klick auf „Open PTY tab“ öffnet die aktive Sitzung in einem eigenen Browser-Tab (`/?ttySession=<id>&standalone=1`)
 - **Erweiterte Sitzungsverwaltung**: Sitzungswechsel, Statusindikatoren, Output-Erhalt und individuelle Sitzungssteuerung
 - **Modulnavigation**: Kategorisierte Seitenleiste mit einzelnen „Start“-Buttons und intuitiver Modulauswahl (ausblendbar)
 - **Erweitertes Dokumentationssystem**: Dualer Dokumentationsmodus mit modulgebundenen Docs und eigenständigem Dokumentbrowser
