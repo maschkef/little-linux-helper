@@ -109,14 +109,39 @@ function lh_ensure_config_files_exist() {
     local -a created_files=()
     local status=0
 
-    # Search configuration directory for all .example files
+    # Search configuration directory for all .example files/directories
     for template_config_file in "$config_dir"/*"$template_suffix"; do
         # Skip if no .example files exist (e.g., empty glob)
-        [ -f "$template_config_file" ] || continue
+        [ -e "$template_config_file" ] || continue
         
         # Extract base filename without .example
         config_file_base=$(basename "$template_config_file" "$template_suffix")
         local actual_config_file="$config_dir/$config_file_base"
+
+        if [ -d "$template_config_file" ]; then
+            if [ ! -d "$actual_config_file" ]; then
+                cp -a "$template_config_file" "$actual_config_file"
+                lh_fix_ownership "$actual_config_file"
+                created_files+=("$actual_config_file")
+            fi
+
+            while IFS= read -r template_fragment; do
+                local relative_path="${template_fragment#"${template_config_file}/"}"
+                local target_fragment="$actual_config_file/$relative_path"
+                local target_dir
+                target_dir="$(dirname "$target_fragment")"
+                mkdir -p "$target_dir"
+                if [ ! -f "$target_fragment" ]; then
+                    cp "$template_fragment" "$target_fragment"
+                    lh_fix_ownership "$target_fragment"
+                    created_files+=("$target_fragment")
+                fi
+                if ! lh_config_sync_missing_keys "$template_fragment" "$target_fragment"; then
+                    status=1
+                fi
+            done < <(find "$template_config_file" -type f -name '*.conf' -print | LC_ALL=C sort)
+            continue
+        fi
 
         if [ ! -f "$actual_config_file" ]; then
             cp "$template_config_file" "$actual_config_file"

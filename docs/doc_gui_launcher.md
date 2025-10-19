@@ -116,7 +116,7 @@ The GUI Launcher Script (`gui_launcher.sh`) is a specialized launcher that provi
 3. **Specific IP Address** - Single machine access (most secure)
 4. **Custom CIDR Range** - Custom network segment
 
-**Configuration Support (`config/general.conf`):**
+**Configuration Support (`config/general.d/30-gui.conf`, legacy `config/general.conf`):**
 ```bash
 # Firewall IP restriction configuration
 CFG_LH_GUI_FIREWALL_RESTRICTION="local"     # Auto-detect local networks
@@ -177,7 +177,7 @@ When running with sudo and network mode (`-n`), displays comprehensive security 
 
 ### Configuration File Support
 
-**Primary Configuration:** `config/general.conf`
+**Primary Configuration:** `config/general.d/*.conf` (legacy `config/general.conf`)
 ```bash
 # Default port setting
 CFG_LH_GUI_PORT="3000"
@@ -194,7 +194,7 @@ CFG_LH_GUI_FIREWALL_RESTRICTION="local"    # Auto-detect local networks
 
 **Configuration Priority:**
 1. **Command Line Arguments** (highest priority)
-2. **Configuration File** (`config/general.conf`)
+2. **Configuration File** (`config/general.d/*.conf`)
 3. **Built-in Defaults** (port 3000, localhost binding)
 
 ### Environment Integration

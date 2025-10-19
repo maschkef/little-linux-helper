@@ -196,7 +196,7 @@ The GUI respects all existing Little Linux Helper configuration:
 
 ### GUI-Specific Configuration
 
-The GUI can be configured via `config/general.conf`:
+The GUI can be configured via `config/general.d/30-gui.conf` (legacy `config/general.conf`):
 
 ```bash
 # GUI server port (default: 3000)
@@ -278,7 +278,7 @@ CFG_LH_LANG="en"
 
 1. **Port already in use**: 
    - Use `-p 8080` or `--port 8080` flag for a different port
-   - Or configure `CFG_LH_GUI_PORT` in `config/general.conf`
+   - Or configure `CFG_LH_GUI_PORT` in `config/general.d/30-gui.conf`
 2. **Missing dependencies**: 
    - All GUI scripts automatically check and can install Go/Node.js/npm
    - If installation fails, install manually via your package manager

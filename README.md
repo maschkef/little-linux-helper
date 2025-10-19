@@ -81,7 +81,7 @@ A modern web-based GUI is available through `gui_launcher.sh`, providing:
 - **Full-Screen Reading Mode**: Hide all panels except documentation for maximum reading space
 - **Multi-panel Layout**: Resizable panels with flexible show/hide controls for optimal workspace organization
 - **Security Features**: Localhost-only binding by default with optional network access via command line
-- **Configurable Networking**: Port and host configuration via `config/general.conf` or command line arguments
+- **Configurable Networking**: Port and host configuration via `config/general.d/30-gui.conf` (legacy `config/general.conf`) or command line arguments
 - **Internationalization Support**: Full English/German translations with dynamic language switching
 - **Error-Resilient Design**: Missing translation keys display fallback content instead of crashing
 - **Comprehensive Help System**: Context-sensitive help with detailed module guidance and usage notes
@@ -103,7 +103,7 @@ A modern web-based GUI is available through `gui_launcher.sh`, providing:
 ./gui_launcher.sh -b -n        # Build and run with network access
 ./gui_launcher.sh -h           # Comprehensive help
 
-# Custom configuration via config/general.conf:
+# Custom configuration via config/general.d/30-gui.conf:
 CFG_LH_GUI_PORT="3000"        # Set default port
 CFG_LH_GUI_HOST="localhost"   # Set binding (localhost/0.0.0.0)
 CFG_LH_GUI_FIREWALL_RESTRICTION="local"  # IP restrictions for firewall opening
@@ -450,7 +450,7 @@ Context-aware module docs displayed alongside active sessions for quick referenc
 
 - **Adaptive default:** When the GUI is bound to `localhost`, authentication is automatically disabled for convenience. Switching to `--network` or any non-loopback host flips the backend into session login mode so that remote users must sign in.
 - **Override modes:** set `LLH_GUI_AUTH_MODE=auto` (default adaptive behaviour), `session` (always require the login form), `basic` (HTTP Basic Auth), or `none` (loopback only). The launcher and backend refuse to start without auth when the GUI is reachable from another machine.
-- **Configuration block** (place in `config/general.conf` or export as environment variables):
+- **Configuration block** (place in `config/general.d/40-gui-auth.conf` or export as environment variables):
 
 ```bash
 export LLH_GUI_AUTH_MODE="auto"
@@ -483,12 +483,12 @@ Little Linux Helper supports multiple languages for the user interface. The inte
 
 **Language Selection:**
 * **Automatic Detection**: The system automatically detects the system language based on environment variables (`LANG`, `LC_ALL`, `LC_MESSAGES`)
-* **Manual Configuration**: The language can be set in the `config/general.conf` file with the `CFG_LH_LANG` setting
+* **Manual Configuration**: The language can be set in `config/general.d/00-language.conf` with the `CFG_LH_LANG` setting
 * **Fallback Mechanism**: For missing translations or unsupported languages, the system automatically falls back to English
 
 **Language Configuration:**
 ```bash
-# In config/general.conf
+# In config/general.d/00-language.conf
 CFG_LH_LANG="auto"    # Automatic system language detection
 CFG_LH_LANG="de"      # German
 CFG_LH_LANG="en"      # English
@@ -734,12 +734,12 @@ When the main script (`help_master.sh`) is started for the first time, default c
 See `docs/lib/doc_config_schema.md` for technical details on the synchronisation helper.
 
 Configuration files are currently used for the following modules:
-* **General Settings (`help_master.sh`)**: Language, logging behavior, GUI port/host configuration, and other basic settings (`config/general.conf`).
-* **Backup & Restore (`modules/backup/mod_backup.sh`, `modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`)**: Settings for backup paths, retention policies, etc. (`config/backup.conf`).
-* **Docker Security Check (`mod_security.sh`)**: Settings for search paths, warnings to skip, etc. (`config/docker.conf`).
+* **General Settings (`help_master.sh`)**: Language, logging behavior, GUI port/host configuration, and other basic settings (`config/general.d/*.conf`, legacy `config/general.conf`).
+* **Backup & Restore (`modules/backup/mod_backup.sh`, `modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`)**: Settings for backup paths, retention policies, etc. (`config/backup.d/*.conf`, legacy `config/backup.conf`).
+* **Docker Security Check (`mod_security.sh`)**: Settings for search paths, warnings to skip, etc. (`config/docker.d/*.conf`, legacy `config/docker.conf`).
 
 **GUI Configuration Options:**
-The GUI server can be configured via `config/general.conf`:
+The GUI server can be configured via `config/general.d/30-gui.conf`:
 ```bash
 # GUI server port (default: 3000)
 CFG_LH_GUI_PORT="3000"

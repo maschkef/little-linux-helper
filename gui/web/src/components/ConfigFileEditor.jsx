@@ -9,6 +9,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { apiFetch } from '../utils/api.js';
+import { getConfigDisplayKey } from '../utils/configDisplayNames.js';
 
 function ConfigFileEditor({ filename, onFileSaved }) {
   const { t } = useTranslation('common');
@@ -60,7 +61,7 @@ function ConfigFileEditor({ filename, onFileSaved }) {
 
   const loadExampleFile = async () => {
     try {
-      const response = await apiFetch(`/api/config/${filename}/example`);
+      const response = await apiFetch(`/api/config/example/${filename}`);
       if (response.ok) {
         const data = await response.json();
         setExampleContent(data.content);
@@ -141,16 +142,11 @@ function ConfigFileEditor({ filename, onFileSaved }) {
   }
 
   const getFileDisplayName = (filename) => {
-    switch (filename) {
-      case 'general.conf':
-        return t('config.generalConfig');
-      case 'backup.conf':
-        return t('config.backupConfig');
-      case 'docker.conf':
-        return t('config.dockerConfig');
-      default:
-        return filename;
+    const key = getConfigDisplayKey(filename);
+    if (key) {
+      return t(key);
     }
+    return filename;
   };
 
   return (

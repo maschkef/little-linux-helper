@@ -397,7 +397,7 @@ The i18n system implements a sophisticated multi-layer fallback mechanism to ens
   ```
 
 **Configuration and Initialization:**
-- The language setting is stored in `config/general.conf`.
+- The language setting is stored in `config/general.d/00-language.conf` (legacy `config/general.conf`).
 - The configuration file contains: `CFG_LH_LANG="en"` (or the user's preferred language, or "auto" for system detection).
 - If no configuration exists, the system defaults to English ('en').
 - **Automatic Detection:** `CFG_LH_LANG="auto"` enables automatic system language detection from environment variables.
@@ -461,45 +461,38 @@ lh_load_language_module "lib"               # Library function messages
 
 ### 5. Configuration System
 
-The Little Linux Helper uses a configuration system based on files in the `config/` directory. Configuration files follow the naming convention `<name>.conf` with corresponding example files `<name>.conf.example`.
+Little Linux Helper stores configuration in fragment directories under `config/`.  
+Each domain (general, backup, docker, …) uses a `<name>.d/` folder whose files are loaded in lexical order (for example `00-*.conf`, `10-*.conf`, …).  
+Every fragment has a matching template inside `<name>.d.example/` that `lh_ensure_config_files_exist()` uses to seed and sync user configs.  
+A legacy monolithic file (e.g. `config/general.conf`) is still recognised for backwards compatibility and for users who prefer to override settings in a single place.
 
-#### 5.1 General Configuration (`config/general.conf`)
+#### 5.1 General Configuration (`config/general.d/*.conf`)
 
-The main configuration file that replaces the previous `language.conf` and includes general settings for the application.
+The general settings are split by topic:
 
-**Configuration Variables:**
-- `CFG_LH_LANG`: Language setting ('de', 'en', 'es', 'fr', or 'auto' for system detection)
-- `CFG_LH_LOG_LEVEL`: Log level setting ('ERROR', 'WARN', 'INFO', 'DEBUG')  
-- `CFG_LH_LOG_TO_CONSOLE`: Enable/disable console output ('true'/'false')
-- `CFG_LH_LOG_TO_FILE`: Enable/disable file logging ('true'/'false')
-- `CFG_LH_LOG_SHOW_FILE_ERROR`: Show source file name in ERROR messages ('true'/'false')
-- `CFG_LH_LOG_SHOW_FILE_WARN`: Show source file name in WARN messages ('true'/'false')
-- `CFG_LH_LOG_SHOW_FILE_INFO`: Show source file name in INFO messages ('true'/'false')
-- `CFG_LH_LOG_SHOW_FILE_DEBUG`: Show source file name in DEBUG messages ('true'/'false')
-- `CFG_LH_LOG_TIMESTAMP_FORMAT`: Timestamp format for all messages ('full', 'time', 'none')
+- `config/general.d/00-language.conf` – Language selection and auto-detection
+- `config/general.d/10-logging-core.conf` – Log level plus console/file toggles
+- `config/general.d/20-logging-detail.conf` – Per-level file-info flags and timestamp format
+- `config/general.d/30-gui.conf` – GUI host/port/firewall defaults
+- `config/general.d/40-gui-auth.conf` – Optional GUI authentication overrides
+- `config/general.d/90-release.conf` – Optional release tag injection
 
-**Example Configuration:**
+**Example fragment (`config/general.d/10-logging-core.conf`):**
 ```bash
-# Language setting
-CFG_LH_LANG="en"
-
-# Logging configuration
+# =============================================================================
+# GENERAL · LOGGING CORE
+# =============================================================================
+# Log level configuration controls which messages reach console and log files.
 CFG_LH_LOG_LEVEL="INFO"
+
+# Enable/disable console output (true/false)
 CFG_LH_LOG_TO_CONSOLE="true"
+
+# Enable/disable file logging (true/false)
 CFG_LH_LOG_TO_FILE="true"
-
-# File info display configuration
-CFG_LH_LOG_SHOW_FILE_ERROR="true"   # Show [script.sh] for ERROR messages
-CFG_LH_LOG_SHOW_FILE_WARN="true"    # Show [script.sh] for WARN messages
-CFG_LH_LOG_SHOW_FILE_INFO="false"   # Don't show file info for INFO messages
-CFG_LH_LOG_SHOW_FILE_DEBUG="true"   # Show [script.sh] for DEBUG messages
-
-# Timestamp format configuration
-CFG_LH_LOG_TIMESTAMP_FORMAT="time"  # Options: "full", "time", "none"
-                                   # full: 2025-08-24 13:44:23
-                                   # time: 13:44:23  
-                                   # none: (no timestamps)
 ```
+
+> 💡 Need an all-in-one override? Create/edit `config/general.conf`. Anything defined there is applied after the fragments have been sourced.
 
 **Log Level Hierarchy:**
 - **ERROR**: Only critical errors that prevent operation
@@ -544,16 +537,29 @@ The logging system supports flexible formatting options:
 
 **Developer Note:** The DEBUG level is designed to be used extensively throughout modules since it's hidden by default. See the "Debugging and Logging Best Practices" section for comprehensive guidelines on implementing debug logging in your modules.
 
-#### 5.2 Backup Configuration (`config/backup.conf`)
+#### 5.2 Backup Configuration (`config/backup.d/*.conf`)
 
-Configuration file for backup-related settings.
+Backup behaviour is organised similarly:
 
-**Configuration Variables:**
-- `CFG_LH_BACKUP_ROOT`: Root directory for backups
-- `CFG_LH_BACKUP_DIR`: Backup subdirectory (relative to root)
-- `CFG_LH_TEMP_SNAPSHOT_DIR`: Temporary snapshot directory
-- `CFG_LH_RETENTION_BACKUP`: Number of backups to retain
-- `CFG_LH_BACKUP_LOG_BASENAME`: Basename for backup log files
+- `config/backup.d/00-storage.conf` – Root paths, backup directory, snapshot staging area
+- `config/backup.d/05-excludes.conf` – Tar exclusion patterns
+- `config/backup.d/10-retention.conf` – Retention count, log basename, debug listing limit
+- `config/backup.d/20-snapshots.conf` – Source snapshot preservation policy
+- `config/backup.d/30-subvolumes.conf` – Explicit subvolume list and auto-detection flag
+
+**Example fragment (`config/backup.d/10-retention.conf`):**
+```bash
+# Number of backup versions to keep (newest first).
+CFG_LH_RETENTION_BACKUP="10"
+
+# Base filename for backup logs. Timestamp prefixes are added automatically.
+CFG_LH_BACKUP_LOG_BASENAME="backup.log"
+
+# Limit how many backup candidates appear in debug listings (0 = unlimited).
+CFG_LH_DEBUG_LOG_LIMIT="10"
+```
+
+Legacy installations may still carry `config/backup.conf`; its settings are loaded after the fragments and continue to work as overrides.
 
 #### 5.3 Configuration File Management
 
@@ -800,7 +806,7 @@ fi
 
 **Enabling Debug Mode:**
 ```bash
-# Method 1: Edit config/general.conf
+# Method 1: Edit config/general.d/10-logging-core.conf (legacy config/general.conf)
 CFG_LH_LOG_LEVEL="DEBUG"
 
 # Method 2: Temporary environment override
@@ -894,7 +900,7 @@ The Little Linux Helper supports flexible logging configuration that developers 
 Configure which log levels show the source file name to help with debugging:
 
 ```bash
-# In config/general.conf - customize per log level
+# In config/general.d/20-logging-detail.conf - customize per log level
 CFG_LH_LOG_SHOW_FILE_ERROR="true"    # [script.sh] shown for ERROR messages
 CFG_LH_LOG_SHOW_FILE_WARN="true"     # [script.sh] shown for WARN messages  
 CFG_LH_LOG_SHOW_FILE_INFO="false"    # No file info for INFO messages (default)
@@ -905,7 +911,7 @@ CFG_LH_LOG_SHOW_FILE_DEBUG="true"    # [script.sh] shown for DEBUG messages
 Enable different timestamp formats for different use cases:
 
 ```bash
-# In config/general.conf - applies to all log levels
+# In config/general.d/20-logging-detail.conf - applies to all log levels
 CFG_LH_LOG_TIMESTAMP_FORMAT="full"  # Full date and time: 2025-08-24 13:44:23
 CFG_LH_LOG_TIMESTAMP_FORMAT="time"  # Time only: 13:44:23
 CFG_LH_LOG_TIMESTAMP_FORMAT="none"  # No timestamps (clean output)

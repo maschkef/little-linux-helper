@@ -142,7 +142,7 @@ The GUI ships with first-class authentication. By default the backend disables l
 - **`none`** – Available **only** when the server binds to `127.0.0.1`/`localhost`. The launcher and backend abort if you attempt to combine `none` with `--network` or a non-loopback host.
 
 ### Configuration Keys
-Set the following environment variables (or export them in `config/general.conf`) to adjust the authentication behaviour:
+Set the following environment variables (or export them in `config/general.d/40-gui-auth.conf`, legacy `config/general.conf`) to adjust the authentication behaviour:
 
 ```
 LLH_GUI_AUTH_MODE=auto|session|basic|none

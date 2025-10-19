@@ -211,7 +211,7 @@ lh_load_language_module "backup" "de"
 
 ### Language Setting
 
-Controlled via `config/general.conf`:
+Controlled via `config/general.d/00-language.conf` (legacy `config/general.conf`):
 ```bash
 CFG_LH_LANG="en"        # Specific language
 CFG_LH_LANG="auto"      # Automatic system detection

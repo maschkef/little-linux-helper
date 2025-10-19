@@ -125,19 +125,150 @@ type Config struct {
 	ReleaseTag string
 }
 
-// loadConfig reads configuration from config/general.conf
-func loadConfig() *Config {
-	config := &Config{
-		Port:       "3000",      // default port
-		Host:       "localhost", // default host (secure)
-		ReleaseTag: "",
+var configDisplayNames = map[string]string{
+	"general.d/00-language.conf":       "General · Language & Locale",
+	"general.d/10-logging-core.conf":   "General · Logging (Core)",
+	"general.d/20-logging-detail.conf": "General · Logging (Advanced)",
+	"general.d/30-gui.conf":            "General · GUI Server",
+	"general.d/40-gui-auth.conf":       "General · GUI Authentication",
+	"general.d/90-release.conf":        "General · Release Tag",
+	"backup.d/00-storage.conf":         "Backup · Storage Paths",
+	"backup.d/05-excludes.conf":        "Backup · Archive Excludes",
+	"backup.d/10-retention.conf":       "Backup · Retention & Logs",
+	"backup.d/20-snapshots.conf":       "Backup · Snapshot Management",
+	"backup.d/30-subvolumes.conf":      "Backup · Subvolumes",
+	"docker.d/00-discovery.conf":       "Docker · Project Discovery",
+	"docker.d/10-scope.conf":           "Docker · Scanning Scope",
+	"docker.d/20-warnings.conf":        "Docker · Warning Filters",
+	"docker.d/30-patterns.conf":        "Docker · Default Pattern Checks",
+	"general.conf":                     "General Configuration (legacy)",
+	"backup.conf":                      "Backup Configuration (legacy)",
+	"docker.conf":                      "Docker Configuration (legacy)",
+}
+
+func configDisplayName(filename string) string {
+	if name, ok := configDisplayNames[filename]; ok {
+		return name
+	}
+	return filename
+}
+
+
+func getConfigParam(c *fiber.Ctx) string {
+	if p := strings.TrimPrefix(c.Params("*"), "/"); p != "" {
+		return p
+	}
+	return strings.TrimPrefix(c.Params("filename"), "/")
+}
+
+func configPaths(filename string) (configPath string, examplePath string, configType string, ok bool) {
+	clean := filepath.ToSlash(filepath.Clean(filename))
+	if clean != filename || strings.HasPrefix(clean, "../") || strings.Contains(clean, "/../") || strings.HasPrefix(clean, "/") {
+		return "", "", "", false
 	}
 
-	configPath := filepath.Join(lhRootDir, "config", "general.conf")
-	file, err := os.Open(configPath)
+	baseDir := filepath.Join(lhRootDir, "config")
+
+	switch {
+	case clean == "general.conf":
+		return filepath.Join(baseDir, clean), filepath.Join(baseDir, clean+".example"), "general", true
+	case clean == "backup.conf":
+		return filepath.Join(baseDir, clean), filepath.Join(baseDir, clean+".example"), "backup", true
+	case clean == "docker.conf":
+		return filepath.Join(baseDir, clean), filepath.Join(baseDir, clean+".example"), "docker", true
+	case strings.HasPrefix(clean, "general.d/"):
+		if strings.Contains(clean[len("general.d/"):], "/") || !strings.HasSuffix(clean, ".conf") {
+			return "", "", "", false
+		}
+		return filepath.Join(baseDir, clean), filepath.Join(baseDir, "general.d.example", filepath.Base(clean)), "general", true
+	case strings.HasPrefix(clean, "backup.d/"):
+		if strings.Contains(clean[len("backup.d/"):], "/") || !strings.HasSuffix(clean, ".conf") {
+			return "", "", "", false
+		}
+		return filepath.Join(baseDir, clean), filepath.Join(baseDir, "backup.d.example", filepath.Base(clean)), "backup", true
+	case strings.HasPrefix(clean, "docker.d/"):
+		if strings.Contains(clean[len("docker.d/"):], "/") || !strings.HasSuffix(clean, ".conf") {
+			return "", "", "", false
+		}
+		return filepath.Join(baseDir, clean), filepath.Join(baseDir, "docker.d.example", filepath.Base(clean)), "docker", true
+	default:
+		return "", "", "", false
+	}
+}
+
+func collectConfigFilenames() []string {
+	configDir := filepath.Join(lhRootDir, "config")
+	var filenames []string
+
+	type dirPair struct {
+		dir      string
+		fallback string
+	}
+
+	pairs := []dirPair{
+		{dir: "general.d", fallback: "general.conf"},
+		{dir: "backup.d", fallback: "backup.conf"},
+		{dir: "docker.d", fallback: "docker.conf"},
+	}
+
+	for _, pair := range pairs {
+		dirPath := filepath.Join(configDir, pair.dir)
+		if entries, err := os.ReadDir(dirPath); err == nil {
+			var local []string
+			for _, entry := range entries {
+				if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".conf") {
+					continue
+				}
+				local = append(local, pair.dir+"/"+entry.Name())
+			}
+			sort.Strings(local)
+			filenames = append(filenames, local...)
+			continue
+		}
+
+		fallbackPath := filepath.Join(configDir, pair.fallback)
+		if _, err := os.Stat(fallbackPath); err == nil {
+			filenames = append(filenames, pair.fallback)
+		}
+	}
+
+	return filenames
+}
+
+func applyGeneralConfigKey(config *Config, key, value string) {
+	switch key {
+	case "CFG_LH_GUI_PORT":
+		if value != "" {
+			config.Port = value
+		}
+	case "CFG_LH_GUI_HOST":
+		if value != "" {
+			config.Host = value
+		}
+	case "CFG_LH_RELEASE_TAG":
+		if value != "" {
+			config.ReleaseTag = value
+		}
+	case "LLH_GUI_AUTH_MODE",
+		"LLH_GUI_USER",
+		"LLH_GUI_PASS_HASH",
+		"LLH_GUI_PASS_PLAIN",
+		"LLH_GUI_COOKIE_NAME",
+		"LLH_GUI_COOKIE_SECURE",
+		"LLH_GUI_ALLOWED_ORIGINS":
+		if _, exists := os.LookupEnv(key); !exists && value != "" {
+			if err := os.Setenv(key, value); err != nil {
+				log.Printf("Warning: Could not set %s from config: %v", key, err)
+			}
+		}
+	}
+}
+
+func readGeneralConfigFile(path string, config *Config) {
+	file, err := os.Open(path)
 	if err != nil {
-		log.Printf("Warning: Could not read config file %s, using defaults: %v", configPath, err)
-		return config
+		log.Printf("Warning: Could not read config file %s, using defaults: %v", path, err)
+		return
 	}
 	defer file.Close()
 
@@ -145,12 +276,10 @@ func loadConfig() *Config {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
-		// Skip comments and empty lines
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
-		// Parse key=value pairs
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
 			continue
@@ -162,38 +291,39 @@ func loadConfig() *Config {
 		}
 		value := strings.Trim(strings.TrimSpace(parts[1]), "\"")
 
-		switch key {
-		case "CFG_LH_GUI_PORT":
-			if value != "" {
-				config.Port = value
-			}
-		case "CFG_LH_GUI_HOST":
-			if value != "" {
-				config.Host = value
-			}
-		case "CFG_LH_RELEASE_TAG":
-			if value != "" {
-				config.ReleaseTag = value
-			}
-		case "LLH_GUI_AUTH_MODE",
-			"LLH_GUI_USER",
-			"LLH_GUI_PASS_HASH",
-			"LLH_GUI_PASS_PLAIN",
-			"LLH_GUI_COOKIE_NAME",
-			"LLH_GUI_COOKIE_SECURE",
-			"LLH_GUI_ALLOWED_ORIGINS":
-			if _, exists := os.LookupEnv(key); !exists && value != "" {
-				if err := os.Setenv(key, value); err != nil {
-					log.Printf("Warning: Could not set %s from config: %v", key, err)
-				}
-			}
-		}
+		applyGeneralConfigKey(config, key, value)
 	}
 
 	if err := scanner.Err(); err != nil {
-		log.Printf("Warning: Error reading config file: %v", err)
+		log.Printf("Warning: Error reading config file %s: %v", path, err)
+	}
+}
+
+// loadConfig reads configuration fragments from config/general.d/*.conf (legacy general.conf)
+func loadConfig() *Config {
+	config := &Config{
+		Port:       "3000",      // default port
+		Host:       "localhost", // default host (secure)
+		ReleaseTag: "",
 	}
 
+	fragmentDir := filepath.Join(lhRootDir, "config", "general.d")
+	if entries, err := os.ReadDir(fragmentDir); err == nil {
+		sort.Slice(entries, func(i, j int) bool {
+			return entries[i].Name() < entries[j].Name()
+		})
+
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".conf") {
+				continue
+			}
+			readGeneralConfigFile(filepath.Join(fragmentDir, entry.Name()), config)
+		}
+		return config
+	}
+
+	configPath := filepath.Join(lhRootDir, "config", "general.conf")
+	readGeneralConfigFile(configPath, config)
 	return config
 }
 
@@ -270,7 +400,7 @@ func main() {
 		fmt.Println("  -h, --help      Show this help information")
 		fmt.Println("      --hash-password <value>  Generate bcrypt hash for <value> and exit")
 		fmt.Println("\nConfiguration:")
-		fmt.Println("  Default settings are read from config/general.conf")
+		fmt.Println("  Default settings are read from config/general.d/*.conf (legacy config/general.conf)")
 		fmt.Println("  Default port: 3000")
 		fmt.Println("  Default binding: localhost (secure)")
 		fmt.Println("\nExamples:")
@@ -463,9 +593,9 @@ func main() {
 	protectedAPI.Get("/config/files", getConfigFiles)
 	protectedAPI.Get("/config/backups", getConfigBackups)
 	protectedAPI.Delete("/config/backups/:backupId", deleteConfigBackup)
-	protectedAPI.Get("/config/:filename", getConfigFile)
-	protectedAPI.Put("/config/:filename", saveConfigFile)
-	protectedAPI.Get("/config/:filename/example", getConfigExample)
+	protectedAPI.Get("/config/example/*", getConfigExample)
+	protectedAPI.Get("/config/*", getConfigFile)
+	protectedAPI.Put("/config/*", saveConfigFile)
 
 	// Start a module session
 	protectedAPI.Post("/modules/:id/start", startModule)
@@ -1506,43 +1636,32 @@ type ConfigBackup struct {
 }
 
 // getConfigFiles returns a list of available configuration files
-func getConfigFiles(c *fiber.Ctx) error {
-	configDir := filepath.Join(lhRootDir, "config")
 
-	// List of config files we want to expose
-	configFiles := []string{"general.conf", "backup.conf", "docker.conf"}
+func getConfigFiles(c *fiber.Ctx) error {
+	configFiles := collectConfigFilenames()
 	var files []ConfigFileInfo
 
 	for _, filename := range configFiles {
-		configPath := filepath.Join(configDir, filename)
-		examplePath := filepath.Join(configDir, filename+".example")
+		configPath, examplePath, _, ok := configPaths(filename)
+		if !ok {
+			continue
+		}
 
-		// Check if config file exists
 		var lastModified time.Time
 		if info, err := os.Stat(configPath); err == nil {
 			lastModified = info.ModTime()
 		}
 
-		// Check if example file exists
 		hasExample := false
-		if _, err := os.Stat(examplePath); err == nil {
-			hasExample = true
-		}
-
-		// Create display name
-		displayName := filename
-		switch filename {
-		case "general.conf":
-			displayName = "General Configuration"
-		case "backup.conf":
-			displayName = "Backup Configuration"
-		case "docker.conf":
-			displayName = "Docker Configuration"
+		if examplePath != "" {
+			if _, err := os.Stat(examplePath); err == nil {
+				hasExample = true
+			}
 		}
 
 		files = append(files, ConfigFileInfo{
 			Filename:     filename,
-			DisplayName:  displayName,
+			DisplayName:  configDisplayName(filename),
 			HasExample:   hasExample,
 			LastModified: lastModified,
 		})
@@ -1551,31 +1670,14 @@ func getConfigFiles(c *fiber.Ctx) error {
 	return c.JSON(files)
 }
 
-// getConfigFile returns the content of a specific configuration file
 func getConfigFile(c *fiber.Ctx) error {
-	filename := c.Params("filename")
+	filename := getConfigParam(c)
 
-	// Security check - only allow specific config files
-	allowedFiles := map[string]bool{
-		"general.conf": true,
-		"backup.conf":  true,
-		"docker.conf":  true,
-	}
-
-	if !allowedFiles[filename] {
+	configPath, examplePath, _, ok := configPaths(filename)
+	if !ok {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid configuration file"})
 	}
 
-	configPath := filepath.Join(lhRootDir, "config", filename)
-	examplePath := filepath.Join(lhRootDir, "config", filename+".example")
-
-	// Check if example file exists
-	hasExample := false
-	if _, err := os.Stat(examplePath); err == nil {
-		hasExample = true
-	}
-
-	// Read config file content
 	var content string
 	var lastModified time.Time
 
@@ -1585,8 +1687,14 @@ func getConfigFile(c *fiber.Ctx) error {
 			lastModified = info.ModTime()
 		}
 	} else {
-		// If config file doesn't exist, use empty content
 		content = ""
+	}
+
+	hasExample := false
+	if examplePath != "" {
+		if _, err := os.Stat(examplePath); err == nil {
+			hasExample = true
+		}
 	}
 
 	return c.JSON(ConfigFile{
@@ -1597,18 +1705,11 @@ func getConfigFile(c *fiber.Ctx) error {
 	})
 }
 
-// saveConfigFile saves configuration file content with backup
 func saveConfigFile(c *fiber.Ctx) error {
-	filename := c.Params("filename")
+	filename := getConfigParam(c)
 
-	// Security check - only allow specific config files
-	allowedFiles := map[string]bool{
-		"general.conf": true,
-		"backup.conf":  true,
-		"docker.conf":  true,
-	}
-
-	if !allowedFiles[filename] {
+	configPath, _, configType, ok := configPaths(filename)
+	if !ok {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid configuration file"})
 	}
 
@@ -1621,21 +1722,12 @@ func saveConfigFile(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
-	configPath := filepath.Join(lhRootDir, "config", filename)
-
-	// Determine config type for validation
-	configType := "general"
-	switch filename {
-	case "backup.conf":
-		configType = "backup"
-	case "docker.conf":
-		configType = "docker"
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to prepare configuration directory"})
 	}
 
-	// Use shell script to safely write the config with backup
 	var backupFile string
 	if request.CreateBackup {
-		// Create backup using our GUI library
 		cmd := exec.Command("bash", "-c", fmt.Sprintf(`
 			source "%s/lib/lib_common.sh"
 			source "%s/lib/lib_gui.sh"
@@ -1650,7 +1742,6 @@ func saveConfigFile(c *fiber.Ctx) error {
 		}
 	}
 
-	// Write config file using GUI library for validation and safety
 	cmd := exec.Command("bash", "-c", fmt.Sprintf(`
 		source "%s/lib/lib_common.sh"
 		source "%s/lib/lib_gui.sh"
@@ -1678,24 +1769,18 @@ func saveConfigFile(c *fiber.Ctx) error {
 	return c.JSON(result)
 }
 
-// getConfigExample returns the content of a configuration example file
 func getConfigExample(c *fiber.Ctx) error {
-	filename := c.Params("filename")
+	filename := getConfigParam(c)
 
-	// Security check - only allow specific config files
-	allowedFiles := map[string]bool{
-		"general.conf": true,
-		"backup.conf":  true,
-		"docker.conf":  true,
-	}
-
-	if !allowedFiles[filename] {
+	_, examplePath, _, ok := configPaths(filename)
+	if !ok {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid configuration file"})
 	}
 
-	examplePath := filepath.Join(lhRootDir, "config", filename+".example")
+	if examplePath == "" {
+		return c.Status(404).JSON(fiber.Map{"error": "Example file not found"})
+	}
 
-	// Read example file content
 	data, err := os.ReadFile(examplePath)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Example file not found"})
@@ -1709,12 +1794,10 @@ func getConfigExample(c *fiber.Ctx) error {
 	return c.JSON(ConfigFile{
 		Filename:     filename + ".example",
 		Content:      string(data),
-		HasExample:   false, // Example files don't have examples
+		HasExample:   false,
 		LastModified: lastModified,
 	})
 }
-
-// getConfigBackups returns a list of configuration backups
 func getConfigBackups(c *fiber.Ctx) error {
 	// Use shell script to list all GUI backups
 	cmd := exec.Command("bash", "-c", fmt.Sprintf(`

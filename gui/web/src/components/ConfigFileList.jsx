@@ -7,6 +7,7 @@ Licensed under the MIT License. See the LICENSE file in the project root for mor
 */
 
 import { useTranslation } from 'react-i18next';
+import { getConfigDisplayKey } from '../utils/configDisplayNames.js';
 
 function ConfigFileList({ files, selectedFile, onFileSelect }) {
   const { t } = useTranslation('common');
@@ -21,28 +22,32 @@ function ConfigFileList({ files, selectedFile, onFileSelect }) {
     <div className="config-file-list">
       <h3>{t('config.configFiles')}</h3>
       <div className="file-list">
-        {files.map((file) => (
-          <div
-            key={file.filename}
-            className={`file-item ${selectedFile === file.filename ? 'selected' : ''}`}
-            onClick={() => onFileSelect(file.filename)}
-          >
-            <div className="file-info">
-              <div className="file-name">{file.display_name}</div>
-              <div className="file-details">
-                <span className="filename">{file.filename}</span>
-                {file.has_example && (
-                  <span className="has-example" title={t('config.hasExample')}>
-                    📋
-                  </span>
-                )}
-              </div>
-              <div className="last-modified">
-                {t('config.lastModified')}: {formatLastModified(file.last_modified)}
+        {files.map((file) => {
+          const displayKey = getConfigDisplayKey(file.filename);
+          const displayName = displayKey ? t(displayKey) : file.display_name;
+          return (
+            <div
+              key={file.filename}
+              className={`file-item ${selectedFile === file.filename ? 'selected' : ''}`}
+              onClick={() => onFileSelect(file.filename)}
+            >
+              <div className="file-info">
+                <div className="file-name">{displayName}</div>
+                <div className="file-details">
+                  <span className="filename">{file.filename}</span>
+                  {file.has_example && (
+                    <span className="has-example" title={t('config.hasExample')}>
+                      📋
+                    </span>
+                  )}
+                </div>
+                <div className="last-modified">
+                  {t('config.lastModified')}: {formatLastModified(file.last_modified)}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       
       <div className="file-list-footer">

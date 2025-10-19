@@ -638,7 +638,7 @@ The module exposes a streamlined two-level menu:
 *   `LH_DEBUG_LOG_LIMIT`: Limits the number of debug log entries displayed (0 for unlimited, positive integer for limit).
 *   `LH_BACKUP_SUBVOLUMES`: Space-separated list of BTRFS subvolumes to backup (e.g., "@ @home @var @opt"). Default: "@ @home".
 *   `LH_AUTO_DETECT_SUBVOLUMES`: Enable automatic detection of BTRFS subvolumes from system configuration (true/false). Default: "true".
-*   `CFG_LH_RELEASE_TAG`: Optional global override (set in `config/general.conf`) used when embedding release identifiers in backup metadata.
+*   `CFG_LH_RELEASE_TAG`: Optional global override (set in `config/general.d/90-release.conf`, legacy `config/general.conf`) used when embedding release identifiers in backup metadata.
 
 **8. Supported BTRFS Layouts:**
 The module supports flexible BTRFS subvolume configurations through both manual configuration and automatic detection:

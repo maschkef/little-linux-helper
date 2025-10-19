@@ -27,11 +27,12 @@ This library handles all configuration-related functionality for the Little Linu
 ### File Paths and Structure
 
 - **Configuration Directory**: `$LH_ROOT_DIR/config`
-- **Backup Configuration**: `config/backup.conf`
-- **General Configuration**: `config/general.conf`
-- **Docker Configuration**: `config/docker.conf`
+- **Backup Configuration**: `config/backup.d/*.conf` (legacy fallback: `config/backup.conf`)
+- **General Configuration**: `config/general.d/*.conf` (legacy fallback: `config/general.conf`)
+- **Docker Configuration**: `config/docker.d/*.conf` (legacy fallback: `config/docker.conf`)
 
-Each configuration file has a corresponding `.example` file that serves as a template.
+Fragments are loaded in lexical order (e.g. `00-*.conf`, `10-*.conf`, …) so related settings can be grouped by filename prefix.  
+Every fragment has a matching `.example` template under `<name>.d.example/` that is used for bootstrapping and schema checks.
 
 ## Key Functions
 
@@ -49,6 +50,7 @@ Loads backup configuration from the backup configuration file or uses default va
 - **Variable validation**: Ensures all required variables are set
 - **Logging integration**: Logs configuration loading process
 - **Timestamp generation**: Creates timestamped backup log file path
+- **Fragment-aware**: Reads every `config/backup.d/*.conf` fragment in lexical order before falling back to the legacy `config/backup.conf`
 
 **Side Effects:**
 - Sets global variables: `LH_BACKUP_ROOT`, `LH_BACKUP_DIR`, `LH_TEMP_SNAPSHOT_DIR`, `LH_RETENTION_BACKUP`, `LH_BACKUP_LOG_BASENAME`, `LH_TAR_EXCLUDES`, etc.
@@ -76,13 +78,14 @@ Saves current backup configuration values to the backup configuration file.
 
 **Features:**
 - **Directory creation**: Creates config directory if missing
-- **Variable persistence**: Saves all backup-related variables
-- **Atomic writing**: Writes complete configuration in single operation
+- **Fragment persistence**: Updates the corresponding files under `config/backup.d/` when available, preserving inline documentation
+- **Legacy fallback**: Recreates `config/backup.conf` for older setups that have not yet adopted fragments
 - **Logging integration**: Logs save operation
 
 **Side Effects:**
 - Creates `$LH_CONFIG_DIR` directory if it doesn't exist
-- Overwrites existing backup configuration file
+- Ensures fragment files exist (cloned from `.example` when missing) and updates their key/value pairs
+- Overwrites the legacy monolithic configuration when fragments are absent
 - Writes info message to log
 
 **Dependencies:**
@@ -110,6 +113,7 @@ Loads general configuration including language and logging settings.
 - **Default fallback**: Uses sensible defaults when configuration missing
 - **Logging configuration**: Sets log level and output options
 - **Language setting**: Configures system language preference
+- **Fragment-aware**: Loads `config/general.d/*.conf` in lexical order (with `config/general.conf` retained for legacy installs)
 
 **Configuration Variables:**
 - `CFG_LH_LANG`: Language setting ('de', 'en', 'es', 'fr', or 'auto')
@@ -150,14 +154,16 @@ Saves general configuration to the configuration file.
 - Maintain configuration file structure
 
 **Features:**
-- **Template-based**: Uses example file as template, updates values
-- **Selective updates**: Updates only specified configuration variables
+- **Fragment-first**: Updates the dedicated fragment files in `config/general.d/` while keeping comments and metadata intact
+- **Legacy support**: Falls back to regenerating `config/general.conf` from its template when fragments are not available
+- **Selective updates**: Touches only the variables managed by the helper
 - **Directory creation**: Ensures configuration directory exists
 - **Backup handling**: Can preserve existing configuration structure
 
 **Side Effects:**
 - Creates `$LH_CONFIG_DIR` directory if needed
-- Updates general configuration file
+- Ensures fragment files exist (copying from `config/general.d.example/` when necessary) before updating their assignments
+- Regenerates the legacy monolithic file when running on older setups
 - Logs configuration save operation
 
 **Dependencies:**
@@ -224,21 +230,21 @@ LH_LOG_TIMESTAMP_FORMAT="time"
 
 ### Configuration File Lifecycle
 
-1. **Template Creation**: Example files (`.example`) provide templates
-2. **Automatic Creation**: Missing configuration files are created from templates and require explicit acknowledgement before continuing
-3. **Template Synchronisation**: Existing configuration files are compared with their templates; missing keys can be added immediately with defaults or custom values
+1. **Template Creation**: Example fragments under `*.d.example/` provide the canonical structure and comments
+2. **Automatic Creation**: Missing configuration fragments are cloned from their templates (entire directories on first run) and require explicit acknowledgement before continuing
+3. **Template Synchronisation**: Existing fragments are compared with their templates; missing keys can be added immediately with defaults or custom values
 4. **Loading**: Configuration values loaded during system initialization
 5. **Runtime Modification**: Configuration can be modified during operation
 6. **Persistence**: Modified configuration can be saved permanently
 
 ### Interactive Configuration Checks
 
-- **New file acknowledgement**: If a `*.conf` file is created from its template, a blocking prompt lists all new files and offers to continue (acknowledge) or quit so the user can edit them right away.
+- **New file acknowledgement**: If a `*.conf` fragment is created from its template, a blocking prompt lists all new files and offers to continue (acknowledge) or quit so the user can edit them right away.
 - **Missing keys wizard**: When templates gain new variables, the helper lists the missing keys per file and lets the user append:
   - Template default values
   - Custom values entered interactively
   - Nothing (skip) — internal defaults stay in place for the session
-- **Template context**: For each missing key the prompt shows the comment block from the `.conf.example` so users know what they are adjusting before choosing a value.
+- **Template context**: For each missing key the prompt shows the comment block from the template fragment so users know what they are adjusting before choosing a value.
 - **Configuration modes (`LH_CONFIG_MODE`)**:
   - `ask` *(default)*: prompt when running in an interactive TTY
   - `auto`: append template defaults automatically without interaction
@@ -248,26 +254,30 @@ Helper routines for these checks are implemented in `lib/lib_config_schema.sh` a
 
 ### Example Configuration Files
 
-**backup.conf.example:**
+**config/general.d.example/00-language.conf:**
+```bash
+# Supported languages (abbreviated excerpt)
+CFG_LH_LANG="en"
+```
+
+**config/general.d.example/30-gui.conf:**
+```bash
+CFG_LH_GUI_PORT="3000"
+CFG_LH_GUI_HOST="localhost"
+CFG_LH_GUI_FIREWALL_RESTRICTION="local"
+```
+
+**config/backup.d.example/00-storage.conf:**
 ```bash
 CFG_LH_BACKUP_ROOT="/run/media/tux/hdd_3tb/"
 CFG_LH_BACKUP_DIR="/backups"
 CFG_LH_TEMP_SNAPSHOT_DIR="/.snapshots_lh_temp"
-CFG_LH_RETENTION_BACKUP="3"
-CFG_LH_BACKUP_LOG_BASENAME="backup.log"
 ```
 
-**general.conf.example:**
+**config/docker.d.example/20-warnings.conf:**
 ```bash
-CFG_LH_LANG="en"
-CFG_LH_LOG_LEVEL="INFO"
-CFG_LH_LOG_TO_CONSOLE="true"
-CFG_LH_LOG_TO_FILE="true"
-CFG_LH_LOG_SHOW_FILE_ERROR="true"
-CFG_LH_LOG_SHOW_FILE_WARN="true"
-CFG_LH_LOG_SHOW_FILE_INFO="false"
-CFG_LH_LOG_SHOW_FILE_DEBUG="true"
-CFG_LH_LOG_TIMESTAMP_FORMAT="time"
+CFG_LH_DOCKER_SKIP_WARNINGS="latest-images"
+CFG_LH_DOCKER_ACCEPTED_WARNINGS=""
 ```
 
 ## Error Handling and Fallbacks

@@ -81,7 +81,7 @@ Eine moderne webbasierte GUI kann über `gui_launcher.sh` gestartet werden und b
 - **Vollbild-Lesemodus**: Blendet alle Panels außer der Dokumentation aus, um maximalen Leseraum zu schaffen
 - **Mehrfach-Panel-Layout**: Skalierbare Panels mit flexiblen Ein-/Ausblendoptionen für eine optimale Arbeitsfläche
 - **Sicherheitsfunktionen**: Standardmäßig nur an `localhost` gebunden, optionaler Netzwerkzugriff per Kommandozeile
-- **Konfigurierbares Netzwerk**: Port- und Host-Konfiguration über `config/general.conf` oder Kommandozeilenargumente
+- **Konfigurierbares Netzwerk**: Port- und Host-Konfiguration über `config/general.d/30-gui.conf` (legacy `config/general.conf`) oder Kommandozeilenargumente
 - **Internationalisierung**: Vollständige Englisch/Deutsch-Übersetzungen mit dynamischem Sprachwechsel
 - **Fehlertolerantes Design**: Fehlende Übersetzungsschlüssel zeigen Fallback-Inhalte anstatt Abstürze zu verursachen
 - **Umfassendes Hilfesystem**: Kontextsensitive Hilfe mit detaillierten Modulhinweisen und Nutzungsempfehlungen
@@ -103,7 +103,7 @@ Eine moderne webbasierte GUI kann über `gui_launcher.sh` gestartet werden und b
 ./gui_launcher.sh -b -n        # Bauen und starten mit Netzwerkzugriff
 ./gui_launcher.sh -h           # Umfassende Hilfe
 
-# Individuelle Konfiguration über config/general.conf:
+# Individuelle Konfiguration über config/general.d/30-gui.conf:
 CFG_LH_GUI_PORT="3000"        # Standard-Port festlegen
 CFG_LH_GUI_HOST="localhost"   # Binding setzen (localhost/0.0.0.0)
 CFG_LH_GUI_FIREWALL_RESTRICTION="local"  # IP-Beschränkungen für Firewallöffnung
@@ -450,7 +450,7 @@ Kontextbezogene Moduldokumentation neben aktiven Sitzungen für schnellen Zugrif
 
 - **Adaptiver Standard:** Wenn die GUI ausschließlich an `localhost` gebunden ist, wird die Anmeldung automatisch deaktiviert. Sobald `--network` oder eine nicht-loopback-Adresse verwendet wird, schaltet der Backend-Server automatisch auf die Sitzungsanmeldung um.
 - **Modi überschreiben:** `LLH_GUI_AUTH_MODE=auto` (adaptives Standardverhalten), `session` (Anmeldung immer erzwingen), `basic` (HTTP Basic Auth) oder `none` (nur für loopback). Wird die GUI aus dem Netzwerk erreichbar, verweigern Launcher und Backend den Start ohne Authentifizierung.
-- **Konfigurationsblock** (in `config/general.conf` oder als Umgebungsvariablen setzen):
+- **Konfigurationsblock** (in `config/general.d/40-gui-auth.conf` oder als Umgebungsvariablen setzen):
 
 ```bash
 export LLH_GUI_AUTH_MODE="auto"
@@ -482,12 +482,12 @@ Little Linux Helper unterstützt mehrere Sprachen für die Benutzeroberfläche. 
 
 **Sprachauswahl:**
 * **Automatische Erkennung**: Die Systemsprache wird automatisch über die Umgebungsvariablen (`LANG`, `LC_ALL`, `LC_MESSAGES`) ermittelt
-* **Manuelle Konfiguration**: Die Sprache kann in `config/general.conf` über die Einstellung `CFG_LH_LANG` festgelegt werden
+* **Manuelle Konfiguration**: Die Sprache kann in `config/general.d/00-language.conf` über die Einstellung `CFG_LH_LANG` festgelegt werden
 * **Fallback-Mechanismus**: Bei fehlenden Übersetzungen oder nicht unterstützten Sprachen fällt das System automatisch auf Englisch zurück
 
 **Sprachkonfiguration:**
 ```bash
-# In config/general.conf
+# In config/general.d/00-language.conf
 CFG_LH_LANG="auto"    # Automatische Systemsprache
 CFG_LH_LANG="de"      # Deutsch
 CFG_LH_LANG="en"      # Englisch
@@ -733,12 +733,12 @@ Beim ersten Start des Hauptskripts (`help_master.sh`) werden Standardkonfigurati
 Technische Details zum Synchronisations-Helfer findest du in `docs/lib/doc_config_schema.md`.
 
 Konfigurationsdateien werden aktuell für folgende Module verwendet:
-* **Allgemeine Einstellungen (`help_master.sh`)**: Sprache, Logging-Verhalten, GUI-Port/Host-Konfiguration und weitere Basiseinstellungen (`config/general.conf`).
-* **Backup & Wiederherstellung (`modules/backup/mod_backup.sh`, `modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`)**: Pfade, Aufbewahrungsrichtlinien etc. (`config/backup.conf`).
-* **Docker-Sicherheitsprüfung (`mod_security.sh`)**: Suchpfade, zu überspringende Warnungen usw. (`config/docker.conf`).
+* **Allgemeine Einstellungen (`help_master.sh`)**: Sprache, Logging-Verhalten, GUI-Port/Host-Konfiguration und weitere Basiseinstellungen (`config/general.d/*.conf`, legacy `config/general.conf`).
+* **Backup & Wiederherstellung (`modules/backup/mod_backup.sh`, `modules/backup/mod_btrfs_backup.sh`, `modules/backup/mod_btrfs_restore.sh`)**: Pfade, Aufbewahrungsrichtlinien etc. (`config/backup.d/*.conf`, legacy `config/backup.conf`).
+* **Docker-Sicherheitsprüfung (`mod_security.sh`)**: Suchpfade, zu überspringende Warnungen usw. (`config/docker.d/*.conf`, legacy `config/docker.conf`).
 
 **GUI-Konfigurationsoptionen:**
-Der GUI-Server lässt sich über `config/general.conf` anpassen:
+Der GUI-Server lässt sich über `config/general.d/30-gui.conf` anpassen:
 ```bash
 # GUI-Server-Port (Standard: 3000)
 CFG_LH_GUI_PORT="3000"

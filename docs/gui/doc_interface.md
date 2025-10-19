@@ -196,7 +196,7 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
     *   **Secure by default:** Localhost-only binding prevents network exposure
     *   **Configurable network access:** Optional `-network` flag for controlled network access (direct binary) or `-n/--network` when using the launcher
     *   **Firewall assistance via launcher:** `gui_launcher.sh -f/--open-firewall` can add temporary rules for ufw/firewalld/iptables when network mode is enabled
-    *   **Port configuration:** Configurable via `config/general.conf` or command line
+    *   **Port configuration:** Configurable via `config/general.d/30-gui.conf` (legacy `config/general.conf`) or command line
     *   **Security warnings:** Launcher prints explicit warnings when network mode is enabled (especially with sudo)
     *   **Same security context:** Maintains CLI-equivalent security permissions
     *   **WebSocket restrictions:** Connections limited by host binding configuration
@@ -242,8 +242,8 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 **9. Technical Specifications:**
 
 *   **Network Configuration:**
-    *   **Default port:** 3000 (configurable via `config/general.conf` or `-p/--port` flag)
-    *   **Default binding:** localhost (secure, configurable via `config/general.conf`)
+    *   **Default port:** 3000 (configurable via `config/general.d/30-gui.conf` or `-p/--port` flag)
+    *   **Default binding:** localhost (secure, configurable via `config/general.d/30-gui.conf`)
     *   **Network access:** Available via `-n/--network` flag (binds to 0.0.0.0)
     *   **Protocol:** HTTP with WebSocket upgrade
     *   **Command line options:** `-p/--port`, `-n/--network`, `-h/--help`
@@ -266,10 +266,10 @@ The GUI provides a modern, web-based interface for the Little Linux Helper syste
 
 **10. Configuration & Usage:**
 
-*   **Configuration File (`config/general.conf`):**
+*   **Configuration File (`config/general.d/30-gui.conf`):**
     *   `CFG_LH_GUI_PORT="3000"` - Set default port for GUI server
     *   `CFG_LH_GUI_HOST="localhost"` - Set default host binding (localhost/0.0.0.0)
-    *   Configuration automatically created from `config/general.conf.example`
+    *   Configuration automatically created from `config/general.d.example/30-gui.conf`
     *   Settings can be overridden by command line arguments
 
 *   **Command Line Usage:**

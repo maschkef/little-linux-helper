@@ -1,83 +1,9 @@
-# config/backup.conf
-# Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# config/backup.conf (legacy aggregate)
 #
-# This file is part of the 'little-linux-helper' collection.
-# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+# Backup settings now reside in config/backup.d/*.conf fragments. This file is
+# retained for tooling that still expects a monolithic configuration. Add
+# override assignments below if you need to force a value after the fragments
+# have been loaded.
 #
-# Little Linux Helper - Backup Configuration
-
-# CFG_LH_BACKUP_ROOT:
-# Root directory for storing backup targets (docs/mod/doc_btrfs_backup.md).
-# Choose an absolute path with sufficient free space (external disk, NAS mount, dedicated BTRFS volume, ...).
-# Example: "/mnt/external_drive" or "/srv/backups"
-CFG_LH_BACKUP_ROOT="/run/media/tux/hdd_3tb/"
-
-# CFG_LH_BACKUP_DIR:
-# Subdirectory (prefixed with "/") appended to CFG_LH_BACKUP_ROOT to form the final destination.
-# The helper creates `<root><dir>` automatically when running backups.
-# Example: "/my_system_backup"
-CFG_LH_BACKUP_DIR="/backups"
-
-# CFG_LH_TEMP_SNAPSHOT_DIR:
-# Absolute path for temporary read-only snapshots during backup runs (docs/mod/doc_btrfs_backup.md).
-# Must live on a BTRFS filesystem owned by the helper so cleanup and chain validation stay reliable.
-# IMPORTANT: Avoid Snapper/Timeshift reserved directories to prevent collisions.
-CFG_LH_TEMP_SNAPSHOT_DIR="/.snapshots_lh_temp"
-
-# CFG_LH_RETENTION_BACKUP:
-# Number of completed backups to keep per target (docs/mod/doc_btrfs_backup.md section 7).
-# The cleanup stage keeps the newest N folders/snapshots and removes older ones.
-CFG_LH_RETENTION_BACKUP="10"
-
-# CFG_LH_BACKUP_LOG_BASENAME:
-# Base name for timestamped log files created per run (YYMMDD-HHMM_<basename>).
-# Helpful when correlating backup activity with metadata markers.
-CFG_LH_BACKUP_LOG_BASENAME="backup.log"
-
-# CFG_LH_TAR_EXCLUDES:
-# Extra tar exclusion patterns (space-separated). Combined with internal defaults like /proc/* (docs/mod/doc_backup_tar.md).
-# Example: "*.tmp *.log /var/cache"
-CFG_LH_TAR_EXCLUDES=""
-
-# CFG_LH_DEBUG_LOG_LIMIT:
-# Caps how many backup candidates appear in debug listings (docs/mod/doc_btrfs_backup.md).
-# 0 prints every candidate; higher values keep logs succinct without affecting retention.
-CFG_LH_DEBUG_LOG_LIMIT="10"
-
-# CFG_LH_KEEP_SOURCE_SNAPSHOTS:
-# Determines how source snapshots are handled after a run (docs/mod/doc_btrfs_backup.md).
-# Values: "prompt" (ask per subvolume), "true" (always retain), "false" (always delete).
-# Preserved snapshots move into CFG_LH_SOURCE_SNAPSHOT_DIR to avoid Snapper/Timeshift conflicts.
-CFG_LH_KEEP_SOURCE_SNAPSHOTS="prompt"
-
-# CFG_LH_SOURCE_SNAPSHOT_DIR:
-# Destination for preserved source snapshots (used when KEEP_SOURCE_SNAPSHOTS is "prompt" or "true"; see docs/mod/doc_btrfs_backup.md).
-# Keep this separate from Snapper/Timeshift paths; the helper tags snapshots for safe cleanup.
-CFG_LH_SOURCE_SNAPSHOT_DIR="/.snapshots_lh"
-
-# CFG_LH_SOURCE_SNAPSHOT_RETENTION:
-# Limits how many preserved parents stay available per subvolume for incremental chains (docs/mod/doc_btrfs_backup.md).
-# 0 disables preservation, 1 keeps the latest parent, higher values retain additional fallbacks.
-CFG_LH_SOURCE_SNAPSHOT_RETENTION="1"
-
-# CFG_LH_BACKUP_SUBVOLUMES:
-# Manual list of BTRFS subvolumes to back up (space-separated; docs/mod/doc_btrfs_backup.md).
-# Default: "@" "@home" (standard layout used by most distributions)
-# 
-# Examples:
-#   Standard layout:     "@" "@home"
-#   openSUSE layout:     "@" "@home" "@opt" "@srv" "@tmp" "@usr/local" "@var"
-#   Arch Linux layout:   "@" "@home" "@var/log" "@var/cache/pacman/pkg"
-#   Custom layout:       "@" "@home" "@docker" "@snapshots"
-# 
-# IMPORTANT: Each subvolume name should start with '@' and match your /etc/fstab entries.
-# When CFG_LH_AUTO_DETECT_SUBVOLUMES="true", detected subvolumes are merged with this list (duplicates removed).
-# Use 'btrfs subvolume list /' to see available subvolumes on your system.
-CFG_LH_BACKUP_SUBVOLUMES="@ @home"
-
-# CFG_LH_AUTO_DETECT_SUBVOLUMES:
-# Toggle automatic discovery of @-prefixed subvolumes from /etc/fstab and /proc/mounts (docs/mod/doc_btrfs_backup.md).
-# Values: "true" (merge detected entries with CFG_LH_BACKUP_SUBVOLUMES) or "false" (manual list only).
-# Helps prevent accidental omissions when distributions add new layout subvolumes.
-CFG_LH_AUTO_DETECT_SUBVOLUMES="true"
+# Example override (set custom backup root):
+# CFG_LH_BACKUP_ROOT="/srv/backups"
