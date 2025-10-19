@@ -8,62 +8,61 @@
 # Little Linux Helper - Backup Configuration
 
 # CFG_LH_BACKUP_ROOT:
-# The absolute path to the root directory where backups should be stored.
+# Root directory for storing backup targets (docs/mod/doc_btrfs_backup.md).
+# Choose an absolute path with sufficient free space (external disk, NAS mount, dedicated BTRFS volume, ...).
 # Example: "/mnt/external_drive" or "/srv/backups"
 CFG_LH_BACKUP_ROOT="/run/media/tux/hdd_3tb/"
 
 # CFG_LH_BACKUP_DIR:
-# The name of the subdirectory within CFG_LH_BACKUP_ROOT where the actual backup data will be stored.
-# Must start with "/". Example: "/my_system_backup"
+# Subdirectory (prefixed with "/") appended to CFG_LH_BACKUP_ROOT to form the final destination.
+# The helper creates `<root><dir>` automatically when running backups.
+# Example: "/my_system_backup"
 CFG_LH_BACKUP_DIR="/backups"
 
 # CFG_LH_TEMP_SNAPSHOT_DIR:
-# An absolute path to a temporary directory used for BTRFS snapshots during the backup process.
-# This directory should be on a BTRFS volume, ideally on the system itself if possible.
-# IMPORTANT: Do NOT use Snapper (.snapshots) or Timeshift directories to avoid conflicts.
+# Absolute path for temporary read-only snapshots during backup runs (docs/mod/doc_btrfs_backup.md).
+# Must live on a BTRFS filesystem owned by the helper so cleanup and chain validation stay reliable.
+# IMPORTANT: Avoid Snapper/Timeshift reserved directories to prevent collisions.
 CFG_LH_TEMP_SNAPSHOT_DIR="/.snapshots_lh_temp"
 
 # CFG_LH_RETENTION_BACKUP:
-# The number of backup versions to keep (e.g., 10 means the 10 newest backups will be retained).
+# Number of completed backups to keep per target (docs/mod/doc_btrfs_backup.md section 7).
+# The cleanup stage keeps the newest N folders/snapshots and removes older ones.
 CFG_LH_RETENTION_BACKUP="10"
 
 # CFG_LH_BACKUP_LOG_BASENAME:
-# The base name for backup log files. A timestamp (YYMMDD-HHMM_) will be prepended to this name.
-# Example: "backup.log" becomes "240730-1015_backup.log".
+# Base name for timestamped log files created per run (YYMMDD-HHMM_<basename>).
+# Helpful when correlating backup activity with metadata markers.
 CFG_LH_BACKUP_LOG_BASENAME="backup.log"
 
 # CFG_LH_TAR_EXCLUDES:
-# Exclusion patterns for TAR-based backups (space-separated list).
+# Extra tar exclusion patterns (space-separated). Combined with internal defaults like /proc/* (docs/mod/doc_backup_tar.md).
 # Example: "*.tmp *.log /var/cache"
 CFG_LH_TAR_EXCLUDES=""
 
 # CFG_LH_DEBUG_LOG_LIMIT:
-# Maximum number of backup candidates to show in debug logs when listing existing backups.
-# Set to 0 for unlimited (shows all existing backups in debug output).
-# This only affects log verbosity, not backup functionality.
-# Recommended: 10-20 for normal use, 0 for debugging issues.
+# Caps how many backup candidates appear in debug listings (docs/mod/doc_btrfs_backup.md).
+# 0 prints every candidate; higher values keep logs succinct without affecting retention.
 CFG_LH_DEBUG_LOG_LIMIT="10"
 
 # CFG_LH_KEEP_SOURCE_SNAPSHOTS:
-# Controls whether source snapshots created by this script should be preserved after backup.
-# Values: "prompt" (ask user during backup), "true" (always keep), "false" (always delete)
-# When kept, snapshots are stored in CFG_LH_SOURCE_SNAPSHOT_DIR to avoid conflicts with other tools.
+# Determines how source snapshots are handled after a run (docs/mod/doc_btrfs_backup.md).
+# Values: "prompt" (ask per subvolume), "true" (always retain), "false" (always delete).
+# Preserved snapshots move into CFG_LH_SOURCE_SNAPSHOT_DIR to avoid Snapper/Timeshift conflicts.
 CFG_LH_KEEP_SOURCE_SNAPSHOTS="prompt"
 
 # CFG_LH_SOURCE_SNAPSHOT_DIR:
-# Directory for permanent source snapshots when CFG_LH_KEEP_SOURCE_SNAPSHOTS is enabled.
-# This avoids conflicts with Snapper (/.snapshots) and Timeshift directories.
-# Script-created snapshots are marked with metadata for identification and cleanup.
+# Destination for preserved source snapshots (used when KEEP_SOURCE_SNAPSHOTS is "prompt" or "true"; see docs/mod/doc_btrfs_backup.md).
+# Keep this separate from Snapper/Timeshift paths; the helper tags snapshots for safe cleanup.
 CFG_LH_SOURCE_SNAPSHOT_DIR="/.snapshots_lh"
 
 # CFG_LH_SOURCE_SNAPSHOT_RETENTION:
-# Number of preserved source snapshots per subvolume. Controls how many parent snapshots
-# remain available for incremental chains after each backup completes.
-# Set to 0 to disable preservation, 1 to keep only the latest parent, or higher for additional fallbacks.
+# Limits how many preserved parents stay available per subvolume for incremental chains (docs/mod/doc_btrfs_backup.md).
+# 0 disables preservation, 1 keeps the latest parent, higher values retain additional fallbacks.
 CFG_LH_SOURCE_SNAPSHOT_RETENTION="1"
 
 # CFG_LH_BACKUP_SUBVOLUMES:
-# List of BTRFS subvolumes to backup (space-separated).
+# Manual list of BTRFS subvolumes to back up (space-separated; docs/mod/doc_btrfs_backup.md).
 # Default: "@" "@home" (standard layout used by most distributions)
 # 
 # Examples:
@@ -73,13 +72,12 @@ CFG_LH_SOURCE_SNAPSHOT_RETENTION="1"
 #   Custom layout:       "@" "@home" "@docker" "@snapshots"
 # 
 # IMPORTANT: Each subvolume name should start with '@' and match your /etc/fstab entries.
+# When CFG_LH_AUTO_DETECT_SUBVOLUMES="true", detected subvolumes are merged with this list (duplicates removed).
 # Use 'btrfs subvolume list /' to see available subvolumes on your system.
 CFG_LH_BACKUP_SUBVOLUMES="@ @home"
 
 # CFG_LH_AUTO_DETECT_SUBVOLUMES:
-# Enable automatic detection of BTRFS subvolumes from /etc/fstab and /proc/mounts.
-# Values: "true" (detect automatically), "false" (use CFG_LH_BACKUP_SUBVOLUMES only)
-# When enabled, the script will scan for @-prefixed subvolumes commonly used for backups
-# and merge them with the manually configured list above.
-# Automatic detection helps ensure no important subvolumes are missed.
+# Toggle automatic discovery of @-prefixed subvolumes from /etc/fstab and /proc/mounts (docs/mod/doc_btrfs_backup.md).
+# Values: "true" (merge detected entries with CFG_LH_BACKUP_SUBVOLUMES) or "false" (manual list only).
+# Helps prevent accidental omissions when distributions add new layout subvolumes.
 CFG_LH_AUTO_DETECT_SUBVOLUMES="true"

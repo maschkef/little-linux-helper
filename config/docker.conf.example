@@ -8,23 +8,23 @@
 # Little Linux Helper - Docker Security Configuration
 
 # CFG_LH_DOCKER_COMPOSE_ROOT:
-# The absolute path to the root directory where Docker-Compose projects should be searched.
-# Only used when CFG_LH_DOCKER_CHECK_MODE="all".
-CFG_LH_DOCKER_COMPOSE_ROOT="/opt/containers" # Note: My docker setup is usually created according to goneuland.de guides (german), hence this folder.
+# Root directory that the security audit scans for docker-compose projects (docs/mod/doc_docker_security.md).
+# Only relevant when CFG_LH_DOCKER_CHECK_MODE="all" (running mode reads compose files directly from the container list).
+# Example: "/opt/containers" for a consolidated compose archive.
+CFG_LH_DOCKER_COMPOSE_ROOT="/opt/containers"
 
 # CFG_LH_DOCKER_CHECK_MODE:
-# Determines which Docker-Compose files should be checked.
-# Available options:
-# - running: Only check Docker-Compose files of currently running containers (default, recommended)
-# - all:     Check all Docker-Compose files in the configured directory
+# Defines the scope of the audit (docs/mod/doc_docker.md).
+# - running: Inspect compose files of currently running stacks (default, faster).
+# - all:     Walk CFG_LH_DOCKER_COMPOSE_ROOT recursively to audit every stack.
 CFG_LH_DOCKER_CHECK_MODE="running"
 
 # CFG_LH_DOCKER_SKIP_WARNINGS:
-# Comma-separated list of warnings that should be skipped
+# Comma-separated list of security categories to suppress globally (docs/mod/doc_docker_security.md).
 # Available options:
 # - update-labels: Skip checking for Diun/Watchtower labels
 # - env-permissions: Skip .env file permissions
-# - dir-permissions: Skip directory permissions  
+# - dir-permissions: Skip directory permissions
 # - latest-images: Skip latest image warnings
 # - privileged: Skip privileged container warnings
 # - host-volumes: Skip host volume mount notices
@@ -36,13 +36,13 @@ CFG_LH_DOCKER_CHECK_MODE="running"
 CFG_LH_DOCKER_SKIP_WARNINGS="latest-images"
 
 # CFG_LH_DOCKER_CHECK_RUNNING:
-# Should an overview of running containers be displayed? (true/false)
-# When 'true', 'docker ps' will be executed to show running containers in the summary
+# Toggle whether the summary lists active containers via `docker ps` (true/false; docs/mod/doc_docker.md).
+# Helpful when using the helper as an operational dashboard.
 CFG_LH_DOCKER_CHECK_RUNNING="false"
 
 # CFG_LH_DOCKER_DEFAULT_PATTERNS:
-# Comma-separated list of regex patterns for insecure default values
-# These patterns are searched in Docker-Compose files
+# Comma-separated list of regex patterns that flag insecure defaults in compose files (docs/mod/doc_docker_security.md).
+# These patterns are searched in Docker-Compose files.
 # Format: VARIABLE=regex_for_value,OTHER_VAR=other_regex
 # The script must interpret the part after '=' as a regular expression.
 # Examples for regex patterns:
@@ -73,25 +73,23 @@ CFG_LH_DOCKER_DEFAULT_PATTERNS="PASSWORD=${COMMON_WEAK_PASSWORD_REGEX},"\
 "APP_KEY=${COMMON_PLACEHOLDER_KEY_REGEX}"
 
 # CFG_LH_DOCKER_ACCEPTED_WARNINGS:
-# Comma-separated list of specific warnings that are accepted for certain directories.
-# Format is: "/path/to/project:warning_type,/other/path:other_warning_type"
-# Example: CFG_LH_DOCKER_ACCEPTED_WARNINGS="/opt/containers/glances:privileged,/opt/containers/photoprism:security-opt"
-# Valid warning types are: privileged, security-opt, default-passwords, sensitive-data,
+# Directory-specific acknowledgements for findings you accept (docs/mod/doc_docker_security.md).
+# Format: "/path/to/project:warning_type,/other/path:other_warning_type"
+# Example: /opt/containers/glances:privileged,/opt/containers/photoprism:security-opt
+# Supported warning types: privileged, security-opt, default-passwords, sensitive-data,
 # host-volumes, dir-permissions, capabilities, env-permissions, update-labels, latest-images, exposed-ports.
-CFG_LH_DOCKER_ACCEPTED_WARNINGS="" 
+CFG_LH_DOCKER_ACCEPTED_WARNINGS=""
 
 
 # CFG_LH_DOCKER_EXCLUDE_DIRS:
-# Comma-separated list of directory names (not paths) that should be skipped when
-# searching for Docker-Compose files. These names are checked relative
-# to each searched directory.
-# Only used when CFG_LH_DOCKER_CHECK_MODE="all".
-CFG_LH_DOCKER_EXCLUDE_DIRS="docker,.docker_archive,node_modules,.git,.cache,venv,__pycache__" # Note: "docker" and ".docker_archive" are only specific to my environment
+# Directory names to skip while crawling CFG_LH_DOCKER_COMPOSE_ROOT (all-mode only).
+# Use this to avoid vendor caches or archived stacks (docs/mod/doc_docker.md).
+# Example: "docker,.docker_archive,node_modules,.git,.cache,venv,__pycache__"
+CFG_LH_DOCKER_EXCLUDE_DIRS="docker,.docker_archive,node_modules,.git,.cache,venv,__pycache__"
 
 # CFG_LH_DOCKER_SEARCH_DEPTH:
-# Maximum depth for searching Docker-Compose files.
-# Default value is 3 if not set in configuration.
-# Only used when CFG_LH_DOCKER_CHECK_MODE="all".
+# Maximum recursion depth when scanning CFG_LH_DOCKER_COMPOSE_ROOT (all-mode).
+# Defaults to 3 when unset (docs/mod/doc_docker_security.md).
 CFG_LH_DOCKER_SEARCH_DEPTH="3"
 
 # Example for extended configuration:

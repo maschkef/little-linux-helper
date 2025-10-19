@@ -11,18 +11,13 @@
 # LANGUAGE SETTINGS
 # =============================================================================
 
-# Supported languages: 
-# - de (German) - Full translation support
-# - en (English) - Full translation support
-# - es (Spanish) - Library translations only (lib/* files)
-# - fr (French) - Library translations only (lib/* files)
+# Supported languages (docs/lib/doc_i18n.md):
+# - de (German) - Full translation coverage
+# - en (English) - Full translation coverage (default)
+# - es (Spanish) and fr (French) - Library translations only; modules fall back to English
 #
-# Note: Spanish and French are partial implementations primarily for testing.
-# They have basic library translations but fall back to English for modules
-# and main menu items. Full support can be added by translating language files.
-#
-# Set to "auto" to automatically detect from system locale
-# Default: English
+# Set to "auto" to derive the language from LANG/LC_MESSAGES. Unsupported locales fall back to English.
+# Default: "en"
 
 CFG_LH_LANG="en"
 
@@ -30,36 +25,31 @@ CFG_LH_LANG="en"
 # LOGGING SETTINGS
 # =============================================================================
 
-# Log level configuration
-# Determines which messages are shown on console and written to log files
-# 
-# Available levels (in order of verbosity):
-# - ERROR: Only critical errors that prevent operation
-# - WARN:  Warnings and errors (recommended for normal use)
-# - INFO:  Informational messages, warnings and errors (default)
-# - DEBUG: All messages including debug information (verbose)
-#
-# Each level includes all levels above it (ERROR < WARN < INFO < DEBUG)
+# Log level configuration (docs/lib/doc_logging.md).
+# Controls what reaches the console/log files. Levels (ascending verbosity, inclusive):
+# - ERROR: Fatal issues that stop the current action
+# - WARN:  Problems worth investigating (suggested for production runs)
+# - INFO:  Status/progress updates (project default)
+# - DEBUG: Verbose diagnostics for troubleshooting
+# Tip: DEBUG output is heavily instrumented but stays hidden unless you opt in.
 
 CFG_LH_LOG_LEVEL="INFO"
 
-# Enable/disable console output (true/false)
-# When false, messages are only written to log files
+# Enable/disable console output (true/false).
+# Disable for cron/systemd jobs that expect silent stdout.
 CFG_LH_LOG_TO_CONSOLE="true"
 
-# Enable/disable file logging (true/false) 
-# When false, messages are only shown on console
+# Enable/disable file logging (true/false).
+# Logs are written to `$LH_LOG_DIR/YYYY-MM/...` so you can review past sessions.
 CFG_LH_LOG_TO_FILE="true"
 
 # =============================================================================
 # LOG MESSAGE FILE INFO SETTINGS
 # =============================================================================
 
-# Configure whether to show the source file name in log messages for each log level
-# This helps with debugging by showing which script/module generated each message
-# 
-# Format: [script_name.sh] message content
-# Example: [mod_backup.sh] Backup started successfully
+# Toggle inclusion of the originating script in log messages (per level).
+# Useful while debugging multi-module sessions.
+# Format: [script_name.sh] message - e.g. [mod_backup.sh] Backup started successfully.
 
 # Show file info for ERROR messages (true/false)
 CFG_LH_LOG_SHOW_FILE_ERROR="true"
@@ -77,13 +67,10 @@ CFG_LH_LOG_SHOW_FILE_DEBUG="true"
 # LOG MESSAGE TIMESTAMP SETTINGS
 # =============================================================================
 
-# Configure whether to show timestamps in log messages
-# This controls timestamp display for ALL log messages globally
-# 
-# Available options:
-# - "full" - Full timestamp: 2025-08-24 13:44:23
-# - "time" - Time only: 13:44:23  
-# - "none" - No timestamps (clean output)
+# Timestamp style applied to every log entry (see CLI Developer Guide section 5.1).
+# - "full": 2025-08-24 13:44:23
+# - "time": 13:44:23
+# - "none": Disable timestamps for minimal output.
 
 # Timestamp format for all log messages
 CFG_LH_LOG_TIMESTAMP_FORMAT="time"
@@ -102,11 +89,8 @@ CFG_LH_LOG_TIMESTAMP_FORMAT="time"
 #   ./gui_launcher.sh --port 8080  - Use custom port (long form)
 #   ./gui_launcher.sh -h           - Show comprehensive help
 
-# GUI server port (default: 3000)
-# The port on which the web GUI will be available
-# Valid range: 1-65535
-# Can be overridden with -p or --port command line flag
-# Examples: "3000", "8080", "80"
+# GUI server port (default: 3000).
+# Valid range: 1-65535. Override temporarily with `./gui_launcher.sh -p 8080` or `--port` (docs/doc_gui_launcher.md).
 CFG_LH_GUI_PORT="3000"
 
 # GUI server host binding (default: localhost - SECURE)
@@ -130,40 +114,34 @@ CFG_LH_GUI_PORT="3000"
 # Priority: Command line arguments > config file > built-in defaults
 CFG_LH_GUI_HOST="localhost"
 
-# Firewall port opening configuration
-# Controls IP restrictions when using the -f/--open-firewall option
-#
-# Available options:
-# - "all" - Allow access from any IP address (0.0.0.0/0)
-# - "local" - Allow access from detected local networks only (recommended)
-# - Specific IP or CIDR - e.g., "192.168.1.100" or "192.168.1.0/24"
-#
-# If not configured, the user will be prompted when using -f flag
-# Leave empty to always prompt: CFG_LH_GUI_FIREWALL_RESTRICTION=""
+# Firewall automation for `./gui_launcher.sh -f/--open-firewall`.
+# - "local": Allow the private home/office networks detected on this machine (e.g. 192.168.x.x, 10.x.x.x). Safe default for LAN testing.
+# - "all":   Allow 0.0.0.0/0 (only for hardened environments)
+# - Custom:  Provide an IP or CIDR (e.g. "192.168.1.0/24") for targeted rules
+# Leave empty to ask on every run (docs/doc_gui_launcher.md).
+# Applies only when the launcher manages firewall rules.
 CFG_LH_GUI_FIREWALL_RESTRICTION="local"
 
-# GUI authentication settings
+# GUI authentication settings (docs/GUI_DEVELOPER_GUIDE.md).
 #
-# Available modes:
-#   auto    - (default) disable auth on loopback bindings, require session auth otherwise
-#   session - Cookie-based login with CSRF protection (force login even on localhost)
-#   basic   - HTTP Basic Auth
-#   none    - Only permitted when binding to localhost/127.0.0.1
+# Modes:
+#   auto    - Default. Skip login on loopback, require sessions when reachable over the network.
+#   session - Always enforce the login form (cookie-based auth with CSRF protection).
+#   basic   - HTTP Basic Auth backed by bcrypt credentials.
+#   none    - Loopback-only. Launcher/backend refuse it when binding externally.
 #
 # Credentials:
-#   - Set LLH_GUI_USER to the login username
-#   - Use LLH_GUI_PASS_HASH with a bcrypt hash (recommended)
-#   - LLH_GUI_PASS_PLAIN is for development only; when provided and PASS_HASH
-#     is empty, the GUI backend derives a bcrypt hash at startup and logs a warning
+#   - Set LLH_GUI_USER to the login username.
+#   - Prefer LLH_GUI_PASS_HASH (bcrypt). Generate with `./gui/little-linux-helper-gui --hash-password "secret"`.
+#   - LLH_GUI_PASS_PLAIN is dev-only; the backend hashes it on startup and warns you.
 #
 # Cookies:
-#   - LLH_GUI_COOKIE_NAME defaults to "__Host-llh_sess"
-#   - LLH_GUI_COOKIE_SECURE should stay "true" when serving over HTTPS
-#     (the launcher and backend automatically relax this on localhost when unset)
+#   - Default cookie name is "__Host-llh_sess". Non-Host cookies fall back automatically when required.
+#   - Keep LLH_GUI_COOKIE_SECURE="true" for HTTPS. The launcher relaxes it automatically on localhost.
 #
-# Cross-origin support:
-#   - LLH_GUI_ALLOWED_ORIGINS accepts a comma-separated list of origins that are
-#     allowed to perform authenticated requests (useful for development tooling)
+# Cross-origin access:
+#   - LLH_GUI_ALLOWED_ORIGINS accepts a comma-separated list of trusted origins for authenticated API calls (e.g. Vite dev server).
+#   - Same-origin requests never need to be listed.
 #
 export LLH_GUI_AUTH_MODE="auto"
 export LLH_GUI_USER=""
@@ -182,7 +160,6 @@ export LLH_GUI_ALLOWED_ORIGINS=""
 # =============================================================================
 # RELEASE TAG (OPTIONAL)
 # =============================================================================
-# If set, this release tag will be embedded into backup metadata files so that
-# troubleshooting can correlate sessions with published versions. When unset,
-# the tooling attempts to derive a tag automatically via `git describe`.
+# Embed a custom release identifier into backup metadata (docs/mod/doc_btrfs_backup.md).
+# Leave empty to let the helper pick up `git describe` output or packaged version info automatically.
 CFG_LH_RELEASE_TAG=""
