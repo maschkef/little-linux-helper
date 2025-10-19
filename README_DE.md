@@ -724,7 +724,13 @@ Little Linux Helper verwendet Konfigurationsdateien, um bestimmte Verhaltensweis
 
 Beim ersten Start des Hauptskripts (`help_master.sh`) werden Standardkonfigurationsdateien automatisch angelegt, sofern sie noch nicht existieren. Dafür werden Vorlagendateien mit der Endung `.example` (z. B. `backup.conf.example`) in ihre aktiven Pendants ohne Suffix (z. B. `backup.conf`) kopiert.
 
-**Wichtig:** Wenn eine Konfigurationsdatei erstmals angelegt wird, erhältst du einen Hinweis. Es empfiehlt sich, die frisch erstellten `.conf`-Dateien zu prüfen und bei Bedarf an die eigenen Anforderungen anzupassen.
+**Wichtig:** Wenn eine Konfigurationsdatei erstmals angelegt wird, erscheint ein blockierender Hinweis. Du kannst bestätigen und mit den Standardwerten fortfahren oder das Programm beenden, um die Dateien sofort zu bearbeiten. Während der normalen Initialisierung vergleicht der Konfigurations-Schema-Helfer jede `*.conf` mit ihrer Vorlage:
+
+- Fehlende Schlüssel werden gemeinsam mit den Vorlage-Kommentaren angezeigt, sodass klar ist, wofür der Eintrag gedacht ist.
+- Du kannst Vorlagenwerte übernehmen, eigene Werte setzen oder Schlüssel überspringen (Überspringen gilt für die aktuelle Sitzung).
+- In nicht-interaktiven Umgebungen sorgt `LH_CONFIG_MODE=auto` für automatische Standardwerte, während `LH_CONFIG_MODE=strict` bei Abweichungen abbricht.
+
+Technische Details zum Synchronisations-Helfer findest du in `docs/lib/doc_config_schema.md`.
 
 Konfigurationsdateien werden aktuell für folgende Module verwendet:
 * **Allgemeine Einstellungen (`help_master.sh`)**: Sprache, Logging-Verhalten, GUI-Port/Host-Konfiguration und weitere Basiseinstellungen (`config/general.conf`).

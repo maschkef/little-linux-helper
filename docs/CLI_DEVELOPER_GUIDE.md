@@ -44,8 +44,8 @@ The primary goal of this project is to be as compatible as possible across a wid
 4.  **Command Line Argument Parsing**: Processes `-h/--help` and `-g/--gui` parameters. Sets `LH_GUI_MODE=true` when GUI mode is requested.
 5.  **Help Display**: Shows comprehensive usage information if `-h/--help` is specified, then exits.
 6.  `source "$LH_ROOT_DIR/lib/lib_common.sh"`: Loads all functions and variables from the common library into the current shell environment.
-7.  `lh_ensure_config_files_exist`: Ensures that configuration files exist by copying example files if needed.
-8.  `lh_load_general_config`: Loads general configuration including language and logging settings from `general.conf`.
+7.  `lh_ensure_config_files_exist`: Ensures that configuration files exist by copying example files if needed and invokes the configuration schema helper to synchronise missing variables.
+8.  `lh_load_general_config`: Loads general configuration including language and logging settings from `general.conf` (after schema checks).
 9.  `lh_initialize_logging`: Initializes the logging system (see description in `lib_common.sh`).
 10. `lh_check_root_privileges`: Checks for root privileges and sets `LH_SUDO_CMD` (see description in `lib_common.sh`).
 11. `lh_detect_package_manager`: Detects the primary package manager and sets `LH_PKG_MANAGER` (see description in `lib_common.sh`).
@@ -557,7 +557,14 @@ Configuration file for backup-related settings.
 
 #### 5.3 Configuration File Management
 
-The system automatically ensures configuration files exist by copying example files when needed. Users can modify settings either by editing files directly or through functions like `lh_save_general_config()` and `lh_save_backup_config()`.
+During startup `lh_ensure_config_files_exist()` copies missing files from their `.example` templates **and** invokes the configuration schema helper to reconcile variables:
+
+- Missing keys are detected by comparing the template and active `*.conf`.
+- Users are prompted to add defaults or custom values, with template comments displayed for context.
+- Choices to skip specific keys are remembered for the rest of the session; defaults still apply at runtime.
+- Non-interactive mode (`LH_CONFIG_MODE=auto`) appends defaults automatically, while `strict` mode aborts when mismatches remain.
+
+All helper routines are implemented in `lib/lib_config_schema.sh` (see `docs/lib/doc_config_schema.md` for details). Existing save functions (`lh_save_general_config()`, `lh_save_backup_config()`) remain available for manual updates.
 
 ### 6. Benefits of the Modular Library Architecture
 

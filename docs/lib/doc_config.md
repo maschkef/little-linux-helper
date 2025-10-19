@@ -225,10 +225,26 @@ LH_LOG_TIMESTAMP_FORMAT="time"
 ### Configuration File Lifecycle
 
 1. **Template Creation**: Example files (`.example`) provide templates
-2. **Automatic Creation**: Missing configuration files are created from templates
-3. **Loading**: Configuration values loaded during system initialization
-4. **Runtime Modification**: Configuration can be modified during operation
-5. **Persistence**: Modified configuration can be saved permanently
+2. **Automatic Creation**: Missing configuration files are created from templates and require explicit acknowledgement before continuing
+3. **Template Synchronisation**: Existing configuration files are compared with their templates; missing keys can be added immediately with defaults or custom values
+4. **Loading**: Configuration values loaded during system initialization
+5. **Runtime Modification**: Configuration can be modified during operation
+6. **Persistence**: Modified configuration can be saved permanently
+
+### Interactive Configuration Checks
+
+- **New file acknowledgement**: If a `*.conf` file is created from its template, a blocking prompt lists all new files and offers to continue (acknowledge) or quit so the user can edit them right away.
+- **Missing keys wizard**: When templates gain new variables, the helper lists the missing keys per file and lets the user append:
+  - Template default values
+  - Custom values entered interactively
+  - Nothing (skip) — internal defaults stay in place for the session
+- **Template context**: For each missing key the prompt shows the comment block from the `.conf.example` so users know what they are adjusting before choosing a value.
+- **Configuration modes (`LH_CONFIG_MODE`)**:
+  - `ask` *(default)*: prompt when running in an interactive TTY
+  - `auto`: append template defaults automatically without interaction
+  - `strict`: abort when configuration files are out of sync with their templates
+
+Helper routines for these checks are implemented in `lib/lib_config_schema.sh` and called from `lh_ensure_config_files_exist()`.
 
 ### Example Configuration Files
 

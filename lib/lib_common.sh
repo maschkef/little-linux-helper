@@ -55,6 +55,7 @@ declare -A MSG # Global message array
 # Load modular library components
 source "$LH_ROOT_DIR/lib/lib_colors.sh"
 source "$LH_ROOT_DIR/lib/lib_package_mappings.sh"
+source "$LH_ROOT_DIR/lib/lib_config_schema.sh"
 source "$LH_ROOT_DIR/lib/lib_config.sh"
 source "$LH_ROOT_DIR/lib/lib_logging.sh"
 source "$LH_ROOT_DIR/lib/lib_json.sh"
@@ -105,6 +106,8 @@ function lh_ensure_config_files_exist() {
     local template_config_file
     local actual_config_file
     local config_file_base
+    local -a created_files=()
+    local status=0
 
     # Search configuration directory for all .example files
     for template_config_file in "$config_dir"/*"$template_suffix"; do
@@ -123,8 +126,20 @@ function lh_ensure_config_files_exist() {
             fi
             echo -e "${LH_COLOR_INFO}$(lh_msg "CONFIG_FILE_CREATED" "$config_file_base" "${config_file_base}${template_suffix}")${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_INFO}$(lh_msg "CONFIG_FILE_REVIEW" "$actual_config_file")${LH_COLOR_RESET}"
+            created_files+=("$actual_config_file")
+        fi
+
+        # Synchronize missing keys (returns non-zero only in strict mode)
+        if ! lh_config_sync_missing_keys "$template_config_file" "$actual_config_file"; then
+            status=1
         fi
     done
+
+    if ! lh_config_prompt_new_files "${created_files[@]}"; then
+        return 1
+    fi
+
+    return "$status"
 }
 
 # --- Session registry helpers -------------------------------------------------

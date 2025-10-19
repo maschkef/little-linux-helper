@@ -725,7 +725,13 @@ Little Linux Helper uses configuration files to customize certain aspects of its
 
 When the main script (`help_master.sh`) is started for the first time, default configuration files are automatically created if they don't already exist. This is done by copying template files with the `.example` extension (e.g., `backup.conf.example`) to their active counterparts without the suffix (e.g., `backup.conf`).
 
-**Important:** You will be notified when a configuration file is first created. It is recommended to review these newly created `.conf` files and adapt them to your specific needs if necessary.
+**Important:** You will be notified when a configuration file is first created. A blocking prompt lets you acknowledge the new files or exit immediately to edit them. During normal startup the configuration schema helper compares every `*.conf` with its template:
+
+- Missing keys are listed with the template comments so you know what they control.
+- You can append template defaults, enter custom values, or skip (skips are remembered for the rest of the run).
+- Non-interactive environments can set `LH_CONFIG_MODE=auto` to accept defaults automatically, while `LH_CONFIG_MODE=strict` aborts if files are out of sync.
+
+See `docs/lib/doc_config_schema.md` for technical details on the synchronisation helper.
 
 Configuration files are currently used for the following modules:
 * **General Settings (`help_master.sh`)**: Language, logging behavior, GUI port/host configuration, and other basic settings (`config/general.conf`).
