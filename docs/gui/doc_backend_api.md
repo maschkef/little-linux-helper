@@ -598,8 +598,8 @@ func (wsb *WebSocketBuffer) flush(conn *websocket.Conn) {
 ### Network Security
 - Default to localhost-only binding for security
 - Provide clear warnings when enabling network access
-- Authentication is mandatory for network deployments: session login is enabled by default; HTTP Basic Auth is available for simpler setups.
-- `LLH_GUI_AUTH_MODE` controls the mode (`session` | `basic` | `none`). `none` is rejected if the server binds to anything other than `127.0.0.1`.
+- Authentication is mandatory for network deployments: the adaptive default (`auto`) activates session login whenever the GUI is exposed, while loopback-only runs may proceed without credentials.
+- `LLH_GUI_AUTH_MODE` controls the mode (`auto` | `session` | `basic` | `none`). `none` is rejected if the server binds to anything other than `127.0.0.1`.
 - Credentials are configured via `LLH_GUI_USER` and `LLH_GUI_PASS_HASH` (bcrypt). The backend exposes `--hash-password` to generate hashes without external tools.
 - CSRF protection, secure cookie settings, and login rate limiting are enabled automatically in session mode.
 - `LLH_GUI_ALLOWED_ORIGINS` can be set to a comma-separated list when trusted tooling (e.g., Vite) needs cross-origin access; same-origin requests are always accepted.

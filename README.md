@@ -448,12 +448,12 @@ Context-aware module docs displayed alongside active sessions for quick referenc
 
 ## GUI Authentication
 
-- **Session login is enabled by default.** When you launch the GUI, the browser redirects to `/login`. Enter the credentials configured via `LLH_GUI_USER` and `LLH_GUI_PASS_HASH` to obtain a session cookie (protected by CSRF and a rate-limited login endpoint).
-- **Alternative modes:** set `LLH_GUI_AUTH_MODE=basic` to use HTTP Basic Auth, or `LLH_GUI_AUTH_MODE=none` to disable authentication **only** for loopback usage. The launcher and backend refuse to start without auth when binding to anything beyond `127.0.0.1`/`localhost`.
+- **Adaptive default:** When the GUI is bound to `localhost`, authentication is automatically disabled for convenience. Switching to `--network` or any non-loopback host flips the backend into session login mode so that remote users must sign in.
+- **Override modes:** set `LLH_GUI_AUTH_MODE=auto` (default adaptive behaviour), `session` (always require the login form), `basic` (HTTP Basic Auth), or `none` (loopback only). The launcher and backend refuse to start without auth when the GUI is reachable from another machine.
 - **Configuration block** (place in `config/general.conf` or export as environment variables):
 
 ```bash
-export LLH_GUI_AUTH_MODE="session"
+export LLH_GUI_AUTH_MODE="auto"
 export LLH_GUI_USER="admin"
 export LLH_GUI_PASS_HASH="$(./gui/little-linux-helper-gui --hash-password 'MySecret')"
 export LLH_GUI_COOKIE_NAME="__Host-llh_sess"

@@ -94,6 +94,7 @@ type DocMetadata struct {
 }
 
 const (
+	authModeAuto    = "auto"
 	authModeNone    = "none"
 	authModeSession = "session"
 	authModeBasic   = "basic"
@@ -1947,17 +1948,35 @@ func newBasicAuthMiddleware(expectedUser string, passHash []byte) fiber.Handler 
 }
 
 func loadAuthSettings(host string, networkFlag bool) (AuthSettings, error) {
-	modeValue, modeSet := os.LookupEnv("LLH_GUI_AUTH_MODE")
-	modeValue = strings.TrimSpace(strings.ToLower(modeValue))
-	if !modeSet || modeValue == "" {
-		modeValue = authModeSession
+	exposedHost := !isLoopbackHost(host)
+	networkAccess := networkFlag || exposedHost
+
+	rawModeValue, modeSet := os.LookupEnv("LLH_GUI_AUTH_MODE")
+	modeValue := strings.TrimSpace(strings.ToLower(rawModeValue))
+
+	autoResolved := false
+	if !modeSet || modeValue == "" || modeValue == authModeAuto {
+		autoResolved = true
+		if networkAccess {
+			modeValue = authModeSession
+		} else {
+			modeValue = authModeNone
+		}
 	}
 
 	switch modeValue {
 	case authModeSession, authModeBasic, authModeNone:
 	default:
-		log.Printf("Warning: unknown LLH_GUI_AUTH_MODE value %q, defaulting to 'session'", modeValue)
+		log.Printf("Warning: unknown LLH_GUI_AUTH_MODE value %q, defaulting to 'session'", strings.TrimSpace(rawModeValue))
 		modeValue = authModeSession
+	}
+
+	if autoResolved {
+		if networkAccess {
+			log.Println("INFO: LLH_GUI_AUTH_MODE resolved to 'session' because the GUI is reachable over the network.")
+		} else {
+			log.Println("INFO: LLH_GUI_AUTH_MODE resolved to 'none' for loopback-only access.")
+		}
 	}
 
 	user := strings.TrimSpace(os.Getenv("LLH_GUI_USER"))
@@ -1977,7 +1996,7 @@ func loadAuthSettings(host string, networkFlag bool) (AuthSettings, error) {
 		} else {
 			cookieSecure = parsed
 		}
-	} else if isLoopbackHost(host) {
+	} else if !exposedHost {
 		cookieSecure = false
 	}
 
@@ -1997,8 +2016,7 @@ func loadAuthSettings(host string, networkFlag bool) (AuthSettings, error) {
 		settings.CookieName = "llh_sess"
 	}
 
-	exposedHost := !isLoopbackHost(host)
-	if settings.Mode == authModeNone && (networkFlag || exposedHost) {
+	if settings.Mode == authModeNone && networkAccess {
 		return settings, fmt.Errorf("refusing to start: non-localhost binding requires authentication (session|basic)")
 	}
 

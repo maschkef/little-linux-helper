@@ -1034,14 +1034,28 @@ fi
 GUI_HOST=$(_determine_gui_host)
 lh_log_msg "DEBUG" "Resolved GUI host: $GUI_HOST"
 
-AUTH_MODE_RAW="${LLH_GUI_AUTH_MODE:-}"
+IN_NETWORK_MODE=false
+if [[ " ${GUI_ARGS[*]} " =~ " -network " ]]; then
+    IN_NETWORK_MODE=true
+fi
+
+AUTH_MODE_RAW="${LLH_GUI_AUTH_MODE:-auto}"
 if [ -z "$AUTH_MODE_RAW" ]; then
-    AUTH_MODE_RAW="session"
-    lh_log_msg "DEBUG" "LLH_GUI_AUTH_MODE not set; defaulting to 'session'"
+    AUTH_MODE_RAW="auto"
+    lh_log_msg "DEBUG" "LLH_GUI_AUTH_MODE not set; defaulting to 'auto'"
 fi
 AUTH_MODE="${AUTH_MODE_RAW,,}"
 
 case "$AUTH_MODE" in
+    auto)
+        if [ "$IN_NETWORK_MODE" = true ] || ! _is_loopback_host "$GUI_HOST"; then
+            AUTH_MODE="session"
+            lh_log_msg "DEBUG" "LLH_GUI_AUTH_MODE resolved to 'session' because GUI is reachable over the network"
+        else
+            AUTH_MODE="none"
+            lh_log_msg "DEBUG" "LLH_GUI_AUTH_MODE resolved to 'none' for loopback-only usage"
+        fi
+        ;;
     none|session|basic)
         ;;
     *)
@@ -1057,10 +1071,10 @@ if [ "$AUTH_MODE" = "none" ]; then
     if ! _is_loopback_host "$GUI_HOST"; then
         lh_log_msg "ERROR" "Authentication disabled but GUI host '$GUI_HOST' is not loopback"
         echo -e "${LH_COLOR_ERROR}❌ Authentication cannot be disabled when exposing the GUI on ${GUI_HOST}.${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_ERROR}❌ Set LLH_GUI_AUTH_MODE=session or basic before using network mode.${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_ERROR}❌ Set LLH_GUI_AUTH_MODE=auto, session or basic before using network mode.${LH_COLOR_RESET}"
         exit 1
     fi
-    if [[ " ${GUI_ARGS[*]} " =~ " -network " ]]; then
+    if [ "$IN_NETWORK_MODE" = true ]; then
         lh_log_msg "ERROR" "Authentication disabled but --network flag requested"
         echo -e "${LH_COLOR_ERROR}❌ Authentication cannot be disabled when using --network.${LH_COLOR_RESET}"
         exit 1

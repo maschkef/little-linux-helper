@@ -145,7 +145,8 @@ CFG_LH_GUI_FIREWALL_RESTRICTION="local"
 # GUI authentication settings
 #
 # Available modes:
-#   session - Cookie-based login with CSRF protection (default)
+#   auto    - (default) disable auth on loopback bindings, require session auth otherwise
+#   session - Cookie-based login with CSRF protection (force login even on localhost)
 #   basic   - HTTP Basic Auth
 #   none    - Only permitted when binding to localhost/127.0.0.1
 #
@@ -164,7 +165,7 @@ CFG_LH_GUI_FIREWALL_RESTRICTION="local"
 #   - LLH_GUI_ALLOWED_ORIGINS accepts a comma-separated list of origins that are
 #     allowed to perform authenticated requests (useful for development tooling)
 #
-export LLH_GUI_AUTH_MODE="session"
+export LLH_GUI_AUTH_MODE="auto"
 export LLH_GUI_USER=""
 export LLH_GUI_PASS_HASH=""
 export LLH_GUI_PASS_PLAIN=""

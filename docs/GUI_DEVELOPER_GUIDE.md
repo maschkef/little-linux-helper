@@ -133,10 +133,11 @@ esac
 
 ## Security & Authentication
 
-The GUI ships with first-class authentication. By default the backend requires a session login and protects every HTTP API and WebSocket endpoint (with `/api/health` remaining public for liveness probes).
+The GUI ships with first-class authentication. By default the backend disables login for strictly loopback deployments and automatically switches to session authentication whenever the server is reachable over the network (`/api/health` remains public for liveness probes in every mode).
 
 ### Supported Modes
-- **`session` (default)** – Username/password login with signed cookies, CSRF protection, and rate-limited `/api/login`.
+- **`auto` (default)** – Disables authentication on loopback bindings and requires session login as soon as the GUI is exposed beyond the local machine.
+- **`session`** – Username/password login with signed cookies, CSRF protection, and rate-limited `/api/login`.
 - **`basic`** – HTTP Basic Auth backed by bcrypt credentials for simple deployments.
 - **`none`** – Available **only** when the server binds to `127.0.0.1`/`localhost`. The launcher and backend abort if you attempt to combine `none` with `--network` or a non-loopback host.
 
@@ -144,7 +145,7 @@ The GUI ships with first-class authentication. By default the backend requires a
 Set the following environment variables (or export them in `config/general.conf`) to adjust the authentication behaviour:
 
 ```
-LLH_GUI_AUTH_MODE=session|basic|none
+LLH_GUI_AUTH_MODE=auto|session|basic|none
 LLH_GUI_USER=admin
 LLH_GUI_PASS_HASH=$2y$12$...
 LLH_GUI_PASS_PLAIN=dev-only
