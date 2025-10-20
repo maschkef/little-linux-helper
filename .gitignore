@@ -2,6 +2,7 @@
 logs/
 # Ignore local configuration files
 config/*.conf
+config/*.d/
 # For testing purposes
 temp/
 # GUI build artifacts
