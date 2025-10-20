@@ -28,8 +28,9 @@ LH_SESSION_REGISTRY_LOCK="$LH_SESSION_REGISTRY_DIR/registry.lock"
 # The current log file is set during initialization
 LH_LOG_FILE="${LH_LOG_FILE:-}" # Ensures it exists, but does not overwrite it if it was already set/exported externally.
 
-# Contains 'sudo' if root privileges are required and the script is not running as root
-LH_SUDO_CMD=""
+# Contains 'sudo' if root privileges are required and the script is not running as root.
+# Preserve any existing value exported by the caller (e.g. help_master.sh).
+LH_SUDO_CMD="${LH_SUDO_CMD:-}"
 
 # Detected package manager
 LH_PKG_MANAGER=""
