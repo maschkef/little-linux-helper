@@ -382,8 +382,9 @@
               "type": "text",
               "label": "Backup root",
               "labelKey": "config.forms.backupStorage.fields.CFG_LH_BACKUP_ROOT.label",
-              "placeholder": "/run/media/tux/hdd_3tb/",
-              "placeholderKey": "config.forms.backupStorage.fields.CFG_LH_BACKUP_ROOT.placeholder"
+              "placeholder": "/mnt/backup_drive/",
+              "placeholderKey": "config.forms.backupStorage.fields.CFG_LH_BACKUP_ROOT.placeholder",
+              "helpKey": "config.forms.backupStorage.fields.CFG_LH_BACKUP_ROOT.help"
             },
             {
               "key": "CFG_LH_BACKUP_DIR",
@@ -401,7 +402,8 @@
               "label": "Temporary snapshot directory",
               "labelKey": "config.forms.backupStorage.fields.CFG_LH_TEMP_SNAPSHOT_DIR.label",
               "placeholder": "/.snapshots_lh_temp",
-              "placeholderKey": "config.forms.backupStorage.fields.CFG_LH_TEMP_SNAPSHOT_DIR.placeholder"
+              "placeholderKey": "config.forms.backupStorage.fields.CFG_LH_TEMP_SNAPSHOT_DIR.placeholder",
+              "helpKey": "config.forms.backupStorage.fields.CFG_LH_TEMP_SNAPSHOT_DIR.help"
             }
           ]
         }
@@ -447,7 +449,8 @@
               "label": "Backups to keep (per type)",
               "labelKey": "config.forms.backupRetention.fields.CFG_LH_RETENTION_BACKUP.label",
               "min": 1,
-              "default": "3"
+              "default": "10",
+              "helpKey": "config.forms.backupRetention.fields.CFG_LH_RETENTION_BACKUP.help"
             },
             {
               "key": "CFG_LH_BACKUP_LOG_BASENAME",
@@ -455,7 +458,8 @@
               "label": "Log file basename",
               "labelKey": "config.forms.backupRetention.fields.CFG_LH_BACKUP_LOG_BASENAME.label",
               "placeholder": "backup.log",
-              "placeholderKey": "config.forms.backupRetention.fields.CFG_LH_BACKUP_LOG_BASENAME.placeholder"
+              "placeholderKey": "config.forms.backupRetention.fields.CFG_LH_BACKUP_LOG_BASENAME.placeholder",
+              "helpKey": "config.forms.backupRetention.fields.CFG_LH_BACKUP_LOG_BASENAME.help"
             },
             {
               "key": "CFG_LH_DEBUG_LOG_LIMIT",
@@ -464,7 +468,8 @@
               "labelKey": "config.forms.backupRetention.fields.CFG_LH_DEBUG_LOG_LIMIT.label",
               "min": 0,
               "default": "10",
-              "advanced": true
+              "advanced": true,
+              "helpKey": "config.forms.backupRetention.fields.CFG_LH_DEBUG_LOG_LIMIT.help"
             }
           ]
         }
@@ -503,7 +508,8 @@
                   "labelKey": "config.forms.backupSnapshots.fields.CFG_LH_KEEP_SOURCE_SNAPSHOTS.options.false"
                 }
               ],
-              "default": "prompt"
+              "default": "prompt",
+              "helpKey": "config.forms.backupSnapshots.fields.CFG_LH_KEEP_SOURCE_SNAPSHOTS.help"
             },
             {
               "key": "CFG_LH_SOURCE_SNAPSHOT_DIR",
@@ -511,7 +517,8 @@
               "label": "Permanent snapshot directory",
               "labelKey": "config.forms.backupSnapshots.fields.CFG_LH_SOURCE_SNAPSHOT_DIR.label",
               "placeholder": "/.snapshots_lh",
-              "placeholderKey": "config.forms.backupSnapshots.fields.CFG_LH_SOURCE_SNAPSHOT_DIR.placeholder"
+              "placeholderKey": "config.forms.backupSnapshots.fields.CFG_LH_SOURCE_SNAPSHOT_DIR.placeholder",
+              "helpKey": "config.forms.backupSnapshots.fields.CFG_LH_SOURCE_SNAPSHOT_DIR.help"
             },
             {
               "key": "CFG_LH_SOURCE_SNAPSHOT_RETENTION",
@@ -519,7 +526,8 @@
               "label": "Snapshots preserved per subvolume",
               "labelKey": "config.forms.backupSnapshots.fields.CFG_LH_SOURCE_SNAPSHOT_RETENTION.label",
               "min": 0,
-              "default": "1"
+              "default": "1",
+              "helpKey": "config.forms.backupSnapshots.fields.CFG_LH_SOURCE_SNAPSHOT_RETENTION.help"
             }
           ]
         }
@@ -541,14 +549,14 @@
               "type": "textarea",
               "label": "Configured subvolumes",
               "labelKey": "config.forms.backupSubvolumes.fields.CFG_LH_BACKUP_SUBVOLUMES.label",
-              "help": "Space separated list (e.g. '@ @home').",
               "helpKey": "config.forms.backupSubvolumes.fields.CFG_LH_BACKUP_SUBVOLUMES.help"
             },
             {
               "key": "CFG_LH_AUTO_DETECT_SUBVOLUMES",
               "type": "toggle",
               "label": "Auto-detect @-prefixed subvolumes",
-              "labelKey": "config.forms.backupSubvolumes.fields.CFG_LH_AUTO_DETECT_SUBVOLUMES.label"
+              "labelKey": "config.forms.backupSubvolumes.fields.CFG_LH_AUTO_DETECT_SUBVOLUMES.label",
+              "helpKey": "config.forms.backupSubvolumes.fields.CFG_LH_AUTO_DETECT_SUBVOLUMES.help"
             }
           ]
         }

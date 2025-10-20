@@ -409,7 +409,8 @@
         "fields": {
           "CFG_LH_BACKUP_ROOT": {
             "label": "Backup-Wurzelverzeichnis",
-            "placeholder": "/run/media/tux/hdd_3tb/"
+            "placeholder": "/mnt/backup_drive/",
+            "help": "Absoluter Einhängepunkt des Backup-Laufwerks. Stelle sicher, dass das Medium vor dem Start eingebunden und beschreibbar ist."
           },
           "CFG_LH_BACKUP_DIR": {
             "label": "Backup-Verzeichnis",
@@ -418,7 +419,8 @@
           },
           "CFG_LH_TEMP_SNAPSHOT_DIR": {
             "label": "Temporäres Snapshot-Verzeichnis",
-            "placeholder": "/.snapshots_lh_temp"
+            "placeholder": "/.snapshots_lh_temp",
+            "help": "Zwischenablage für temporäre schreibgeschützte Snapshots auf dem Quellsystem. Sollte auf dem Quell-BTRFS liegen und zwischen den Läufen leer bleiben."
           }
         }
       },
@@ -445,14 +447,17 @@
         },
         "fields": {
           "CFG_LH_RETENTION_BACKUP": {
-            "label": "Anzahl Backups pro Typ"
+            "label": "Anzahl Backups pro Typ",
+            "help": "Behält die neuesten N Sicherungen je Format (BTRFS-Snapshot, TAR-Archiv, rsync-Kopie) pro Subvolume. Ältere Einträge werden automatisch entfernt."
           },
           "CFG_LH_BACKUP_LOG_BASENAME": {
             "label": "Log-Dateiname",
-            "placeholder": "backup.log"
+            "placeholder": "backup.log",
+            "help": "Basisname für Backup-Protokolle. Für jeden Lauf wird automatisch ein Zeitstempel vorangestellt."
           },
           "CFG_LH_DEBUG_LOG_LIMIT": {
-            "label": "Anzahl der Kandidaten im Debug-Log"
+            "label": "Anzahl der Kandidaten im Debug-Log",
+            "help": "Begrenzt, wie viele Sicherungskandidaten im ausführlichen Log erscheinen. 0 zeigt alle."
           }
         }
       },
@@ -466,6 +471,7 @@
         "fields": {
           "CFG_LH_KEEP_SOURCE_SNAPSHOTS": {
             "label": "Quell-Snapshots behalten",
+            "help": "Legt fest, ob die Quell-Snapshots für inkrementelle Ketten behalten werden. \"Jedes Mal nachfragen\" bestätigt jeden Lauf, \"Immer behalten\" konserviert sie, \"Nicht behalten\" löscht sie nach dem Transfer.",
             "options": {
               "prompt": "Jedes Mal nachfragen",
               "true": "Immer behalten",
@@ -474,10 +480,12 @@
           },
           "CFG_LH_SOURCE_SNAPSHOT_DIR": {
             "label": "Verzeichnis für permanente Snapshots",
-            "placeholder": "/.snapshots_lh"
+            "placeholder": "/.snapshots_lh",
+            "help": "Verzeichnis für dauerhaft aufgehobene Quell-Snapshots. Muss auf demselben BTRFS wie die Quelle liegen. Snapshots sind Copy-on-Write und benötigen anfangs kaum Speicher, wachsen aber mit geänderten oder gelöschten Dateien – freien Platz im Blick behalten."
           },
           "CFG_LH_SOURCE_SNAPSHOT_RETENTION": {
-            "label": "Snapshots pro Subvolume"
+            "label": "Snapshots pro Subvolume",
+            "help": "Anzahl dauerhaft aufgehobener Quell-Snapshots pro Subvolume. 0 deaktiviert die Aufbewahrung (es bleiben keine Eltern-Snapshots erhalten)."
           }
         }
       },
@@ -491,10 +499,11 @@
         "fields": {
           "CFG_LH_BACKUP_SUBVOLUMES": {
             "label": "Konfigurierte Subvolumes",
-            "help": "Leerzeichengetrennte Liste (z. B. '@ @home')."
+            "help": "Leerzeichengetrennte Liste @-präfixierter Subvolumes für das Backup (z. B. '@ @home @var'). Leer lassen, wenn ausschließlich die Auto-Erkennung genutzt wird."
           },
           "CFG_LH_AUTO_DETECT_SUBVOLUMES": {
-            "label": "@-Subvolumes automatisch erkennen"
+            "label": "@-Subvolumes automatisch erkennen",
+            "help": "Wenn aktiviert, durchsucht der Helfer /etc/fstab und aktuelle BTRFS-Mounts nach @-präfixierten Subvolumes und ersetzt die manuelle Liste bei jedem Lauf durch die gefundenen Werte."
           }
         }
       },

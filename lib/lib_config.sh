@@ -125,7 +125,7 @@ lh_config_update_fragment() {
 }
 
 # Default backup configuration (overridden by lh_load_backup_config if configuration file exists)
-LH_BACKUP_ROOT_DEFAULT="/run/media/tux/hdd_3tb/"
+LH_BACKUP_ROOT_DEFAULT="/mnt/backup_drive/"
 LH_BACKUP_DIR_DEFAULT="/backups" # Relative to LH_BACKUP_ROOT
 LH_TEMP_SNAPSHOT_DIR_DEFAULT="/.snapshots_lh_temp" # Absolute path - script-controlled, not Snapper
 LH_RETENTION_BACKUP_DEFAULT=10

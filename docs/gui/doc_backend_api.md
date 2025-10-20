@@ -315,7 +315,7 @@ The configuration manager consumes a schema defined in `gui/config-schema/config
           "key": "CFG_LH_BACKUP_ROOT",
           "type": "text",
           "label": "Backup root",
-          "placeholder": "/run/media/tux/hdd_3tb/"
+          "placeholder": "/mnt/backup_drive/"
         },
         {
           "key": "CFG_LH_BACKUP_DIR",

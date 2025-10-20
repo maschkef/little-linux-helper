@@ -222,7 +222,7 @@ fi
 **Purpose:** Implements smart backup rotation that respects incremental chains while maintaining retention policies.
 
 **Critical Requirements:**
-- **Retention Respect**: Honors `LH_RETENTION_BACKUP` setting (defaults to 7)
+- **Retention Respect**: Honors `LH_RETENTION_BACKUP` setting (defaults to 10)
 - **Chain Preservation**: Never breaks incremental backup chains by deleting needed parents
 - **Dependency Analysis**: Builds parent-child relationship maps to identify safe deletion candidates
 - **received_uuid Protection**: Protects snapshots with received_uuid that serve as chain anchors
