@@ -16,3 +16,4 @@ CLAUDE.md
 config/backup.conf.gui_*
 
 gui/.gocache/*
+.gocache/*
