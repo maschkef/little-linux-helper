@@ -14,7 +14,7 @@ import ConfigOptionsMenu from './ConfigOptionsMenu.jsx';
 import ConfigChanges from './ConfigChanges.jsx';
 import { apiFetch } from '../utils/api.js';
 
-function ConfigPanel({ devMode = false, onToggleDevMode }) {
+function ConfigPanel({ devMode = false }) {
   const { t } = useTranslation('common');
 
   const [activeTab, setActiveTab] = useState('options'); // options, editor, changes
@@ -34,6 +34,13 @@ function ConfigPanel({ devMode = false, onToggleDevMode }) {
   const [formError, setFormError] = useState('');
   const [formLoading, setFormLoading] = useState(false);
 
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    return window.localStorage.getItem('lh-gui-show-advanced') === 'true';
+  });
+
   const [configFiles, setConfigFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileListLoading, setFileListLoading] = useState(false);
@@ -41,12 +48,12 @@ function ConfigPanel({ devMode = false, onToggleDevMode }) {
   const [filesFetched, setFilesFetched] = useState(false);
 
   const visibleForms = useMemo(
-    () => forms.filter((form) => devMode || !form.advanced),
-    [forms, devMode]
+    () => forms.filter((form) => showAdvancedOptions || !form.advanced),
+    [forms, showAdvancedOptions]
   );
   const advancedFormsHidden = useMemo(
-    () => !devMode && forms.length > visibleForms.length,
-    [forms, visibleForms, devMode]
+    () => !showAdvancedOptions && forms.some((form) => form.advanced),
+    [forms, showAdvancedOptions]
   );
 
   const fetchConfigForms = useCallback(async () => {
@@ -183,6 +190,12 @@ function ConfigPanel({ devMode = false, onToggleDevMode }) {
   }, [devMode, filesFetched, activeTab, fetchConfigFiles]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('lh-gui-show-advanced', showAdvancedOptions.toString());
+    }
+  }, [showAdvancedOptions]);
+
+  useEffect(() => {
     if (forms.length === 0) {
       setSelectedForm(null);
       setCurrentFormDetail(null);
@@ -232,6 +245,16 @@ function ConfigPanel({ devMode = false, onToggleDevMode }) {
       return updated;
     });
     setFormSuccess('');
+  };
+
+  const handleFieldReset = (key, defaultValue) => {
+    setFormValues((prev) => {
+      const updated = { ...prev, [key]: defaultValue };
+      setFormDirty(hasChanges(updated, formOriginalValues));
+      return updated;
+    });
+    setFormSuccess('');
+    setFormError('');
   };
 
   const handleFormReset = () => {
@@ -314,46 +337,44 @@ function ConfigPanel({ devMode = false, onToggleDevMode }) {
   };
 
   return (
-    <div className="config-panel">
-      <div className="config-panel-header">
-        <h2>{t('config.title')}</h2>
-        <div className="config-header-controls">
-          {typeof onToggleDevMode === 'function' && (
-            <label className="config-dev-toggle">
+      <div className="config-panel">
+        <div className="config-panel-header">
+          <h2>{t('config.title')}</h2>
+          <div className="config-header-controls">
+            <label className="config-advanced-toggle">
               <input
                 type="checkbox"
-                checked={devMode}
-                onChange={(e) => onToggleDevMode(e.target.checked)}
+                checked={showAdvancedOptions}
+                onChange={(e) => setShowAdvancedOptions(e.target.checked)}
               />
-              <span>{t('config.devModeToggle')}</span>
+              <span>{t('config.advancedToggle')}</span>
             </label>
-          )}
-        <div className="config-tabs">
-          <button
-            className={`tab-button ${activeTab === 'options' ? 'active' : ''}`}
-            onClick={() => onTabChange('options')}
-          >
-            {t('config.options')}
-          </button>
+            <div className="config-tabs">
+              <button
+                className={`tab-button ${activeTab === 'options' ? 'active' : ''}`}
+                onClick={() => onTabChange('options')}
+              >
+                {t('config.options')}
+              </button>
 
-          {devMode && (
-            <button
-              className={`tab-button ${activeTab === 'editor' ? 'active' : ''}`}
-              onClick={() => onTabChange('editor')}
-            >
-              {t('config.editor')}
-            </button>
-          )}
+              {devMode && (
+                <button
+                  className={`tab-button ${activeTab === 'editor' ? 'active' : ''}`}
+                  onClick={() => onTabChange('editor')}
+                >
+                  {t('config.editor')}
+                </button>
+              )}
 
-          <button
-            className={`tab-button ${activeTab === 'changes' ? 'active' : ''}`}
-            onClick={() => onTabChange('changes')}
-          >
-            {t('config.changes')}
-          </button>
+              <button
+                className={`tab-button ${activeTab === 'changes' ? 'active' : ''}`}
+                onClick={() => onTabChange('changes')}
+              >
+                {t('config.changes')}
+              </button>
+            </div>
+          </div>
         </div>
-        </div>
-      </div>
 
       <div className="config-panel-content">
         {activeTab === 'options' && (
@@ -367,7 +388,9 @@ function ConfigPanel({ devMode = false, onToggleDevMode }) {
             detail={currentFormDetail}
             detailLoading={formLoading}
             values={formValues}
+            defaults={formDefaults}
             onValueChange={handleFormValueChange}
+            onResetField={handleFieldReset}
             onReset={handleFormReset}
             onSave={handleFormSave}
             dirty={formDirty}
@@ -375,7 +398,7 @@ function ConfigPanel({ devMode = false, onToggleDevMode }) {
             success={formSuccess}
             error={formError}
             advancedHidden={advancedFormsHidden}
-            devMode={devMode}
+            showAdvanced={showAdvancedOptions}
           />
         )}
 
@@ -407,7 +430,16 @@ function ConfigPanel({ devMode = false, onToggleDevMode }) {
         )}
 
         {activeTab === 'changes' && (
-          <ConfigChanges />
+          <ConfigChanges
+            selectedForm={selectedForm}
+            onResetField={handleFieldReset}
+            onReset={handleFormReset}
+            onSave={handleFormSave}
+            dirty={formDirty}
+            saving={formSaving}
+            success={formSuccess}
+            error={formError}
+          />
         )}
       </div>
     </div>

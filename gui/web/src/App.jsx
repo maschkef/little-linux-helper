@@ -45,6 +45,7 @@ function AppContent({ standaloneSessionId, isStandalone }) {
     return saved === 'true';
   });
   const [toolVersion, setToolVersion] = useState('');
+  const [authMode, setAuthMode] = useState('session');
   
   const { startNewSession, sessions, getActiveSession, activeSessionId, switchToSession } = useSession();
 
@@ -67,6 +68,11 @@ function AppContent({ standaloneSessionId, isStandalone }) {
           const data = await response.json();
           if (data.release) {
             setToolVersion(data.release);
+          }
+          if (Object.prototype.hasOwnProperty.call(data, 'auth_mode')) {
+            setAuthMode(data.auth_mode || 'session');
+          } else {
+            setAuthMode('session');
           }
         }
       } catch (error) {
@@ -250,7 +256,7 @@ function AppContent({ standaloneSessionId, isStandalone }) {
           </div>
           <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
             <LanguageSelector />
-            <LogoutButton />
+            {authMode !== 'none' && <LogoutButton />}
             <ExitButton />
           </div>
         </div>

@@ -5,21 +5,45 @@
       "displayKey": "config.generalLanguage",
       "label": "Language & Locale",
       "description": "Choose the default interface language that should be applied when the helper starts.",
+      "descriptionKey": "config.forms.generalLanguage.description",
       "groups": [
         {
           "title": "Language",
+          "titleKey": "config.forms.generalLanguage.groups.language.title",
           "fields": [
             {
               "key": "CFG_LH_LANG",
               "type": "select",
               "label": "Preferred language",
+              "labelKey": "config.forms.generalLanguage.fields.CFG_LH_LANG.label",
               "help": "Set to 'auto' to match the current system locale automatically.",
+              "helpKey": "config.forms.generalLanguage.fields.CFG_LH_LANG.help",
               "options": [
-                { "value": "auto", "label": "Auto detect (system locale)" },
-                { "value": "de", "label": "German" },
-                { "value": "en", "label": "English" },
-                { "value": "es", "label": "Spanish (partial)" },
-                { "value": "fr", "label": "French (partial)" }
+                {
+                  "value": "auto",
+                  "label": "Auto detect (system locale)",
+                  "labelKey": "config.forms.generalLanguage.fields.CFG_LH_LANG.options.auto"
+                },
+                {
+                  "value": "de",
+                  "label": "German",
+                  "labelKey": "config.forms.generalLanguage.fields.CFG_LH_LANG.options.de"
+                },
+                {
+                  "value": "en",
+                  "label": "English",
+                  "labelKey": "config.forms.generalLanguage.fields.CFG_LH_LANG.options.en"
+                },
+                {
+                  "value": "es",
+                  "label": "Spanish (partial)",
+                  "labelKey": "config.forms.generalLanguage.fields.CFG_LH_LANG.options.es"
+                },
+                {
+                  "value": "fr",
+                  "label": "French (partial)",
+                  "labelKey": "config.forms.generalLanguage.fields.CFG_LH_LANG.options.fr"
+                }
               ],
               "default": "en"
             }
@@ -32,20 +56,40 @@
       "displayKey": "config.generalLoggingCore",
       "label": "Logging (Core)",
       "description": "Control the verbosity of the helper and where log messages should be written.",
+      "descriptionKey": "config.forms.generalLoggingCore.description",
       "groups": [
         {
           "title": "Log level",
+          "titleKey": "config.forms.generalLoggingCore.groups.logLevel.title",
           "fields": [
             {
               "key": "CFG_LH_LOG_LEVEL",
               "type": "select",
               "label": "Log level",
+              "labelKey": "config.forms.generalLoggingCore.fields.CFG_LH_LOG_LEVEL.label",
               "help": "Select how much information should be emitted during runs.",
+              "helpKey": "config.forms.generalLoggingCore.fields.CFG_LH_LOG_LEVEL.help",
               "options": [
-                { "value": "ERROR", "label": "Errors only" },
-                { "value": "WARN", "label": "Warnings and errors" },
-                { "value": "INFO", "label": "Informational messages" },
-                { "value": "DEBUG", "label": "Detailed debug output" }
+                {
+                  "value": "ERROR",
+                  "label": "Errors only",
+                  "labelKey": "config.forms.generalLoggingCore.fields.CFG_LH_LOG_LEVEL.options.ERROR"
+                },
+                {
+                  "value": "WARN",
+                  "label": "Warnings and errors",
+                  "labelKey": "config.forms.generalLoggingCore.fields.CFG_LH_LOG_LEVEL.options.WARN"
+                },
+                {
+                  "value": "INFO",
+                  "label": "Informational messages",
+                  "labelKey": "config.forms.generalLoggingCore.fields.CFG_LH_LOG_LEVEL.options.INFO"
+                },
+                {
+                  "value": "DEBUG",
+                  "label": "Detailed debug output",
+                  "labelKey": "config.forms.generalLoggingCore.fields.CFG_LH_LOG_LEVEL.options.DEBUG"
+                }
               ],
               "default": "INFO"
             }
@@ -53,18 +97,23 @@
         },
         {
           "title": "Output",
+          "titleKey": "config.forms.generalLoggingCore.groups.output.title",
           "fields": [
             {
               "key": "CFG_LH_LOG_TO_CONSOLE",
               "type": "toggle",
               "label": "Send logs to console",
-              "help": "Disable when you only want logs written to the log file."
+              "labelKey": "config.forms.generalLoggingCore.fields.CFG_LH_LOG_TO_CONSOLE.label",
+              "help": "Disable when you only want logs written to the log file.",
+              "helpKey": "config.forms.generalLoggingCore.fields.CFG_LH_LOG_TO_CONSOLE.help"
             },
             {
               "key": "CFG_LH_LOG_TO_FILE",
               "type": "toggle",
               "label": "Write logs to file",
-              "help": "Disable to prevent creation of log files in the log directory."
+              "labelKey": "config.forms.generalLoggingCore.fields.CFG_LH_LOG_TO_FILE.label",
+              "help": "Disable to prevent creation of log files in the log directory.",
+              "helpKey": "config.forms.generalLoggingCore.fields.CFG_LH_LOG_TO_FILE.help"
             }
           ]
         }
@@ -76,43 +125,63 @@
       "label": "Logging (Advanced)",
       "description": "Fine tune metadata that is included with every log entry.",
       "advanced": true,
+      "descriptionKey": "config.forms.generalLoggingDetail.description",
       "groups": [
         {
           "title": "File name visibility",
+          "titleKey": "config.forms.generalLoggingDetail.groups.fileNameVisibility.title",
           "fields": [
             {
               "key": "CFG_LH_LOG_SHOW_FILE_ERROR",
               "type": "toggle",
-              "label": "Include script name on error level"
+              "label": "Include script name on error level",
+              "labelKey": "config.forms.generalLoggingDetail.fields.CFG_LH_LOG_SHOW_FILE_ERROR.label"
             },
             {
               "key": "CFG_LH_LOG_SHOW_FILE_WARN",
               "type": "toggle",
-              "label": "Include script name on warn level"
+              "label": "Include script name on warn level",
+              "labelKey": "config.forms.generalLoggingDetail.fields.CFG_LH_LOG_SHOW_FILE_WARN.label"
             },
             {
               "key": "CFG_LH_LOG_SHOW_FILE_INFO",
               "type": "toggle",
-              "label": "Include script name on info level"
+              "label": "Include script name on info level",
+              "labelKey": "config.forms.generalLoggingDetail.fields.CFG_LH_LOG_SHOW_FILE_INFO.label"
             },
             {
               "key": "CFG_LH_LOG_SHOW_FILE_DEBUG",
               "type": "toggle",
-              "label": "Include script name on debug level"
+              "label": "Include script name on debug level",
+              "labelKey": "config.forms.generalLoggingDetail.fields.CFG_LH_LOG_SHOW_FILE_DEBUG.label"
             }
           ]
         },
         {
           "title": "Timestamps",
+          "titleKey": "config.forms.generalLoggingDetail.groups.timestamps.title",
           "fields": [
             {
               "key": "CFG_LH_LOG_TIMESTAMP_FORMAT",
               "type": "select",
               "label": "Timestamp format",
+              "labelKey": "config.forms.generalLoggingDetail.fields.CFG_LH_LOG_TIMESTAMP_FORMAT.label",
               "options": [
-                { "value": "full", "label": "Full date & time" },
-                { "value": "time", "label": "Time only" },
-                { "value": "none", "label": "No timestamps" }
+                {
+                  "value": "full",
+                  "label": "Full date & time",
+                  "labelKey": "config.forms.generalLoggingDetail.fields.CFG_LH_LOG_TIMESTAMP_FORMAT.options.full"
+                },
+                {
+                  "value": "time",
+                  "label": "Time only",
+                  "labelKey": "config.forms.generalLoggingDetail.fields.CFG_LH_LOG_TIMESTAMP_FORMAT.options.time"
+                },
+                {
+                  "value": "none",
+                  "label": "No timestamps",
+                  "labelKey": "config.forms.generalLoggingDetail.fields.CFG_LH_LOG_TIMESTAMP_FORMAT.options.none"
+                }
               ],
               "default": "time"
             }
@@ -125,15 +194,19 @@
       "displayKey": "config.generalGui",
       "label": "GUI Server",
       "description": "Adjust host and port of the Little Linux Helper web interface.",
+      "descriptionKey": "config.forms.generalGui.description",
       "groups": [
         {
           "title": "Network",
+          "titleKey": "config.forms.generalGui.groups.network.title",
           "fields": [
             {
               "key": "CFG_LH_GUI_PORT",
               "type": "number",
               "label": "Listening port",
+              "labelKey": "config.forms.generalGui.fields.CFG_LH_GUI_PORT.label",
               "help": "Choose a port between 1 and 65535.",
+              "helpKey": "config.forms.generalGui.fields.CFG_LH_GUI_PORT.help",
               "min": 1,
               "max": 65535,
               "default": "3000"
@@ -142,13 +215,17 @@
               "key": "CFG_LH_GUI_HOST",
               "type": "text",
               "label": "Host binding",
-              "help": "Use 'localhost' to restrict access or '0.0.0.0' to serve other devices."
+              "labelKey": "config.forms.generalGui.fields.CFG_LH_GUI_HOST.label",
+              "help": "Use 'localhost' to restrict access or '0.0.0.0' to serve other devices.",
+              "helpKey": "config.forms.generalGui.fields.CFG_LH_GUI_HOST.help"
             },
             {
               "key": "CFG_LH_GUI_FIREWALL_RESTRICTION",
               "type": "text",
               "label": "Firewall scope",
-              "help": "Values: 'all', 'local', or a CIDR (e.g. 192.168.1.0/24)."
+              "labelKey": "config.forms.generalGui.fields.CFG_LH_GUI_FIREWALL_RESTRICTION.label",
+              "help": "Values: 'all', 'local', or a CIDR (e.g. 192.168.1.0/24).",
+              "helpKey": "config.forms.generalGui.fields.CFG_LH_GUI_FIREWALL_RESTRICTION.help"
             }
           ]
         }
@@ -160,19 +237,38 @@
       "label": "GUI Authentication",
       "description": "Manage login requirements for the GUI when running on shared machines.",
       "advanced": true,
+      "descriptionKey": "config.forms.generalGuiAuth.description",
       "groups": [
         {
           "title": "Mode",
+          "titleKey": "config.forms.generalGuiAuth.groups.mode.title",
           "fields": [
             {
               "key": "LLH_GUI_AUTH_MODE",
               "type": "select",
               "label": "Authentication mode",
+              "labelKey": "config.forms.generalGuiAuth.fields.LLH_GUI_AUTH_MODE.label",
               "options": [
-                { "value": "auto", "label": "Auto (local = open, remote = login)" },
-                { "value": "session", "label": "Session login (username + password)" },
-                { "value": "basic", "label": "HTTP basic auth" },
-                { "value": "none", "label": "No authentication (loopback only)" }
+                {
+                  "value": "auto",
+                  "label": "Auto (local = open, remote = login)",
+                  "labelKey": "config.forms.generalGuiAuth.fields.LLH_GUI_AUTH_MODE.options.auto"
+                },
+                {
+                  "value": "session",
+                  "label": "Session login (username + password)",
+                  "labelKey": "config.forms.generalGuiAuth.fields.LLH_GUI_AUTH_MODE.options.session"
+                },
+                {
+                  "value": "basic",
+                  "label": "HTTP basic auth",
+                  "labelKey": "config.forms.generalGuiAuth.fields.LLH_GUI_AUTH_MODE.options.basic"
+                },
+                {
+                  "value": "none",
+                  "label": "No authentication (loopback only)",
+                  "labelKey": "config.forms.generalGuiAuth.fields.LLH_GUI_AUTH_MODE.options.none"
+                }
               ],
               "default": "auto"
             }
@@ -180,52 +276,67 @@
         },
         {
           "title": "Credentials",
+          "titleKey": "config.forms.generalGuiAuth.groups.credentials.title",
           "fields": [
             {
               "key": "LLH_GUI_USER",
               "type": "text",
               "label": "Username",
-              "placeholder": "admin"
+              "labelKey": "config.forms.generalGuiAuth.fields.LLH_GUI_USER.label",
+              "placeholder": "admin",
+              "placeholderKey": "config.forms.generalGuiAuth.fields.LLH_GUI_USER.placeholder"
             },
             {
               "key": "LLH_GUI_PASS_HASH",
               "type": "text",
               "label": "Password hash",
+              "labelKey": "config.forms.generalGuiAuth.fields.LLH_GUI_PASS_HASH.label",
               "help": "Use the bundled --hash-password helper to generate bcrypt hashes.",
+              "helpKey": "config.forms.generalGuiAuth.fields.LLH_GUI_PASS_HASH.help",
               "advanced": true
             },
             {
               "key": "LLH_GUI_PASS_PLAIN",
               "type": "text",
               "label": "Plaintext password (development only)",
-              "help": "Only use in development environments, hashes are preferred."
+              "labelKey": "config.forms.generalGuiAuth.fields.LLH_GUI_PASS_PLAIN.label",
+              "help": "Only use in development environments, hashes are preferred.",
+              "helpKey": "config.forms.generalGuiAuth.fields.LLH_GUI_PASS_PLAIN.help"
             }
           ]
         },
         {
           "title": "Cookies",
+          "titleKey": "config.forms.generalGuiAuth.groups.cookies.title",
           "fields": [
             {
               "key": "LLH_GUI_COOKIE_NAME",
               "type": "text",
-              "label": "Session cookie name"
+              "label": "Session cookie name",
+              "labelKey": "config.forms.generalGuiAuth.fields.LLH_GUI_COOKIE_NAME.label"
             },
             {
               "key": "LLH_GUI_COOKIE_SECURE",
               "type": "toggle",
               "label": "Mark cookie as secure",
-              "help": "Disable only when serving plain HTTP on localhost."
+              "labelKey": "config.forms.generalGuiAuth.fields.LLH_GUI_COOKIE_SECURE.label",
+              "help": "Disable only when serving plain HTTP on localhost.",
+              "helpKey": "config.forms.generalGuiAuth.fields.LLH_GUI_COOKIE_SECURE.help"
             }
           ]
         },
         {
           "title": "Cross-origin requests",
+          "titleKey": "config.forms.generalGuiAuth.groups.cors.title",
           "fields": [
             {
               "key": "LLH_GUI_ALLOWED_ORIGINS",
               "type": "textarea",
               "label": "Allowed origins",
-              "help": "Comma separated list of origins that may access the API (e.g. http://localhost:3001)."
+              "label": "Allowed origins",
+              "labelKey": "config.forms.generalGuiAuth.fields.LLH_GUI_ALLOWED_ORIGINS.label",
+              "help": "Comma separated list of origins that may access the API (e.g. http://localhost:3001).",
+              "helpKey": "config.forms.generalGuiAuth.fields.LLH_GUI_ALLOWED_ORIGINS.help"
             }
           ]
         }
@@ -237,15 +348,19 @@
       "label": "Release Tag",
       "description": "Optional release tag that is embedded into generated metadata to aid troubleshooting.",
       "advanced": true,
+      "descriptionKey": "config.forms.generalRelease.description",
       "groups": [
         {
           "title": "Metadata",
+          "titleKey": "config.forms.generalRelease.groups.metadata.title",
           "fields": [
             {
               "key": "CFG_LH_RELEASE_TAG",
               "type": "text",
               "label": "Release tag",
-              "placeholder": "v0.6.0"
+              "labelKey": "config.forms.generalRelease.fields.CFG_LH_RELEASE_TAG.label",
+              "placeholder": "v0.6.0",
+              "placeholderKey": "config.forms.generalRelease.fields.CFG_LH_RELEASE_TAG.placeholder"
             }
           ]
         }
@@ -256,28 +371,37 @@
       "displayKey": "config.backupStorage",
       "label": "Backup Storage",
       "description": "Set the directories that hold backups and staging snapshots.",
+      "descriptionKey": "config.forms.backupStorage.description",
       "groups": [
         {
           "title": "Paths",
+          "titleKey": "config.forms.backupStorage.groups.paths.title",
           "fields": [
             {
               "key": "CFG_LH_BACKUP_ROOT",
               "type": "text",
               "label": "Backup root",
-              "placeholder": "/run/media/tux/hdd_3tb/"
+              "labelKey": "config.forms.backupStorage.fields.CFG_LH_BACKUP_ROOT.label",
+              "placeholder": "/run/media/tux/hdd_3tb/",
+              "placeholderKey": "config.forms.backupStorage.fields.CFG_LH_BACKUP_ROOT.placeholder"
             },
             {
               "key": "CFG_LH_BACKUP_DIR",
               "type": "text",
               "label": "Backup directory",
+              "labelKey": "config.forms.backupStorage.fields.CFG_LH_BACKUP_DIR.label",
               "help": "Relative to the backup root and usually starts with '/'.",
-              "placeholder": "/backups"
+              "helpKey": "config.forms.backupStorage.fields.CFG_LH_BACKUP_DIR.help",
+              "placeholder": "/backups",
+              "placeholderKey": "config.forms.backupStorage.fields.CFG_LH_BACKUP_DIR.placeholder"
             },
             {
               "key": "CFG_LH_TEMP_SNAPSHOT_DIR",
               "type": "text",
               "label": "Temporary snapshot directory",
-              "placeholder": "/.snapshots_lh_temp"
+              "labelKey": "config.forms.backupStorage.fields.CFG_LH_TEMP_SNAPSHOT_DIR.label",
+              "placeholder": "/.snapshots_lh_temp",
+              "placeholderKey": "config.forms.backupStorage.fields.CFG_LH_TEMP_SNAPSHOT_DIR.placeholder"
             }
           ]
         }
@@ -288,15 +412,19 @@
       "displayKey": "config.backupExcludes",
       "label": "Backup Exclusions",
       "description": "Set additional TAR excludes that should never be archived.",
+      "descriptionKey": "config.forms.backupExcludes.description",
       "groups": [
         {
           "title": "TAR exclusions",
+          "titleKey": "config.forms.backupExcludes.groups.tarExclusions.title",
           "fields": [
             {
               "key": "CFG_LH_TAR_EXCLUDES",
               "type": "textarea",
               "label": "Exclude patterns",
-              "help": "Comma separated paths or glob patterns skipped during TAR backups."
+              "labelKey": "config.forms.backupExcludes.fields.CFG_LH_TAR_EXCLUDES.label",
+              "help": "Comma separated paths or glob patterns skipped during TAR backups.",
+              "helpKey": "config.forms.backupExcludes.fields.CFG_LH_TAR_EXCLUDES.help"
             }
           ]
         }
@@ -307,14 +435,17 @@
       "displayKey": "config.backupRetention",
       "label": "Retention & Logs",
       "description": "Control how many backups are kept and where log files are stored.",
+      "descriptionKey": "config.forms.backupRetention.description",
       "groups": [
         {
           "title": "Retention",
+          "titleKey": "config.forms.backupRetention.groups.retention.title",
           "fields": [
             {
               "key": "CFG_LH_RETENTION_BACKUP",
               "type": "number",
               "label": "Backups to keep (per type)",
+              "labelKey": "config.forms.backupRetention.fields.CFG_LH_RETENTION_BACKUP.label",
               "min": 1,
               "default": "3"
             },
@@ -322,12 +453,15 @@
               "key": "CFG_LH_BACKUP_LOG_BASENAME",
               "type": "text",
               "label": "Log file basename",
-              "placeholder": "backup.log"
+              "labelKey": "config.forms.backupRetention.fields.CFG_LH_BACKUP_LOG_BASENAME.label",
+              "placeholder": "backup.log",
+              "placeholderKey": "config.forms.backupRetention.fields.CFG_LH_BACKUP_LOG_BASENAME.placeholder"
             },
             {
               "key": "CFG_LH_DEBUG_LOG_LIMIT",
               "type": "number",
               "label": "Candidates shown in debug output",
+              "labelKey": "config.forms.backupRetention.fields.CFG_LH_DEBUG_LOG_LIMIT.label",
               "min": 0,
               "default": "10",
               "advanced": true
@@ -341,18 +475,33 @@
       "displayKey": "config.backupSnapshots",
       "label": "Snapshot Management",
       "description": "Configure how source snapshots should be preserved during backup runs.",
+      "descriptionKey": "config.forms.backupSnapshots.description",
       "groups": [
         {
           "title": "Preservation",
+          "titleKey": "config.forms.backupSnapshots.groups.preservation.title",
           "fields": [
             {
               "key": "CFG_LH_KEEP_SOURCE_SNAPSHOTS",
               "type": "select",
               "label": "Keep source snapshots",
+              "labelKey": "config.forms.backupSnapshots.fields.CFG_LH_KEEP_SOURCE_SNAPSHOTS.label",
               "options": [
-                { "value": "prompt", "label": "Prompt every time" },
-                { "value": "true", "label": "Always keep" },
-                { "value": "false", "label": "Do not keep" }
+                {
+                  "value": "prompt",
+                  "label": "Prompt every time",
+                  "labelKey": "config.forms.backupSnapshots.fields.CFG_LH_KEEP_SOURCE_SNAPSHOTS.options.prompt"
+                },
+                {
+                  "value": "true",
+                  "label": "Always keep",
+                  "labelKey": "config.forms.backupSnapshots.fields.CFG_LH_KEEP_SOURCE_SNAPSHOTS.options.true"
+                },
+                {
+                  "value": "false",
+                  "label": "Do not keep",
+                  "labelKey": "config.forms.backupSnapshots.fields.CFG_LH_KEEP_SOURCE_SNAPSHOTS.options.false"
+                }
               ],
               "default": "prompt"
             },
@@ -360,12 +509,15 @@
               "key": "CFG_LH_SOURCE_SNAPSHOT_DIR",
               "type": "text",
               "label": "Permanent snapshot directory",
-              "placeholder": "/.snapshots_lh"
+              "labelKey": "config.forms.backupSnapshots.fields.CFG_LH_SOURCE_SNAPSHOT_DIR.label",
+              "placeholder": "/.snapshots_lh",
+              "placeholderKey": "config.forms.backupSnapshots.fields.CFG_LH_SOURCE_SNAPSHOT_DIR.placeholder"
             },
             {
               "key": "CFG_LH_SOURCE_SNAPSHOT_RETENTION",
               "type": "number",
               "label": "Snapshots preserved per subvolume",
+              "labelKey": "config.forms.backupSnapshots.fields.CFG_LH_SOURCE_SNAPSHOT_RETENTION.label",
               "min": 0,
               "default": "1"
             }
@@ -378,20 +530,25 @@
       "displayKey": "config.backupSubvolumes",
       "label": "Subvolumes",
       "description": "Choose which subvolumes participate in backup runs.",
+      "descriptionKey": "config.forms.backupSubvolumes.description",
       "groups": [
         {
           "title": "Subvolume list",
+          "titleKey": "config.forms.backupSubvolumes.groups.subvolumeList.title",
           "fields": [
             {
               "key": "CFG_LH_BACKUP_SUBVOLUMES",
               "type": "textarea",
               "label": "Configured subvolumes",
-              "help": "Space separated list (e.g. '@ @home')."
+              "labelKey": "config.forms.backupSubvolumes.fields.CFG_LH_BACKUP_SUBVOLUMES.label",
+              "help": "Space separated list (e.g. '@ @home').",
+              "helpKey": "config.forms.backupSubvolumes.fields.CFG_LH_BACKUP_SUBVOLUMES.help"
             },
             {
               "key": "CFG_LH_AUTO_DETECT_SUBVOLUMES",
               "type": "toggle",
-              "label": "Auto-detect @-prefixed subvolumes"
+              "label": "Auto-detect @-prefixed subvolumes",
+              "labelKey": "config.forms.backupSubvolumes.fields.CFG_LH_AUTO_DETECT_SUBVOLUMES.label"
             }
           ]
         }
@@ -402,26 +559,33 @@
       "displayKey": "config.dockerDiscovery",
       "label": "Docker Discovery",
       "description": "Define where to look for compose projects and which folders to skip.",
+      "descriptionKey": "config.forms.dockerDiscovery.description",
       "groups": [
         {
           "title": "Search parameters",
+          "titleKey": "config.forms.dockerDiscovery.groups.searchParameters.title",
           "fields": [
             {
               "key": "CFG_LH_DOCKER_COMPOSE_ROOT",
               "type": "text",
               "label": "Compose root directory",
-              "placeholder": "/opt/containers"
+              "labelKey": "config.forms.dockerDiscovery.fields.CFG_LH_DOCKER_COMPOSE_ROOT.label",
+              "placeholder": "/opt/containers",
+              "placeholderKey": "config.forms.dockerDiscovery.fields.CFG_LH_DOCKER_COMPOSE_ROOT.placeholder"
             },
             {
               "key": "CFG_LH_DOCKER_EXCLUDE_DIRS",
               "type": "textarea",
               "label": "Exclude directories",
-              "help": "Comma separated list of directories relative to the scan root that should be skipped."
+              "labelKey": "config.forms.dockerDiscovery.fields.CFG_LH_DOCKER_EXCLUDE_DIRS.label",
+              "help": "Comma separated list of directories relative to the scan root that should be skipped.",
+              "helpKey": "config.forms.dockerDiscovery.fields.CFG_LH_DOCKER_EXCLUDE_DIRS.help"
             },
             {
               "key": "CFG_LH_DOCKER_SEARCH_DEPTH",
               "type": "number",
               "label": "Search depth",
+              "labelKey": "config.forms.dockerDiscovery.fields.CFG_LH_DOCKER_SEARCH_DEPTH.label",
               "min": 0,
               "default": "3"
             }
@@ -434,17 +598,28 @@
       "displayKey": "config.dockerScope",
       "label": "Docker Scope",
       "description": "Control how the Docker security checks run.",
+      "descriptionKey": "config.forms.dockerScope.description",
       "groups": [
         {
           "title": "Checks",
+          "titleKey": "config.forms.dockerScope.groups.checks.title",
           "fields": [
             {
               "key": "CFG_LH_DOCKER_CHECK_MODE",
               "type": "select",
               "label": "Check mode",
+              "labelKey": "config.forms.dockerScope.fields.CFG_LH_DOCKER_CHECK_MODE.label",
               "options": [
-                { "value": "running", "label": "Analyse running containers only" },
-                { "value": "all", "label": "Analyse all compose services" }
+                {
+                  "value": "running",
+                  "label": "Analyse running containers only",
+                  "labelKey": "config.forms.dockerScope.fields.CFG_LH_DOCKER_CHECK_MODE.options.running"
+                },
+                {
+                  "value": "all",
+                  "label": "Analyse all compose services",
+                  "labelKey": "config.forms.dockerScope.fields.CFG_LH_DOCKER_CHECK_MODE.options.all"
+                }
               ],
               "default": "running"
             },
@@ -452,7 +627,9 @@
               "key": "CFG_LH_DOCKER_CHECK_RUNNING",
               "type": "toggle",
               "label": "Require running containers",
-              "help": "If disabled, offline services are still inspected."
+              "labelKey": "config.forms.dockerScope.fields.CFG_LH_DOCKER_CHECK_RUNNING.label",
+              "help": "If disabled, offline services are still inspected.",
+              "helpKey": "config.forms.dockerScope.fields.CFG_LH_DOCKER_CHECK_RUNNING.help"
             }
           ]
         }
@@ -463,21 +640,27 @@
       "displayKey": "config.dockerWarnings",
       "label": "Warning Filters",
       "description": "Mute noisy warnings or mark specific findings as acceptable.",
+      "descriptionKey": "config.forms.dockerWarnings.description",
       "groups": [
         {
           "title": "Filters",
+          "titleKey": "config.forms.dockerWarnings.groups.filters.title",
           "fields": [
             {
               "key": "CFG_LH_DOCKER_SKIP_WARNINGS",
               "type": "textarea",
               "label": "Warnings to skip",
-              "help": "Comma separated list of warning identifiers to hide."
+              "labelKey": "config.forms.dockerWarnings.fields.CFG_LH_DOCKER_SKIP_WARNINGS.label",
+              "help": "Comma separated list of warning identifiers to hide.",
+              "helpKey": "config.forms.dockerWarnings.fields.CFG_LH_DOCKER_SKIP_WARNINGS.help"
             },
             {
               "key": "CFG_LH_DOCKER_ACCEPTED_WARNINGS",
               "type": "textarea",
               "label": "Accepted warnings",
-              "help": "Comma separated identifiers treated as acknowledged."
+              "labelKey": "config.forms.dockerWarnings.fields.CFG_LH_DOCKER_ACCEPTED_WARNINGS.label",
+              "help": "Comma separated identifiers treated as acknowledged.",
+              "helpKey": "config.forms.dockerWarnings.fields.CFG_LH_DOCKER_ACCEPTED_WARNINGS.help"
             }
           ]
         }
@@ -489,15 +672,19 @@
       "label": "Default Pattern Checks",
       "description": "Modify the weak password detection regex used during container reviews.",
       "advanced": true,
+      "descriptionKey": "config.forms.dockerPatterns.description",
       "groups": [
         {
           "title": "Patterns",
+          "titleKey": "config.forms.dockerPatterns.groups.patterns.title",
           "fields": [
             {
               "key": "COMMON_WEAK_PASSWORD_REGEX",
               "type": "textarea",
               "label": "Weak password regex",
-              "help": "Advanced: adjust with care, the bundled pattern catches frequently exposed passwords."
+              "labelKey": "config.forms.dockerPatterns.fields.COMMON_WEAK_PASSWORD_REGEX.label",
+              "help": "Advanced: adjust with care, the bundled pattern catches frequently exposed passwords.",
+              "helpKey": "config.forms.dockerPatterns.fields.COMMON_WEAK_PASSWORD_REGEX.help"
             }
           ]
         }

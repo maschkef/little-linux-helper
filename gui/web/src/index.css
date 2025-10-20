@@ -912,7 +912,8 @@ code {
   gap: 16px;
 }
 
-.config-dev-toggle {
+.config-dev-toggle,
+.config-advanced-toggle {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -921,7 +922,8 @@ code {
   user-select: none;
 }
 
-.config-dev-toggle input {
+.config-dev-toggle input,
+.config-advanced-toggle input {
   transform: scale(1.1);
   cursor: pointer;
 }
@@ -1369,6 +1371,17 @@ code {
   font-size: 0.95rem;
 }
 
+.config-changes-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.config-changes-controls .error-message,
+.config-changes-controls .success-message {
+  margin: 0;
+}
+
 .summary-count {
   background-color: rgba(52, 152, 219, 0.2);
   color: #ecf0f1;
@@ -1440,6 +1453,17 @@ code {
   gap: 8px;
   padding: 10px 16px;
   font-size: 0.95rem;
+}
+
+.change-table-header.has-actions,
+.change-table-row.has-actions {
+  grid-template-columns: 1fr 1fr 1fr auto;
+  align-items: center;
+}
+
+.change-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .change-table-header {

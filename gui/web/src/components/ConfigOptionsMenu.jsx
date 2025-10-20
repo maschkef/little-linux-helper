@@ -29,7 +29,7 @@ function ConfigOptionsMenu({
   success,
   error,
   advancedHidden,
-  devMode,
+  showAdvanced = false,
 }) {
   const { t } = useTranslation('common');
 
@@ -46,7 +46,11 @@ function ConfigOptionsMenu({
     return Array.from(buckets.entries()).map(([key, items]) => ({
       key,
       label: getCategoryLabel(key, t),
-      items: items.sort((a, b) => a.display_name.localeCompare(b.display_name)),
+      items: items.sort((a, b) => {
+        const labelA = a.display_key ? t(a.display_key) : a.display_name;
+        const labelB = b.display_key ? t(b.display_key) : b.display_name;
+        return labelA.localeCompare(labelB);
+      }),
     }));
   }, [forms, t]);
 
@@ -199,7 +203,7 @@ function ConfigOptionsMenu({
   }
 
   const visibleGroups = (detail?.groups || []).filter(
-    (group) => devMode || !group.advanced
+    (group) => showAdvanced || !group.advanced
   );
 
   return (
@@ -215,7 +219,7 @@ function ConfigOptionsMenu({
                     className={`config-options-item ${form.filename === selectedForm ? 'active' : ''}`}
                     onClick={() => onSelectForm(form.filename)}
                   >
-                    {form.display_name}
+                    {form.display_key ? t(form.display_key) : form.display_name}
                     {form.advanced && <span className="badge-advanced">{t('config.advancedBadge')}</span>}
                   </button>
                 </li>
@@ -225,7 +229,7 @@ function ConfigOptionsMenu({
         ))}
         {advancedHidden && (
           <div className="config-options-hint">
-            {t('config.enableDevForAdvanced')}
+            {t('config.enableAdvancedToggle')}
           </div>
         )}
       </div>
@@ -246,9 +250,11 @@ function ConfigOptionsMenu({
         {!detailLoading && detail && (
           <>
             <div className="config-options-header">
-              <h3>{detail.display_name}</h3>
-              {detail.description && (
-                <p className="config-options-description">{detail.description}</p>
+              <h3>{detail.display_key ? t(detail.display_key) : detail.display_name}</h3>
+              {(detail.description_key || detail.description) && (
+                <p className="config-options-description">
+                  {detail.description_key ? t(detail.description_key) : detail.description}
+                </p>
               )}
             </div>
 
@@ -269,7 +275,7 @@ function ConfigOptionsMenu({
             <div className="config-options-groups">
               {visibleGroups.map((group, index) => {
                 const visibleFields = group.fields.filter(
-                  (field) => devMode || !field.advanced
+                  (field) => showAdvanced || !field.advanced
                 );
                 if (visibleFields.length === 0) {
                   return null;

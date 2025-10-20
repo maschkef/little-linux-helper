@@ -97,14 +97,15 @@ type DocMetadata struct {
 }
 
 type ConfigFormDefinition struct {
-	ConfigType  string            `json:"configType"`
-	DisplayKey  string            `json:"displayKey,omitempty"`
-	Label       string            `json:"label,omitempty"`
-	Description string            `json:"description,omitempty"`
-	Advanced    bool              `json:"advanced,omitempty"`
-	Order       int               `json:"order,omitempty"`
-	Groups      []ConfigFormGroup `json:"groups"`
-	RawFilename string            `json:"-"`
+	ConfigType     string            `json:"configType"`
+	DisplayKey     string            `json:"displayKey,omitempty"`
+	Label          string            `json:"label,omitempty"`
+	Description    string            `json:"description,omitempty"`
+	DescriptionKey string            `json:"descriptionKey,omitempty"`
+	Advanced       bool              `json:"advanced,omitempty"`
+	Order          int               `json:"order,omitempty"`
+	Groups         []ConfigFormGroup `json:"groups"`
+	RawFilename    string            `json:"-"`
 }
 
 type ConfigFormGroup struct {
@@ -117,22 +118,22 @@ type ConfigFormGroup struct {
 }
 
 type ConfigFormField struct {
-    Key            string             `json:"key"`
-    Type           string             `json:"type"`
-    Label          string             `json:"label,omitempty"`
-    LabelKey       string             `json:"labelKey,omitempty"`
-    Help           string             `json:"help,omitempty"`
-    HelpKey        string             `json:"helpKey,omitempty"`
-    Placeholder    string             `json:"placeholder,omitempty"`
-    PlaceholderKey string             `json:"placeholderKey,omitempty"`
-    Options        []ConfigFormOption `json:"options,omitempty"`
-    Advanced       bool               `json:"advanced,omitempty"`
-    Required       bool               `json:"required,omitempty"`
-    Default        string             `json:"default,omitempty"`
-    Pattern        string             `json:"pattern,omitempty"`
-    Min            *float64           `json:"min,omitempty"`
-    Max            *float64           `json:"max,omitempty"`
-    Resettable     *bool              `json:"resettable,omitempty"`
+	Key            string             `json:"key"`
+	Type           string             `json:"type"`
+	Label          string             `json:"label,omitempty"`
+	LabelKey       string             `json:"labelKey,omitempty"`
+	Help           string             `json:"help,omitempty"`
+	HelpKey        string             `json:"helpKey,omitempty"`
+	Placeholder    string             `json:"placeholder,omitempty"`
+	PlaceholderKey string             `json:"placeholderKey,omitempty"`
+	Options        []ConfigFormOption `json:"options,omitempty"`
+	Advanced       bool               `json:"advanced,omitempty"`
+	Required       bool               `json:"required,omitempty"`
+	Default        string             `json:"default,omitempty"`
+	Pattern        string             `json:"pattern,omitempty"`
+	Min            *float64           `json:"min,omitempty"`
+	Max            *float64           `json:"max,omitempty"`
+	Resettable     *bool              `json:"resettable,omitempty"`
 }
 
 type ConfigFormOption struct {
@@ -170,6 +171,7 @@ type ConfigChange struct {
 type ConfigChangeSet struct {
 	Filename    string         `json:"filename"`
 	DisplayName string         `json:"display_name"`
+	DisplayKey  string         `json:"display_key,omitempty"`
 	ConfigType  string         `json:"config_type"`
 	Changes     []ConfigChange `json:"changes"`
 }
@@ -194,10 +196,11 @@ var (
 	sessionManager = &SessionManager{
 		sessions: make(map[string]*ModuleSession),
 	}
-	lhRootDir         string
-	appStartTime      time.Time
-	releaseVersion    string
-	configFormSchemas map[string]ConfigFormDefinition
+	lhRootDir           string
+	appStartTime        time.Time
+	releaseVersion      string
+	configFormSchemas   map[string]ConfigFormDefinition
+	currentAuthSettings AuthSettings
 )
 
 // Config holds GUI configuration
@@ -366,13 +369,14 @@ func getConfigFormSummaries() []ConfigFormSummary {
 		}
 
 		summaries = append(summaries, ConfigFormSummary{
-			Filename:    filename,
-			DisplayName: displayName,
-			DisplayKey:  def.DisplayKey,
-			Label:       def.Label,
-			Description: def.Description,
-			ConfigType:  def.ConfigType,
-			Advanced:    def.Advanced,
+			Filename:       filename,
+			DisplayName:    displayName,
+			DisplayKey:     def.DisplayKey,
+			Label:          def.Label,
+			Description:    def.Description,
+			DescriptionKey: def.DescriptionKey,
+			ConfigType:     def.ConfigType,
+			Advanced:       def.Advanced,
 		})
 	}
 
@@ -534,13 +538,14 @@ func buildConfigFormDetail(filename string, def ConfigFormDefinition) (ConfigFor
 	}
 
 	summary := ConfigFormSummary{
-		Filename:    filename,
-		DisplayName: displayName,
-		DisplayKey:  def.DisplayKey,
-		Label:       def.Label,
-		Description: def.Description,
-		ConfigType:  configType,
-		Advanced:    def.Advanced,
+		Filename:       filename,
+		DisplayName:    displayName,
+		DisplayKey:     def.DisplayKey,
+		Label:          def.Label,
+		Description:    def.Description,
+		DescriptionKey: def.DescriptionKey,
+		ConfigType:     configType,
+		Advanced:       def.Advanced,
 	}
 
 	return ConfigFormDetail{
@@ -643,6 +648,7 @@ func buildConfigChangeSet(filename string, def ConfigFormDefinition) (ConfigChan
 	return ConfigChangeSet{
 		Filename:    filename,
 		DisplayName: displayName,
+		DisplayKey:  def.DisplayKey,
 		ConfigType:  configType,
 		Changes:     changes,
 	}, true, nil
@@ -1047,6 +1053,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	currentAuthSettings = authSettings
 	log.Printf("Authentication mode: %s", authSettings.Mode)
 	if authSettings.Mode == authModeSession {
 		log.Printf("Session cookie: %s (secure=%t)", authSettings.CookieName, authSettings.CookieSecure)
@@ -2046,7 +2053,8 @@ func getHealth(c *fiber.Ctx) error {
 
 func getVersion(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
-		"release": releaseVersion,
+		"release":   releaseVersion,
+		"auth_mode": currentAuthSettings.Mode,
 	})
 }
 

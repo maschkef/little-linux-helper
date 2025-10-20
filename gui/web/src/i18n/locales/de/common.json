@@ -150,6 +150,7 @@
     "changes": "Änderungen",
     "backups": "Backups",
     "devModeToggle": "Entwicklersteuerung",
+    "advancedToggle": "Erweiterte Optionen",
     "errorLoadingForms": "Fehler beim Laden der Konfigurationsoptionen",
     "errorLoadingForm": "Fehler beim Laden des Konfigurationsformulars",
     "errorLoadingChanges": "Fehler beim Laden der Konfigurationsänderungen",
@@ -203,7 +204,7 @@
     "groupDocker": "Docker-Konfiguration",
     "groupOther": "Weitere Einstellungen",
     "advancedBadge": "Erweitert",
-    "enableDevForAdvanced": "Aktivieren Sie die Entwicklersteuerung, um erweiterte Formulare zu sehen.",
+    "enableAdvancedToggle": "Aktivieren Sie „Erweiterte Optionen“, um erweiterte Formulare zu sehen.",
     "backupStorage": "Backup · Speicherpfade",
     "backupExcludes": "Backup · Archiv-Ausschlüsse",
     "backupRetention": "Backup · Aufbewahrung & Logs",
@@ -222,8 +223,356 @@
     "key": "Schlüssel",
     "defaultValue": "Standardwert",
     "currentValue": "Aktueller Wert",
+    "actions": "Aktionen",
     "noValue": "Nicht gesetzt",
-    "blankValue": "(leer)"
+    "blankValue": "(leer)",
+    "forms": {
+      "generalLanguage": {
+        "description": "Wählen Sie die Standardsprache der Oberfläche, die beim Start des Helpers verwendet werden soll.",
+        "groups": {
+          "language": {
+            "title": "Sprache"
+          }
+        },
+        "fields": {
+          "CFG_LH_LANG": {
+            "label": "Bevorzugte Sprache",
+            "help": "Auf 'auto' setzen, um automatisch die aktuelle Systemsprache zu übernehmen.",
+            "options": {
+              "auto": "Automatisch (Systemsprache)",
+              "de": "Deutsch",
+              "en": "Englisch",
+              "es": "Spanisch (teilweise)",
+              "fr": "Französisch (teilweise)"
+            }
+          }
+        }
+      },
+      "generalLoggingCore": {
+        "description": "Steuern Sie die Ausführlichkeit des Helpers und wohin Logmeldungen geschrieben werden.",
+        "groups": {
+          "logLevel": {
+            "title": "Log-Level"
+          },
+          "output": {
+            "title": "Ausgabe"
+          }
+        },
+        "fields": {
+          "CFG_LH_LOG_LEVEL": {
+            "label": "Log-Level",
+            "help": "Wählen Sie, wie viele Informationen während der Ausführung ausgegeben werden sollen.",
+            "options": {
+              "ERROR": "Nur Fehler",
+              "WARN": "Warnungen und Fehler",
+              "INFO": "Informationsmeldungen",
+              "DEBUG": "Detaillierte Debug-Ausgabe"
+            }
+          },
+          "CFG_LH_LOG_TO_CONSOLE": {
+            "label": "Logs an Konsole senden",
+            "help": "Deaktivieren, wenn Logs nur in die Logdatei geschrieben werden sollen."
+          },
+          "CFG_LH_LOG_TO_FILE": {
+            "label": "Logs in Datei schreiben",
+            "help": "Deaktivieren, um das Anlegen von Logdateien im Log-Verzeichnis zu verhindern."
+          }
+        }
+      },
+      "generalLoggingDetail": {
+        "description": "Feineinstellungen für Metadaten, die jeder Logzeile hinzugefügt werden.",
+        "groups": {
+          "fileNameVisibility": {
+            "title": "Sichtbarkeit des Skriptnamens"
+          },
+          "timestamps": {
+            "title": "Zeitstempel"
+          }
+        },
+        "fields": {
+          "CFG_LH_LOG_SHOW_FILE_ERROR": {
+            "label": "Skriptname bei Fehlern anzeigen"
+          },
+          "CFG_LH_LOG_SHOW_FILE_WARN": {
+            "label": "Skriptname bei Warnungen anzeigen"
+          },
+          "CFG_LH_LOG_SHOW_FILE_INFO": {
+            "label": "Skriptname bei Infos anzeigen"
+          },
+          "CFG_LH_LOG_SHOW_FILE_DEBUG": {
+            "label": "Skriptname bei Debug-Ausgaben anzeigen"
+          },
+          "CFG_LH_LOG_TIMESTAMP_FORMAT": {
+            "label": "Zeitstempel-Format",
+            "options": {
+              "full": "Datum und Uhrzeit",
+              "time": "Nur Zeit",
+              "none": "Keine Zeitstempel"
+            }
+          }
+        }
+      },
+      "generalGui": {
+        "description": "Host und Port der Little-Linux-Helper-Weboberfläche anpassen.",
+        "groups": {
+          "network": {
+            "title": "Netzwerk"
+          }
+        },
+        "fields": {
+          "CFG_LH_GUI_PORT": {
+            "label": "Port",
+            "help": "Wählen Sie einen Port zwischen 1 und 65535."
+          },
+          "CFG_LH_GUI_HOST": {
+            "label": "Host-Bindung",
+            "help": "'localhost' beschränkt den Zugriff, '0.0.0.0' erlaubt anderen Geräten den Zugriff."
+          },
+          "CFG_LH_GUI_FIREWALL_RESTRICTION": {
+            "label": "Firewall-Bereich",
+            "help": "Werte: 'all', 'local' oder ein CIDR (z. B. 192.168.1.0/24)."
+          }
+        }
+      },
+      "generalGuiAuth": {
+        "description": "Legt fest, wann beim Einsatz auf gemeinsam genutzten Systemen eine Anmeldung erforderlich ist.",
+        "groups": {
+          "mode": {
+            "title": "Modus"
+          },
+          "credentials": {
+            "title": "Zugangsdaten"
+          },
+          "cookies": {
+            "title": "Cookies"
+          },
+          "cors": {
+            "title": "Cross-Origin-Anfragen"
+          }
+        },
+        "fields": {
+          "LLH_GUI_AUTH_MODE": {
+            "label": "Authentifizierungsmodus",
+            "options": {
+              "auto": "Auto (lokal offen, remote mit Login)",
+              "session": "Sitzungs-Login (Benutzername + Passwort)",
+              "basic": "HTTP Basic Auth",
+              "none": "Keine Authentifizierung (nur Loopback)"
+            }
+          },
+          "LLH_GUI_USER": {
+            "label": "Benutzername",
+            "placeholder": "admin"
+          },
+          "LLH_GUI_PASS_HASH": {
+            "label": "Passworthash",
+            "help": "Verwenden Sie das mitgelieferte --hash-password, um bcrypt-Hashes zu erzeugen."
+          },
+          "LLH_GUI_PASS_PLAIN": {
+            "label": "Klartext-Passwort (nur Entwicklung)",
+            "help": "Nur in Entwicklungsumgebungen nutzen, Hashes werden bevorzugt."
+          },
+          "LLH_GUI_COOKIE_NAME": {
+            "label": "Name des Session-Cookies"
+          },
+          "LLH_GUI_COOKIE_SECURE": {
+            "label": "Cookie als sicher markieren",
+            "help": "Nur deaktivieren, wenn auf localhost ohne HTTPS ausgeliefert wird."
+          },
+          "LLH_GUI_ALLOWED_ORIGINS": {
+            "label": "Erlaubte Ursprünge",
+            "help": "Kommagetrennte Liste von Ursprüngen, die auf die API zugreifen dürfen (z. B. http://localhost:3001)."
+          }
+        }
+      },
+      "generalRelease": {
+        "description": "Optionaler Release-Tag, der zur Fehleranalyse in Metadaten übernommen wird.",
+        "groups": {
+          "metadata": {
+            "title": "Metadaten"
+          }
+        },
+        "fields": {
+          "CFG_LH_RELEASE_TAG": {
+            "label": "Release-Tag",
+            "placeholder": "v0.6.0"
+          }
+        }
+      },
+      "backupStorage": {
+        "description": "Legt die Verzeichnisse für Backups und temporäre Snapshots fest.",
+        "groups": {
+          "paths": {
+            "title": "Pfade"
+          }
+        },
+        "fields": {
+          "CFG_LH_BACKUP_ROOT": {
+            "label": "Backup-Wurzelverzeichnis",
+            "placeholder": "/run/media/tux/hdd_3tb/"
+          },
+          "CFG_LH_BACKUP_DIR": {
+            "label": "Backup-Verzeichnis",
+            "help": "Relativ zur Backup-Wurzel, beginnt normalerweise mit '/'.",
+            "placeholder": "/backups"
+          },
+          "CFG_LH_TEMP_SNAPSHOT_DIR": {
+            "label": "Temporäres Snapshot-Verzeichnis",
+            "placeholder": "/.snapshots_lh_temp"
+          }
+        }
+      },
+      "backupExcludes": {
+        "description": "Zusätzliche TAR-Ausschlüsse definieren, die nie archiviert werden sollen.",
+        "groups": {
+          "tarExclusions": {
+            "title": "TAR-Ausschlüsse"
+          }
+        },
+        "fields": {
+          "CFG_LH_TAR_EXCLUDES": {
+            "label": "Auszuschließende Muster",
+            "help": "Kommagetrennte Pfade oder Glob-Muster, die bei TAR-Backups übersprungen werden."
+          }
+        }
+      },
+      "backupRetention": {
+        "description": "Steuert, wie viele Backups aufbewahrt und wo Logdateien gespeichert werden.",
+        "groups": {
+          "retention": {
+            "title": "Aufbewahrung"
+          }
+        },
+        "fields": {
+          "CFG_LH_RETENTION_BACKUP": {
+            "label": "Anzahl Backups pro Typ"
+          },
+          "CFG_LH_BACKUP_LOG_BASENAME": {
+            "label": "Log-Dateiname",
+            "placeholder": "backup.log"
+          },
+          "CFG_LH_DEBUG_LOG_LIMIT": {
+            "label": "Anzahl der Kandidaten im Debug-Log"
+          }
+        }
+      },
+      "backupSnapshots": {
+        "description": "Legt fest, wie Quell-Snapshots während der Backups erhalten bleiben.",
+        "groups": {
+          "preservation": {
+            "title": "Aufbewahrung"
+          }
+        },
+        "fields": {
+          "CFG_LH_KEEP_SOURCE_SNAPSHOTS": {
+            "label": "Quell-Snapshots behalten",
+            "options": {
+              "prompt": "Jedes Mal nachfragen",
+              "true": "Immer behalten",
+              "false": "Nicht behalten"
+            }
+          },
+          "CFG_LH_SOURCE_SNAPSHOT_DIR": {
+            "label": "Verzeichnis für permanente Snapshots",
+            "placeholder": "/.snapshots_lh"
+          },
+          "CFG_LH_SOURCE_SNAPSHOT_RETENTION": {
+            "label": "Snapshots pro Subvolume"
+          }
+        }
+      },
+      "backupSubvolumes": {
+        "description": "Bestimmt, welche Subvolumes in den Backup-Lauf einbezogen werden.",
+        "groups": {
+          "subvolumeList": {
+            "title": "Subvolume-Liste"
+          }
+        },
+        "fields": {
+          "CFG_LH_BACKUP_SUBVOLUMES": {
+            "label": "Konfigurierte Subvolumes",
+            "help": "Leerzeichengetrennte Liste (z. B. '@ @home')."
+          },
+          "CFG_LH_AUTO_DETECT_SUBVOLUMES": {
+            "label": "@-Subvolumes automatisch erkennen"
+          }
+        }
+      },
+      "dockerDiscovery": {
+        "description": "Bestimmt, wo nach Compose-Projekten gesucht und welche Ordner übersprungen werden.",
+        "groups": {
+          "searchParameters": {
+            "title": "Suchparameter"
+          }
+        },
+        "fields": {
+          "CFG_LH_DOCKER_COMPOSE_ROOT": {
+            "label": "Basisverzeichnis für Compose",
+            "placeholder": "/opt/containers"
+          },
+          "CFG_LH_DOCKER_EXCLUDE_DIRS": {
+            "label": "Ausgeschlossene Verzeichnisse",
+            "help": "Kommagetrennte Liste relativer Verzeichnisse, die übersprungen werden sollen."
+          },
+          "CFG_LH_DOCKER_SEARCH_DEPTH": {
+            "label": "Suchtiefe"
+          }
+        }
+      },
+      "dockerScope": {
+        "description": "Steuert die Ausführung der Docker-Sicherheitsprüfungen.",
+        "groups": {
+          "checks": {
+            "title": "Prüfungen"
+          }
+        },
+        "fields": {
+          "CFG_LH_DOCKER_CHECK_MODE": {
+            "label": "Prüfmodus",
+            "options": {
+              "running": "Nur laufende Container analysieren",
+              "all": "Alle Compose-Dienste analysieren"
+            }
+          },
+          "CFG_LH_DOCKER_CHECK_RUNNING": {
+            "label": "Laufende Container erforderlich",
+            "help": "Wenn deaktiviert, werden auch offline Dienste geprüft."
+          }
+        }
+      },
+      "dockerWarnings": {
+        "description": "Unterdrückt laute Warnungen oder markiert akzeptierte Ergebnisse.",
+        "groups": {
+          "filters": {
+            "title": "Filter"
+          }
+        },
+        "fields": {
+          "CFG_LH_DOCKER_SKIP_WARNINGS": {
+            "label": "Zu überspringende Warnungen",
+            "help": "Kommagetrennte Liste von Warnungskennungen, die ausgeblendet werden."
+          },
+          "CFG_LH_DOCKER_ACCEPTED_WARNINGS": {
+            "label": "Akzeptierte Warnungen",
+            "help": "Kommagetrennte Kennungen, die als akzeptiert gelten."
+          }
+        }
+      },
+      "dockerPatterns": {
+        "description": "Ändert die Regex zum Erkennen schwacher Passwörter während Container-Prüfungen.",
+        "groups": {
+          "patterns": {
+            "title": "Pattern"
+          }
+        },
+        "fields": {
+          "COMMON_WEAK_PASSWORD_REGEX": {
+            "label": "Regex für schwache Passwörter",
+            "help": "Fortgeschritten: nur mit Vorsicht ändern, das mitgelieferte Pattern erkennt häufig auftretende Passwörter."
+          }
+        }
+      }
+    }
   },
   "auth": {
     "title": "Anmelden",
