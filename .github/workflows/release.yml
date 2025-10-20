@@ -185,27 +185,47 @@ jobs:
           ${{ steps.version.outputs.release_type == 'pre-release' && '⚠️ **Note**: This is a pre-release version and may contain bugs or incomplete features.' || '' }}
           
           ### What's included:
+          <details>
+          <summary> click here </summary>
+          
           - ✅ **No Node.js/npm required** - everything is pre-built
           - ✅ **Ready to run** - just download, extract, and start
           - ✅ **Multiple architectures** supported
           
+          </details>
+          
           ### Available packages:
+          <details>
+          <summary> click here </summary>
+          
           - **AMD64** - For most modern 64-bit systems (Intel/AMD processors)
           - **ARM64** - For Raspberry Pi 4, modern ARM servers  
           - **ARMv7** - For Raspberry Pi 2/3, older ARM devices
           
+          </details>
+          
           ### How to use:
+          <details>
+          <summary> click here </summary>
+          
           1. Download the package for your architecture
           2. Extract: `tar -xzf little-linux-helper-gui-<arch>.tar.gz`
           3. Run: `cd little-linux-helper-gui-<arch> && ./gui_launcher.sh`
           4. Open browser: http://localhost:3000
           
+          </details>
+          
           ### Advanced usage:
+          <details>
+          <summary> click here </summary>
+          
           - **Recommended**: `./gui_launcher.sh` (full feature set with build management, firewall, security)
           - **Network access**: `./gui_launcher.sh -n` (accessible from other machines)
           - **Firewall management**: `./gui_launcher.sh -n -f` (automatically configure firewall)
           - **Custom port**: `./gui_launcher.sh -p 8080` (run on different port)
           - **Direct binary**: `./gui/little-linux-helper-gui` (minimal, for advanced users)
+          
+          </details>
           
           ### System Requirements:
           - Any Linux distribution
