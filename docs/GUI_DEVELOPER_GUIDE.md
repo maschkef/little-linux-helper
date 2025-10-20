@@ -131,6 +131,15 @@ esac
 - Modules work identically in both interfaces
 - GUI provides appropriate navigation for its context
 
+### Configuration Options Menu
+
+The GUI now exposes a schema-driven **Options** tab that lets users change configuration fragments without touching the raw files. Form layouts are defined in `gui/config-schema/config-forms.json`, read by the backend during startup, and served to the frontend via the new `/api/config/forms` endpoints. Each form groups related keys (general, backup, Docker, …) and renders appropriate controls (select boxes, toggles, numeric inputs, text areas).
+
+- The structured editor is enabled for every user; the legacy text editor is still available but gated behind the developer toggle (`🔧` in the header) to avoid accidental low-level edits.
+- Every successful save updates the corresponding fragment through `lh_config_update_fragment()` and marks the file with `# Edited from Little Linux Helper GUI on YYYY-mm-DD`. The marker is refreshed whenever the GUI changes the file again.
+- Advanced forms and form sections are automatically hidden unless developer controls are enabled, keeping production deployments focused on the most relevant settings.
+- The new **Changes** view highlights any deviations from the template defaults so administrators can quickly review overrides; the legacy backup manager remains available via CLI for manual restore workflows.
+
 ## Security & Authentication
 
 The GUI ships with first-class authentication. By default the backend disables login for strictly loopback deployments and automatically switches to session authentication whenever the server is reachable over the network (`/api/health` remains public for liveness probes in every mode).

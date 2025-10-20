@@ -81,6 +81,62 @@ function lh_gui_remove_config_backup() {
     fi
 }
 
+# Ensure configuration file contains GUI edit marker with current date.
+function lh_gui_ensure_edit_marker() {
+    local config_file="$1"
+    local marker_prefix="# Edited from Little Linux Helper GUI on "
+    local today
+    today="$(date '+%Y-%m-%d')"
+    local marker_line="${marker_prefix}${today}"
+
+    if [ ! -f "$config_file" ]; then
+        return 0
+    fi
+
+    local tmp_file
+    tmp_file="$(mktemp)" || return 1
+
+    # shellcheck disable=SC2064
+    trap "rm -f '$tmp_file'" EXIT
+
+    local updated=0
+    local inserted=0
+    local line has_marker
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        if [ "$updated" -eq 0 ] && [[ "$line" == "${marker_prefix}"* ]]; then
+            printf '%s\n' "$marker_line" >>"$tmp_file"
+            updated=1
+            continue
+        fi
+
+        if [ "$inserted" -eq 0 ] && [[ "$line" != \#* ]] && [[ -n "$line" ]]; then
+            printf '%s\n' "$marker_line" >>"$tmp_file"
+            inserted=1
+        fi
+
+        printf '%s\n' "$line" >>"$tmp_file"
+    done <"$config_file"
+
+    if [ "$updated" -eq 0 ] && [ "$inserted" -eq 0 ]; then
+        printf '%s\n' "$marker_line" >>"$tmp_file"
+    fi
+
+    if cmp -s "$tmp_file" "$config_file"; then
+        rm -f "$tmp_file"
+        trap - EXIT
+        return 0
+    fi
+
+    mv "$tmp_file" "$config_file"
+    trap - EXIT
+    rm -f "$tmp_file"
+
+    if command -v lh_fix_ownership >/dev/null 2>&1; then
+        lh_fix_ownership "$config_file" >/dev/null 2>&1 || true
+    fi
+}
+
 # Function to list GUI configuration backups for a specific config file
 function lh_gui_list_config_backups() {
     local config_file="$1"
@@ -249,6 +305,8 @@ function lh_gui_write_config_file() {
     if echo "$config_content" > "$config_file"; then
         local msg="${MSG[LIB_GUI_CONFIG_WRITE_SUCCESS]:-Configuration file written successfully: %s}"
         lh_log_msg "INFO" "$(printf "$msg" "$config_file")"
+
+        lh_gui_ensure_edit_marker "$config_file"
         
         # Return backup file path if created (for potential cleanup)
         if [ -n "$backup_file" ]; then
@@ -307,3 +365,4 @@ export -f lh_gui_restore_config_backup
 export -f lh_gui_validate_config_content
 export -f lh_gui_write_config_file
 export -f lh_gui_cleanup_old_backups
+export -f lh_gui_ensure_edit_marker

@@ -39,6 +39,11 @@ web/src/
 │   ├── LanguageSelector.jsx     # EN/DE language switching
 │   ├── LogoutButton.jsx         # Ends GUI session and returns to login
 │   ├── ExitButton.jsx           # Application exit with session-aware confirmation
+│   ├── ConfigPanel.jsx          # Configuration overlay (options, raw editor, change summary)
+│   ├── ConfigOptionsMenu.jsx    # Schema-driven configuration form renderer
+│   ├── ConfigFileEditor.jsx     # Raw configuration editor (dev mode only)
+│   ├── ConfigFileList.jsx       # Lists available configuration fragments
+│   ├── ConfigChanges.jsx        # Highlights local overrides compared to defaults
 │   └── ErrorBoundary.jsx        # Error handling wrapper
 ├── contexts/            # React contexts
 │   └── SessionContext.jsx      # Session and WebSocket management
@@ -157,6 +162,64 @@ const groupedModules = modules.reduce((acc, module) => {
   return acc;
 }, {});
 ```
+
+### ConfigPanel.jsx - Configuration Overlay
+
+**Purpose:** Presents configuration management in three tabs:
+- **Options** – schema-driven forms rendered by `ConfigOptionsMenu.jsx`
+- **Editor** – raw configuration file editor (only visible when developer controls are enabled)
+- **Changes** – read-only summary of keys that differ from their default template values
+
+**Key Behaviours:**
+- Fetches available forms through `/api/config/forms`, caching form definitions and values locally.
+- Automatically hides advanced forms or form sections unless developer controls are active.
+- Persists dirty state per form and disables the save button until changes are detected.
+- Calls the structured save endpoint (`PUT /api/config/forms/:filename`) and refreshes the cached detail response on success.
+- Triggers config file list refreshes after saves so the legacy editor reflects updated timestamps.
+- Surfaces the `Changes` tab as soon as deviations are detected via `/api/config/changes` (data is cached client-side per fetch).
+
+```jsx
+const visibleForms = useMemo(
+  () => forms.filter((form) => devMode || !form.advanced),
+  [forms, devMode]
+);
+
+const handleFormSave = async () => {
+  const payload = {};
+  currentFormDetail.groups.forEach((group) => {
+    group.fields.forEach((field) => {
+      payload[field.key] = formValues[field.key];
+    });
+  });
+
+  const response = await apiFetch(`/api/config/forms/${selectedForm}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: payload }),
+  });
+
+  if (response.ok) {
+    const data = await response.json();
+    applyDetail(data.form, { resetMessages: false });
+    setFormSuccess(t('config.savedSuccess'));
+  } else {
+    setFormError(t('config.errorSaving'));
+  }
+};
+```
+
+### ConfigOptionsMenu.jsx - Schema-Driven Forms
+
+- Receives the pre-filtered form list and renders sidebar groups based on `config_type` (general, backup, docker, ...).
+- Maps schema field types (`toggle`, `select`, `number`, `text`, `textarea`) to matching inputs.
+- Displays contextual help strings and badges advanced-only entries.
+- Surface-level errors and success messages are shown above the form; reset/save buttons live at the bottom.
+
+### ConfigChanges.jsx - Default Comparison
+
+- Fetches `/api/config/changes` to compile a list of keys that diverge from their template defaults (or schema-provided default values when no template entry exists).
+- Groups changes by fragment and presents an inline table showing the default and current values to aid quick auditing.
+- Collapses to an informational message when no overrides exist, keeping the UI noise-free for fresh installations.
 
 ### Authentication Workflow
 

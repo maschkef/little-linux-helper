@@ -34,6 +34,12 @@ This library handles all configuration-related functionality for the Little Linu
 Fragments are loaded in lexical order (e.g. `00-*.conf`, `10-*.conf`, …) so related settings can be grouped by filename prefix.  
 Every fragment has a matching `.example` template under `<name>.d.example/` that is used for bootstrapping and schema checks.
 
+### GUI Form Schema Integration
+
+- The GUI consumes `gui/config-schema/config-forms.json` to know which fragments can be edited through the options menu and how fields should be rendered (type, help text, defaults, validation).
+- When a user saves changes from the GUI, the backend calls `lh_config_update_fragment()` for each touched key and then `lh_gui_ensure_edit_marker()` to stamp the file with `# Edited from Little Linux Helper GUI on YYYY-mm-DD`. The marker is updated every time the GUI writes to the fragment.
+- Advanced forms or individual fields can be hidden from production users by setting `"advanced": true` in the schema; they remain editable through the raw editor when developer controls are enabled.
+
 ## Key Functions
 
 ### `lh_load_backup_config()`

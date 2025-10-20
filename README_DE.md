@@ -85,6 +85,7 @@ Eine moderne webbasierte GUI kann über `gui_launcher.sh` gestartet werden und b
 - **Internationalisierung**: Vollständige Englisch/Deutsch-Übersetzungen mit dynamischem Sprachwechsel
 - **Fehlertolerantes Design**: Fehlende Übersetzungsschlüssel zeigen Fallback-Inhalte anstatt Abstürze zu verursachen
 - **Umfassendes Hilfesystem**: Kontextsensitive Hilfe mit detaillierten Modulhinweisen und Nutzungsempfehlungen
+- **Optionsmenü für Konfiguration**: Schema-basierte Formulare für `config/*.d/*.conf`, automatischer GUI-Änderungsmarker, Raw-Editor nur mit aktivierten Entwicklersteuerungen sichtbar sowie ein Reiter „Änderungen“, der Abweichungen von den Standardwerten hervorhebt
 - **Erweiterte Funktionen**: PTY-Integration für echtes Terminalgefühl und WebSocket-Kommunikation für Echtzeit-Updates
 
 > **🌐 Internationalisierung:** Die GUI unterstützt vollständige Englisch/Deutsch-Übersetzungen mit dynamischem Sprachwechsel und automatischer Sprachvererbung von der CLI.

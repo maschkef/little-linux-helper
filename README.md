@@ -85,6 +85,7 @@ A modern web-based GUI is available through `gui_launcher.sh`, providing:
 - **Internationalization Support**: Full English/German translations with dynamic language switching
 - **Error-Resilient Design**: Missing translation keys display fallback content instead of crashing
 - **Comprehensive Help System**: Context-sensitive help with detailed module guidance and usage notes
+- **Configuration Options Menu**: Schema-driven forms for `config/*.d/*.conf` fragments, automatic GUI edit marker, raw editor available only when developer controls are enabled, plus a Changes tab that highlights overrides vs defaults
 - **Advanced Features**: PTY integration for authentic terminal experience, WebSocket communication for real-time updates
 
 > **🌐 Internationalization:** The GUI supports full English/German translations with dynamic language switching and GUI-to-CLI language inheritance.

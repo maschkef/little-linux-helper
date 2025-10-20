@@ -269,6 +269,119 @@ curl -X POST http://localhost:3000/api/shutdown
 curl -X POST "http://localhost:3000/api/shutdown?force=true"
 ```
 
+### Configuration Forms
+
+The configuration manager consumes a schema defined in `gui/config-schema/config-forms.json`. The backend loads this file at startup and exposes helper endpoints that deliver both the schema and live values.
+
+#### `GET /api/config/forms`
+**Purpose:** List the available configuration forms.
+
+**Response Format:**
+```json
+[
+  {
+    "filename": "general.d/00-language.conf",
+    "display_name": "Language & Locale",
+    "display_key": "config.generalLanguage",
+    "config_type": "general",
+    "advanced": false,
+    "description": "Choose the default interface language that should be applied when the helper starts."
+  },
+  {
+    "filename": "general.d/20-logging-detail.conf",
+    "display_name": "Logging (Advanced)",
+    "config_type": "general",
+    "advanced": true
+  }
+]
+```
+
+#### `GET /api/config/forms/:filename`
+**Purpose:** Retrieve the schema and current values for a single form.
+
+**Response Format:**
+```json
+{
+  "filename": "backup.d/00-storage.conf",
+  "display_name": "Backup Storage",
+  "config_type": "backup",
+  "advanced": false,
+  "has_example": true,
+  "groups": [
+    {
+      "title": "Paths",
+      "fields": [
+        {
+          "key": "CFG_LH_BACKUP_ROOT",
+          "type": "text",
+          "label": "Backup root",
+          "placeholder": "/run/media/tux/hdd_3tb/"
+        },
+        {
+          "key": "CFG_LH_BACKUP_DIR",
+          "type": "text",
+          "label": "Backup directory",
+          "help": "Relative to the backup root and usually starts with '/'."
+        }
+      ]
+    }
+  ],
+  "values": {
+    "CFG_LH_BACKUP_ROOT": "/media/backup",
+    "CFG_LH_BACKUP_DIR": "/backups",
+    "CFG_LH_TEMP_SNAPSHOT_DIR": "/.snapshots_lh_temp"
+  },
+  "last_modified": "2025-01-14T08:15:30Z"
+}
+```
+
+#### `PUT /api/config/forms/:filename`
+**Purpose:** Persist changes from the options menu back to the configuration fragment.
+
+**Request Body:**
+```json
+{
+  "values": {
+    "CFG_LH_GUI_PORT": "3010",
+    "CFG_LH_GUI_HOST": "localhost",
+    "CFG_LH_GUI_FIREWALL_RESTRICTION": "local"
+  }
+}
+```
+
+**Responses:**
+- `200 OK` with `{ "status": "saved", "form": { ...updated detail... } }`
+- `400 Bad Request` for missing/invalid fields
+- `500 Internal Server Error` if the shell helpers fail (logs contain `lh_gui_write_config_file` output)
+
+> Saving via this endpoint delegates to `lh_config_update_fragment()` and `lh_gui_ensure_edit_marker()`. Every fragment touched by the GUI receives the marker `# Edited from Little Linux Helper GUI on YYYY-mm-DD`, which is refreshed on subsequent edits.
+
+#### `GET /api/config/changes`
+**Purpose:** Provide a read-only summary of keys that differ from their default template values.
+
+**Response Format:**
+```json
+[
+  {
+    "filename": "general.d/30-gui.conf",
+    "display_name": "GUI Server",
+    "config_type": "general",
+    "changes": [
+      {
+        "key": "CFG_LH_GUI_PORT",
+        "default": "3000",
+        "current": "3010"
+      }
+    ]
+  }
+]
+```
+
+**Notes:**
+- Values are normalised strings with quotes removed to simplify comparison in the frontend.
+- Keys without a known template default fall back to the schema-defined `default` property (if present); otherwise the default column remains blank.
+- Entries with zero differences are omitted, resulting in an empty array when the installation matches its defaults.
+
 ### System Endpoints
 
 #### `GET /api/health`

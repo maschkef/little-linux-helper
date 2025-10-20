@@ -13,15 +13,18 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"io/fs"
 	"log"
+	"math"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -93,6 +96,84 @@ type DocMetadata struct {
 	Filename    string `json:"filename"`
 }
 
+type ConfigFormDefinition struct {
+	ConfigType  string            `json:"configType"`
+	DisplayKey  string            `json:"displayKey,omitempty"`
+	Label       string            `json:"label,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Advanced    bool              `json:"advanced,omitempty"`
+	Order       int               `json:"order,omitempty"`
+	Groups      []ConfigFormGroup `json:"groups"`
+	RawFilename string            `json:"-"`
+}
+
+type ConfigFormGroup struct {
+	Title          string            `json:"title,omitempty"`
+	TitleKey       string            `json:"titleKey,omitempty"`
+	Description    string            `json:"description,omitempty"`
+	DescriptionKey string            `json:"descriptionKey,omitempty"`
+	Advanced       bool              `json:"advanced,omitempty"`
+	Fields         []ConfigFormField `json:"fields"`
+}
+
+type ConfigFormField struct {
+    Key            string             `json:"key"`
+    Type           string             `json:"type"`
+    Label          string             `json:"label,omitempty"`
+    LabelKey       string             `json:"labelKey,omitempty"`
+    Help           string             `json:"help,omitempty"`
+    HelpKey        string             `json:"helpKey,omitempty"`
+    Placeholder    string             `json:"placeholder,omitempty"`
+    PlaceholderKey string             `json:"placeholderKey,omitempty"`
+    Options        []ConfigFormOption `json:"options,omitempty"`
+    Advanced       bool               `json:"advanced,omitempty"`
+    Required       bool               `json:"required,omitempty"`
+    Default        string             `json:"default,omitempty"`
+    Pattern        string             `json:"pattern,omitempty"`
+    Min            *float64           `json:"min,omitempty"`
+    Max            *float64           `json:"max,omitempty"`
+    Resettable     *bool              `json:"resettable,omitempty"`
+}
+
+type ConfigFormOption struct {
+	Value    string `json:"value"`
+	Label    string `json:"label,omitempty"`
+	LabelKey string `json:"labelKey,omitempty"`
+}
+
+type ConfigFormSummary struct {
+	Filename       string `json:"filename"`
+	DisplayName    string `json:"display_name"`
+	DisplayKey     string `json:"display_key,omitempty"`
+	Label          string `json:"label,omitempty"`
+	Description    string `json:"description,omitempty"`
+	DescriptionKey string `json:"description_key,omitempty"`
+	ConfigType     string `json:"config_type"`
+	Advanced       bool   `json:"advanced,omitempty"`
+}
+
+type ConfigFormDetail struct {
+	ConfigFormSummary
+	Groups       []ConfigFormGroup `json:"groups"`
+	Values       map[string]string `json:"values"`
+	LastModified *time.Time        `json:"last_modified,omitempty"`
+	HasExample   bool              `json:"has_example"`
+	SchemaOrder  int               `json:"order,omitempty"`
+}
+
+type ConfigChange struct {
+	Key     string `json:"key"`
+	Default string `json:"default"`
+	Current string `json:"current"`
+}
+
+type ConfigChangeSet struct {
+	Filename    string         `json:"filename"`
+	DisplayName string         `json:"display_name"`
+	ConfigType  string         `json:"config_type"`
+	Changes     []ConfigChange `json:"changes"`
+}
+
 const (
 	authModeAuto    = "auto"
 	authModeNone    = "none"
@@ -113,9 +194,10 @@ var (
 	sessionManager = &SessionManager{
 		sessions: make(map[string]*ModuleSession),
 	}
-	lhRootDir      string
-	appStartTime   time.Time
-	releaseVersion string
+	lhRootDir         string
+	appStartTime      time.Time
+	releaseVersion    string
+	configFormSchemas map[string]ConfigFormDefinition
 )
 
 // Config holds GUI configuration
@@ -152,7 +234,6 @@ func configDisplayName(filename string) string {
 	}
 	return filename
 }
-
 
 func getConfigParam(c *fiber.Ctx) string {
 	if p := strings.TrimPrefix(c.Params("*"), "/"); p != "" {
@@ -233,6 +314,510 @@ func collectConfigFilenames() []string {
 	}
 
 	return filenames
+}
+
+func loadConfigFormSchemas() map[string]ConfigFormDefinition {
+	schemaPath := filepath.Join(lhRootDir, "gui", "config-schema", "config-forms.json")
+	data, err := os.ReadFile(schemaPath)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			log.Printf("Warning: Could not read config form schema: %v", err)
+		}
+		return map[string]ConfigFormDefinition{}
+	}
+
+	var raw struct {
+		Forms map[string]ConfigFormDefinition `json:"forms"`
+	}
+
+	if err := json.Unmarshal(data, &raw); err != nil {
+		log.Printf("Warning: Failed to parse config form schema: %v", err)
+		return map[string]ConfigFormDefinition{}
+	}
+
+	result := make(map[string]ConfigFormDefinition, len(raw.Forms))
+
+	for filename, def := range raw.Forms {
+		def.RawFilename = filename
+		if def.ConfigType == "" {
+			if _, _, configType, ok := configPaths(filename); ok {
+				def.ConfigType = configType
+			}
+		}
+		if def.Label == "" {
+			def.Label = configDisplayName(filename)
+		}
+		result[filename] = def
+	}
+
+	return result
+}
+
+func getConfigFormSummaries() []ConfigFormSummary {
+	if len(configFormSchemas) == 0 {
+		return []ConfigFormSummary{}
+	}
+
+	summaries := make([]ConfigFormSummary, 0, len(configFormSchemas))
+	for filename, def := range configFormSchemas {
+		displayName := def.Label
+		if displayName == "" {
+			displayName = configDisplayName(filename)
+		}
+
+		summaries = append(summaries, ConfigFormSummary{
+			Filename:    filename,
+			DisplayName: displayName,
+			DisplayKey:  def.DisplayKey,
+			Label:       def.Label,
+			Description: def.Description,
+			ConfigType:  def.ConfigType,
+			Advanced:    def.Advanced,
+		})
+	}
+
+	sort.SliceStable(summaries, func(i, j int) bool {
+		defI := configFormSchemas[summaries[i].Filename]
+		defJ := configFormSchemas[summaries[j].Filename]
+
+		if defI.Order != 0 || defJ.Order != 0 {
+			if defI.Order == defJ.Order {
+				return summaries[i].DisplayName < summaries[j].DisplayName
+			}
+			if defI.Order == 0 {
+				return false
+			}
+			if defJ.Order == 0 {
+				return true
+			}
+			return defI.Order < defJ.Order
+		}
+
+		return summaries[i].DisplayName < summaries[j].DisplayName
+	})
+
+	return summaries
+}
+
+func readConfigValues(path string) (map[string]string, error) {
+	values := make(map[string]string)
+
+	file, err := os.Open(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return values, nil
+		}
+		return values, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		key, value, ok := parseConfigAssignment(line)
+		if !ok {
+			continue
+		}
+
+		values[key] = value
+	}
+
+	if err := scanner.Err(); err != nil {
+		return values, err
+	}
+
+	return values, nil
+}
+
+func parseConfigAssignment(line string) (string, string, bool) {
+	parts := strings.SplitN(line, "=", 2)
+	if len(parts) != 2 {
+		return "", "", false
+	}
+
+	key := strings.TrimSpace(parts[0])
+	if key == "" {
+		return "", "", false
+	}
+
+	value := strings.TrimSpace(parts[1])
+	if value == "" {
+		return key, "", true
+	}
+
+	if strings.HasPrefix(value, "\"") {
+		if parsed, _, ok := extractQuotedValue(value); ok {
+			return key, parsed, true
+		}
+	}
+
+	if idx := strings.Index(value, "#"); idx != -1 {
+		value = strings.TrimSpace(value[:idx])
+	}
+
+	return key, value, true
+}
+
+func extractQuotedValue(input string) (string, string, bool) {
+	var (
+		builder strings.Builder
+		escaped bool
+	)
+
+	if !strings.HasPrefix(input, "\"") {
+		return "", input, false
+	}
+
+	for i := 1; i < len(input); i++ {
+		ch := input[i]
+		if escaped {
+			switch ch {
+			case 'n':
+				builder.WriteByte('\n')
+			case 't':
+				builder.WriteByte('\t')
+			case '"', '\\':
+				builder.WriteByte(ch)
+			default:
+				builder.WriteByte(ch)
+			}
+			escaped = false
+			continue
+		}
+
+		if ch == '\\' {
+			escaped = true
+			continue
+		}
+
+		if ch == '"' {
+			return builder.String(), input[i+1:], true
+		}
+
+		builder.WriteByte(ch)
+	}
+
+	return "", input, false
+}
+
+func buildConfigFormDetail(filename string, def ConfigFormDefinition) (ConfigFormDetail, error) {
+	configPath, examplePath, configType, ok := configPaths(filename)
+	if !ok {
+		return ConfigFormDetail{}, fmt.Errorf("invalid configuration file: %s", filename)
+	}
+
+	values, err := readConfigValues(configPath)
+	if err != nil {
+		return ConfigFormDetail{}, fmt.Errorf("failed to read configuration values: %w", err)
+	}
+
+	displayName := def.Label
+	if displayName == "" {
+		displayName = configDisplayName(filename)
+	}
+
+	var lastModified *time.Time
+	if info, err := os.Stat(configPath); err == nil {
+		mod := info.ModTime()
+		lastModified = &mod
+	}
+
+	hasExample := false
+	if examplePath != "" {
+		if _, err := os.Stat(examplePath); err == nil {
+			hasExample = true
+		}
+	}
+
+	summary := ConfigFormSummary{
+		Filename:    filename,
+		DisplayName: displayName,
+		DisplayKey:  def.DisplayKey,
+		Label:       def.Label,
+		Description: def.Description,
+		ConfigType:  configType,
+		Advanced:    def.Advanced,
+	}
+
+	return ConfigFormDetail{
+		ConfigFormSummary: summary,
+		Groups:            def.Groups,
+		Values:            values,
+		LastModified:      lastModified,
+		HasExample:        hasExample,
+		SchemaOrder:       def.Order,
+	}, nil
+}
+
+func collectFieldDefinitions(def ConfigFormDefinition) map[string]ConfigFormField {
+	fields := make(map[string]ConfigFormField)
+	for _, group := range def.Groups {
+		for _, field := range group.Fields {
+			fields[field.Key] = field
+		}
+	}
+	return fields
+}
+
+func buildConfigChangeSet(filename string, def ConfigFormDefinition) (ConfigChangeSet, bool, error) {
+	configPath, examplePath, configType, ok := configPaths(filename)
+	if !ok {
+		return ConfigChangeSet{}, false, fmt.Errorf("invalid configuration file: %s", filename)
+	}
+
+	currentValues, err := readConfigValues(configPath)
+	if err != nil {
+		return ConfigChangeSet{}, false, fmt.Errorf("failed to read configuration values: %w", err)
+	}
+
+	defaultValues := make(map[string]string)
+	if examplePath != "" {
+		if values, err := readConfigValues(examplePath); err == nil {
+			defaultValues = values
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return ConfigChangeSet{}, false, fmt.Errorf("failed to read template values: %w", err)
+		}
+	}
+
+	fieldDefs := collectFieldDefinitions(def)
+	keySet := make(map[string]struct{})
+	for key := range fieldDefs {
+		keySet[key] = struct{}{}
+	}
+	for key := range defaultValues {
+		keySet[key] = struct{}{}
+	}
+	for key := range currentValues {
+		keySet[key] = struct{}{}
+	}
+
+	changes := make([]ConfigChange, 0)
+
+	for key := range keySet {
+		fieldDef, hasField := fieldDefs[key]
+
+		defaultValue := ""
+		if val, ok := defaultValues[key]; ok {
+			defaultValue = val
+		} else if hasField && fieldDef.Default != "" {
+			defaultValue = fieldDef.Default
+		}
+
+		currentValue, hasCurrent := currentValues[key]
+		if !hasCurrent {
+			currentValue = defaultValue
+		}
+
+		if !hasCurrent && defaultValue == "" {
+			continue
+		}
+
+		if currentValue == defaultValue {
+			continue
+		}
+
+		changes = append(changes, ConfigChange{
+			Key:     key,
+			Default: defaultValue,
+			Current: currentValue,
+		})
+	}
+
+	sort.Slice(changes, func(i, j int) bool {
+		return changes[i].Key < changes[j].Key
+	})
+
+	if len(changes) == 0 {
+		return ConfigChangeSet{}, false, nil
+	}
+
+	displayName := def.Label
+	if displayName == "" {
+		displayName = configDisplayName(filename)
+	}
+
+	return ConfigChangeSet{
+		Filename:    filename,
+		DisplayName: displayName,
+		ConfigType:  configType,
+		Changes:     changes,
+	}, true, nil
+}
+
+func stringifyFormValue(value interface{}) (string, bool) {
+	switch v := value.(type) {
+	case string:
+		return v, true
+	case bool:
+		if v {
+			return "true", true
+		}
+		return "false", true
+	case float64:
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return "", false
+		}
+		if v == math.Trunc(v) {
+			return strconv.FormatInt(int64(v), 10), true
+		}
+		return strconv.FormatFloat(v, 'f', -1, 64), true
+	case nil:
+		return "", true
+	default:
+		return "", false
+	}
+}
+
+func validateFieldValue(field ConfigFormField, raw string) error {
+	trimmed := strings.TrimSpace(raw)
+
+	switch field.Type {
+	case "toggle":
+		switch strings.ToLower(trimmed) {
+		case "true", "false", "1", "0", "yes", "no", "on", "off":
+			return nil
+		default:
+			return fmt.Errorf("invalid boolean value for %s", field.Key)
+		}
+	case "select":
+		if len(field.Options) == 0 {
+			return fmt.Errorf("field %s has no options configured", field.Key)
+		}
+		for _, option := range field.Options {
+			if option.Value == trimmed {
+				return nil
+			}
+		}
+		return fmt.Errorf("value '%s' not allowed for %s", trimmed, field.Key)
+	case "number":
+		if trimmed == "" {
+			if field.Required {
+				return fmt.Errorf("%s is required", field.Key)
+			}
+			return nil
+		}
+		num, err := strconv.ParseFloat(trimmed, 64)
+		if err != nil {
+			return fmt.Errorf("invalid number for %s", field.Key)
+		}
+		if field.Min != nil && num < *field.Min {
+			return fmt.Errorf("%s must be >= %g", field.Key, *field.Min)
+		}
+		if field.Max != nil && num > *field.Max {
+			return fmt.Errorf("%s must be <= %g", field.Key, *field.Max)
+		}
+	case "text", "textarea":
+		if field.Required && trimmed == "" {
+			return fmt.Errorf("%s is required", field.Key)
+		}
+	default:
+		if field.Required && trimmed == "" {
+			return fmt.Errorf("%s is required", field.Key)
+		}
+	}
+
+	if field.Pattern != "" && trimmed != "" {
+		matched, err := regexp.MatchString(field.Pattern, raw)
+		if err != nil {
+			return fmt.Errorf("invalid validation pattern for %s: %v", field.Key, err)
+		}
+		if !matched {
+			return fmt.Errorf("value for %s does not match required pattern", field.Key)
+		}
+	}
+
+	return nil
+}
+
+func normalizeFieldValue(field ConfigFormField, raw string) string {
+	switch field.Type {
+	case "toggle":
+		switch strings.ToLower(strings.TrimSpace(raw)) {
+		case "1", "true", "yes", "on":
+			return "true"
+		case "0", "false", "no", "off":
+			return "false"
+		default:
+			return strings.ToLower(strings.TrimSpace(raw))
+		}
+	case "number":
+		return strings.TrimSpace(raw)
+	default:
+		return raw
+	}
+}
+
+func updateConfigFormValues(filename string, def ConfigFormDefinition, values map[string]string) error {
+	configPath, examplePath, _, ok := configPaths(filename)
+	if !ok {
+		return fmt.Errorf("invalid configuration file: %s", filename)
+	}
+
+	templateDir := ""
+	if examplePath != "" {
+		templateDir = filepath.Dir(examplePath)
+	}
+	if templateDir == "" {
+		return fmt.Errorf("missing template directory for %s", filename)
+	}
+
+	var scriptBuilder strings.Builder
+	scriptBuilder.WriteString("set -euo pipefail\n")
+	scriptBuilder.WriteString("source " + shellescape(filepath.Join(lhRootDir, "lib", "lib_common.sh")) + "\n")
+	scriptBuilder.WriteString("source " + shellescape(filepath.Join(lhRootDir, "lib", "lib_config.sh")) + "\n")
+	scriptBuilder.WriteString("source " + shellescape(filepath.Join(lhRootDir, "lib", "lib_gui.sh")) + "\n")
+
+	scriptBuilder.WriteString("CONFIG_PATH=" + shellescape(configPath) + "\n")
+	if templateDir != "" {
+		scriptBuilder.WriteString("TEMPLATE_DIR=" + shellescape(templateDir) + "\n")
+	} else {
+		scriptBuilder.WriteString("TEMPLATE_DIR=\"\"\n")
+	}
+
+	var keys []string
+	for _, group := range def.Groups {
+		for _, field := range group.Fields {
+			keys = append(keys, field.Key)
+		}
+	}
+
+	uniqueKeys := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		uniqueKeys[key] = struct{}{}
+	}
+
+	sortedKeys := make([]string, 0, len(values))
+	for key := range values {
+		sortedKeys = append(sortedKeys, key)
+	}
+	sort.Strings(sortedKeys)
+
+	for _, key := range sortedKeys {
+		value := values[key]
+		if _, allowed := uniqueKeys[key]; !allowed {
+			return fmt.Errorf("field %s is not configurable through this form", key)
+		}
+
+		command := "lh_config_update_fragment \"$CONFIG_PATH\" %s %s \"$TEMPLATE_DIR\"\n"
+		scriptBuilder.WriteString(fmt.Sprintf(command, shellescape(key), shellescape(value)))
+	}
+
+	scriptBuilder.WriteString("if declare -F lh_gui_ensure_edit_marker >/dev/null 2>&1; then\n")
+	scriptBuilder.WriteString("  lh_gui_ensure_edit_marker \"$CONFIG_PATH\"\n")
+	scriptBuilder.WriteString("fi\n")
+
+	cmd := exec.Command("bash", "-c", scriptBuilder.String())
+	cmd.Env = append(os.Environ(), "LH_ROOT_DIR="+lhRootDir)
+
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to update configuration: %v (details: %s)", err, strings.TrimSpace(string(output)))
+	}
+
+	return nil
 }
 
 func applyGeneralConfigKey(config *Config, key, value string) {
@@ -415,6 +1000,7 @@ func main() {
 
 	// Load configuration
 	config := loadConfig()
+	configFormSchemas = loadConfigFormSchemas()
 
 	// Override port from command line if provided (either -p or --port)
 	portValue := *portFlag
@@ -591,6 +1177,10 @@ func main() {
 
 	// Configuration file management
 	protectedAPI.Get("/config/files", getConfigFiles)
+	protectedAPI.Get("/config/forms", listConfigForms)
+	protectedAPI.Get("/config/forms/*", getConfigForm)
+	protectedAPI.Put("/config/forms/*", saveConfigForm)
+	protectedAPI.Get("/config/changes", getConfigChanges)
 	protectedAPI.Get("/config/backups", getConfigBackups)
 	protectedAPI.Delete("/config/backups/:backupId", deleteConfigBackup)
 	protectedAPI.Get("/config/example/*", getConfigExample)
@@ -1797,6 +2387,113 @@ func getConfigExample(c *fiber.Ctx) error {
 		HasExample:   false,
 		LastModified: lastModified,
 	})
+}
+
+func listConfigForms(c *fiber.Ctx) error {
+	return c.JSON(getConfigFormSummaries())
+}
+
+func getConfigForm(c *fiber.Ctx) error {
+	filename := getConfigParam(c)
+	def, ok := configFormSchemas[filename]
+	if !ok {
+		return c.Status(404).JSON(fiber.Map{"error": "Configuration form not available"})
+	}
+
+	detail, err := buildConfigFormDetail(filename, def)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(detail)
+}
+
+func saveConfigForm(c *fiber.Ctx) error {
+	filename := getConfigParam(c)
+	def, ok := configFormSchemas[filename]
+	if !ok {
+		return c.Status(404).JSON(fiber.Map{"error": "Configuration form not available"})
+	}
+
+	var payload struct {
+		Values map[string]interface{} `json:"values"`
+	}
+	if err := c.BodyParser(&payload); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	if len(payload.Values) == 0 {
+		return c.Status(400).JSON(fiber.Map{"error": "No values provided"})
+	}
+
+	fieldMap := make(map[string]ConfigFormField)
+	for _, group := range def.Groups {
+		for _, field := range group.Fields {
+			fieldMap[field.Key] = field
+		}
+	}
+
+	stringValues := make(map[string]string, len(payload.Values))
+	for key, raw := range payload.Values {
+		field, allowed := fieldMap[key]
+		if !allowed {
+			return c.Status(400).JSON(fiber.Map{"error": fmt.Sprintf("Field %s is not configurable", key)})
+		}
+
+		str, ok := stringifyFormValue(raw)
+		if !ok {
+			return c.Status(400).JSON(fiber.Map{"error": fmt.Sprintf("Unsupported value type for %s", key)})
+		}
+
+		if err := validateFieldValue(field, str); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+		}
+
+		stringValues[key] = normalizeFieldValue(field, str)
+	}
+
+	if err := updateConfigFormValues(filename, def, stringValues); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	detail, err := buildConfigFormDetail(filename, def)
+	if err != nil {
+		log.Printf("Warning: configuration saved but reloading failed: %v", err)
+		return c.JSON(fiber.Map{"status": "saved"})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": "saved",
+		"form":   detail,
+	})
+}
+
+func getConfigChanges(c *fiber.Ctx) error {
+	if len(configFormSchemas) == 0 {
+		return c.JSON([]ConfigChangeSet{})
+	}
+
+	changeSets := make([]ConfigChangeSet, 0, len(configFormSchemas))
+
+	for filename, def := range configFormSchemas {
+		set, ok, err := buildConfigChangeSet(filename, def)
+		if err != nil {
+			log.Printf("Warning: failed to build configuration change set for %s: %v", filename, err)
+			continue
+		}
+		if ok {
+			changeSets = append(changeSets, set)
+		}
+	}
+
+	sort.SliceStable(changeSets, func(i, j int) bool {
+		if changeSets[i].ConfigType == changeSets[j].ConfigType {
+			return changeSets[i].DisplayName < changeSets[j].DisplayName
+		}
+		return changeSets[i].ConfigType < changeSets[j].ConfigType
+	})
+
+	return c.JSON(changeSets)
 }
 func getConfigBackups(c *fiber.Ctx) error {
 	// Use shell script to list all GUI backups

@@ -505,7 +505,10 @@ function AppContent({ standaloneSessionId, isStandalone }) {
               </button>
             </div>
             <Suspense fallback={<div className="loading-panel">Loading configuration...</div>}>
-              <ConfigPanel />
+              <ConfigPanel
+                devMode={showDevControls}
+                onToggleDevMode={toggleDevControls}
+              />
             </Suspense>
           </div>
         </div>

@@ -1,0 +1,507 @@
+{
+  "forms": {
+    "general.d/00-language.conf": {
+      "configType": "general",
+      "displayKey": "config.generalLanguage",
+      "label": "Language & Locale",
+      "description": "Choose the default interface language that should be applied when the helper starts.",
+      "groups": [
+        {
+          "title": "Language",
+          "fields": [
+            {
+              "key": "CFG_LH_LANG",
+              "type": "select",
+              "label": "Preferred language",
+              "help": "Set to 'auto' to match the current system locale automatically.",
+              "options": [
+                { "value": "auto", "label": "Auto detect (system locale)" },
+                { "value": "de", "label": "German" },
+                { "value": "en", "label": "English" },
+                { "value": "es", "label": "Spanish (partial)" },
+                { "value": "fr", "label": "French (partial)" }
+              ],
+              "default": "en"
+            }
+          ]
+        }
+      ]
+    },
+    "general.d/10-logging-core.conf": {
+      "configType": "general",
+      "displayKey": "config.generalLoggingCore",
+      "label": "Logging (Core)",
+      "description": "Control the verbosity of the helper and where log messages should be written.",
+      "groups": [
+        {
+          "title": "Log level",
+          "fields": [
+            {
+              "key": "CFG_LH_LOG_LEVEL",
+              "type": "select",
+              "label": "Log level",
+              "help": "Select how much information should be emitted during runs.",
+              "options": [
+                { "value": "ERROR", "label": "Errors only" },
+                { "value": "WARN", "label": "Warnings and errors" },
+                { "value": "INFO", "label": "Informational messages" },
+                { "value": "DEBUG", "label": "Detailed debug output" }
+              ],
+              "default": "INFO"
+            }
+          ]
+        },
+        {
+          "title": "Output",
+          "fields": [
+            {
+              "key": "CFG_LH_LOG_TO_CONSOLE",
+              "type": "toggle",
+              "label": "Send logs to console",
+              "help": "Disable when you only want logs written to the log file."
+            },
+            {
+              "key": "CFG_LH_LOG_TO_FILE",
+              "type": "toggle",
+              "label": "Write logs to file",
+              "help": "Disable to prevent creation of log files in the log directory."
+            }
+          ]
+        }
+      ]
+    },
+    "general.d/20-logging-detail.conf": {
+      "configType": "general",
+      "displayKey": "config.generalLoggingDetail",
+      "label": "Logging (Advanced)",
+      "description": "Fine tune metadata that is included with every log entry.",
+      "advanced": true,
+      "groups": [
+        {
+          "title": "File name visibility",
+          "fields": [
+            {
+              "key": "CFG_LH_LOG_SHOW_FILE_ERROR",
+              "type": "toggle",
+              "label": "Include script name on error level"
+            },
+            {
+              "key": "CFG_LH_LOG_SHOW_FILE_WARN",
+              "type": "toggle",
+              "label": "Include script name on warn level"
+            },
+            {
+              "key": "CFG_LH_LOG_SHOW_FILE_INFO",
+              "type": "toggle",
+              "label": "Include script name on info level"
+            },
+            {
+              "key": "CFG_LH_LOG_SHOW_FILE_DEBUG",
+              "type": "toggle",
+              "label": "Include script name on debug level"
+            }
+          ]
+        },
+        {
+          "title": "Timestamps",
+          "fields": [
+            {
+              "key": "CFG_LH_LOG_TIMESTAMP_FORMAT",
+              "type": "select",
+              "label": "Timestamp format",
+              "options": [
+                { "value": "full", "label": "Full date & time" },
+                { "value": "time", "label": "Time only" },
+                { "value": "none", "label": "No timestamps" }
+              ],
+              "default": "time"
+            }
+          ]
+        }
+      ]
+    },
+    "general.d/30-gui.conf": {
+      "configType": "general",
+      "displayKey": "config.generalGui",
+      "label": "GUI Server",
+      "description": "Adjust host and port of the Little Linux Helper web interface.",
+      "groups": [
+        {
+          "title": "Network",
+          "fields": [
+            {
+              "key": "CFG_LH_GUI_PORT",
+              "type": "number",
+              "label": "Listening port",
+              "help": "Choose a port between 1 and 65535.",
+              "min": 1,
+              "max": 65535,
+              "default": "3000"
+            },
+            {
+              "key": "CFG_LH_GUI_HOST",
+              "type": "text",
+              "label": "Host binding",
+              "help": "Use 'localhost' to restrict access or '0.0.0.0' to serve other devices."
+            },
+            {
+              "key": "CFG_LH_GUI_FIREWALL_RESTRICTION",
+              "type": "text",
+              "label": "Firewall scope",
+              "help": "Values: 'all', 'local', or a CIDR (e.g. 192.168.1.0/24)."
+            }
+          ]
+        }
+      ]
+    },
+    "general.d/40-gui-auth.conf": {
+      "configType": "general",
+      "displayKey": "config.generalGuiAuth",
+      "label": "GUI Authentication",
+      "description": "Manage login requirements for the GUI when running on shared machines.",
+      "advanced": true,
+      "groups": [
+        {
+          "title": "Mode",
+          "fields": [
+            {
+              "key": "LLH_GUI_AUTH_MODE",
+              "type": "select",
+              "label": "Authentication mode",
+              "options": [
+                { "value": "auto", "label": "Auto (local = open, remote = login)" },
+                { "value": "session", "label": "Session login (username + password)" },
+                { "value": "basic", "label": "HTTP basic auth" },
+                { "value": "none", "label": "No authentication (loopback only)" }
+              ],
+              "default": "auto"
+            }
+          ]
+        },
+        {
+          "title": "Credentials",
+          "fields": [
+            {
+              "key": "LLH_GUI_USER",
+              "type": "text",
+              "label": "Username",
+              "placeholder": "admin"
+            },
+            {
+              "key": "LLH_GUI_PASS_HASH",
+              "type": "text",
+              "label": "Password hash",
+              "help": "Use the bundled --hash-password helper to generate bcrypt hashes.",
+              "advanced": true
+            },
+            {
+              "key": "LLH_GUI_PASS_PLAIN",
+              "type": "text",
+              "label": "Plaintext password (development only)",
+              "help": "Only use in development environments, hashes are preferred."
+            }
+          ]
+        },
+        {
+          "title": "Cookies",
+          "fields": [
+            {
+              "key": "LLH_GUI_COOKIE_NAME",
+              "type": "text",
+              "label": "Session cookie name"
+            },
+            {
+              "key": "LLH_GUI_COOKIE_SECURE",
+              "type": "toggle",
+              "label": "Mark cookie as secure",
+              "help": "Disable only when serving plain HTTP on localhost."
+            }
+          ]
+        },
+        {
+          "title": "Cross-origin requests",
+          "fields": [
+            {
+              "key": "LLH_GUI_ALLOWED_ORIGINS",
+              "type": "textarea",
+              "label": "Allowed origins",
+              "help": "Comma separated list of origins that may access the API (e.g. http://localhost:3001)."
+            }
+          ]
+        }
+      ]
+    },
+    "general.d/90-release.conf": {
+      "configType": "general",
+      "displayKey": "config.generalRelease",
+      "label": "Release Tag",
+      "description": "Optional release tag that is embedded into generated metadata to aid troubleshooting.",
+      "advanced": true,
+      "groups": [
+        {
+          "title": "Metadata",
+          "fields": [
+            {
+              "key": "CFG_LH_RELEASE_TAG",
+              "type": "text",
+              "label": "Release tag",
+              "placeholder": "v0.6.0"
+            }
+          ]
+        }
+      ]
+    },
+    "backup.d/00-storage.conf": {
+      "configType": "backup",
+      "displayKey": "config.backupStorage",
+      "label": "Backup Storage",
+      "description": "Set the directories that hold backups and staging snapshots.",
+      "groups": [
+        {
+          "title": "Paths",
+          "fields": [
+            {
+              "key": "CFG_LH_BACKUP_ROOT",
+              "type": "text",
+              "label": "Backup root",
+              "placeholder": "/run/media/tux/hdd_3tb/"
+            },
+            {
+              "key": "CFG_LH_BACKUP_DIR",
+              "type": "text",
+              "label": "Backup directory",
+              "help": "Relative to the backup root and usually starts with '/'.",
+              "placeholder": "/backups"
+            },
+            {
+              "key": "CFG_LH_TEMP_SNAPSHOT_DIR",
+              "type": "text",
+              "label": "Temporary snapshot directory",
+              "placeholder": "/.snapshots_lh_temp"
+            }
+          ]
+        }
+      ]
+    },
+    "backup.d/05-excludes.conf": {
+      "configType": "backup",
+      "displayKey": "config.backupExcludes",
+      "label": "Backup Exclusions",
+      "description": "Set additional TAR excludes that should never be archived.",
+      "groups": [
+        {
+          "title": "TAR exclusions",
+          "fields": [
+            {
+              "key": "CFG_LH_TAR_EXCLUDES",
+              "type": "textarea",
+              "label": "Exclude patterns",
+              "help": "Comma separated paths or glob patterns skipped during TAR backups."
+            }
+          ]
+        }
+      ]
+    },
+    "backup.d/10-retention.conf": {
+      "configType": "backup",
+      "displayKey": "config.backupRetention",
+      "label": "Retention & Logs",
+      "description": "Control how many backups are kept and where log files are stored.",
+      "groups": [
+        {
+          "title": "Retention",
+          "fields": [
+            {
+              "key": "CFG_LH_RETENTION_BACKUP",
+              "type": "number",
+              "label": "Backups to keep (per type)",
+              "min": 1,
+              "default": "3"
+            },
+            {
+              "key": "CFG_LH_BACKUP_LOG_BASENAME",
+              "type": "text",
+              "label": "Log file basename",
+              "placeholder": "backup.log"
+            },
+            {
+              "key": "CFG_LH_DEBUG_LOG_LIMIT",
+              "type": "number",
+              "label": "Candidates shown in debug output",
+              "min": 0,
+              "default": "10",
+              "advanced": true
+            }
+          ]
+        }
+      ]
+    },
+    "backup.d/20-snapshots.conf": {
+      "configType": "backup",
+      "displayKey": "config.backupSnapshots",
+      "label": "Snapshot Management",
+      "description": "Configure how source snapshots should be preserved during backup runs.",
+      "groups": [
+        {
+          "title": "Preservation",
+          "fields": [
+            {
+              "key": "CFG_LH_KEEP_SOURCE_SNAPSHOTS",
+              "type": "select",
+              "label": "Keep source snapshots",
+              "options": [
+                { "value": "prompt", "label": "Prompt every time" },
+                { "value": "true", "label": "Always keep" },
+                { "value": "false", "label": "Do not keep" }
+              ],
+              "default": "prompt"
+            },
+            {
+              "key": "CFG_LH_SOURCE_SNAPSHOT_DIR",
+              "type": "text",
+              "label": "Permanent snapshot directory",
+              "placeholder": "/.snapshots_lh"
+            },
+            {
+              "key": "CFG_LH_SOURCE_SNAPSHOT_RETENTION",
+              "type": "number",
+              "label": "Snapshots preserved per subvolume",
+              "min": 0,
+              "default": "1"
+            }
+          ]
+        }
+      ]
+    },
+    "backup.d/30-subvolumes.conf": {
+      "configType": "backup",
+      "displayKey": "config.backupSubvolumes",
+      "label": "Subvolumes",
+      "description": "Choose which subvolumes participate in backup runs.",
+      "groups": [
+        {
+          "title": "Subvolume list",
+          "fields": [
+            {
+              "key": "CFG_LH_BACKUP_SUBVOLUMES",
+              "type": "textarea",
+              "label": "Configured subvolumes",
+              "help": "Space separated list (e.g. '@ @home')."
+            },
+            {
+              "key": "CFG_LH_AUTO_DETECT_SUBVOLUMES",
+              "type": "toggle",
+              "label": "Auto-detect @-prefixed subvolumes"
+            }
+          ]
+        }
+      ]
+    },
+    "docker.d/00-discovery.conf": {
+      "configType": "docker",
+      "displayKey": "config.dockerDiscovery",
+      "label": "Docker Discovery",
+      "description": "Define where to look for compose projects and which folders to skip.",
+      "groups": [
+        {
+          "title": "Search parameters",
+          "fields": [
+            {
+              "key": "CFG_LH_DOCKER_COMPOSE_ROOT",
+              "type": "text",
+              "label": "Compose root directory",
+              "placeholder": "/opt/containers"
+            },
+            {
+              "key": "CFG_LH_DOCKER_EXCLUDE_DIRS",
+              "type": "textarea",
+              "label": "Exclude directories",
+              "help": "Comma separated list of directories relative to the scan root that should be skipped."
+            },
+            {
+              "key": "CFG_LH_DOCKER_SEARCH_DEPTH",
+              "type": "number",
+              "label": "Search depth",
+              "min": 0,
+              "default": "3"
+            }
+          ]
+        }
+      ]
+    },
+    "docker.d/10-scope.conf": {
+      "configType": "docker",
+      "displayKey": "config.dockerScope",
+      "label": "Docker Scope",
+      "description": "Control how the Docker security checks run.",
+      "groups": [
+        {
+          "title": "Checks",
+          "fields": [
+            {
+              "key": "CFG_LH_DOCKER_CHECK_MODE",
+              "type": "select",
+              "label": "Check mode",
+              "options": [
+                { "value": "running", "label": "Analyse running containers only" },
+                { "value": "all", "label": "Analyse all compose services" }
+              ],
+              "default": "running"
+            },
+            {
+              "key": "CFG_LH_DOCKER_CHECK_RUNNING",
+              "type": "toggle",
+              "label": "Require running containers",
+              "help": "If disabled, offline services are still inspected."
+            }
+          ]
+        }
+      ]
+    },
+    "docker.d/20-warnings.conf": {
+      "configType": "docker",
+      "displayKey": "config.dockerWarnings",
+      "label": "Warning Filters",
+      "description": "Mute noisy warnings or mark specific findings as acceptable.",
+      "groups": [
+        {
+          "title": "Filters",
+          "fields": [
+            {
+              "key": "CFG_LH_DOCKER_SKIP_WARNINGS",
+              "type": "textarea",
+              "label": "Warnings to skip",
+              "help": "Comma separated list of warning identifiers to hide."
+            },
+            {
+              "key": "CFG_LH_DOCKER_ACCEPTED_WARNINGS",
+              "type": "textarea",
+              "label": "Accepted warnings",
+              "help": "Comma separated identifiers treated as acknowledged."
+            }
+          ]
+        }
+      ]
+    },
+    "docker.d/30-patterns.conf": {
+      "configType": "docker",
+      "displayKey": "config.dockerPatterns",
+      "label": "Default Pattern Checks",
+      "description": "Modify the weak password detection regex used during container reviews.",
+      "advanced": true,
+      "groups": [
+        {
+          "title": "Patterns",
+          "fields": [
+            {
+              "key": "COMMON_WEAK_PASSWORD_REGEX",
+              "type": "textarea",
+              "label": "Weak password regex",
+              "help": "Advanced: adjust with care, the bundled pattern catches frequently exposed passwords."
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
