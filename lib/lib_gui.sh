@@ -104,9 +104,12 @@ function lh_gui_ensure_edit_marker() {
     local line has_marker
 
     while IFS= read -r line || [ -n "$line" ]; do
-        if [ "$updated" -eq 0 ] && [[ "$line" == "${marker_prefix}"* ]]; then
-            printf '%s\n' "$marker_line" >>"$tmp_file"
-            updated=1
+        if [[ "$line" == "${marker_prefix}"* ]]; then
+            if [ "$updated" -eq 0 ]; then
+                printf '%s\n' "$marker_line" >>"$tmp_file"
+                updated=1
+                inserted=1
+            fi
             continue
         fi
 
