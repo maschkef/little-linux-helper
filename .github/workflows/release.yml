@@ -170,15 +170,13 @@ jobs:
           echo "release_type=pre-release" >> $GITHUB_OUTPUT
         fi
         
-    # Step 8: Create GitHub Release
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # Step 8: Create GitHub Release and upload assets (maintained action)
+    - name: Publish GitHub Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.ref }}
-        release_name: Little Linux Helper ${{ steps.version.outputs.version }} (${{ steps.version.outputs.release_type }})
+        tag_name: ${{ github.ref_name }}
+        name: Little Linux Helper ${{ steps.version.outputs.version }} (${{ steps.version.outputs.release_type }})
         body: |
           ## Little Linux Helper GUI ${{ steps.version.outputs.version }}
           
@@ -217,34 +215,9 @@ jobs:
           *Built automatically with GitHub Actions*
         draft: false
         prerelease: ${{ steps.version.outputs.is_prerelease }}
-        
-    # Step 9: Upload release assets
-    - name: Upload AMD64 Release Asset
-      uses: actions/upload-release-asset@v1
+        files: |
+          releases/little-linux-helper-gui-amd64.tar.gz
+          releases/little-linux-helper-gui-arm64.tar.gz
+          releases/little-linux-helper-gui-armv7.tar.gz
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./releases/little-linux-helper-gui-amd64.tar.gz
-        asset_name: little-linux-helper-gui-amd64.tar.gz
-        asset_content_type: application/gzip
-        
-    - name: Upload ARM64 Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./releases/little-linux-helper-gui-arm64.tar.gz
-        asset_name: little-linux-helper-gui-arm64.tar.gz
-        asset_content_type: application/gzip
-        
-    - name: Upload ARMv7 Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./releases/little-linux-helper-gui-armv7.tar.gz
-        asset_name: little-linux-helper-gui-armv7.tar.gz
-        asset_content_type: application/gzip
