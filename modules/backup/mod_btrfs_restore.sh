@@ -1082,39 +1082,7 @@ display_safety_warnings() {
         "$(lh_msg 'RESTORE_WARNING_TESTING')"
     )
 
-    local max_width=${#title}
-    local line
-    for line in "${warning_lines[@]}"; do
-        local visible_length=${#line}
-        (( visible_length > max_width )) && max_width=$visible_length
-    done
-
-    local inner_width=$((max_width + 2))
-    local horizontal
-    printf -v horizontal '%*s' "$inner_width" ""
-    horizontal=${horizontal// /═}
-
-    local title_padding_left=$(( (max_width - ${#title}) / 2 ))
-    local title_padding_right=$(( max_width - ${#title} - title_padding_left ))
-
-    printf '%b╔%s╗%b\n' "${LH_COLOR_BOLD_RED}" "$horizontal" "${LH_COLOR_RESET}"
-
-    printf '%b║ ' "${LH_COLOR_BOLD_RED}"
-    printf '%*s' "$title_padding_left" ""
-    printf '%b' "${LH_COLOR_WHITE}${title}${LH_COLOR_BOLD_RED}"
-    printf '%*s' "$title_padding_right" ""
-    printf '%b\n' " ║${LH_COLOR_RESET}"
-
-    printf '%b╠%s╣%b\n' "${LH_COLOR_BOLD_RED}" "$horizontal" "${LH_COLOR_RESET}"
-
-    for line in "${warning_lines[@]}"; do
-        local padding=$((max_width - ${#line}))
-        printf '%b║ %s' "${LH_COLOR_BOLD_RED}" "$line"
-        printf '%*s' "$padding" ""
-        printf '%b\n' " ║${LH_COLOR_RESET}"
-    done
-
-    printf '%b╚%s╝%b\n' "${LH_COLOR_BOLD_RED}" "$horizontal" "${LH_COLOR_RESET}"
+    lh_print_boxed_message --preset danger --min-width 40 "$title" "${warning_lines[@]}"
     echo ""
     
     echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_WARNING_DETAILS'):${LH_COLOR_RESET}"

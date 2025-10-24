@@ -25,6 +25,154 @@ function lh_print_header() {
     echo ""
 }
 
+# Prints a colored box with dynamic width, centered title, and message lines.
+# Options (optional):
+#   --border-color <color>
+#   --title-color <color>
+#   --content-color <color>
+# Usage:
+#   lh_print_boxed_message "Title" "Line 1" "Line 2"
+#   lh_print_boxed_message --border-color "${LH_COLOR_BOLD_YELLOW}" "Notice" "Message"
+function lh_print_boxed_message() {
+    local border_color="${LH_COLOR_BOLD_RED}"
+    local title_color="${LH_COLOR_WHITE}"
+    local content_color=""
+    local preset=""
+    local min_width=""
+    local reset="${LH_COLOR_RESET}"
+
+    local border_color_custom=false
+    local title_color_custom=false
+    local content_color_custom=false
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --border-color)
+                border_color="$2"
+                border_color_custom=true
+                shift 2
+                continue
+                ;;
+            --title-color)
+                title_color="$2"
+                title_color_custom=true
+                shift 2
+                continue
+                ;;
+            --content-color)
+                content_color="$2"
+                content_color_custom=true
+                shift 2
+                continue
+                ;;
+            --preset)
+                preset="$2"
+                shift 2
+                continue
+                ;;
+            --min-width|--width)
+                min_width="$2"
+                shift 2
+                continue
+                ;;
+            --)
+                shift
+                break
+                ;;
+        esac
+        break
+    done
+
+    if [[ -n "$preset" ]]; then
+        preset=$(echo "$preset" | tr '[:upper:]' '[:lower:]')
+        case "$preset" in
+            danger|error|critical)
+                [[ "$border_color_custom" == false ]] && border_color="${LH_COLOR_BOLD_RED}"
+                [[ "$title_color_custom" == false ]] && title_color="${LH_COLOR_WHITE}"
+                ;;
+            warning|caution)
+                [[ "$border_color_custom" == false ]] && border_color="${LH_COLOR_WARNING}"
+                [[ "$title_color_custom" == false ]] && title_color="${LH_COLOR_BOLD_WHITE}"
+                ;;
+            info|information|notice)
+                [[ "$border_color_custom" == false ]] && border_color="${LH_COLOR_INFO}"
+                [[ "$title_color_custom" == false ]] && title_color="${LH_COLOR_WHITE}"
+                [[ "$content_color_custom" == false ]] && content_color="${LH_COLOR_WHITE}"
+                ;;
+            success|ok|done)
+                [[ "$border_color_custom" == false ]] && border_color="${LH_COLOR_SUCCESS}"
+                [[ "$title_color_custom" == false ]] && title_color="${LH_COLOR_WHITE}"
+                ;;
+            *)
+                lh_log_msg "WARN" "lh_print_boxed_message: Unknown preset '$preset'"
+                ;;
+        esac
+    fi
+
+    if [[ $# -lt 1 ]]; then
+        lh_log_msg "WARN" "lh_print_boxed_message called without a title"
+        return 1
+    fi
+
+    local title="$1"
+    shift
+    local lines=("$@")
+
+    local max_width=${#title}
+    local line
+    for line in "${lines[@]}"; do
+        local length=${#line}
+        (( length > max_width )) && max_width=$length
+    done
+
+    if [[ -n "$min_width" && "$min_width" =~ ^[0-9]+$ ]]; then
+        if (( min_width > max_width )); then
+            max_width=$min_width
+        fi
+    elif [[ -n "$min_width" ]]; then
+        lh_log_msg "WARN" "lh_print_boxed_message: Ignoring non-numeric min-width '$min_width'"
+    fi
+
+    local inner_width=$((max_width + 2))
+    local horizontal
+    printf -v horizontal '%*s' "$inner_width" ""
+    horizontal=${horizontal// /═}
+
+    local title_padding_left=$(( (max_width - ${#title}) / 2 ))
+    local title_padding_right=$(( max_width - ${#title} - title_padding_left ))
+
+    printf '%b╔%s╗%b\n' "$border_color" "$horizontal" "$reset"
+
+    printf '%b║%b ' "$border_color" "$reset"
+    printf '%*s' "$title_padding_left" ""
+    if [[ -n "$title_color" ]]; then
+        printf '%b%s%b' "$title_color" "$title" "$reset"
+    else
+        printf '%s' "$title"
+    fi
+    printf '%*s' "$title_padding_right" ""
+    printf ' '
+    printf '%b║%b\n' "$border_color" "$reset"
+
+    printf '%b╠%s╣%b\n' "$border_color" "$horizontal" "$reset"
+
+    for line in "${lines[@]}"; do
+        local padding=$((max_width - ${#line}))
+        printf '%b║%b ' "$border_color" "$reset"
+        if [[ -n "$content_color" ]]; then
+            printf '%b%s%b' "$content_color" "$line" "$reset"
+        else
+            printf '%s' "$line"
+        fi
+        printf '%*s' "$padding" ""
+        printf ' '
+        printf '%b║%b\n' "$border_color" "$reset"
+    done
+
+    printf '%b╚%s╝%b\n' "$border_color" "$horizontal" "$reset"
+    return 0
+}
+
 # Outputs a formatted menu item
 # $1: Number of the menu item
 # $2: Text of the menu item

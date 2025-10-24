@@ -119,6 +119,7 @@ The library system is split into the following specialized modules:
 **Purpose:** User interface functions for formatted output and input handling
 **Contains:**
 - `lh_print_header()`
+- `lh_print_boxed_message()` – dynamic message boxes with presets (`danger`, `warning`, `info`, `success`) and optional width overrides
 - `lh_print_menu_item()`
 - `lh_gui_mode_active()`
 - `lh_print_gui_hidden_menu_item()`
@@ -418,6 +419,20 @@ The i18n system implements a sophisticated multi-layer fallback mechanism to ens
 - **✅ FOR COLORS + TRANSLATION + PARAMS:** `echo -e "${LH_COLOR_ERROR}$(lh_msg 'ERROR_WITH_FILE' "$filename")${LH_COLOR_RESET}"`
 - **Problem:** Using printf with lh_msg causes variables to display as empty strings in UI
 - **Reference:** See `debug_printf.md` for detailed explanation and systematic fix procedures
+
+**Boxed Messages with Presets:**
+- Use `lh_print_boxed_message` for consistent warning/info/success frames across modules.
+- Presets: `danger`, `warning`, `info`, `success` (aliases: `critical`, `caution`, `notice`, `ok`).
+- Options: `--border-color`, `--title-color`, `--content-color` (override preset colors); `--min-width` (or `--width`) enforces a minimum content width.
+- Example:
+  ```bash
+  lh_print_boxed_message \
+      --preset info \
+      --min-width 48 \
+      "$(lh_msg 'STATUS_HEADING')" \
+      "$(lh_msg 'STATUS_DETAILS')" \
+      "$(lh_msg 'STATUS_HINT')"
+  ```
 
 **Module-Specific Translations:**
 - Modules can load their specific translations using `lh_load_language_module "backup"`
