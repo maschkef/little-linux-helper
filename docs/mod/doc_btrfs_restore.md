@@ -61,21 +61,24 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
 *   **Session Registration:** Registers with enhanced session registry including blocking categories to prevent conflicting operations and ensure system stability.
 *   **`RESTORE_NON_LIVE_OVERRIDE`**: Tracks whether the user acknowledged running on a non-live system so subsequent operations don’t prompt again
 *   **`RESTORE_NON_LIVE_NOTICE_SHOWN`**: Ensures the informational reminder about running non-live is printed only once after override
+*   **`RESTORE_LIVE_ENV_REASON`**: Captures the heuristics that triggered live-environment detection for improved logging transparency
 
 **4. Core Safety and Validation Functions:**
 
 *   **`detect_live_environment()`**
     *   **Purpose:** Performs heuristic live-environment detection and returns "true"/"false".
     *   **Mechanism:**
-        *   Looks for common live-image artefacts (e.g. `/run/archiso`, `/run/initramfs/live`, `/live`, `/rofs`, `/casper`, `/usr/lib/live`, `/var/lib/live`)
+        *   Looks for strong live-image artefacts (e.g. `/run/archiso`, `/run/initramfs/live`, `/live`, `/rofs`, `/casper`) that alone are sufficient to consider the system "live"
+        *   Tracks weaker hints (such as `/etc/calamares`, `/usr/lib/live`, `/var/lib/live`) but requires at least one additional strong signal before trusting them, preventing false positives on installed systems that keep these directories (e.g. Garuda)
         *   Examines `findmnt /` to identify overlay/squashfs/loop-based roots or read-only mounts
         *   Parses `/proc/cmdline` for live boot parameters (`boot=live`, `casper`, `archiso`, `toram`, etc.)
+        *   Records the matched indicators in `RESTORE_LIVE_ENV_REASON` so logs clearly state why a system was treated as live (or which weak hints were observed)
         *   Respects the override environment variable `LH_RESTORE_ASSUME_LIVE=true` for scripted usage or unusual live setups
 
 *   **`check_live_environment()`**
     *   **Purpose:** Warns about destructive operations when the module is not running from a detected live environment.
     *   **Mechanism:**
-        *   Uses the cached result from `detect_live_environment()` and logs the detection decision
+        *   Uses the cached result from `detect_live_environment()` and logs both the decision and the associated reason string when available
         *   Displays the success banner only once when a live environment is confirmed
         *   If not live, prints a warning/recommendation and requires an explicit confirmation before proceeding
         *   Remembers the user’s override so later operations in the same session do not ask again, while still showing a single informational reminder

@@ -166,6 +166,7 @@ MSG_DE[RESTORE_OPTION_TEMP_RSYNC]="In temporäres Verzeichnis (/tmp/restore_rsyn
 MSG_DE[RESTORE_OPTION_CUSTOM]="Benutzerdefinierter Pfad"
 MSG_DE[RESTORE_CHOOSE_OPTION]="Wählen Sie eine Option (1-3):"
 MSG_DE[RESTORE_WARNING_TITLE]="=== WARNUNG ==="
+MSG_DE[RESTORE_WARNING_CRITICAL_HEADING]="KRITISCHE WARNUNG"
 MSG_DE[RESTORE_WARNING_OVERWRITE]="Dies wird vorhandene Dateien an ihrem ursprünglichen Ort überschreiben!"
 MSG_DE[RESTORE_CONFIRM_CONTINUE]="Möchten Sie wirklich fortfahren?"
 MSG_DE[RESTORE_CANCELLED]="Wiederherstellung abgebrochen."

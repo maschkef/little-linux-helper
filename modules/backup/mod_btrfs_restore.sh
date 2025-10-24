@@ -370,6 +370,7 @@ RESTORE_LIVE_MESSAGE_SHOWN="false"  # Ensure success message only appears once p
 RESTORE_NON_LIVE_OVERRIDE="false"   # Tracks whether user explicitly accepted running on a non-live system
 RESTORE_NON_LIVE_NOTICE_SHOWN="false"  # Avoid repeating informational message after override
 RESTORE_MARKER_FILE=""      # Path to the backup marker JSON file for the selected snapshot bundle
+RESTORE_LIVE_ENV_REASON=""  # Human-readable explanation for the last live-environment detection
 
 # LH_RESTORE_KEEP_ANCHOR controls whether we keep the read-only snapshot that was
 # just received from the backup. Set this to "true" if you want an extra safety
@@ -516,60 +517,84 @@ btrfs_restore_find_subvol_path_by_uuid() {
 # Try to determine whether we are running from a live/rescue system.
 # Returns "true" or "false" via stdout.
 detect_live_environment() {
+    RESTORE_LIVE_ENV_REASON=""
+
     if [[ "${LH_RESTORE_ASSUME_LIVE:-}" == "true" ]]; then
+        RESTORE_LIVE_ENV_REASON="override:LH_RESTORE_ASSUME_LIVE"
         echo "true"
         return 0
     fi
 
     local indicator
-    local directory_indicators=(
+    local -a reasons=()
+    local -a weak_hits=()
+
+    local strong_directory_indicators=(
         "/run/archiso"
         "/run/initramfs/live"
         "/run/live"
-        "/etc/calamares"
         "/live"
         "/rofs"
         "/casper"
+    )
+
+    local weak_directory_indicators=(
+        "/etc/calamares"
         "/usr/lib/live"
         "/var/lib/live"
     )
 
-    for indicator in "${directory_indicators[@]}"; do
+    for indicator in "${strong_directory_indicators[@]}"; do
         if [[ -d "$indicator" ]]; then
-            echo "true"
-            return 0
+            reasons+=("dir:$indicator")
+        fi
+    done
+
+    for indicator in "${weak_directory_indicators[@]}"; do
+        if [[ -d "$indicator" ]]; then
+            weak_hits+=("$indicator")
         fi
     done
 
     # Many live systems boot with squashfs/overlay root or mark the root filesystem read-only.
     local root_fstype
-    root_fstype=$(findmnt -n -o FSTYPE / 2>/dev/null || echo "")
+    root_fstype="$(findmnt -n -o FSTYPE / 2>/dev/null)"
     if [[ "$root_fstype" =~ ^(overlay|squashfs|tmpfs)$ ]]; then
-        echo "true"
-        return 0
+        reasons+=("fstype:$root_fstype")
     fi
 
     local root_source
-    root_source=$(findmnt -n -o SOURCE / 2>/dev/null || echo "")
+    root_source="$(findmnt -n -o SOURCE / 2>/dev/null)"
     if [[ "$root_source" =~ (squashfs|overlay|loop|casper|archiso|luks-archiso) ]]; then
-        echo "true"
-        return 0
+        reasons+=("source:$root_source")
     fi
 
     local root_opts
-    root_opts=$(findmnt -n -o OPTIONS / 2>/dev/null || echo "")
+    root_opts="$(findmnt -n -o OPTIONS / 2>/dev/null)"
     if [[ "$root_opts" =~ (^|,)ro(,|$) ]]; then
-        echo "true"
-        return 0
+        reasons+=("mount-opt:ro")
     fi
 
+    local cmdline=""
     if [[ -r /proc/cmdline ]]; then
-        local cmdline
         cmdline=$(< /proc/cmdline)
-        if [[ "$cmdline" =~ (boot=live|boot=casper|boot=archiso|boot=overlay|cow_device|cowfile|toram|iso-scan|frugal|persistence|live-media) ]]; then
-            echo "true"
-            return 0
+        if [[ -n "$cmdline" && "$cmdline" =~ (boot=live|boot=casper|boot=archiso|boot=overlay|cow_device|cowfile|toram|iso-scan|frugal|persistence|live-media) ]]; then
+            reasons+=("cmdline:${BASH_REMATCH[0]}")
         fi
+    fi
+
+    if [[ ${#weak_hits[@]} -gt 0 ]]; then
+        if [[ ${#reasons[@]} -gt 0 ]]; then
+            reasons+=("weakdir:${weak_hits[*]}")
+        else
+            RESTORE_LIVE_ENV_REASON="weak-dir-hits:${weak_hits[*]}"
+        fi
+    fi
+
+    if [[ ${#reasons[@]} -gt 0 ]]; then
+        RESTORE_LIVE_ENV_REASON="$(IFS='; '; printf '%s' "${reasons[*]}")"
+        echo "true"
+        return 0
     fi
 
     echo "false"
@@ -875,7 +900,11 @@ check_live_environment() {
     
     if [[ -z "$RESTORE_LIVE_ENV_STATUS" ]]; then
         RESTORE_LIVE_ENV_STATUS=$(detect_live_environment)
-        restore_log_msg "DEBUG" "Live environment auto-detect result: $RESTORE_LIVE_ENV_STATUS"
+        if [[ -n "$RESTORE_LIVE_ENV_REASON" ]]; then
+            restore_log_msg "DEBUG" "Live environment auto-detect result: $RESTORE_LIVE_ENV_STATUS (reason: $RESTORE_LIVE_ENV_REASON)"
+        else
+            restore_log_msg "DEBUG" "Live environment auto-detect result: $RESTORE_LIVE_ENV_STATUS"
+        fi
     fi
 
     if [[ "$RESTORE_LIVE_ENV_STATUS" == "true" ]]; then
@@ -883,7 +912,11 @@ check_live_environment() {
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_LIVE_DETECTED')${LH_COLOR_RESET}"
             RESTORE_LIVE_MESSAGE_SHOWN="true"
         fi
-        restore_log_msg "INFO" "Live environment check completed. Live: true"
+        if [[ -n "$RESTORE_LIVE_ENV_REASON" ]]; then
+            restore_log_msg "INFO" "Live environment check completed. Live: true (reason: $RESTORE_LIVE_ENV_REASON)"
+        else
+            restore_log_msg "INFO" "Live environment check completed. Live: true"
+        fi
         return 0
     fi
 
@@ -894,7 +927,11 @@ check_live_environment() {
             echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_LIVE_RECOMMENDATION')${LH_COLOR_RESET}"
             RESTORE_NON_LIVE_NOTICE_SHOWN="true"
         fi
-        restore_log_msg "INFO" "Live environment check completed. Live: false (user override)"
+        if [[ -n "$RESTORE_LIVE_ENV_REASON" ]]; then
+            restore_log_msg "INFO" "Live environment check completed. Live: false (user override; reason: $RESTORE_LIVE_ENV_REASON)"
+        else
+            restore_log_msg "INFO" "Live environment check completed. Live: false (user override)"
+        fi
         return 0
     fi
 
@@ -908,7 +945,11 @@ check_live_environment() {
     fi
 
     RESTORE_NON_LIVE_OVERRIDE="true"
-    restore_log_msg "WARN" "Proceeding without live environment after user confirmation"
+    if [[ -n "$RESTORE_LIVE_ENV_REASON" ]]; then
+        restore_log_msg "WARN" "Proceeding without live environment after user confirmation (reason: $RESTORE_LIVE_ENV_REASON)"
+    else
+        restore_log_msg "WARN" "Proceeding without live environment after user confirmation"
+    fi
     return 0
 }
 
@@ -1034,13 +1075,46 @@ check_restore_space() {
 display_safety_warnings() {
     lh_print_header "$(lh_msg 'RESTORE_SAFETY_WARNINGS')"
     
-    echo -e "${LH_COLOR_BOLD_RED}╔════════════════════════════════════════╗"
-    echo -e "║          ${LH_COLOR_WHITE}CRITICAL WARNING${LH_COLOR_BOLD_RED}           ║"
-    echo -e "╠════════════════════════════════════════╣"
-    echo -e "║ $(lh_msg 'RESTORE_WARNING_DESTRUCTIVE')                  ║"
-    echo -e "║ $(lh_msg 'RESTORE_WARNING_BACKUP')                       ║"
-    echo -e "║ $(lh_msg 'RESTORE_WARNING_TESTING')                      ║"
-    echo -e "╚════════════════════════════════════════╝${LH_COLOR_RESET}"
+    local title="$(lh_msg 'RESTORE_WARNING_CRITICAL_HEADING')"
+    local warning_lines=(
+        "$(lh_msg 'RESTORE_WARNING_DESTRUCTIVE')"
+        "$(lh_msg 'RESTORE_WARNING_BACKUP')"
+        "$(lh_msg 'RESTORE_WARNING_TESTING')"
+    )
+
+    local max_width=${#title}
+    local line
+    for line in "${warning_lines[@]}"; do
+        local visible_length=${#line}
+        (( visible_length > max_width )) && max_width=$visible_length
+    done
+
+    local inner_width=$((max_width + 2))
+    local horizontal
+    printf -v horizontal '%*s' "$inner_width" ""
+    horizontal=${horizontal// /═}
+
+    local title_padding_left=$(( (max_width - ${#title}) / 2 ))
+    local title_padding_right=$(( max_width - ${#title} - title_padding_left ))
+
+    printf '%b╔%s╗%b\n' "${LH_COLOR_BOLD_RED}" "$horizontal" "${LH_COLOR_RESET}"
+
+    printf '%b║ ' "${LH_COLOR_BOLD_RED}"
+    printf '%*s' "$title_padding_left" ""
+    printf '%b' "${LH_COLOR_WHITE}${title}${LH_COLOR_BOLD_RED}"
+    printf '%*s' "$title_padding_right" ""
+    printf '%b\n' " ║${LH_COLOR_RESET}"
+
+    printf '%b╠%s╣%b\n' "${LH_COLOR_BOLD_RED}" "$horizontal" "${LH_COLOR_RESET}"
+
+    for line in "${warning_lines[@]}"; do
+        local padding=$((max_width - ${#line}))
+        printf '%b║ %s' "${LH_COLOR_BOLD_RED}" "$line"
+        printf '%*s' "$padding" ""
+        printf '%b\n' " ║${LH_COLOR_RESET}"
+    done
+
+    printf '%b╚%s╝%b\n' "${LH_COLOR_BOLD_RED}" "$horizontal" "${LH_COLOR_RESET}"
     echo ""
     
     echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_WARNING_DETAILS'):${LH_COLOR_RESET}"
