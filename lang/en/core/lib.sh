@@ -181,3 +181,7 @@ MSG_EN[LIB_POWER_TOOL_AVAILABLE]="Available"
 MSG_EN[LIB_POWER_TOOL_NOT_AVAILABLE]="Not available"
 MSG_EN[LIB_POWER_NO_TOOLS_AVAILABLE]="No power management tools available"
 MSG_EN[LIB_POWER_TOOLS_SUMMARY]="%s power management tools available: %s"
+
+# System command execution messages
+MSG_EN[LIB_COMMAND_EXECUTION]="Executing command as user %s: %s"
+MSG_EN[LIB_XDG_RUNTIME_ERROR]="XDG_RUNTIME_DIR does not exist for user %s"

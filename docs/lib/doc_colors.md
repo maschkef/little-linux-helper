@@ -98,13 +98,12 @@ echo -e "${LH_COLOR_WARNING}================================${LH_COLOR_RESET}"
 # → Use lh_print_boxed_message instead!
 ```
 
-### Important Guidelines
+### Important Notes
 
 1. **Prefer boxed messages** (`lh_print_boxed_message`) for warnings, errors, and notices
 2. **Use `echo -e` only for** simple inline formatting or menu items
 3. **Always end colored strings** with `${LH_COLOR_RESET}` to prevent color bleeding
 4. **Use semantic aliases** (e.g., `LH_COLOR_ERROR`) instead of raw colors
-5. **See `docs/AI_STYLING_PLAYBOOK.md`** for complete standardization guidelines
 
 ### When to Use Each Approach
 

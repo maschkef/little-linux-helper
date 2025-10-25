@@ -35,20 +35,21 @@ DEFAULT_MODULE=""
 show_usage() {
     echo "Usage: $0 [OPTIONS] [MODULE_PATH]"
     echo ""
-    echo "Analyzes language tags used in modules and compares them against existing language files."
+    echo "Analyzes language tags used in modules and libraries and compares them against existing language files."
     echo ""
     echo "OPTIONS:"
     echo "  -l, --lang LANG     Language to check against (default: $DEFAULT_LANG)"
     echo "  -h, --help          Show this help message"
     echo ""
     echo "ARGUMENTS:"
-    echo "  MODULE_PATH         Path to specific module file to analyze"
-    echo "                      If not provided, analyzes all modules"
+    echo "  MODULE_PATH         Path to specific module or library file to analyze"
+    echo "                      If not provided, analyzes all modules and libraries"
     echo ""
     echo "EXAMPLES:"
-    echo "  $0                                    # Analyze all modules against English"
-    echo "  $0 -l de                             # Analyze all modules against German"
+    echo "  $0                                    # Analyze all modules and libraries against English"
+    echo "  $0 -l de                             # Analyze all modules and libraries against German"
     echo "  $0 modules/mod_disk.sh               # Analyze specific module"
+    echo "  $0 lib/lib_common.sh                 # Analyze specific library"
     echo "  $0 -l fr modules/backup/mod_backup.sh # Analyze backup module against French"
     echo ""
     echo "SUPPORTED LANGUAGES:"
@@ -140,7 +141,7 @@ extract_language_tags() {
         # Pattern 2: Unquoted keys (must start with letter/underscore, contain letters, numbers, underscores)
         grep -oE "(lh_msg|lh_t)[[:space:]]+([A-Z_][A-Z0-9_]*)" "$file" 2>/dev/null | \
             sed -E "s/^(lh_msg|lh_t)[[:space:]]+([A-Z_][A-Z0-9_]*)$/\2/"
-    } | sort -u || true
+    } | grep -vE '^\$' | sort -u || true  # Filter out variable references starting with $
 }
 
 # Load keys from a specific language file into an associative array
@@ -264,6 +265,11 @@ find_module_files() {
     find "$PROJECT_ROOT/modules" -name "*.sh" -type f | sort
 }
 
+# Find all library files
+find_library_files() {
+    find "$PROJECT_ROOT/lib" -name "*.sh" -type f | sort
+}
+
 # Get module name from file path for language file suggestions
 get_module_name() {
     local file_path="$1"
@@ -271,8 +277,15 @@ get_module_name() {
     # Extract module name from path patterns:
     # modules/mod_xxx.sh -> xxx
     # modules/backup/mod_xxx.sh -> backup (or xxx)
+    # lib/lib_xxx.sh -> lib (for library files)
     
     local basename=$(basename "$file_path" .sh)
+    
+    # Check if it's a library file
+    if [[ "$file_path" =~ /lib/ ]]; then
+        echo "lib"
+        return
+    fi
     
     # Remove 'mod_' prefix if present
     if [[ "$basename" =~ ^mod_ ]]; then
@@ -302,24 +315,42 @@ suggest_language_files() {
     local lang_dir="$PROJECT_ROOT/lang/$target_lang"
     local suggestions=()
     
-    # Check if module-specific language file exists
-    if [[ -f "$lang_dir/${module_name}.sh" ]]; then
-        suggestions+=("$lang_dir/${module_name}.sh")
-    fi
-    
-    # Always suggest common.sh for general keys like BACK, CANCEL, etc.
-    if [[ -f "$lang_dir/common.sh" ]]; then
-        suggestions+=("$lang_dir/common.sh")
-    fi
-    
-    # Suggest lib.sh for library-related keys
-    if [[ -f "$lang_dir/lib.sh" ]]; then
-        suggestions+=("$lang_dir/lib.sh")
+    # For library files, suggest core/lib.sh
+    if [[ "$module_file" =~ /lib/ ]]; then
+        if [[ -f "$lang_dir/core/lib.sh" ]]; then
+            suggestions+=("$lang_dir/core/lib.sh")
+        fi
+    else
+        # Check if module-specific language file exists
+        if [[ -f "$lang_dir/${module_name}.sh" ]]; then
+            suggestions+=("$lang_dir/${module_name}.sh")
+        fi
+        
+        # Check for module subdirectory
+        if [[ -f "$lang_dir/modules/${module_name}.sh" ]]; then
+            suggestions+=("$lang_dir/modules/${module_name}.sh")
+        fi
+        
+        # Always suggest common.sh for general keys like BACK, CANCEL, etc.
+        if [[ -f "$lang_dir/common.sh" ]]; then
+            suggestions+=("$lang_dir/common.sh")
+        fi
+        if [[ -f "$lang_dir/core/common.sh" ]]; then
+            suggestions+=("$lang_dir/core/common.sh")
+        fi
+        
+        # Suggest lib.sh for library-related keys
+        if [[ -f "$lang_dir/lib.sh" ]]; then
+            suggestions+=("$lang_dir/lib.sh")
+        fi
+        if [[ -f "$lang_dir/core/lib.sh" ]]; then
+            suggestions+=("$lang_dir/core/lib.sh")
+        fi
     fi
     
     if [[ ${#suggestions[@]} -gt 0 ]]; then
         echo -e "  ${COLOR_INFO}Suggested language files to update:${COLOR_RESET}"
-        printf "    %s\n" "${suggestions[@]}"
+        printf "    %s\n" "${suggestions[@]}" | sort -u
     fi
 }
 
@@ -354,10 +385,14 @@ main() {
     # Determine which modules to analyze
     if [[ -n "$module_path" ]]; then
         module_files=("$module_path")
-        echo -e "${COLOR_INFO}Analyzing single module: $module_path${COLOR_RESET}"
+        echo -e "${COLOR_INFO}Analyzing single file: $module_path${COLOR_RESET}"
     else
+        # Collect both module and library files
         readarray -t module_files < <(find_module_files)
-        echo -e "${COLOR_INFO}Analyzing all modules (${#module_files[@]} files)${COLOR_RESET}"
+        local lib_files=()
+        readarray -t lib_files < <(find_library_files)
+        module_files+=("${lib_files[@]}")
+        echo -e "${COLOR_INFO}Analyzing all modules and libraries (${#module_files[@]} files)${COLOR_RESET}"
     fi
     
     echo ""

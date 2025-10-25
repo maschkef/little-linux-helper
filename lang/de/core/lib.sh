@@ -181,3 +181,7 @@ MSG_DE[LIB_POWER_TOOL_AVAILABLE]="Verfügbar"
 MSG_DE[LIB_POWER_TOOL_NOT_AVAILABLE]="Nicht verfügbar"
 MSG_DE[LIB_POWER_NO_TOOLS_AVAILABLE]="Keine Energieverwaltungs-Tools verfügbar"
 MSG_DE[LIB_POWER_TOOLS_SUMMARY]="%s Energieverwaltungs-Tools verfügbar: %s"
+
+# System-Befehlsausführungsnachrichten
+MSG_DE[LIB_COMMAND_EXECUTION]="Führe Befehl als Benutzer %s aus: %s"
+MSG_DE[LIB_XDG_RUNTIME_ERROR]="XDG_RUNTIME_DIR existiert nicht für Benutzer %s"
