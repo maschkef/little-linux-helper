@@ -62,6 +62,8 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
 *   **`RESTORE_NON_LIVE_OVERRIDE`**: Tracks whether the user acknowledged running on a non-live system so subsequent operations don’t prompt again
 *   **`RESTORE_NON_LIVE_NOTICE_SHOWN`**: Ensures the informational reminder about running non-live is printed only once after override
 *   **`RESTORE_LIVE_ENV_REASON`**: Captures the heuristics that triggered live-environment detection for improved logging transparency
+*   **`RESTORE_DRY_RUN_NOTICE_SHOWN`**: Prevents the informational dry-run banner from appearing more than once per session
+*   **`RESTORE_DESTRUCTIVE_ACKNOWLEDGED`**: Records that the user has already confirmed the destructive warning in the current session so repeated prompts are avoided
 
 **4. Core Safety and Validation Functions:**
 
@@ -113,13 +115,13 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
     *   **Dependencies (internal):** `check_btrfs_space`, `get_btrfs_available_space`, `restore_log_msg`
 
 *   **`display_safety_warnings()`**
-    *   **Purpose:** Displays critical safety warnings about destructive operations.
+    *   **Purpose:** Presents context-aware safety messaging for destructive restore operations.
     *   **Mechanism:**
-        *   Shows formatted warning box with critical information
-        *   Details specific risks: subvolume replacement, received_uuid impacts, bootloader considerations
-        *   Requires explicit user acknowledgment before proceeding
-    *   **Safety Features:** Ensures users understand the destructive nature of operations
-    *   **Dependencies (internal):** `lh_confirm_action`, `restore_log_msg`
+        *   Detects dry-run mode and shows a one-time informational box without confirmation
+        *   For destructive operations, renders a danger preset box and asks for acknowledgement only once per session (tracked via `RESTORE_DESTRUCTIVE_ACKNOWLEDGED`)
+        *   Supports a “review” mode that replays the warnings from the menu without additional prompts
+    *   **Safety Features:** Balances visibility of critical warnings with reduced prompt fatigue; avoids redundant confirmations while still logging every decision
+    *   **Dependencies (internal):** `lh_print_header`, `lh_print_boxed_message`, `lh_confirm_action`, `restore_log_msg`
 
 **5. Interactive Setup and Configuration:**
 
@@ -141,6 +143,7 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
             *   Actual mode: Performs real restore operations
         4. **Configuration Summary:**
             *   Displays complete configuration for user verification
+            *   Automatically replays the safety banner in the appropriate mode before asking for final confirmation
             *   Requires final confirmation before proceeding
     *   **Auto-Detection Features:**
         *   `detect_backup_drives()`: Scans for BTRFS filesystems containing backup directories
@@ -703,7 +706,7 @@ The module provides an interactive menu-driven interface with the following main
    - Intelligent bootloader handling with multiple strategies
 3. **Individual Folder Restore:** Granular folder-level restore without full subvolume replacement
 4. **Show Disk Information:** Comprehensive disk and filesystem analysis for restore planning
-5. **Review Safety Information:** Display critical safety information and live environment detection
+5. **Review Safety Information:** Replays the safety banners (without extra confirmations) alongside the latest live-environment status
 6. **Cleanup Restore Artifacts:** Intelligent cleanup of temporary files and failed restore artifacts
 7. **Retry Bootloader Configuration:** Re-run bootloader configuration detection and setup
 8. **Post-Restore Verification & Bootloader Setup:** Interactive wizard for post-restore verification (NEW)

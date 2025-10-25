@@ -371,6 +371,8 @@ RESTORE_NON_LIVE_OVERRIDE="false"   # Tracks whether user explicitly accepted ru
 RESTORE_NON_LIVE_NOTICE_SHOWN="false"  # Avoid repeating informational message after override
 RESTORE_MARKER_FILE=""      # Path to the backup marker JSON file for the selected snapshot bundle
 RESTORE_LIVE_ENV_REASON=""  # Human-readable explanation for the last live-environment detection
+RESTORE_DRY_RUN_NOTICE_SHOWN="false"  # Avoid repeating dry-run notices unnecessarily
+RESTORE_DESTRUCTIVE_ACKNOWLEDGED="false" # Tracks whether the destructive warning was acknowledged during this session
 
 # LH_RESTORE_KEEP_ANCHOR controls whether we keep the read-only snapshot that was
 # just received from the backup. Set this to "true" if you want an extra safety
@@ -923,8 +925,11 @@ check_live_environment() {
     # Not detected as live
     if [[ "$RESTORE_NON_LIVE_OVERRIDE" == "true" ]]; then
         if [[ "$RESTORE_NON_LIVE_NOTICE_SHOWN" != "true" ]]; then
-            echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_NOT_LIVE_WARNING')${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_LIVE_RECOMMENDATION')${LH_COLOR_RESET}"
+            lh_print_boxed_message \
+                --preset warning \
+                "$(lh_msg 'WARNING')" \
+                "$(lh_msg 'RESTORE_NOT_LIVE_WARNING')" \
+                "$(lh_msg 'RESTORE_LIVE_RECOMMENDATION')"
             RESTORE_NON_LIVE_NOTICE_SHOWN="true"
         fi
         if [[ -n "$RESTORE_LIVE_ENV_REASON" ]]; then
@@ -935,8 +940,11 @@ check_live_environment() {
         return 0
     fi
 
-    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_NOT_LIVE_WARNING')${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_LIVE_RECOMMENDATION')${LH_COLOR_RESET}"
+    lh_print_boxed_message \
+        --preset warning \
+        "$(lh_msg 'WARNING')" \
+        "$(lh_msg 'RESTORE_NOT_LIVE_WARNING')" \
+        "$(lh_msg 'RESTORE_LIVE_RECOMMENDATION')"
     echo ""
 
     if ! lh_confirm_action "$(lh_msg 'RESTORE_CONTINUE_NOT_LIVE')" "n"; then
@@ -1073,8 +1081,54 @@ check_restore_space() {
 
 # Display critical safety warnings
 display_safety_warnings() {
+    local mode="${1:-auto}"
+    local require_ack="false"
+
+    case "$mode" in
+        auto)
+            if [[ "${DRY_RUN:-false}" == "true" ]]; then
+                mode="dry-run"
+            else
+                mode="destructive"
+                require_ack="true"
+            fi
+            ;;
+        dry-run)
+            mode="dry-run"
+            ;;
+        destructive|interactive)
+            mode="destructive"
+            require_ack="true"
+            ;;
+        review)
+            mode="destructive"
+            require_ack="false"
+            ;;
+        *)
+            mode="destructive"
+            require_ack="true"
+            ;;
+    esac
+
+    if [[ "$mode" == "dry-run" ]]; then
+        if [[ "$RESTORE_DRY_RUN_NOTICE_SHOWN" != "true" ]]; then
+            lh_print_header "$(lh_msg 'RESTORE_MODE_DRY_RUN')"
+            lh_print_boxed_message \
+                --preset info \
+                --min-width 40 \
+                "$(lh_msg 'RESTORE_MODE_DRY_RUN')" \
+                "$(lh_msg 'RESTORE_DRY_RUN_ENABLED')" \
+                "$(lh_msg 'RESTORE_WARNING_TESTING')"
+            RESTORE_DRY_RUN_NOTICE_SHOWN="true"
+            restore_log_msg "INFO" "Displayed dry-run safety notice"
+        else
+            restore_log_msg "DEBUG" "Dry-run safety notice already shown"
+        fi
+        return 0
+    fi
+
     lh_print_header "$(lh_msg 'RESTORE_SAFETY_WARNINGS')"
-    
+
     local title="$(lh_msg 'RESTORE_WARNING_CRITICAL_HEADING')"
     local warning_lines=(
         "$(lh_msg 'RESTORE_WARNING_DESTRUCTIVE')"
@@ -1084,19 +1138,30 @@ display_safety_warnings() {
 
     lh_print_boxed_message --preset danger --min-width 40 "$title" "${warning_lines[@]}"
     echo ""
-    
+
     echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_WARNING_DETAILS'):${LH_COLOR_RESET}"
     echo -e "• $(lh_msg 'RESTORE_WARNING_SUBVOLUMES')"
     echo -e "• $(lh_msg 'RESTORE_WARNING_RECEIVED_UUID')"
     echo -e "• $(lh_msg 'RESTORE_WARNING_BOOTLOADER')"
     echo ""
-    
-    if ! lh_confirm_action "$(lh_msg 'RESTORE_ACKNOWLEDGE_WARNINGS')" "n"; then
-        restore_log_msg "INFO" "User aborted after reading safety warnings"
-        return 1
+
+    if [[ "$require_ack" == "true" ]]; then
+        if [[ "$RESTORE_DESTRUCTIVE_ACKNOWLEDGED" == "true" ]]; then
+            restore_log_msg "DEBUG" "Destructive warning previously acknowledged; skipping confirmation prompt"
+            return 0
+        fi
+
+        if ! lh_confirm_action "$(lh_msg 'RESTORE_ACKNOWLEDGE_WARNINGS')" "n"; then
+            restore_log_msg "INFO" "User aborted after reading safety warnings"
+            return 1
+        fi
+
+        RESTORE_DESTRUCTIVE_ACKNOWLEDGED="true"
+        restore_log_msg "INFO" "User acknowledged destructive safety warnings"
+    else
+        restore_log_msg "INFO" "Presented destructive safety warnings (acknowledgement not required)"
     fi
-    
-    restore_log_msg "INFO" "User acknowledged safety warnings"
+
     return 0
 }
 
@@ -1278,11 +1343,14 @@ setup_restore_environment() {
     case "$mode_choice" in
         1)
             DRY_RUN="true"
+            RESTORE_DESTRUCTIVE_ACKNOWLEDGED="false"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_DRY_RUN_ENABLED')${LH_COLOR_RESET}"
             restore_log_msg "INFO" "Dry-run mode enabled"
             ;;
         2)
             DRY_RUN="false"
+            RESTORE_DESTRUCTIVE_ACKNOWLEDGED="false"
+            RESTORE_DRY_RUN_NOTICE_SHOWN="false"
             echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_ACTUAL_MODE_ENABLED')${LH_COLOR_RESET}"
             restore_log_msg "INFO" "Actual operation mode enabled"
             ;;
@@ -1300,6 +1368,10 @@ setup_restore_environment() {
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_TEMP_DIR'):${LH_COLOR_RESET} $TEMP_SNAPSHOT_DIR"
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_OPERATION_MODE'):${LH_COLOR_RESET} $([ "$DRY_RUN" == "true" ] && echo "$(lh_msg 'RESTORE_DRY_RUN')" || echo "$(lh_msg 'RESTORE_ACTUAL')")"
     echo ""
+
+    if ! display_safety_warnings "auto"; then
+        return 1
+    fi
     
     if ! lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_CONFIGURATION')" "y"; then
         restore_log_msg "INFO" "User rejected configuration"
@@ -1315,14 +1387,12 @@ create_manual_checkpoint() {
     local context_msg="$1"
     
     echo ""
-    echo -e "${LH_COLOR_WARNING}╔════════════════════════════════════════╗"
-    echo -e "║          ${LH_COLOR_WHITE}MANUAL CHECKPOINT${LH_COLOR_WARNING}           ║"
-    echo -e "╚════════════════════════════════════════╝${LH_COLOR_RESET}"
-    echo ""
-    echo -e "${LH_COLOR_INFO}$context_msg${LH_COLOR_RESET}"
-    echo ""
-    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_CHECKPOINT_INSTRUCTIONS')${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_CHECKPOINT_VERIFY')${LH_COLOR_RESET}"
+    lh_print_boxed_message \
+        --preset warning \
+        "$(lh_msg 'RESTORE_CHECKPOINT_HEADING')" \
+        "$context_msg" \
+        "$(lh_msg 'RESTORE_CHECKPOINT_INSTRUCTIONS')" \
+        "$(lh_msg 'RESTORE_CHECKPOINT_VERIFY')"
     echo ""
     
     lh_press_any_key 'RESTORE_CHECKPOINT_CONTINUE'
@@ -1482,7 +1552,6 @@ safely_replace_subvolume() {
 }
 
 # Perform the actual subvolume restore using atomic receive from BTRFS library
-# CRITICAL FIX: Use atomic_receive_with_validation instead of manual atomic implementation
 perform_subvolume_restore() {
     local subvol_to_restore="$1"    # e.g., "@" or "@home"
     local snapshot_to_use="$2"      # Full path to the backup snapshot
@@ -2049,9 +2118,12 @@ select_restore_type_and_snapshot() {
             
             # Final confirmation with warnings
             echo ""
-            echo -e "${LH_COLOR_WARNING}╔════════════════════════════════════════╗"
-            echo -e "║     ${LH_COLOR_WHITE}COMPLETE SYSTEM RESTORE${LH_COLOR_WARNING}        ║"
-            echo -e "╚════════════════════════════════════════╝${LH_COLOR_RESET}"
+            lh_print_boxed_message \
+                --preset danger \
+                "$(lh_msg 'RESTORE_COMPLETE_SYSTEM_SELECTED')" \
+                "$(lh_msg 'RESTORE_COMPLETE_SYSTEM_WARNING')" \
+                "$(lh_msg 'RESTORE_CONFIRM_COMPLETE_RESTORE')"
+            echo ""
             
             # Get bundle name for display
             local first_subvol="${restore_subvols[0]}"
@@ -3129,13 +3201,10 @@ rollback_bootloader_changes() {
 # Enhanced bootloader configuration with safety features
 handle_bootloader_configuration() {
     echo ""
-    echo -e "${LH_COLOR_WARNING}╔════════════════════════════════════════╗"
-    echo -e "║      ${LH_COLOR_WHITE}BOOTLOADER CONFIGURATION${LH_COLOR_WARNING}       ║"
-    echo -e "╚════════════════════════════════════════╝${LH_COLOR_RESET}"
-    echo ""
-    
-    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_BOOTLOADER_ENHANCED_INFO')${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_BOOTLOADER_CRITICAL')${LH_COLOR_RESET}"
+    lh_print_boxed_message \
+        --preset warning \
+        "$(lh_msg 'RESTORE_BOOTLOADER_ENHANCED_INFO')" \
+        "$(lh_msg 'RESTORE_BOOTLOADER_CRITICAL')"
     echo ""
     
     # Initialize global variables for detection results
@@ -3302,9 +3371,9 @@ post_restore_verification() {
     echo ""
     
     # Summary and next steps
-    echo -e "${LH_COLOR_SUCCESS}╔════════════════════════════════════════════════════╗${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_SUCCESS}║  ${LH_COLOR_WHITE}$(lh_msg 'RESTORE_VERIFICATION_COMPLETE')${LH_COLOR_SUCCESS}                    ║${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_SUCCESS}╚════════════════════════════════════════════════════╝${LH_COLOR_RESET}"
+    lh_print_boxed_message \
+        --preset success \
+        "$(lh_msg 'RESTORE_VERIFICATION_COMPLETE')"
     echo ""
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_NEXT_STEPS'):${LH_COLOR_RESET}"
     echo -e "  ${LH_COLOR_CYAN}1. $(lh_msg 'RESTORE_NEXT_UNMOUNT')${LH_COLOR_RESET}"
@@ -3370,9 +3439,10 @@ retry_bootloader_configuration() {
     esac
     
     echo ""
-    echo -e "${LH_COLOR_WARNING}╔════════════════════════════════════════╗"
-    echo -e "║  ${LH_COLOR_WHITE}RETRY BOOTLOADER CONFIGURATION${LH_COLOR_WARNING}     ║"
-    echo -e "╚════════════════════════════════════════╝${LH_COLOR_RESET}"
+    lh_print_boxed_message \
+        --preset warning \
+        "$(lh_msg 'RESTORE_BOOTLOADER_CONFIG')" \
+        "$(lh_msg 'RESTORE_BOOTLOADER_CONFIG_INFO')"
     echo ""
     
     # Execute boot strategy selection with chosen method
@@ -3676,7 +3746,7 @@ show_disk_information() {
 # Restore menu function
 show_restore_menu() {
     while true; do
-        lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTORE_MENU_TITLE')")"
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'RESTORE_MENU_TITLE')")"
         lh_print_header "$(lh_msg 'RESTORE_MENU_TITLE') - BTRFS"
         
         # Show current configuration if set up
@@ -3704,8 +3774,8 @@ show_restore_menu() {
 
         case $option in
             1)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTORE_MENU_SETUP')")"
-                if check_live_environment && display_safety_warnings; then
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'RESTORE_MENU_SETUP')")"
+                if check_live_environment; then
                     setup_restore_environment
                 fi
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
@@ -3714,7 +3784,7 @@ show_restore_menu() {
                 if [[ -z "$BACKUP_ROOT" ]] || [[ -z "$TARGET_ROOT" ]]; then
                     echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_SETUP_REQUIRED')${LH_COLOR_RESET}"
                 else
-                    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'RESTORE_MENU_SYSTEM_RESTORE')")"
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION' "$(lh_msg 'RESTORE_MENU_SYSTEM_RESTORE')")"
                     select_restore_type_and_snapshot
                     lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 fi
@@ -3723,24 +3793,26 @@ show_restore_menu() {
                 if [[ -z "$BACKUP_ROOT" ]] || [[ -z "$TARGET_ROOT" ]]; then
                     echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_SETUP_REQUIRED')${LH_COLOR_RESET}"
                 else
-                    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'RESTORE_MENU_FOLDER_RESTORE')")"
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION' "$(lh_msg 'RESTORE_MENU_FOLDER_RESTORE')")"
                     restore_folder_from_snapshot
                     lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 fi
                 ;;
             4)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTORE_MENU_DISK_INFO')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'RESTORE_MENU_DISK_INFO')")"
                 show_disk_information
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             5)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTORE_MENU_SAFETY_CHECK')")"
-                check_live_environment && display_safety_warnings
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'RESTORE_MENU_SAFETY_CHECK')")"
+                if check_live_environment; then
+                    display_safety_warnings "review"
+                fi
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             6)
                 if [[ -n "$TARGET_ROOT" ]] && [[ -d "$TARGET_ROOT" ]]; then
-                    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_CLEANUP')" "BTRFS")"
+                    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_CLEANUP' "BTRFS")"
                     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_CLEANUP_ARTIFACTS')${LH_COLOR_RESET}"
                     cleanup_old_restore_artifacts "$TARGET_ROOT" "artifacts"
                     
@@ -3754,12 +3826,12 @@ show_restore_menu() {
                 fi
                 ;;
             7)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'RESTORE_MENU_RETRY_BOOTLOADER')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION' "$(lh_msg 'RESTORE_MENU_RETRY_BOOTLOADER')")"
                 retry_bootloader_configuration
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             8)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'RESTORE_MENU_POST_VERIFICATION')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION' "$(lh_msg 'RESTORE_MENU_POST_VERIFICATION')")"
                 post_restore_verification
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;

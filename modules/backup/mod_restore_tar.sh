@@ -66,13 +66,15 @@ restore_tar() {
     lh_log_msg "DEBUG" "Backup configuration: LH_BACKUP_ROOT='$LH_BACKUP_ROOT', LH_BACKUP_DIR='$LH_BACKUP_DIR'"
     
     lh_print_header "$(lh_msg 'RESTORE_TAR_HEADER')"
-    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP')" "$(lh_msg 'RESTORE_TAR_HEADER')")"
+    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP' "$(lh_msg 'RESTORE_TAR_HEADER')")"
     
     # List available TAR archives
     lh_log_msg "DEBUG" "Checking for backup directory: $LH_BACKUP_ROOT$LH_BACKUP_DIR"
     if [ ! -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
         lh_log_msg "DEBUG" "Backup directory does not exist"
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_NO_BACKUP_DIR')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'RESTORE_NO_BACKUP_DIR')"
         return 1
     fi
     
@@ -82,7 +84,9 @@ restore_tar() {
     
     if [ ${#archives[@]} -eq 0 ]; then
         lh_log_msg "DEBUG" "No TAR archives found"
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_NO_TAR_ARCHIVES')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'RESTORE_NO_TAR_ARCHIVES')"
         return 1
     fi
     
@@ -123,10 +127,11 @@ restore_tar() {
         case $restore_choice in
             1)
                 lh_log_msg "DEBUG" "Taking path: Restore to original location"
-                # Show warning
                 echo ""
-                echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'RESTORE_WARNING_TITLE')${LH_COLOR_RESET}"
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_WARNING_OVERWRITE')${LH_COLOR_RESET}"
+                lh_print_boxed_message \
+                    --preset danger \
+                    "$(lh_msg 'RESTORE_WARNING_TITLE')" \
+                    "$(lh_msg 'RESTORE_WARNING_OVERWRITE')"
                 if ! lh_confirm_action "$(lh_msg 'RESTORE_CONFIRM_CONTINUE')" "n"; then
                     lh_log_msg "DEBUG" "User cancelled restore after warning"
                     echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
@@ -170,7 +175,7 @@ restore_tar() {
 
         local cmd="$LH_SUDO_CMD tar xzf \"$selected_archive\" -C \"$restore_path\" --verbose"
         lh_log_msg "DEBUG" "TAR restore command: $cmd"
-        lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_RESTORE')" "$(basename "$selected_archive")")"
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_RESTORE' "$(basename "$selected_archive")")"
         $LH_SUDO_CMD tar xzf "$selected_archive" -C "$restore_path" --verbose
 
         if [ $? -eq 0 ]; then
@@ -183,7 +188,9 @@ restore_tar() {
             fi
         else
             lh_log_msg "DEBUG" "TAR restore failed"
-            echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_ERROR')${LH_COLOR_RESET}"
+            lh_print_boxed_message \
+                --preset danger \
+                "$(lh_msg 'RESTORE_ERROR')"
             backup_log_msg "ERROR" "TAR restore failed: $selected_archive"
         fi
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
@@ -201,7 +208,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     lh_log_msg "DEBUG" "Module called with parameters: $*"
 
     lh_log_active_sessions_debug "$(lh_msg 'RESTORE_TAR_HEADER')"
-    lh_begin_module_session "mod_restore_tar" "$(lh_msg 'RESTORE_TAR_HEADER')" "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP')" "$(lh_msg 'RESTORE_TAR_HEADER')")" "${LH_BLOCK_FILESYSTEM_WRITE},${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"
+    lh_begin_module_session "mod_restore_tar" "$(lh_msg 'RESTORE_TAR_HEADER')" "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP' "$(lh_msg 'RESTORE_TAR_HEADER')")" "${LH_BLOCK_FILESYSTEM_WRITE},${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"
 
     # Brief info message
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_TAR_MODULE_INFO')${LH_COLOR_RESET}"

@@ -86,7 +86,10 @@ function check_docker_installation() {
     
     # Offer installation if needed
     if [ "$docker_installed" = false ] || [ "$docker_compose_installed" = false ]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_SETUP_MISSING_COMPONENTS')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'WARNING')" \
+            "$(lh_msg 'DOCKER_SETUP_MISSING_COMPONENTS')"
         echo ""
         
         if lh_confirm_action "$(lh_msg 'DOCKER_SETUP_INSTALL_PROMPT')" "n"; then
@@ -165,7 +168,10 @@ function install_docker() {
         *)
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_SETUP_UNSUPPORTED_PKG_MANAGER'): $LH_PKG_MANAGER${LH_COLOR_RESET}"
             lh_log_msg "ERROR" "$(lh_msg 'DOCKER_SETUP_UNSUPPORTED_PKG_MANAGER'): $LH_PKG_MANAGER"
-            echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_SETUP_MANUAL_INSTALL_HINT')${LH_COLOR_RESET}"
+            lh_print_boxed_message \
+                --preset warning \
+                "$(lh_msg 'WARNING')" \
+                "$(lh_msg 'DOCKER_SETUP_MANUAL_INSTALL_HINT')"
             return 1
             ;;
     esac
@@ -198,7 +204,10 @@ function install_docker_compose() {
                 $LH_SUDO_CMD zypper install -y docker-compose
                 ;;
             *)
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_SETUP_COMPOSE_MANUAL_INSTALL')${LH_COLOR_RESET}"
+                lh_print_boxed_message \
+                    --preset warning \
+                    "$(lh_msg 'WARNING')" \
+                    "$(lh_msg 'DOCKER_SETUP_COMPOSE_MANUAL_INSTALL')"
                 install_docker_compose_manual
                 return $?
                 ;;
@@ -227,7 +236,10 @@ function install_docker_compose_manual() {
     fi
     
     if [ -z "$compose_version" ]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_SETUP_VERSION_DETECTION_FAILED')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'WARNING')" \
+            "$(lh_msg 'DOCKER_SETUP_VERSION_DETECTION_FAILED')"
         compose_version="v2.24.6"  # Fallback version
     fi
     
@@ -268,7 +280,10 @@ function post_install_setup() {
         if systemctl is-active --quiet docker; then
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_SETUP_SERVICE_STARTED')${LH_COLOR_RESET}"
         else
-            echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_SETUP_SERVICE_START_FAILED')${LH_COLOR_RESET}"
+            lh_print_boxed_message \
+                --preset warning \
+                "$(lh_msg 'WARNING')" \
+                "$(lh_msg 'DOCKER_SETUP_SERVICE_START_FAILED')"
         fi
     fi
     
@@ -285,7 +300,10 @@ function post_install_setup() {
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_SETUP_ADDING_USER_TO_GROUP'): $target_user${LH_COLOR_RESET}"
         $LH_SUDO_CMD usermod -aG docker "$target_user"
         
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_SETUP_LOGOUT_REQUIRED')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'WARNING')" \
+            "$(lh_msg 'DOCKER_SETUP_LOGOUT_REQUIRED')"
     fi
 }
 
@@ -297,7 +315,10 @@ function check_docker_service_status() {
         if systemctl is-active --quiet docker; then
             echo -e "${LH_COLOR_SUCCESS}✓ $(lh_msg 'DOCKER_SETUP_SERVICE_RUNNING')${LH_COLOR_RESET}"
         else
-            echo -e "${LH_COLOR_WARNING}⚠ $(lh_msg 'DOCKER_SETUP_SERVICE_NOT_RUNNING')${LH_COLOR_RESET}"
+            lh_print_boxed_message \
+                --preset warning \
+                "$(lh_msg 'WARNING')" \
+                "$(lh_msg 'DOCKER_SETUP_SERVICE_NOT_RUNNING')"
             
             if lh_confirm_action "$(lh_msg 'DOCKER_SETUP_START_SERVICE_PROMPT')" "y"; then
                 $LH_SUDO_CMD systemctl start docker
@@ -312,7 +333,10 @@ function check_docker_service_status() {
         if systemctl is-enabled --quiet docker; then
             echo -e "${LH_COLOR_SUCCESS}✓ $(lh_msg 'DOCKER_SETUP_SERVICE_ENABLED')${LH_COLOR_RESET}"
         else
-            echo -e "${LH_COLOR_WARNING}⚠ $(lh_msg 'DOCKER_SETUP_SERVICE_NOT_ENABLED')${LH_COLOR_RESET}"
+            lh_print_boxed_message \
+                --preset warning \
+                "$(lh_msg 'WARNING')" \
+                "$(lh_msg 'DOCKER_SETUP_SERVICE_NOT_ENABLED')"
             
             if lh_confirm_action "$(lh_msg 'DOCKER_SETUP_ENABLE_SERVICE_PROMPT')" "y"; then
                 $LH_SUDO_CMD systemctl enable docker
@@ -320,7 +344,10 @@ function check_docker_service_status() {
             fi
         fi
     else
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_SETUP_NO_SYSTEMCTL')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'WARNING')" \
+            "$(lh_msg 'DOCKER_SETUP_NO_SYSTEMCTL')"
     fi
 }
 

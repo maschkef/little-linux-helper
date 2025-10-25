@@ -98,7 +98,7 @@ function security_show_failed_logins() {
                 $LH_SUDO_CMD grep "sshd.*Failed password" /var/log/secure | tail -n 50
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             else
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'SECURITY_FAILED_LOGINS_NO_LOGS')${LH_COLOR_RESET}"
+                lh_print_boxed_message --preset warning "$(lh_msg 'SECURITY_FAILED_LOGINS_NO_LOGS')"
             fi
             ;;
         2)
@@ -118,7 +118,7 @@ function security_show_failed_logins() {
                 $LH_SUDO_CMD grep -v "sshd" /var/log/secure | grep "Failed password" | tail -n 50
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             else
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'SECURITY_FAILED_LOGINS_NO_LOGS')${LH_COLOR_RESET}"
+                lh_print_boxed_message --preset warning "$(lh_msg 'SECURITY_FAILED_LOGINS_NO_LOGS')"
             fi
             ;;
         3)
@@ -138,7 +138,7 @@ function security_show_failed_logins() {
                 $LH_SUDO_CMD grep "Failed password" /var/log/secure | tail -n 50
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
             else
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'SECURITY_FAILED_LOGINS_NO_LOGS')${LH_COLOR_RESET}"
+                lh_print_boxed_message --preset warning "$(lh_msg 'SECURITY_FAILED_LOGINS_NO_LOGS')"
             fi
             ;;
         4)
@@ -290,12 +290,15 @@ function security_check_firewall() {
     fi
 
     if ! $firewall_found; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'SECURITY_FIREWALL_NOT_FOUND')${LH_COLOR_RESET}"
+        lh_print_boxed_message --preset warning "$(lh_msg 'SECURITY_FIREWALL_NOT_FOUND')"
     fi
 
     if ! $firewall_active && $firewall_found; then
-        echo -e "\n${LH_COLOR_WARNING}$(lh_msg 'SECURITY_FIREWALL_INACTIVE_WARNING' "$firewall_name")${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'SECURITY_FIREWALL_ACTIVATION_RECOMMENDED')${LH_COLOR_RESET}"
+        echo ""
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'SECURITY_FIREWALL_INACTIVE_WARNING' "$firewall_name")" \
+            "$(lh_msg 'SECURITY_FIREWALL_ACTIVATION_RECOMMENDED')"
 
         if lh_confirm_action "$(lh_msg 'SECURITY_FIREWALL_SHOW_ACTIVATION_INFO')" "y"; then
             case $firewall_name in
@@ -458,7 +461,7 @@ function security_check_password_policy() {
         grep -v "^#" /etc/pam.d/system-auth | grep -v "^$" | grep "password"
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     else
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'SECURITY_PASSWORD_NO_CONFIG')${LH_COLOR_RESET}"
+        lh_print_boxed_message --preset warning "$(lh_msg 'SECURITY_PASSWORD_NO_CONFIG')"
     fi
 
     # Expiration date for user passwords
@@ -468,7 +471,7 @@ function security_check_password_policy() {
         grep "PASS_MAX_DAYS\|PASS_MIN_DAYS\|PASS_WARN_AGE" /etc/login.defs
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     else
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'SECURITY_PASSWORD_LOGIN_DEFS_NOT_FOUND')${LH_COLOR_RESET}"
+        lh_print_boxed_message --preset warning "$(lh_msg 'SECURITY_PASSWORD_LOGIN_DEFS_NOT_FOUND')"
     fi
 
     # Check for users without passwords
@@ -480,8 +483,11 @@ function security_check_password_policy() {
         local users_without_password=$($LH_SUDO_CMD passwd -S -a | grep -v "L" | grep "NP" 2>/dev/null || echo "$(lh_msg 'SECURITY_PASSWORD_NO_PASSWORD_FOUND')")
         if [ -n "$users_without_password" ] && [ "$users_without_password" != "$(lh_msg 'SECURITY_PASSWORD_NO_PASSWORD_FOUND')" ]; then
             echo "$users_without_password"
-            echo -e "\n${LH_COLOR_WARNING}$(lh_msg 'SECURITY_PASSWORD_NO_PASSWORD_WARNING')${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'SECURITY_PASSWORD_SET_PASSWORD_INFO')${LH_COLOR_RESET}"
+            echo ""
+            lh_print_boxed_message \
+                --preset warning \
+                "$(lh_msg 'SECURITY_PASSWORD_NO_PASSWORD_WARNING')" \
+                "$(lh_msg 'SECURITY_PASSWORD_SET_PASSWORD_INFO')"
         else
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'SECURITY_PASSWORD_NO_PASSWORD_FOUND')${LH_COLOR_RESET}"
         fi
@@ -518,31 +524,31 @@ function security_checks_menu() {
 
         case $option in
             1)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SECURITY_MENU_OPEN_PORTS')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SECURITY_MENU_OPEN_PORTS')")"
                 security_show_open_ports
                 ;;
             2)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SECURITY_MENU_FAILED_LOGINS')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SECURITY_MENU_FAILED_LOGINS')")"
                 security_show_failed_logins
                 ;;
             3)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SECURITY_MENU_ROOTKITS')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SECURITY_MENU_ROOTKITS')")"
                 security_check_rootkits
                 ;;
             4)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SECURITY_MENU_FIREWALL')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SECURITY_MENU_FIREWALL')")"
                 security_check_firewall
                 ;;
             5)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SECURITY_MENU_UPDATES')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SECURITY_MENU_UPDATES')")"
                 security_check_updates
                 ;;
             6)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SECURITY_MENU_PASSWORDS')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SECURITY_MENU_PASSWORDS')")"
                 security_check_password_policy
                 ;;
             7)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'SECURITY_MENU_DOCKER')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION' "$(lh_msg 'SECURITY_MENU_DOCKER')")"
                 bash "$LH_ROOT_DIR/modules/mod_docker_security.sh"
                 ;;
             0)

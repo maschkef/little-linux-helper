@@ -781,6 +781,7 @@ MSG_DE[BTRFS_DELETE_NEEDS_ROOT]="Das Löschen von BTRFS-Backups erfordert Root-R
 MSG_DE[BTRFS_DELETE_WITH_SUDO]="Backups mit sudo löschen?"
 MSG_DE[BTRFS_SELECT_BUNDLE_DELETE]="Geben Sie die Nummer(n) der zu löschenden Backup-Sitzung(en) ein (einzeln: 3, Bereich: 1-5, mehrere: 1,3,5) oder 0 zum Abbrechen: "
 MSG_DE[BTRFS_CONFIRM_DELETE_BUNDLES]="Sind Sie sicher, dass Sie die ausgewählten Backup-Sitzung(en) löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden!"
+MSG_DE[BTRFS_DELETE_BUNDLE_LIST_INFO]="Die folgenden Sicherungssitzungen werden gelöscht:"
 MSG_DE[BTRFS_NO_BACKUPS_FOUND]="Keine Backup-Sitzungen gefunden"
 
 # BTRFS log messages - problematic cleanup
@@ -877,6 +878,7 @@ MSG_DE[RESTORE_ACTUAL]="Echt"
 MSG_DE[RESTORE_CONFIRM_CONFIGURATION]="Diese Konfiguration bestätigen?"
 
 # Manuelle Kontrollpunkte
+MSG_DE[RESTORE_CHECKPOINT_HEADING]="Manueller Kontrollpunkt"
 MSG_DE[RESTORE_CHECKPOINT_INSTRUCTIONS]="Sie können jetzt ein zweites Terminal öffnen, um den Systemzustand zu überprüfen."
 MSG_DE[RESTORE_CHECKPOINT_VERIFY]="Überprüfen Sie, dass die Situation wie erwartet ist, bevor Sie fortfahren."
 MSG_DE[RESTORE_CHECKPOINT_CONTINUE]="Beliebige Taste drücken, wenn bereit zum Fortfahren..."

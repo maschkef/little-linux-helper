@@ -403,9 +403,11 @@ determine_snapshot_preservation() {
         "prompt")
             # Ask user
             echo ""
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_SOURCE_SNAPSHOT_PRESERVATION_PROMPT')${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_WARNING}$(lh_msg 'BACKUP_SOURCE_SNAPSHOT_EXPLANATION')${LH_COLOR_RESET}"
-            echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SOURCE_SNAPSHOT_LOCATION'):${LH_COLOR_RESET} $LH_SOURCE_SNAPSHOT_DIR"
+            lh_print_boxed_message \
+                --preset warning \
+                "$(lh_msg 'BACKUP_SOURCE_SNAPSHOT_PRESERVATION_PROMPT')" \
+                "$(lh_msg 'BACKUP_SOURCE_SNAPSHOT_EXPLANATION')" \
+                "$(lh_msg 'BACKUP_SOURCE_SNAPSHOT_LOCATION'): $LH_SOURCE_SNAPSHOT_DIR"
             echo ""
             if lh_confirm_action "$(lh_msg 'BACKUP_KEEP_SOURCE_SNAPSHOTS')" "n"; then
                 return 0  # Keep
@@ -750,8 +752,10 @@ btrfs_backup() {
     local btrfs_supported=$(check_btrfs_support)
     backup_log_msg "DEBUG" "BTRFS support check result: $btrfs_supported"
     if [ "$btrfs_supported" = "false" ]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_NOT_SUPPORTED')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_TOOLS_MISSING')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'BTRFS_NOT_SUPPORTED')" \
+            "$(lh_msg 'BTRFS_TOOLS_MISSING')"
         trap - INT TERM EXIT
         return 1
     fi
@@ -863,13 +867,18 @@ btrfs_backup() {
         local health_exit_code=$?
         if [ $health_exit_code -eq 2 ]; then
             backup_log_msg "ERROR" "Critical filesystem health issue: read-only or corrupted filesystem"
-            echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_ERROR_CRITICAL_HEALTH_ISSUE')${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_HEALTH_CHECK_FAILED')${LH_COLOR_RESET}"
+            lh_print_boxed_message \
+                --preset danger \
+                "$(lh_msg 'BTRFS_ERROR_CRITICAL_HEALTH_ISSUE')" \
+                "$(lh_msg 'BTRFS_ERROR_HEALTH_CHECK_FAILED')"
             trap - INT TERM EXIT
             return 1
         else
             backup_log_msg "WARN" "Filesystem health check detected issues (exit code: $health_exit_code)"
-            echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_WARNING_HEALTH_ISSUES')${LH_COLOR_RESET}"
+            lh_print_boxed_message \
+                --preset warning \
+                "$(lh_msg 'BTRFS_WARNING_HEALTH_ISSUES')" \
+                "$(lh_msg 'CONFIRM_CONTINUE_DESPITE_WARNINGS')"
             if ! lh_confirm_action "$(lh_msg 'CONFIRM_CONTINUE_DESPITE_WARNINGS')" "n"; then
                 backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_OPERATION_CANCELLED_HEALTH')"
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
@@ -887,9 +896,11 @@ btrfs_backup() {
     
     if [ $space_exit_code -eq 2 ]; then
         backup_log_msg "ERROR" "Critical BTRFS metadata exhaustion detected"
-        echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_ERROR_METADATA_EXHAUSTION')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_BALANCE_REQUIRED')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ERROR_BALANCE_COMMAND' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset danger \
+            "$(lh_msg 'BTRFS_ERROR_METADATA_EXHAUSTION')" \
+            "$(lh_msg 'BTRFS_ERROR_BALANCE_REQUIRED')" \
+            "$(lh_msg 'BTRFS_ERROR_BALANCE_COMMAND' "$LH_BACKUP_ROOT")"
         trap - INT TERM EXIT
         return 1
     elif [ $space_exit_code -ne 0 ]; then
@@ -919,8 +930,10 @@ btrfs_backup() {
 
     if [ $space_get_exit_code -ne 0 ] || ! [[ "$available_space_bytes" =~ ^[0-9]+$ ]]; then
         backup_log_msg "WARN" "$(lh_msg 'BTRFS_LOG_SPACE_CHECK_ERROR' "$LH_BACKUP_ROOT")"
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'SPACE_CHECK_WARNING' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_SPACE_CHECK_FALLBACK_MSG')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'SPACE_CHECK_WARNING' "$LH_BACKUP_ROOT")" \
+            "$(lh_msg 'BTRFS_SPACE_CHECK_FALLBACK_MSG')"
         if ! lh_confirm_action "$(lh_msg 'CONFIRM_CONTINUE')" "n"; then
             backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_OPERATION_CANCELLED_SPACE')"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
@@ -1022,8 +1035,10 @@ btrfs_backup() {
         backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_SPACE_INFO' "$available_hr" "$required_hr")"
 
         if [ "$available_space_bytes" -lt "$required_with_margin" ]; then
-            echo -e "${LH_COLOR_WARNING}$(lh_msg 'SPACE_INSUFFICIENT_WARNING' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'SPACE_INFO' "$available_hr" "$required_hr")${LH_COLOR_RESET}"
+            lh_print_boxed_message \
+                --preset warning \
+                "$(lh_msg 'SPACE_INSUFFICIENT_WARNING' "$LH_BACKUP_ROOT")" \
+                "$(lh_msg 'SPACE_INFO' "$available_hr" "$required_hr")"
             if ! lh_confirm_action "$(lh_msg 'CONFIRM_CONTINUE')" "n"; then
                 backup_log_msg "INFO" "$(lh_msg 'BTRFS_LOG_OPERATION_CANCELLED_LOW_SPACE')"
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
@@ -1103,8 +1118,10 @@ btrfs_backup() {
     if ! protect_received_snapshots "$LH_BACKUP_ROOT$LH_BACKUP_DIR"; then
         backup_log_msg "WARN" "Received UUID integrity issues detected - incremental chains may be broken"
         backup_log_msg "WARN" "This backup session will use full backups to re-establish chains"
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_WARNING_CHAIN_INTEGRITY')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_INFO_FULL_BACKUP_RECOVERY')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'BTRFS_WARNING_CHAIN_INTEGRITY')" \
+            "$(lh_msg 'BTRFS_INFO_FULL_BACKUP_RECOVERY')"
     else
         backup_log_msg "DEBUG" "Received UUID integrity check passed - incremental chains intact"
     fi
@@ -1166,7 +1183,7 @@ btrfs_backup() {
             local elapsed_sec=$((elapsed_total % 60))
             echo -e "${LH_COLOR_DEBUG}  ⏱️  Total elapsed time: ${elapsed_min}m ${elapsed_sec}s${LH_COLOR_RESET}"
         fi
-        lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_BACKUP')" "$subvol")"
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_BACKUP' "$subvol")"
         
         # Define snapshot names and paths
         local snapshot_name="$subvol-$timestamp"
@@ -1483,8 +1500,10 @@ btrfs_backup() {
                     2)
                         backup_log_msg "WARN" "Parent snapshot validation failed - incremental chain integrity issue detected"
                         backup_log_msg "INFO" "Attempting automatic fallback to full backup"
-                        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_INCREMENTAL_CHAIN_BROKEN')${LH_COLOR_RESET}"
-                        echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_FALLBACK_TO_FULL')${LH_COLOR_RESET}"
+                        lh_print_boxed_message \
+                            --preset warning \
+                            "$(lh_msg 'BTRFS_INCREMENTAL_CHAIN_BROKEN')" \
+                            "$(lh_msg 'BTRFS_FALLBACK_TO_FULL')"
                         
                         # Fallback to full backup
                         if atomic_receive_with_validation "$snapshot_path" "$final_backup_path"; then
@@ -1500,9 +1519,11 @@ btrfs_backup() {
                         backup_log_msg "ERROR" "BTRFS metadata exhaustion detected during backup transfer"
                         backup_log_msg "ERROR" "This is not a simple disk full condition - requires immediate attention"
                         backup_log_msg "ERROR" "Often not a lack of total memory, but of metadata chunks"
-                        echo -e "${LH_COLOR_BOLD_RED}$(lh_msg 'BTRFS_ERROR_METADATA_EXHAUSTION')${LH_COLOR_RESET}"
-                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_BALANCE_REQUIRED')${LH_COLOR_RESET}"
-                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_ERROR_BALANCE_METADATA_COMMAND' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+                        lh_print_boxed_message \
+                            --preset danger \
+                            "$(lh_msg 'BTRFS_ERROR_METADATA_EXHAUSTION')" \
+                            "$(lh_msg 'BTRFS_ERROR_BALANCE_REQUIRED')" \
+                            "$(lh_msg 'BTRFS_ERROR_BALANCE_METADATA_COMMAND' "$LH_BACKUP_ROOT")"
                         echo -e "${LH_COLOR_INFO}$(lh_msg 'BTRFS_ERROR_FILESYSTEM_USAGE_COMMAND' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
                         send_result=1
                         ;;
@@ -1669,7 +1690,7 @@ btrfs_backup() {
         echo "" # Empty line for spacing
     done
 
-    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_CLEANUP')" "BTRFS")"
+    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_CLEANUP' "BTRFS")"
   
     # Clean up old chain parent markers before finishing
     cleanup_old_chain_markers "$LH_TEMP_SNAPSHOT_DIR"
@@ -2375,7 +2396,11 @@ delete_btrfs_backups() {
     
     # Show what will be deleted
     echo ""
-    echo -e "${LH_COLOR_WARNING}The following backup session(s) will be DELETED:${LH_COLOR_RESET}"
+    lh_print_boxed_message \
+        --preset danger \
+        "$(lh_msg 'BTRFS_DELETE_BACKUPS_HEADER')" \
+        "$(lh_msg 'BTRFS_DELETE_WARNING_IRREVERSIBLE')"
+    echo -e "${LH_COLOR_WARNING}$(lh_msg 'BTRFS_DELETE_BUNDLE_LIST_INFO')${LH_COLOR_RESET}"
     for idx in "${indices_to_delete[@]}"; do
         echo -e "  - ${bundle_names[idx]} (${bundle_metadata[idx]})"
     done
@@ -2644,14 +2669,17 @@ cleanup_script_created_snapshots() {
     
     # Show what will be deleted
     echo ""
-    echo -e "${LH_COLOR_WARNING}The following snapshots will be permanently deleted:${LH_COLOR_RESET}"
+    lh_print_boxed_message \
+        --preset danger \
+        "$(lh_msg 'BTRFS_DELETE_SNAPSHOTS_HEADER')" \
+        "$(lh_msg 'BTRFS_DELETE_LIST_INFO')" \
+        "$(lh_msg 'BTRFS_DELETE_WARNING_IRREVERSIBLE')"
     for entry in "${snapshots_to_delete[@]}"; do
         local snapshot_path="${entry%%:*}"
         local snapshot_name=$(basename "$snapshot_path")
         echo -e "  - ${LH_COLOR_INFO}$snapshot_name${LH_COLOR_RESET}"
     done
     echo ""
-    echo -e "${LH_COLOR_WARNING}This action cannot be undone!${LH_COLOR_RESET}"
     
     if ! lh_confirm_action "Continue with deletion?" "n"; then
         echo -e "${LH_COLOR_INFO}Cleanup cancelled by user.${LH_COLOR_RESET}"
@@ -3910,7 +3938,7 @@ cleanup_problematic_backups() {
 
 maintenance_menu() {
     while true; do
-        lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_MAINTENANCE')")"
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'BTRFS_MENU_MAINTENANCE')")"
         lh_print_header "$(lh_msg 'BTRFS_MENU_MAINTENANCE_TITLE')"
         lh_print_menu_item 1 "$(lh_msg 'BTRFS_MENU_DELETE')"
         lh_print_menu_item 2 "$(lh_msg 'BTRFS_MENU_CLEANUP')"
@@ -3924,27 +3952,27 @@ maintenance_menu() {
         read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET}")" subopt
         case $subopt in
             1)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_DELETE')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'BTRFS_MENU_DELETE')")"
                 delete_btrfs_backups
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             2)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_CLEANUP')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'BTRFS_MENU_CLEANUP')")"
                 cleanup_problematic_backups
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             3)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_CLEANUP_SOURCE')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'BTRFS_MENU_CLEANUP_SOURCE')")"
                 cleanup_script_created_snapshots
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             4)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_CLEANUP_RECEIVING')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'BTRFS_MENU_CLEANUP_RECEIVING')")"
                 cleanup_orphan_receiving_dirs
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             5)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_DEBUG_CHAIN')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'BTRFS_MENU_DEBUG_CHAIN')")"
                 maintenance_debug_chain
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
@@ -4082,28 +4110,28 @@ main_menu() {
 
         case $option in
             1)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'BTRFS_MENU_BACKUP')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION' "$(lh_msg 'BTRFS_MENU_BACKUP')")"
                 btrfs_backup
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             2)
                 # Enhanced restore (with set-default)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'BTRFS_MENU_RESTORE')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION' "$(lh_msg 'BTRFS_MENU_RESTORE')")"
                 show_restore_menu
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             3)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_STATUS_INFO')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'BTRFS_MENU_STATUS_INFO')")"
                 show_backup_status
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             4)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_CONFIG')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'BTRFS_MENU_CONFIG')")"
                 configure_backup
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;
             5)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'BTRFS_MENU_MAINTENANCE')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'BTRFS_MENU_MAINTENANCE')")"
                 maintenance_menu
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
                 ;;

@@ -97,6 +97,23 @@ function energy_allow_standby() {
     fi
 }
 
+# Display a boxed info note if backup operations already block sleep
+function energy_show_backup_sleep_notice() {
+    local duration_text="${1:-}"
+    local hint_msg
+
+    if [[ -n "$duration_text" ]]; then
+        hint_msg="$(lh_msg 'ENERGY_BACKUP_SLEEP_NOTE_HINT_TIMER' "$duration_text")"
+    else
+        hint_msg="$(lh_msg 'ENERGY_BACKUP_SLEEP_NOTE_HINT')"
+    fi
+
+    lh_print_boxed_message \
+        --preset info \
+        "$(lh_msg 'ENERGY_BACKUP_SLEEP_NOTE_TITLE')" \
+        "$hint_msg"
+}
+
 # Function to disable sleep/hibernate temporarily
 function energy_disable_sleep() {
     lh_print_header "$(lh_msg 'ENERGY_HEADER_DISABLE_SLEEP')"
@@ -148,8 +165,7 @@ function energy_disable_sleep_until_shutdown() {
         local backup_inhibits
         backup_inhibits=$(systemd-inhibit --list 2>/dev/null | grep "little-linux-helper-backup" || true)
         if [[ -n "$backup_inhibits" ]]; then
-            echo -e "${LH_COLOR_INFO}ℹ️  Note: Backup operations are currently preventing sleep independently.${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}   Your energy setting will work alongside the backup operation.${LH_COLOR_RESET}"
+            energy_show_backup_sleep_notice
             echo ""
         fi
     fi
@@ -237,8 +253,7 @@ function energy_disable_sleep_for_time() {
             local backup_inhibits
             backup_inhibits=$(systemd-inhibit --list 2>/dev/null | grep "little-linux-helper-backup" || true)
             if [[ -n "$backup_inhibits" ]]; then
-                echo -e "${LH_COLOR_INFO}ℹ️  Note: Backup operations are currently preventing sleep independently.${LH_COLOR_RESET}"
-                echo -e "${LH_COLOR_INFO}   Your $duration_text timer will work alongside any backup operations.${LH_COLOR_RESET}"
+                energy_show_backup_sleep_notice "$duration_text"
             fi
         fi
         
@@ -272,7 +287,10 @@ function energy_show_sleep_status() {
     if command -v systemd-inhibit >/dev/null 2>&1; then
         systemd-inhibit --list 2>/dev/null || echo -e "${LH_COLOR_WARNING}$(lh_msg 'ENERGY_STATUS_NO_INHIBITS')${LH_COLOR_RESET}"
     else
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'ENERGY_ERROR_NO_SYSTEMD_INHIBIT')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'WARNING')" \
+            "$(lh_msg 'ENERGY_ERROR_NO_SYSTEMD_INHIBIT')"
     fi
     
     echo -e "${LH_COLOR_SEPARATOR}--------------------------------------------${LH_COLOR_RESET}"
@@ -600,7 +618,10 @@ function energy_power_stats() {
             echo -e "${LH_COLOR_INFO}$(lh_msg 'ENERGY_STATS_NO_BATTERY')${LH_COLOR_RESET}"
         fi
     else
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'ENERGY_STATS_NO_POWER_SUPPLY')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'WARNING')" \
+            "$(lh_msg 'ENERGY_STATS_NO_POWER_SUPPLY')"
     fi
     
     echo -e "${LH_COLOR_SEPARATOR}--------------------------------------------${LH_COLOR_RESET}"
@@ -683,19 +704,19 @@ function energy_main_menu() {
 
         case $choice in
             1)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'ENERGY_MENU_DISABLE_SLEEP')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'ENERGY_MENU_DISABLE_SLEEP')")"
                 energy_disable_sleep
                 ;;
             2)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'ENERGY_MENU_CPU_GOVERNOR')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'ENERGY_MENU_CPU_GOVERNOR')")"
                 energy_cpu_governor
                 ;;
             3)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'ENERGY_MENU_SCREEN_BRIGHTNESS')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'ENERGY_MENU_SCREEN_BRIGHTNESS')")"
                 energy_screen_brightness
                 ;;
             4)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'ENERGY_MENU_POWER_STATS')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'ENERGY_MENU_POWER_STATS')")"
                 energy_power_stats
                 ;;
             0)

@@ -38,6 +38,19 @@ fi
 lh_log_active_sessions_debug "$(lh_msg 'MENU_PACKAGE_MGMT')"
 lh_begin_module_session "mod_packages" "$(lh_msg 'MENU_PACKAGE_MGMT')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
 
+# Helper wrappers for consistent boxed styling
+function pkg_print_info_box() {
+    lh_print_boxed_message \
+        --preset info \
+        "$@"
+}
+
+function pkg_print_warning_box() {
+    lh_print_boxed_message \
+        --preset warning \
+        "$@"
+}
+
 # Function for system update
 function pkg_system_update() {
     # Check for blocking conflicts before proceeding - package updates can conflict with backups
@@ -59,8 +72,9 @@ function pkg_system_update() {
 
     # Specific logic for Garuda Linux, if 'garuda-update' exists
     if command -v garuda-update >/dev/null 2>&1; then
-        echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_GARUDA_SPECIAL)${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_BEGINNING_UPDATE)${LH_COLOR_RESET}"
+        pkg_print_info_box \
+            "$(lh_msg 'PKG_INFO_GARUDA_SPECIAL')" \
+            "$(lh_msg 'PKG_INFO_BEGINNING_UPDATE')"
 
         if $auto_confirm; then
             garuda-update --noconfirm
@@ -87,15 +101,16 @@ function pkg_system_update() {
             return 0 # Finished successfully
         else
             lh_log_msg "WARN" "garuda-update failed (Code: $garuda_update_status). Trying fallback to standard package manager."
-            echo -e "${LH_COLOR_WARNING}$(lh_msg PKG_WARN_GARUDA_FALLBACK)${LH_COLOR_RESET}"
+            pkg_print_warning_box "$(lh_msg 'PKG_WARN_GARUDA_FALLBACK')"
             # Continue with the regular update process
         fi
     fi
 
     # Specific logic for immutable distros like Fedora Silverblue
     if command -v rpm-ostree >/dev/null 2>&1; then
-        echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_IMMUTABLE_SPECIAL)${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_BEGINNING_UPDATE)${LH_COLOR_RESET}"
+        pkg_print_info_box \
+            "$(lh_msg 'PKG_INFO_IMMUTABLE_SPECIAL')" \
+            "$(lh_msg 'PKG_INFO_BEGINNING_UPDATE')"
 
         $LH_SUDO_CMD rpm-ostree upgrade
         local rpm_ostree_status=$?
@@ -229,16 +244,17 @@ function pkg_update_alternative() {
             nix-env -u
             ;;
         appimage)
-            echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_APPIMAGE_MANUAL)${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_APPIMAGE_CHECK)${LH_COLOR_RESET}"
+            pkg_print_info_box \
+                "$(lh_msg 'PKG_INFO_APPIMAGE_MANUAL')" \
+                "$(lh_msg 'PKG_INFO_APPIMAGE_CHECK')" \
+                "$(lh_msg 'PKG_INFO_APPIMAGE_LOCATIONS')"
             if [ -d "$HOME/.local/bin" ]; then
                 find "$HOME/.local/bin" -name "*.AppImage" -print
             fi
-            echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_APPIMAGE_LOCATIONS)${LH_COLOR_RESET}"
             ;;
         *)
             lh_log_msg "WARN" "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER "$alt_manager")"
-            echo -e "${LH_COLOR_WARNING}$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER "$alt_manager")${LH_COLOR_RESET}"
+            pkg_print_warning_box "$(lh_msg 'PKG_WARN_UNKNOWN_ALT_MANAGER' "$alt_manager")"
             ;;
     esac
 }
@@ -457,7 +473,7 @@ function pkg_clean_cache() {
                     $LH_SUDO_CMD pacman -Scc
                     ;;
                 *)
-                    echo -e "${LH_COLOR_WARNING}$(lh_msg PKG_WARN_INVALID_PACMAN_OPTION)${LH_COLOR_RESET}"
+                    pkg_print_warning_box "$(lh_msg 'PKG_WARN_INVALID_PACMAN_OPTION')"
                     $LH_SUDO_CMD pacman -Sc
                     ;;
             esac
@@ -489,7 +505,7 @@ function pkg_clean_cache() {
                     yay -Scca
                     ;;
                 *)
-                    echo -e "${LH_COLOR_WARNING}$(lh_msg PKG_WARN_INVALID_YAY_OPTION)${LH_COLOR_RESET}"
+                    pkg_print_warning_box "$(lh_msg 'PKG_WARN_INVALID_YAY_OPTION')"
                     yay -Sc
                     ;;
             esac
@@ -711,8 +727,9 @@ function pkg_search_install_alternative() {
                 fi
                 ;;
             appimage)
-                echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_APPIMAGE_RECOMMENDATION)${LH_COLOR_RESET}"
-                echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_APPIMAGE_CENTRAL_REPO)${LH_COLOR_RESET}"
+                pkg_print_info_box \
+                    "$(lh_msg 'PKG_INFO_APPIMAGE_RECOMMENDATION')" \
+                    "$(lh_msg 'PKG_INFO_APPIMAGE_CENTRAL_REPO')"
                 ;;
             *)
                 lh_log_msg "WARN" "$(lh_msg PKG_WARN_UNKNOWN_ALT_MANAGER "$selected_manager")"
@@ -948,7 +965,7 @@ function pkg_show_logs() {
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 fi
             else
-                echo -e "${LH_COLOR_WARNING}$(lh_msg PKG_WARN_LOG_NOT_FOUND "/var/log/pacman.log")${LH_COLOR_RESET}"
+                pkg_print_warning_box "$(lh_msg 'PKG_WARN_LOG_NOT_FOUND' "/var/log/pacman.log")"
             fi
             ;;
         apt)
@@ -964,7 +981,7 @@ function pkg_show_logs() {
             fi
 
             if [ ${#apt_logs[@]} -eq 0 ]; then
-                echo -e "${LH_COLOR_WARNING}$(lh_msg PKG_WARN_LOG_NOT_FOUND "apt/dpkg")${LH_COLOR_RESET}"
+                pkg_print_warning_box "$(lh_msg 'PKG_WARN_LOG_NOT_FOUND' "apt/dpkg")"
                 return 1
             fi
 
@@ -1015,7 +1032,7 @@ function pkg_show_logs() {
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 fi
             else
-                echo -e "${LH_COLOR_WARNING}$(lh_msg PKG_WARN_NO_DNF_LOGS)${LH_COLOR_RESET}"
+                pkg_print_warning_box "$(lh_msg 'PKG_WARN_NO_DNF_LOGS')"
             fi
             ;;
         yay)
@@ -1034,7 +1051,7 @@ function pkg_show_logs() {
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 fi
             else
-                echo -e "${LH_COLOR_WARNING}$(lh_msg PKG_WARN_LOG_NOT_FOUND "/var/log/pacman.log")${LH_COLOR_RESET}"
+                pkg_print_warning_box "$(lh_msg 'PKG_WARN_LOG_NOT_FOUND' "/var/log/pacman.log")"
             fi
             ;;
         *)
@@ -1131,8 +1148,9 @@ function pkg_show_logs_alternative() {
                 fi
                 ;;
             appimage)
-                echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_APPIMAGE_NO_LOGS)${LH_COLOR_RESET}"
-                echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_APPIMAGE_CHECK_LOGS)${LH_COLOR_RESET}"
+                pkg_print_info_box \
+                    "$(lh_msg 'PKG_INFO_APPIMAGE_NO_LOGS')" \
+                    "$(lh_msg 'PKG_INFO_APPIMAGE_CHECK_LOGS')"
                 echo -e "${LH_COLOR_INFO}  - ~/.local/share/applications/${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_INFO}  - ~/.cache/${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_INFO}  - Application-specific directories${LH_COLOR_RESET}"
@@ -1183,31 +1201,31 @@ function package_management_menu() {
         
         case $option in
             1)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg PKG_MENU_SYSTEM_UPDATE)")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg PKG_MENU_SYSTEM_UPDATE)")"
                 pkg_system_update
                 ;;
             2)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg PKG_MENU_FIND_ORPHANS)")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg PKG_MENU_FIND_ORPHANS)")"
                 pkg_find_orphans
                 ;;
             3)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg PKG_MENU_CLEAN_CACHE)")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg PKG_MENU_CLEAN_CACHE)")"
                 pkg_clean_cache
                 ;;
             4)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg PKG_MENU_SEARCH_INSTALL)")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg PKG_MENU_SEARCH_INSTALL)")"
                 pkg_search_install
                 ;;
             5) 
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg PKG_MENU_DOCKER_SETUP)")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION' "$(lh_msg PKG_MENU_DOCKER_SETUP)")"
                 bash "$LH_ROOT_DIR/modules/mod_docker_setup.sh" 
                 ;;
             6)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg PKG_MENU_LIST_INSTALLED)")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg PKG_MENU_LIST_INSTALLED)")"
                 pkg_list_installed
                 ;;
             7)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg PKG_MENU_SHOW_LOGS)")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg PKG_MENU_SHOW_LOGS)")"
                 pkg_show_logs
                 ;;
             0)

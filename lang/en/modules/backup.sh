@@ -643,6 +643,7 @@ MSG_EN[BTRFS_DELETE_NEEDS_ROOT]="Deleting BTRFS backups requires root privileges
 MSG_EN[BTRFS_DELETE_WITH_SUDO]="Delete backups with sudo?"
 MSG_EN[BTRFS_SELECT_BUNDLE_DELETE]="Enter backup session number(s) to delete (single: 3, range: 1-5, multiple: 1,3,5) or 0 to cancel: "
 MSG_EN[BTRFS_CONFIRM_DELETE_BUNDLES]="Are you sure you want to delete the selected backup session(s)? This action cannot be undone!"
+MSG_EN[BTRFS_DELETE_BUNDLE_LIST_INFO]="The following backup session(s) will be deleted:"
 MSG_EN[BTRFS_NO_BACKUPS_FOUND]="No backup sessions found"
 
 # BTRFS log messages - problematic cleanup
@@ -735,6 +736,7 @@ MSG_EN[RESTORE_ACTUAL]="Actual"
 MSG_EN[RESTORE_CONFIRM_CONFIGURATION]="Confirm this configuration?"
 
 # Manual checkpoints
+MSG_EN[RESTORE_CHECKPOINT_HEADING]="Manual checkpoint"
 MSG_EN[RESTORE_CHECKPOINT_INSTRUCTIONS]="You can now open a second terminal to inspect the system state."
 MSG_EN[RESTORE_CHECKPOINT_VERIFY]="Verify that the situation is as expected before continuing."
 MSG_EN[RESTORE_CHECKPOINT_CONTINUE]="Press any key when ready to continue..."

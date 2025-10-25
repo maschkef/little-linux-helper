@@ -117,8 +117,11 @@ function restart_login_manager_action() {
     local DM_NAME=${DM_SERVICE%.service}
 
     # Warning and confirmation before restart
-    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_DM_WARNING_SESSIONS')${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_DM_WARNING_SAVE_DATA')${LH_COLOR_RESET}"
+    lh_print_boxed_message \
+        --preset danger \
+        "$(lh_msg 'WARNING')" \
+        "$(lh_msg 'RESTART_DM_WARNING_SESSIONS')" \
+        "$(lh_msg 'RESTART_DM_WARNING_SAVE_DATA')"
 
     if ! lh_confirm_action "$(lh_msg 'RESTART_DM_CONFIRM' "$DM_NAME")" "n"; then
         lh_log_msg "INFO" "$(lh_msg 'RESTART_DM_CANCELLED')"
@@ -464,8 +467,11 @@ function restart_desktop_environment_action() {
     fi
 
     # Warning and confirmation before restart
-    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_DE_WARNING_APPS' "$DESKTOP_ENVIRONMENT")${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_DE_WARNING_SAVE')${LH_COLOR_RESET}"
+    lh_print_boxed_message \
+        --preset warning \
+        "$(lh_msg 'WARNING')" \
+        "$(lh_msg 'RESTART_DE_WARNING_APPS' "$DESKTOP_ENVIRONMENT")" \
+        "$(lh_msg 'RESTART_DE_WARNING_SAVE')"
 
     if ! lh_confirm_action "$(lh_msg 'RESTART_DE_CONFIRM' "$DESKTOP_ENVIRONMENT")" "n"; then
         lh_log_msg "INFO" "$(lh_msg 'RESTART_DE_CANCELLED')"
@@ -628,13 +634,19 @@ function restart_desktop_environment_action() {
                         lh_log_msg "INFO" "$(lh_msg 'RESTART_DE_GNOME_WAYLAND_RESTART_SENT')"
                     else
                         lh_log_msg "ERROR" "$(lh_msg 'RESTART_DE_GNOME_WAYLAND_NO_SAFE_RESTART')"
-                        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_DE_GNOME_WAYLAND_WARNING')${LH_COLOR_RESET}"
-                        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_DE_GNOME_WAYLAND_LOGOUT_RECOMMENDED')${LH_COLOR_RESET}"
+                        lh_print_boxed_message \
+                            --preset warning \
+                            "$(lh_msg 'WARNING')" \
+                            "$(lh_msg 'RESTART_DE_GNOME_WAYLAND_WARNING')" \
+                            "$(lh_msg 'RESTART_DE_GNOME_WAYLAND_LOGOUT_RECOMMENDED')"
                     fi
                 else
                     # Hard restart
                     lh_log_msg "WARN" "$(lh_msg 'RESTART_DE_GNOME_WAYLAND_HARD_RISKY')"
-                    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_DE_GNOME_WAYLAND_HARD_WARNING')${LH_COLOR_RESET}"
+                    lh_print_boxed_message \
+                        --preset danger \
+                        "$(lh_msg 'WARNING')" \
+                        "$(lh_msg 'RESTART_DE_GNOME_WAYLAND_HARD_WARNING')"
                     if lh_confirm_action "$(lh_msg 'RESTART_DE_GNOME_WAYLAND_HARD_CONTINUE')" "n"; then
                         # Try to restart gnome-shell with forced termination
                         lh_run_command_as_target_user "killall -q gnome-shell"
@@ -854,7 +866,10 @@ function restart_network_services_action() {
     fi
 
     # Warning and confirmation before restart
-    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_NET_WARNING_INTERRUPTION')${LH_COLOR_RESET}"
+    lh_print_boxed_message \
+        --preset warning \
+        "$(lh_msg 'WARNING')" \
+        "$(lh_msg 'RESTART_NET_WARNING_INTERRUPTION')"
 
     if ! lh_confirm_action "$(lh_msg 'RESTART_NET_CONFIRM_CONTINUE')" "n"; then
         lh_log_msg "INFO" "$(lh_msg 'RESTART_NET_CANCELLED')"
@@ -983,7 +998,10 @@ function restart_firewall_services_action() {
     fi
 
     # Warning and confirmation
-    echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_FW_WARNING_INTERRUPTION')${LH_COLOR_RESET}"
+    lh_print_boxed_message \
+        --preset warning \
+        "$(lh_msg 'WARNING')" \
+        "$(lh_msg 'RESTART_FW_WARNING_INTERRUPTION')"
     if ! lh_confirm_action "$(lh_msg 'RESTART_FW_CONFIRM_CONTINUE')" "n"; then
         lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_CANCELLED')"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_FW_CANCELLED')${LH_COLOR_RESET}"
@@ -1327,8 +1345,11 @@ function restart_graphics_system_action() {
     
     # Handle display server specific restarts
     if $has_wayland && [ -n "$TARGET_USER" ]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_GRAPHICS_WAYLAND_WARNING')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTART_GRAPHICS_WAYLAND_COMPOSITOR_INFO' "$compositor")${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'WARNING')" \
+            "$(lh_msg 'RESTART_GRAPHICS_WAYLAND_WARNING')" \
+            "$(lh_msg 'RESTART_GRAPHICS_WAYLAND_COMPOSITOR_INFO' "$compositor")"
         
         if lh_confirm_action "$(lh_msg 'RESTART_GRAPHICS_WAYLAND_CONTINUE')" "n"; then
             lh_log_msg "INFO" "$(lh_msg 'RESTART_GRAPHICS_WAYLAND_RESTARTING')"
@@ -1521,35 +1542,35 @@ function restart_module_menu() {
 
         case $option in
             1)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_LOGIN_MANAGER')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'RESTART_LOGIN_MANAGER')")"
                 restart_login_manager_action
                 ;;
             2)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_SOUND_SYSTEM')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'RESTART_SOUND_SYSTEM')")"
                 restart_sound_system_action
                 ;;
             3)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_DESKTOP_ENVIRONMENT')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'RESTART_DESKTOP_ENVIRONMENT')")"
                 restart_desktop_environment_action
                 ;;
             4)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_NETWORK_SERVICES')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'RESTART_NETWORK_SERVICES')")"
                 restart_network_services_action
                 ;;
             5)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_FIREWALL')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'RESTART_FIREWALL')")"
                 restart_firewall_services_action
                 ;;
             6)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_BLUETOOTH_SERVICES')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'RESTART_BLUETOOTH_SERVICES')")"
                 restart_bluetooth_services_action
                 ;;
             7)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTART_GRAPHICS_SYSTEM')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'RESTART_GRAPHICS_SYSTEM')")"
                 restart_graphics_system_action
                 ;;
             8)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'POWER_MANAGEMENT')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'POWER_MANAGEMENT')")"
                 power_management_action
                 ;;
             0)

@@ -204,7 +204,9 @@ function docker_find_running_compose_files() {
     
     if [ -z "$running_containers" ]; then
         lh_log_msg "WARN" "$(lh_msg 'DOCKER_NO_RUNNING_FOUND')"
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_NO_RUNNING_FOUND')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'DOCKER_NO_RUNNING_FOUND')"
         return 1
     fi
     
@@ -299,11 +301,13 @@ function docker_find_running_compose_files() {
     lh_log_msg "INFO" "$(lh_msg 'DOCKER_COMPOSE_SEARCH_COMPLETED' "${#found_compose_files[@]}")"
     
     if [ ${#found_compose_files[@]} -eq 0 ]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_NO_COMPOSE_FOR_RUNNING')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_POSSIBLE_REASONS')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_REASON_NOT_COMPOSE')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_REASON_OUTSIDE_SEARCH')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_REASON_NO_LABELS')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'DOCKER_NO_COMPOSE_FOR_RUNNING')" \
+            "$(lh_msg 'DOCKER_POSSIBLE_REASONS')" \
+            "$(lh_msg 'DOCKER_REASON_NOT_COMPOSE')" \
+            "$(lh_msg 'DOCKER_REASON_OUTSIDE_SEARCH')" \
+            "$(lh_msg 'DOCKER_REASON_NO_LABELS')"
         
         if lh_confirm_action "$(lh_msg 'DOCKER_CHECK_ALL_INSTEAD')" "y"; then
             docker_find_compose_files "$LH_DOCKER_COMPOSE_ROOT_EFFECTIVE"
@@ -338,7 +342,9 @@ function docker_check_update_labels() {
     lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_SEARCH_UPDATE_LABELS')"
     if ! grep -q "diun.enable\|com.centurylinklabs.watchtower" "$compose_file"; then
         lh_log_msg "DEBUG" "$(lh_msg 'DOCKER_NO_UPDATE_LABELS')"
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_UPDATE_LABELS_WARNING')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'DOCKER_UPDATE_LABELS_WARNING')"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_UPDATE_LABELS_RECOMMENDATION')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_UPDATE_LABELS_EXAMPLE1')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_UPDATE_LABELS_EXAMPLE2')${LH_COLOR_RESET}"
@@ -389,8 +395,10 @@ function docker_check_env_permissions() {
             
             if [ "$perms" != "600" ]; then
                 lh_log_msg "WARN" "$(lh_msg 'DOCKER_UNSAFE_PERMS' "$env_file" "$perms")"
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_UNSAFE_PERMS_WARNING' "$env_file" "$perms")${LH_COLOR_RESET}"
-                echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_PERMS_RECOMMENDATION' "$env_file")${LH_COLOR_RESET}"
+                lh_print_boxed_message \
+                    --preset warning \
+                    "$(lh_msg 'DOCKER_UNSAFE_PERMS_WARNING' "$env_file" "$perms")" \
+                    "$(lh_msg 'DOCKER_PERMS_RECOMMENDATION' "$env_file")"
                 
                 if lh_confirm_action "$(lh_msg 'DOCKER_CORRECT_PERMS_NOW')" "y"; then
                     lh_log_msg "INFO" "$(lh_msg 'DOCKER_CORRECTING_PERMS' "$env_file")"

@@ -57,6 +57,9 @@ MSG_DE[ENERGY_SUCCESS_SLEEP_RESTORED]="Standby/Ruhezustand-Funktionalität wiede
 MSG_DE[ENERGY_INFO_RESTORE_SLEEP]="Um die Standby-Funktionalität wiederherzustellen, verwenden Sie Option 4 in diesem Menü."
 MSG_DE[ENERGY_INFO_NO_ACTIVE_INHIBIT]="Keine aktive Standby-Sperre gefunden."
 MSG_DE[ENERGY_INFO_NO_TEMP_INHIBIT]="Keine temporäre Standby-Sperre von Little Linux Helper gefunden."
+MSG_DE[ENERGY_BACKUP_SLEEP_NOTE_TITLE]="Hinweis: Backup-Vorgänge verhindern den Standby bereits eigenständig."
+MSG_DE[ENERGY_BACKUP_SLEEP_NOTE_HINT]="Ihre Energieeinstellung läuft parallel zum aktuellen Backup."
+MSG_DE[ENERGY_BACKUP_SLEEP_NOTE_HINT_TIMER]="Ihr %s Timer läuft parallel zu allen Backup-Vorgängen."
 
 MSG_DE[ENERGY_STATUS_CURRENT_INHIBITS]="Aktuelle Standby-Sperren:"
 MSG_DE[ENERGY_STATUS_NO_INHIBITS]="Keine aktiven Standby-Sperren gefunden."

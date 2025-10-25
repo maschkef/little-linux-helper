@@ -82,6 +82,138 @@ lh_print_menu_item "0" "$(lh_msg 'MENU_EXIT')"
 [0] Exit
 ```
 
+### `lh_print_boxed_message([--preset <preset>] [--border-color <color>] [--title-color <color>] [--content-color <color>] [--min-width <width>] <title> [<line1> <line2> ...])`
+
+Prints a visually distinct boxed message with configurable styling presets. This function is the **recommended approach** for displaying warnings, important notices, and other messages that need to stand out from regular output.
+
+**Parameters:**
+- `--preset <preset>`: Optional, color preset (`danger`, `warning`, `info`, `success`). Also accepts aliases: `critical` (→ danger), `caution` (→ warning), `notice` (→ info), `ok` (→ success)
+- `--border-color <color>`: Optional, override border color (e.g., `${LH_COLOR_RED}`)
+- `--title-color <color>`: Optional, override title color
+- `--content-color <color>`: Optional, override content lines color
+- `--min-width <width>` or `--width <width>`: Optional, enforce minimum content width (default: auto-sized to content)
+- `<title>`: The title/heading for the box (typically bold/emphasized)
+- `<line1> <line2> ...`: Optional additional content lines
+
+**Color Presets:**
+- **`danger`** / `critical`: Red border and title - for destructive or irreversible actions
+- **`warning`** / `caution`: Yellow border and title - for cautionary notices that allow continuation
+- **`info`** / `notice`: Cyan border and title - for neutral informational messages
+- **`success`** / `ok`: Green border and title - for positive confirmations and completions
+
+**Features:**
+- Consistent visual styling across modules for important messages
+- Auto-sizing to content width or enforced minimum width
+- Translation-friendly (works with `lh_msg` keys)
+- Multiple lines supported for detailed notices
+- Replaces manual ASCII art and colored echo blocks
+
+**Dependencies:**
+- Color variables from `lib_colors.sh`
+- `printf`, `echo` commands
+
+**Usage:**
+
+```bash
+# Simple warning with preset
+lh_print_boxed_message \
+    --preset warning \
+    "$(lh_msg 'WARNING_TITLE')" \
+    "$(lh_msg 'WARNING_MESSAGE')"
+
+# Danger notice before destructive action
+lh_print_boxed_message \
+    --preset danger \
+    "$(lh_msg 'CONFIRM_DELETE_TITLE')" \
+    "$(lh_msg 'DELETE_WARNING_LINE1')" \
+    "$(lh_msg 'DELETE_WARNING_LINE2')"
+
+# Info box with minimum width
+lh_print_boxed_message \
+    --preset info \
+    --min-width 50 \
+    "$(lh_msg 'BACKUP_STATUS')" \
+    "$(lh_msg 'FILES_PROCESSED')" \
+    "$(lh_msg 'DURATION')"
+
+# Success confirmation
+lh_print_boxed_message \
+    --preset success \
+    "$(lh_msg 'OPERATION_COMPLETE')" \
+    "$(lh_msg 'SUCCESS_DETAILS')"
+
+# Custom colors without preset
+lh_print_boxed_message \
+    --border-color "${LH_COLOR_MAGENTA}" \
+    --title-color "${LH_COLOR_BOLD_MAGENTA}" \
+    "$(lh_msg 'CUSTOM_TITLE')" \
+    "$(lh_msg 'CUSTOM_MESSAGE')"
+```
+
+**Output Example:**
+```
+╔═══════════════════════════════════╗
+║ ⚠ WARNING: System Restart Required ⚠ ║
+╠═══════════════════════════════════╣
+║ The following services will be    ║
+║ restarted and may interrupt       ║
+║ active sessions.                  ║
+╚═══════════════════════════════════╝
+```
+
+**When to Use:**
+- Important warnings before confirmations
+- Security notices and critical information  
+- Error summaries with multiple details
+- Multi-line status reports that need emphasis
+- Any message that should visually stand out
+
+**Migration from Old Patterns:**
+
+**Before (Old Pattern - Multi-line colored echo blocks):**
+```bash
+echo ""
+echo -e "${LH_COLOR_WARNING}================================${LH_COLOR_RESET}"
+echo -e "${LH_COLOR_WARNING}$(lh_msg 'WARNING_TITLE')${LH_COLOR_RESET}"
+echo -e "${LH_COLOR_WARNING}================================${LH_COLOR_RESET}"
+echo -e "${LH_COLOR_WARNING}$(lh_msg 'WARNING_MESSAGE')${LH_COLOR_RESET}"
+echo -e "${LH_COLOR_WARNING}================================${LH_COLOR_RESET}"
+echo ""
+```
+
+**After (New Pattern - Boxed message):**
+```bash
+lh_print_boxed_message \
+    --preset warning \
+    "$(lh_msg 'WARNING_TITLE')" \
+    "$(lh_msg 'WARNING_MESSAGE')"
+```
+
+**When to Use `lh_print_boxed_message` vs. `echo -e`:**
+
+**✅ Use `lh_print_boxed_message` for:**
+- Warnings before destructive operations
+- Security notices and critical information
+- Error summaries with multiple details
+- Multi-line status reports needing visual emphasis
+- Any message that should stand out from regular output
+
+**✅ Use `echo -e` with colors for:**
+- Simple inline status messages (single line)
+- Menu item formatting (via `lh_print_menu_item`)
+- Quick validation errors in input loops
+- Messages already formatted by other UI functions
+- **Note:** Most colored output should now use boxed messages for consistency
+
+**Best Practices:**
+- Replace multi-line colored echo blocks with `lh_print_boxed_message`
+- Always use translation keys (`lh_msg`) for all text content
+- Choose presets that match the message severity
+- Use `--min-width` only when messages appear cramped
+- Don't box every message - reserve for important notices
+- Place boxed messages before confirmation prompts, not instead of them
+- Remove color codes from echo statements when converting to boxed messages
+
 ### `lh_gui_mode_active()`
 
 Helper function that checks if the system is running in GUI mode.

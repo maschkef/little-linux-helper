@@ -46,7 +46,9 @@ function logs_last_minutes_current() {
     # Final validation for the (possibly defaulted) value, assuming minutes must be positive
     if ! [[ "$minutes" =~ ^[0-9]+$ ]] || [ "$minutes" -lt 1 ]; then
         lh_log_msg "WARN" "$(lh_msg 'LOG_ERROR_INVALID_MINUTES' "$minutes_default")"
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_INVALID_INPUT_DEFAULT' "30")${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'LOG_WARNING_INVALID_INPUT_DEFAULT' "30")"
         minutes=$minutes_default
     fi
 
@@ -126,7 +128,9 @@ function logs_last_minutes_previous() {
 
     if ! [[ "$minutes" =~ ^[0-9]+$ ]] || [ "$minutes" -lt 1 ]; then
         lh_log_msg "WARN" "$(lh_msg 'LOG_ERROR_INVALID_MINUTES_PREVIOUS' "$minutes_default")"
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_INVALID_INPUT_DEFAULT' "30")${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'LOG_WARNING_INVALID_INPUT_DEFAULT' "30")"
         minutes=$minutes_default
     fi
 
@@ -188,7 +192,9 @@ function logs_specific_service() {
     local service_name=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_SERVICE_NAME')")
 
     if [ -z "$service_name" ]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_ERROR_NO_INPUT')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'LOG_ERROR_NO_INPUT')"
         return 1
     fi
     # Add .service if not present
@@ -237,7 +243,9 @@ function logs_specific_service() {
 
             if ! [[ "$hours" =~ ^[0-9]+$ ]] || [ "$hours" -lt 0 ]; then # Allow 0 hours
                 lh_log_msg "WARN" "$(lh_msg 'LOG_ERROR_INVALID_HOURS' "$hours_default")"
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_INVALID_INPUT_HOURS' "$hours_default")${LH_COLOR_RESET}"
+                lh_print_boxed_message \
+                    --preset warning \
+                    "$(lh_msg 'LOG_WARNING_INVALID_INPUT_HOURS' "$hours_default")"
                 hours=$hours_default
             fi
             journalctl_time_opts+=("--since" "$hours hours ago")
@@ -251,7 +259,9 @@ function logs_specific_service() {
 
             if ! [[ "$days" =~ ^[0-9]+$ ]] || [ "$days" -lt 0 ]; then # Allow 0 days
                 lh_log_msg "WARN" "$(lh_msg 'LOG_ERROR_INVALID_DAYS' "$days_default")"
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_INVALID_INPUT_DAYS' "$days_default")${LH_COLOR_RESET}"
+                lh_print_boxed_message \
+                    --preset warning \
+                    "$(lh_msg 'LOG_WARNING_INVALID_INPUT_DAYS' "$days_default")"
                 days=$days_default
             fi
             journalctl_time_opts+=("--since" "$days days ago")
@@ -306,7 +316,9 @@ function logs_show_xorg() {
     done
 
     if ! $xorg_log_found; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_ERROR_NO_XORG_LOGS')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'LOG_ERROR_NO_XORG_LOGS')"
 
         # As a fallback, search for X server logs in the journal
         if command -v journalctl >/dev/null 2>&1; then
@@ -399,7 +411,9 @@ function logs_show_dmesg() {
 
             if ! [[ "$lines" =~ ^[0-9]+$ ]] || [ "$lines" -le 0 ]; then # Must be > 0
                 lh_log_msg "WARN" "$(lh_msg 'LOG_ERROR_INVALID_LINES' "$lines_default")"
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_INVALID_INPUT_LINES' "$lines_default")${LH_COLOR_RESET}"
+                lh_print_boxed_message \
+                    --preset warning \
+                    "$(lh_msg 'LOG_WARNING_INVALID_INPUT_LINES' "$lines_default")"
                 lines=$lines_default
             fi
 
@@ -413,7 +427,9 @@ function logs_show_dmesg() {
             keyword=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_KEYWORD')") # No default value here, requires input
 
             if [ -z "$keyword" ]; then # Check if anything was entered
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_NO_KEYWORD')${LH_COLOR_RESET}"
+                lh_print_boxed_message \
+                    --preset warning \
+                    "$(lh_msg 'LOG_WARNING_NO_KEYWORD')"
                 lh_press_any_key
                 echo
                 return 1
@@ -492,7 +508,9 @@ function logs_show_package_manager() {
             elif [ -f "/var/log/dpkg.log" ]; then
                 log_file="/var/log/dpkg.log"
             else
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_ERROR_NO_PKG_LOGS' "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+                lh_print_boxed_message \
+                    --preset warning \
+                    "$(lh_msg 'LOG_ERROR_NO_PKG_LOGS' "$LH_PKG_MANAGER")"
                 return 1
             fi
             ;;
@@ -505,7 +523,9 @@ function logs_show_package_manager() {
                 # Use latest log file
                 log_file=$(ls -t /var/log/dnf/dnf.log* 2>/dev/null | head -n 1)
             else
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_ERROR_NO_PKG_LOGS' "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+                lh_print_boxed_message \
+                    --preset warning \
+                    "$(lh_msg 'LOG_ERROR_NO_PKG_LOGS' "$LH_PKG_MANAGER")"
                 return 1
             fi
             ;;
@@ -513,7 +533,9 @@ function logs_show_package_manager() {
             log_file="/var/log/pacman.log"
             ;;
         *)
-            echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_ERROR_NO_PKG_LOGS' "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
+            lh_print_boxed_message \
+                --preset warning \
+                "$(lh_msg 'LOG_ERROR_NO_PKG_LOGS' "$LH_PKG_MANAGER")"
             return 1
             ;;
     esac
@@ -607,8 +629,10 @@ function logs_show_package_manager() {
             local package=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_PACKAGE_NAME')")
 
             if [ -z "$package" ]; then
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_ERROR_NO_INPUT')${LH_COLOR_RESET}"
-                return 1
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'LOG_ERROR_NO_INPUT')"
+        return 1
             fi
 
             echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_TEXT_PACKAGE_ENTRIES' "$package")${LH_COLOR_RESET}"
@@ -745,7 +769,9 @@ function logs_advanced_analysis() {
     if [ -z "$python_cmd" ]; then
         lh_log_msg "ERROR" "$(lh_msg 'LOG_PYTHON_NOT_FOUND')"
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'LOG_ERROR_PYTHON_REQUIRED')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_NOT_AVAILABLE')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'LOG_WARNING_NOT_AVAILABLE')"
         return 1
     fi
 
@@ -755,7 +781,9 @@ function logs_advanced_analysis() {
         lh_log_msg "ERROR" "$(lh_msg 'LOG_MSG_PYTHON_SCRIPT_NOT_FOUND' "$python_script")"        
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'LOG_ERROR_SCRIPT_NOT_FOUND')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_ERROR}$python_script${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_ENSURE_SCRIPT')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'LOG_WARNING_ENSURE_SCRIPT')"
         return 1
     fi
 
@@ -828,12 +856,14 @@ function logs_advanced_analysis() {
                     fi
                     $LH_SUDO_CMD journalctl --since "$hours hours ago" > "$journal_file"
                     ;;
-                3)
-                    local service=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_SERVICE_NAME')")
-                    $LH_SUDO_CMD journalctl -u "$service" > "$journal_file"
-                    ;;
-                *)
-                    echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_INVALID_CHOICE')${LH_COLOR_RESET}"
+               3)
+                   local service=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_SERVICE_NAME')")
+                   $LH_SUDO_CMD journalctl -u "$service" > "$journal_file"
+                   ;;
+               *)
+                    lh_print_boxed_message \
+                        --preset warning \
+                        "$(lh_msg 'LOG_WARNING_INVALID_CHOICE')"
                     return 1
                     ;;
             esac
@@ -862,7 +892,9 @@ function logs_advanced_analysis() {
             fi
 
             if [ ${#apache_logs[@]} -eq 0 ] && [ ${#nginx_logs[@]} -eq 0 ]; then
-                echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_ERROR_NO_WEBSERVER_LOGS')${LH_COLOR_RESET}"
+                lh_print_boxed_message \
+                    --preset warning \
+                    "$(lh_msg 'LOG_ERROR_NO_WEBSERVER_LOGS')"
                 log_file=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_WEBSERVER_LOG')")
 
                 if [ ! -f "$log_file" ]; then
@@ -895,7 +927,9 @@ function logs_advanced_analysis() {
                 read -p "$log_choice_prompt" log_choice
 
                 if ! [[ "$log_choice" =~ ^[0-9]+$ ]] || [ "$log_choice" -lt 1 ] || [ "$log_choice" -gt $((i-1)) ]; then
-                    echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_INVALID_CHOICE')${LH_COLOR_RESET}"
+                    lh_print_boxed_message \
+                        --preset warning \
+                        "$(lh_msg 'LOG_WARNING_INVALID_CHOICE')"
                     return 1
                 fi
                 log_file="${all_logs[$((log_choice-1))]}"
@@ -907,7 +941,10 @@ function logs_advanced_analysis() {
             return 0
             ;;
         *)
-            echo -e "${LH_COLOR_WARNING}$(lh_msg 'LOG_WARNING_INVALID_CHOICE') $(lh_msg 'LOG_STATUS_OPERATION_CANCELLED')${LH_COLOR_RESET}"
+            lh_print_boxed_message \
+                --preset warning \
+                "$(lh_msg 'LOG_WARNING_INVALID_CHOICE')" \
+                "$(lh_msg 'LOG_STATUS_OPERATION_CANCELLED')"
             return 1
             ;;
     esac
@@ -966,31 +1003,31 @@ function log_analyzer_menu() {
 
         case $option in
             1)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'LOG_MENU_ITEM_1')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'LOG_MENU_ITEM_1')")"
                 logs_last_minutes_current
                 ;;
             2)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'LOG_MENU_ITEM_2')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'LOG_MENU_ITEM_2')")"
                 logs_last_minutes_previous
                 ;;
             3)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'LOG_MENU_ITEM_3')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'LOG_MENU_ITEM_3')")"
                 logs_specific_service
                 ;;
             4)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'LOG_MENU_ITEM_4')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'LOG_MENU_ITEM_4')")"
                 logs_show_xorg
                 ;;
             5)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'LOG_MENU_ITEM_5')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'LOG_MENU_ITEM_5')")"
                 logs_show_dmesg
                 ;;
             6)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'LOG_MENU_ITEM_6')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'LOG_MENU_ITEM_6')")"
                 logs_show_package_manager
                 ;;
             7)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'LOG_MENU_ITEM_7')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'LOG_MENU_ITEM_7')")"
                 logs_advanced_analysis
                 ;;
             0)

@@ -61,7 +61,7 @@ function disk_smart_values() {
     drives=$($LH_SUDO_CMD smartctl --scan | awk '{print $1}')
 
     if [ -z "$drives" ]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DISK_SMART_NO_DRIVES')${LH_COLOR_RESET}"
+        lh_print_boxed_message --preset warning "$(lh_msg 'DISK_SMART_NO_DRIVES')"
         for device in /dev/sd? /dev/nvme?n? /dev/hd?; do
             if [ -b "$device" ]; then
                 drives="$drives $device"
@@ -199,7 +199,7 @@ function disk_speed_test() {
 
     # Offer optional extended test with dd
     if lh_confirm_action "$(lh_msg 'DISK_SPEED_EXTENDED_TEST')" "n"; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DISK_SPEED_WRITE_WARNING')${LH_COLOR_RESET}"
+        lh_print_boxed_message --preset warning "$(lh_msg 'DISK_SPEED_WRITE_WARNING')"
 
         if lh_confirm_action "$(lh_msg 'DISK_SPEED_CONFIRM_WRITE')" "n"; then
             local test_file="/tmp/disk_speed_test_file"
@@ -228,8 +228,11 @@ function disk_check_filesystem() {
     lsblk -o NAME,FSTYPE,SIZE,MOUNTPOINT,FSAVAIL | grep -v "loop"
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
-    echo -e "${LH_COLOR_WARNING}$(lh_msg 'DISK_FSCK_WARNING_UNMOUNTED')${LH_COLOR_RESET}"
-    echo -e "${LH_COLOR_WARNING}$(lh_msg 'DISK_FSCK_WARNING_LIVECD')${LH_COLOR_RESET}"
+    lh_print_boxed_message \
+        --preset danger \
+        "$(lh_msg 'WARNING')" \
+        "$(lh_msg 'DISK_FSCK_WARNING_UNMOUNTED')" \
+        "$(lh_msg 'DISK_FSCK_WARNING_LIVECD')"
 
     if lh_confirm_action "$(lh_msg 'DISK_FSCK_CONTINUE_ANYWAY')" "n"; then
         local partition=$(lh_ask_for_input "$(lh_msg 'DISK_FSCK_ENTER_PARTITION')")
@@ -274,7 +277,10 @@ function disk_check_filesystem() {
             3) fsck_param="-r" ;;
             4) fsck_param="-y" ;;
             5) fsck_param="" ;;
-            *) echo -e "${LH_COLOR_WARNING}$(lh_msg 'DISK_FSCK_INVALID_DEFAULT')${LH_COLOR_RESET}"; fsck_param="" ;;
+            *)
+                lh_print_boxed_message --preset warning "$(lh_msg 'DISK_FSCK_INVALID_DEFAULT')"
+                fsck_param=""
+                ;;
         esac
 
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_FSCK_CHECKING' "$partition")${LH_COLOR_RESET}"
@@ -287,7 +293,7 @@ function disk_check_filesystem() {
         if [ $fsck_result -eq 0 ]; then
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DISK_FSCK_COMPLETED_NO_ERRORS')${LH_COLOR_RESET}"
         else
-            echo -e "${LH_COLOR_WARNING}$(lh_msg 'DISK_FSCK_COMPLETED_WITH_CODE' "$fsck_result")${LH_COLOR_RESET}"
+            lh_print_boxed_message --preset warning "$(lh_msg 'DISK_FSCK_COMPLETED_WITH_CODE' "$fsck_result")"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_FSCK_ERROR_CODE_MEANING')${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_FSCK_CODE_0')${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_FSCK_CODE_1')${LH_COLOR_RESET}"
@@ -316,7 +322,7 @@ function disk_check_health() {
     drives=$($LH_SUDO_CMD smartctl --scan | awk '{print $1}')
 
     if [ -z "$drives" ]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DISK_HEALTH_NO_DRIVES')${LH_COLOR_RESET}"
+        lh_print_boxed_message --preset warning "$(lh_msg 'DISK_HEALTH_NO_DRIVES')"
         for device in /dev/sd? /dev/nvme?n? /dev/hd?; do
             if [ -b "$device" ]; then
                 drives="$drives $device"
@@ -470,7 +476,7 @@ function disk_show_largest_files() {
             $LH_SUDO_CMD find "$search_path" -type f -exec du -h {} \; 2>/dev/null | sort -hr | head -n "$file_count"
             ;;
         *)
-            echo -e "${LH_COLOR_WARNING}$(lh_msg 'DISK_LARGEST_INVALID_USING_DU')${LH_COLOR_RESET}"
+            lh_print_boxed_message --preset warning "$(lh_msg 'DISK_LARGEST_INVALID_USING_DU')"
             $LH_SUDO_CMD du -ah "$search_path" 2>/dev/null | sort -hr | head -n "$file_count"
             ;;
     esac
@@ -499,35 +505,35 @@ function disk_tools_menu() {
 
         case $option in
             1)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_MOUNTED')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'DISK_MENU_MOUNTED')")"
                 disk_show_mounted
                 ;;
             2)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_SMART')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'DISK_MENU_SMART')")"
                 disk_smart_values
                 ;;
             3)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_FILE_ACCESS')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'DISK_MENU_FILE_ACCESS')")"
                 disk_check_file_access
                 ;;
             4)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_USAGE')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'DISK_MENU_USAGE')")"
                 disk_check_usage
                 ;;
             5)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_SPEED_TEST')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'DISK_MENU_SPEED_TEST')")"
                 disk_speed_test
                 ;;
             6)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_FILESYSTEM')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'DISK_MENU_FILESYSTEM')")"
                 disk_check_filesystem
                 ;;
             7)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_HEALTH')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'DISK_MENU_HEALTH')")"
                 disk_check_health
                 ;;
             8)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DISK_MENU_LARGEST_FILES')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'DISK_MENU_LARGEST_FILES')")"
                 disk_show_largest_files
                 ;;
             0)

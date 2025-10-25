@@ -68,7 +68,7 @@ tar_backup() {
     lh_log_msg "DEBUG" "Configuration: LH_TAR_EXCLUDES='$LH_TAR_EXCLUDES', LH_RETENTION_BACKUP='$LH_RETENTION_BACKUP'"
     
     lh_print_header "$(lh_msg 'BACKUP_TAR_HEADER')"
-    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP')" "$(lh_msg 'BACKUP_TAR_HEADER')")"
+    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP' "$(lh_msg 'BACKUP_TAR_HEADER')")"
 
     # Capture start time
     BACKUP_START_TIME=$(date +%s)
@@ -78,7 +78,9 @@ tar_backup() {
     lh_log_msg "DEBUG" "Checking if tar command is available"
     if ! lh_check_command "tar" true; then
         lh_log_msg "DEBUG" "TAR command not available, aborting"
-        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BACKUP_TAR_NOT_INSTALLED')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset danger \
+            "$(lh_msg 'BACKUP_TAR_NOT_INSTALLED')"
         return 1
     fi
     lh_log_msg "DEBUG" "TAR command is available"
@@ -92,7 +94,9 @@ tar_backup() {
     if [ ! -d "$LH_BACKUP_ROOT" ] || [ -z "$LH_BACKUP_ROOT" ]; then
         lh_log_msg "DEBUG" "Backup target unavailable or empty: '$LH_BACKUP_ROOT'"
         backup_log_msg "WARN" "$(lh_msg 'BACKUP_LOG_TARGET_UNAVAILABLE' "$LH_BACKUP_ROOT")"
-        printf "${LH_COLOR_WARNING}$(lh_msg 'BACKUP_TARGET_UNAVAILABLE')${LH_COLOR_RESET}\n" "$LH_BACKUP_ROOT"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'BACKUP_TARGET_UNAVAILABLE' "$LH_BACKUP_ROOT")"
         change_backup_root_for_session=true
         prompt_for_new_path_message="$(lh_msg 'BACKUP_TARGET_NOT_AVAILABLE_PROMPT')"
     else
@@ -127,7 +131,11 @@ tar_backup() {
                         break 
                     else
                         backup_log_msg "ERROR" "$(lh_msg 'BACKUP_LOG_TARGET_FAILED' "$new_backup_root_path")"
-                        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BACKUP_DIR_CREATE_FAILED' "$new_backup_root_path")${LH_COLOR_RESET}"
+                        lh_print_boxed_message \
+                            --preset danger \
+                            "$(lh_msg 'BACKUP_DIR_CREATE_FAILED')" \
+                            "$(lh_msg 'DIR_CREATE_ERROR' "$new_backup_root_path")" \
+                            "$(lh_msg 'BACKUP_DIR_CREATE_FAILED_PROMPT')"
                         prompt_for_new_path_message="$(lh_msg 'BACKUP_DIR_CREATE_FAILED_PROMPT')"
                     fi
                 else
@@ -235,7 +243,9 @@ tar_backup() {
     if ! [[ "$available_space_bytes" =~ ^[0-9]+$ ]]; then
         lh_log_msg "DEBUG" "Unable to determine available space, prompting user"
         backup_log_msg "WARN" "$(lh_msg 'BACKUP_LOG_SPACE_UNAVAILABLE' "$LH_BACKUP_ROOT")"
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'BACKUP_SPACE_CHECK_UNAVAILABLE' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'BACKUP_SPACE_CHECK_UNAVAILABLE' "$LH_BACKUP_ROOT")"
         if ! lh_confirm_action "$(lh_msg 'BACKUP_SPACE_CONTINUE_ANYWAY')" "n"; then
             lh_log_msg "DEBUG" "User chose not to continue due to space uncertainty"
             backup_log_msg "INFO" "$(lh_msg 'BACKUP_SPACE_CANCELLED_LOW')"
@@ -277,8 +287,10 @@ tar_backup() {
 
         if [ "$available_space_bytes" -lt "$required_with_margin" ]; then
             lh_log_msg "DEBUG" "Insufficient space detected"
-            echo -e "${LH_COLOR_WARNING}$(lh_msg 'BACKUP_SPACE_INSUFFICIENT' "$LH_BACKUP_ROOT")${LH_COLOR_RESET}"
-            echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_SPACE_AVAILABLE' "$available_hr" "$required_hr")${LH_COLOR_RESET}"
+            lh_print_boxed_message \
+                --preset warning \
+                "$(lh_msg 'BACKUP_SPACE_INSUFFICIENT' "$LH_BACKUP_ROOT")" \
+                "$(lh_msg 'BACKUP_SPACE_AVAILABLE' "$available_hr" "$required_hr")"
             if ! lh_confirm_action "$(lh_msg 'BACKUP_SPACE_CONTINUE_ANYWAY')" "n"; then
                 backup_log_msg "INFO" "$(lh_msg 'BACKUP_SPACE_CANCELLED_LOW')"
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'OPERATION_CANCELLED')${LH_COLOR_RESET}"
@@ -332,7 +344,7 @@ tar_backup() {
     
     # Execute TAR backup
     lh_log_msg "DEBUG" "Starting TAR backup execution"
-    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_BACKUP')" "$(basename "$tar_file")")"
+    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_BACKUP' "$(basename "$tar_file")")"
     local cmd="$LH_SUDO_CMD tar czf \"$tar_file\" --exclude-from=\"$exclude_file\" --exclude=\"$tar_file\" ${backup_dirs[*]}"
     lh_log_msg "DEBUG" "TAR command: $cmd"
     $LH_SUDO_CMD tar czf "$tar_file" \
@@ -367,7 +379,9 @@ tar_backup() {
             backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_CHECKSUM_SUCCESS')"
         else
             lh_log_msg "DEBUG" "Checksum creation failed"
-            echo -e "${LH_COLOR_WARNING}$(lh_msg 'BACKUP_CHECKSUM_FAILED')${LH_COLOR_RESET}"
+            lh_print_boxed_message \
+                --preset warning \
+                "$(lh_msg 'BACKUP_CHECKSUM_FAILED')"
             backup_log_msg "WARN" "$(lh_msg 'BACKUP_LOG_CHECKSUM_FAILED' "$tar_file")"
         fi
         
@@ -383,7 +397,10 @@ tar_backup() {
     else
         lh_log_msg "DEBUG" "TAR backup failed with exit code: $tar_status"
         backup_log_msg "ERROR" "$(lh_msg 'BACKUP_LOG_FAILED' "TAR" "$tar_status")"
-        echo -e "${LH_COLOR_ERROR}$(lh_msg 'BACKUP_TAR_FAILED')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset danger \
+            "$(lh_msg 'BACKUP_TAR_FAILED')" \
+            "$(lh_msg 'BACKUP_NOTIFICATION_FAILED_DETAILS' "$tar_status" "$timestamp" "$(basename "$LH_BACKUP_LOG")")"
         
         # Desktop notification for error
         lh_log_msg "DEBUG" "Sending failure notification"
@@ -418,7 +435,7 @@ tar_backup() {
     
     # Clean up old backups
     lh_log_msg "DEBUG" "Starting cleanup of old TAR backups"
-    lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_CLEANUP')" "TAR")"
+    lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_CLEANUP' "TAR")"
     backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_CLEANUP' "TAR")"
     ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | sort -r | tail -n +$((LH_RETENTION_BACKUP+1)) | while read backup; do
         lh_log_msg "DEBUG" "Removing old backup: $backup"
@@ -438,7 +455,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     lh_log_msg "DEBUG" "Module called with parameters: $*"
 
     lh_log_active_sessions_debug "$(lh_msg 'BACKUP_TAR_HEADER')"
-    lh_begin_module_session "mod_backup_tar" "$(lh_msg 'BACKUP_TAR_HEADER')" "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP')" "$(lh_msg 'BACKUP_TAR_HEADER')")"
+    lh_begin_module_session "mod_backup_tar" "$(lh_msg 'BACKUP_TAR_HEADER')" "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP' "$(lh_msg 'BACKUP_TAR_HEADER')")"
 
     # Brief info message
     echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_TAR_MODULE_INFO')${LH_COLOR_RESET}"

@@ -57,8 +57,10 @@ function _docker_load_config() {
         lh_log_msg "INFO" "Docker configuration loaded from: $LH_DOCKER_CONFIG_FILE"
     else
         lh_log_msg "WARN" "Docker configuration file '$LH_DOCKER_CONFIG_FILE' not found."
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_CONFIG_NOT_FOUND')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_CONFIG_USING_DEFAULTS')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'DOCKER_CONFIG_NOT_FOUND')" \
+            "$(lh_msg 'DOCKER_CONFIG_USING_DEFAULTS')"
         
         # Set default values
         CFG_LH_DOCKER_COMPOSE_ROOT="/home"
@@ -83,7 +85,7 @@ function _docker_load_config() {
         running|all)
             ;;
         *)
-            lh_log_msg "WARN" "$(printf "$(lh_msg 'DOCKER_CONFIG_MODE_UNKNOWN')" "${CFG_LH_DOCKER_CHECK_MODE}" "running")"
+            lh_log_msg "WARN" "$(lh_msg 'DOCKER_CONFIG_MODE_UNKNOWN' "${CFG_LH_DOCKER_CHECK_MODE}" "running")"
             CFG_LH_DOCKER_CHECK_MODE="running"
             ;;
     esac
@@ -155,7 +157,9 @@ function show_running_containers() {
     container_count=$($LH_SUDO_CMD docker ps -q | wc -l)
     
     if [ "$container_count" -eq 0 ]; then
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_NO_RUNNING_CONTAINERS')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'DOCKER_NO_RUNNING_CONTAINERS')"
     else
         echo "$(printf "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_CONTAINERS_COUNT')${LH_COLOR_RESET}" "$container_count")"
         echo ""
@@ -267,11 +271,11 @@ function manage_docker_config() {
                         if lh_confirm_action "$(lh_msg 'DOCKER_CONFIG_BACKUP_PROMPT')" "y"; then
                             local backup_path="${LH_DOCKER_CONFIG_FILE}.$(date +%Y%m%d%H%M%S).bak"
                             if cp "$LH_DOCKER_CONFIG_FILE" "$backup_path"; then
-                                lh_log_msg "INFO" "$(printf "$(lh_msg 'DOCKER_CONFIG_BACKUP_SUCCESS')" "$backup_path")"
-                                echo -e "${LH_COLOR_SUCCESS}$(printf "$(lh_msg 'DOCKER_CONFIG_BACKUP_SUCCESS')" "$backup_path")${LH_COLOR_RESET}"
+                                lh_log_msg "INFO" "$(lh_msg 'DOCKER_CONFIG_BACKUP_SUCCESS' "$backup_path")"
+                                echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_CONFIG_BACKUP_SUCCESS' "$backup_path")${LH_COLOR_RESET}"
                             else
-                                lh_log_msg "ERROR" "$(printf "$(lh_msg 'DOCKER_CONFIG_BACKUP_FAILED')" "$backup_path")"
-                                echo -e "${LH_COLOR_ERROR}$(printf "$(lh_msg 'DOCKER_CONFIG_BACKUP_FAILED')" "$backup_path")${LH_COLOR_RESET}"
+                                lh_log_msg "ERROR" "$(lh_msg 'DOCKER_CONFIG_BACKUP_FAILED' "$backup_path")"
+                                echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_CONFIG_BACKUP_FAILED' "$backup_path")${LH_COLOR_RESET}"
                             fi
                         else
                             lh_log_msg "INFO" "$(lh_msg 'DOCKER_CONFIG_BACKUP_SKIPPED')"
@@ -334,24 +338,24 @@ function docker_functions_menu() {
         
         case $choice in
             1)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DOCKER_MENU_SHOW_CONTAINERS')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'DOCKER_MENU_SHOW_CONTAINERS')")"
                 lh_log_msg "DEBUG" "Start displaying running containers"
                 show_running_containers
                 lh_log_msg "DEBUG" "Finished displaying running containers"
                 ;;
             2)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'DOCKER_MENU_MANAGE_CONFIG')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'DOCKER_MENU_MANAGE_CONFIG')")"
                 lh_log_msg "DEBUG" "Start Docker configuration management"
                 manage_docker_config
                 lh_log_msg "DEBUG" "Docker configuration management finished"
                 ;;
             3)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'DOCKER_MENU_SETUP')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION' "$(lh_msg 'DOCKER_MENU_SETUP')")"
                 lh_log_msg "INFO" "Start Docker setup module"
                 bash "$(dirname "$0")/mod_docker_setup.sh"
                 ;;
             4)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION')" "$(lh_msg 'DOCKER_MENU_SECURITY')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION' "$(lh_msg 'DOCKER_MENU_SECURITY')")"
                 lh_log_msg "INFO" "Start Docker security module"
                 # Source the security module and call its function directly to avoid input buffer issues
                 source "$(dirname "$0")/mod_docker_security.sh"

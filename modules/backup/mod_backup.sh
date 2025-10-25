@@ -67,7 +67,7 @@ restore_menu() {
     lh_log_msg "DEBUG" "=== Starting restore_menu function ==="
     
     while true; do
-        lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'MENU_RESTORE')")"
+        lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'MENU_RESTORE')")"
         lh_log_msg "DEBUG" "Displaying restore menu"
         lh_print_header "$(lh_msg 'RESTORE_MENU_TITLE')"
         
@@ -83,12 +83,12 @@ restore_menu() {
         
         case $option in
             1)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTORE_MENU_TAR')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'RESTORE_MENU_TAR')")"
                 lh_log_msg "DEBUG" "Taking path: TAR restore"
                 bash "$LH_ROOT_DIR/modules/backup/mod_restore_tar.sh"
                 ;;
             2)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'RESTORE_MENU_RSYNC')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'RESTORE_MENU_RSYNC')")"
                 lh_log_msg "DEBUG" "Taking path: RSYNC restore"
                 bash "$LH_ROOT_DIR/modules/backup/mod_restore_rsync.sh"
                 ;;
@@ -247,12 +247,18 @@ show_backup_status() {
     
     if [ ! -d "$LH_BACKUP_ROOT" ]; then
         lh_log_msg "DEBUG" "Backup root directory is not available"
-        echo -e "${LH_COLOR_INFO}$(lh_msg 'STATUS'):${LH_COLOR_RESET} ${LH_COLOR_WARNING}$(lh_msg 'STATUS_OFFLINE')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'STATUS')" \
+            "$(lh_msg 'STATUS_OFFLINE')"
         return 1
     fi
     
     lh_log_msg "DEBUG" "Backup root directory is available"
-    echo -e "${LH_COLOR_INFO}$(lh_msg 'STATUS'):${LH_COLOR_RESET} ${LH_COLOR_SUCCESS}$(lh_msg 'STATUS_ONLINE')${LH_COLOR_RESET}"
+    lh_print_boxed_message \
+        --preset success \
+        "$(lh_msg 'STATUS')" \
+        "$(lh_msg 'STATUS_ONLINE')"
     
     # Free disk space
     lh_log_msg "DEBUG" "Checking disk space for backup root"
@@ -370,37 +376,37 @@ backup_menu() {
         
         case $option in
             1)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg "MENU_BTRFS_OPERATIONS")")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg "MENU_BTRFS_OPERATIONS")")"
                 lh_log_msg "DEBUG" "Taking path: BTRFS operations"
                 bash "$LH_ROOT_DIR/modules/backup/mod_btrfs_backup.sh"
                 ;;
             2)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg "MENU_TAR_BACKUP")")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg "MENU_TAR_BACKUP")")"
                 lh_log_msg "DEBUG" "Taking path: TAR backup"
                 bash "$LH_ROOT_DIR/modules/backup/mod_backup_tar.sh"
                 ;;
             3)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg "MENU_RSYNC_BACKUP")")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg "MENU_RSYNC_BACKUP")")"
                 lh_log_msg "DEBUG" "Taking path: RSYNC backup"
                 bash "$LH_ROOT_DIR/modules/backup/mod_backup_rsync.sh"
                 ;;
             4)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg "MENU_RESTORE")")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg "MENU_RESTORE")")"
                 lh_log_msg "DEBUG" "Taking path: Restore menu"
                 restore_menu
                 ;;
             5)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg "MENU_BACKUP_STATUS")")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg "MENU_BACKUP_STATUS")")"
                 lh_log_msg "DEBUG" "Taking path: Backup status"
                 show_backup_status
                 ;;
             6)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg "MENU_BACKUP_CONFIG")")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg "MENU_BACKUP_CONFIG")")"
                 lh_log_msg "DEBUG" "Taking path: Backup configuration"
                 configure_backup
                 ;;
             7)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg "BTRFS_MENU_MAINTENANCE")")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg "BTRFS_MENU_MAINTENANCE")")"
                 lh_log_msg "DEBUG" "Taking path: BTRFS maintenance"
                 bash "$LH_ROOT_DIR/modules/backup/mod_btrfs_backup.sh" --maintenance
                 ;;

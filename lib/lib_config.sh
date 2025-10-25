@@ -587,7 +587,7 @@ function lh_load_docker_config() {
             running|all)
                 ;;
             *)
-                lh_log_msg "WARN" "$(printf "$(lh_msg 'DOCKER_CONFIG_MODE_UNKNOWN')" "$CFG_LH_DOCKER_CHECK_MODE" "$LH_DOCKER_CHECK_MODE_DEFAULT")"
+                lh_log_msg "WARN" "$(lh_msg 'DOCKER_CONFIG_MODE_UNKNOWN' "$CFG_LH_DOCKER_CHECK_MODE" "$LH_DOCKER_CHECK_MODE_DEFAULT")"
                 CFG_LH_DOCKER_CHECK_MODE="$LH_DOCKER_CHECK_MODE_DEFAULT"
                 ;;
         esac

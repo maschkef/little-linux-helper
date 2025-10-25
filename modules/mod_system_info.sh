@@ -43,7 +43,9 @@ function system_os_kernel_info() {
         cat /etc/os-release | grep "^NAME\|^VERSION\|^ID\|^PRETTY_NAME" | sort
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     else
-        echo -e "${LH_COLOR_WARNING}$(lh_msg 'SYSINFO_OS_NOT_AVAILABLE')${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset warning \
+            "$(lh_msg 'SYSINFO_OS_NOT_AVAILABLE')"
     fi
 
     echo -e "\n${LH_COLOR_INFO}$(lh_msg 'SYSINFO_KERNEL_VERSION')${LH_COLOR_RESET}"
@@ -262,39 +264,39 @@ function system_info_menu() {
 
         case $option in
             1)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_OS_KERNEL')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SYSINFO_MENU_OS_KERNEL')")"
                 system_os_kernel_info
                 ;;
             2)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_CPU')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SYSINFO_MENU_CPU')")"
                 system_cpu_info
                 ;;
             3)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_RAM')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SYSINFO_MENU_RAM')")"
                 system_ram_info
                 ;;
             4)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_PCI')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SYSINFO_MENU_PCI')")"
                 system_pci_devices
                 ;;
             5)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_USB')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SYSINFO_MENU_USB')")"
                 system_usb_devices
                 ;;
             6)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_DISK_OVERVIEW')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SYSINFO_MENU_DISK_OVERVIEW')")"
                 system_disk_overview
                 ;;
             7)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_TOP_PROCESSES')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SYSINFO_MENU_TOP_PROCESSES')")"
                 system_top_processes
                 ;;
             8)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_NETWORK')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SYSINFO_MENU_NETWORK')")"
                 system_network_config
                 ;;
             9)
-                lh_update_module_session "$(printf "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION')" "$(lh_msg 'SYSINFO_MENU_SENSORS')")"
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'SYSINFO_MENU_SENSORS')")"
                 system_temperature_sensors
                 ;;
             0)
