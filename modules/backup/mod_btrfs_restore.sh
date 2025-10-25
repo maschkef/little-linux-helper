@@ -111,7 +111,8 @@ recreate_filesystem_structure() {
     # Check if jq is available
     if ! command -v jq >/dev/null 2>&1; then
         restore_log_msg "WARN" "jq not available - using default subvolume structure"
-        return create_default_filesystem_structure "$target_device"
+        create_default_filesystem_structure "$target_device"
+        return $?
     fi
     
     # Check if this marker uses the bundle JSON layout
@@ -120,7 +121,8 @@ recreate_filesystem_structure() {
     
     if [[ "$schema_label" == "unknown" || "$schema_label" == "null" ]]; then
         restore_log_msg "WARN" "Legacy marker - using default subvolume structure"
-        return create_default_filesystem_structure "$target_device"
+        create_default_filesystem_structure "$target_device"
+        return $?
     fi
     
     restore_log_msg "DEBUG" "Using enhanced marker for filesystem recreation (schema: $schema_label)"
@@ -219,13 +221,15 @@ generate_fstab_entries() {
     
     if [[ ! -f "$marker_file" ]]; then
         restore_log_msg "WARN" "No marker file for fstab generation, using defaults"
-        return generate_default_fstab_entries "$target_device"
+        generate_default_fstab_entries "$target_device"
+        return $?
     fi
     
     # Check if jq is available
     if ! command -v jq >/dev/null 2>&1; then
         restore_log_msg "WARN" "jq not available - generating default fstab entries"
-        return generate_default_fstab_entries "$target_device"
+        generate_default_fstab_entries "$target_device"
+        return $?
     fi
     
     # Check for bundle JSON layout
@@ -234,7 +238,8 @@ generate_fstab_entries() {
     
     if [[ "$schema_label" == "unknown" || "$schema_label" == "null" ]]; then
         restore_log_msg "WARN" "Legacy marker, generating default fstab entries"
-        return generate_default_fstab_entries "$target_device"
+        generate_default_fstab_entries "$target_device"
+        return $?
     fi
     
     echo "# Generated fstab entries from backup configuration"
