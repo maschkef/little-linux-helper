@@ -11,7 +11,17 @@
 
 # Load common library
 # Use BASH_SOURCE to get the correct path when sourced
-source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
@@ -53,6 +63,7 @@ function _docker_load_config() {
     # Load configuration file or create if not present
     if [ -f "$LH_DOCKER_CONFIG_FILE" ]; then
         lh_log_msg "DEBUG" "Configuration file found, loading variables..."
+        # shellcheck disable=SC1090  # configuration file lives in $LH_CONFIG_DIR at runtime
         source "$LH_DOCKER_CONFIG_FILE"
         lh_log_msg "INFO" "Docker configuration loaded from: $LH_DOCKER_CONFIG_FILE"
     else
@@ -161,7 +172,9 @@ function show_running_containers() {
             --preset warning \
             "$(lh_msg 'DOCKER_NO_RUNNING_CONTAINERS')"
     else
-        echo "$(printf "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_CONTAINERS_COUNT')${LH_COLOR_RESET}" "$container_count")"
+        local containers_message
+        containers_message=$(lh_msg 'DOCKER_CONTAINERS_COUNT' "$container_count")
+        printf '%s%s%s\n' "$LH_COLOR_SUCCESS" "$containers_message" "$LH_COLOR_RESET"
         echo ""
         $LH_SUDO_CMD docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
         
@@ -207,7 +220,7 @@ function manage_docker_config() {
         lh_print_menu_item "0" "$(lh_msg 'DOCKER_CONFIG_MENU_BACK')"
         echo ""
         
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DOCKER_YOUR_CHOICE'): ${LH_COLOR_RESET}")" choice
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DOCKER_YOUR_CHOICE'): ${LH_COLOR_RESET}")" choice
         
         case $choice in
             1)
@@ -219,7 +232,9 @@ function manage_docker_config() {
                     _docker_save_config
                     echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_CONFIG_PATH_SUCCESS')${LH_COLOR_RESET}"
                 else
-                    printf "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_CONFIG_PATH_NOT_EXISTS')${LH_COLOR_RESET}\n" "$new_path"
+                    local missing_path_msg
+                    missing_path_msg=$(lh_msg 'DOCKER_CONFIG_PATH_NOT_EXISTS' "$new_path")
+                    printf '%s%s%s\n' "$LH_COLOR_ERROR" "$missing_path_msg" "$LH_COLOR_RESET"
                 fi
                 ;;
             2)
@@ -245,7 +260,7 @@ function manage_docker_config() {
                 echo ""
                 echo "1) running"
                 echo "2) all"
-                read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DOCKER_CONFIG_MODE_CHOOSE') ${LH_COLOR_RESET}")" mode_choice
+                read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DOCKER_CONFIG_MODE_CHOOSE') ${LH_COLOR_RESET}")" mode_choice
                 case $mode_choice in
                     1) CFG_LH_DOCKER_CHECK_MODE="running" ;;
                     2) CFG_LH_DOCKER_CHECK_MODE="all" ;;
@@ -269,7 +284,8 @@ function manage_docker_config() {
                 if lh_confirm_action "$(lh_msg 'DOCKER_CONFIG_RESET_CONFIRM')" "n"; then
                     if [ -f "$LH_DOCKER_CONFIG_FILE" ]; then
                         if lh_confirm_action "$(lh_msg 'DOCKER_CONFIG_BACKUP_PROMPT')" "y"; then
-                            local backup_path="${LH_DOCKER_CONFIG_FILE}.$(date +%Y%m%d%H%M%S).bak"
+                            local backup_path
+                            backup_path="${LH_DOCKER_CONFIG_FILE}.$(date +%Y%m%d%H%M%S).bak"
                             if cp "$LH_DOCKER_CONFIG_FILE" "$backup_path"; then
                                 lh_log_msg "INFO" "$(lh_msg 'DOCKER_CONFIG_BACKUP_SUCCESS' "$backup_path")"
                                 echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_CONFIG_BACKUP_SUCCESS' "$backup_path")${LH_COLOR_RESET}"
@@ -295,7 +311,7 @@ function manage_docker_config() {
                 ;;
         esac
         echo ""
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DOCKER_PRESS_ENTER_CONTINUE')${LH_COLOR_RESET}")"
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DOCKER_PRESS_ENTER_CONTINUE')${LH_COLOR_RESET}")"
         echo ""
     done
 }
@@ -318,7 +334,7 @@ function docker_functions_menu() {
         
         lh_log_msg "DEBUG" "Waiting for user input in Docker menu"
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" choice
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" choice
         
         # Check for empty input which could indicate input stream issues
         if [ -z "$choice" ]; then
@@ -358,6 +374,7 @@ function docker_functions_menu() {
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION' "$(lh_msg 'DOCKER_MENU_SECURITY')")"
                 lh_log_msg "INFO" "Start Docker security module"
                 # Source the security module and call its function directly to avoid input buffer issues
+                # shellcheck source=modules/mod_docker_security.sh
                 source "$(dirname "$0")/mod_docker_security.sh"
                 docker_security_menu
                 # Clear any remaining input after returning from security module
@@ -387,7 +404,7 @@ function docker_functions_menu() {
         if [ "$choice" != "0" ]; then
             echo ""
             lh_log_msg "DEBUG" "Waiting for key press to continue"
-            read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")"
+            read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'PRESS_KEY_CONTINUE')${LH_COLOR_RESET}")"
             lh_log_msg "DEBUG" "Continue key pressed"
         fi
     done

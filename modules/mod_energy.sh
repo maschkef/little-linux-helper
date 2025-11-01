@@ -11,7 +11,17 @@
 
 # Load common library
 # Use BASH_SOURCE to get the correct path when sourced
-source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
@@ -129,7 +139,7 @@ function energy_disable_sleep() {
     echo ""
     
     local choice
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET} ")" choice
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET} ")" choice
     
     case $choice in
         1)
@@ -208,7 +218,7 @@ function energy_disable_sleep_for_time() {
     echo ""
     
     local choice
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET} ")" choice
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET} ")" choice
     
     local duration_seconds=0
     local duration_text=""
@@ -401,7 +411,7 @@ function energy_cpu_governor() {
     echo ""
     
     local choice
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET} ")" choice
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET} ")" choice
     
     local new_governor=""
     
@@ -461,8 +471,8 @@ function energy_screen_brightness() {
         brightness_tool="xbacklight"
     elif [[ -d /sys/class/backlight ]]; then
         # Try to find backlight devices
-        local backlight_devices
-        backlight_devices=($(find /sys/class/backlight -name "brightness" 2>/dev/null | head -1))
+        local backlight_devices=()
+        mapfile -t backlight_devices < <(find /sys/class/backlight -name "brightness" 2>/dev/null | head -1)
         if [[ ${#backlight_devices[@]} -gt 0 ]]; then
             brightness_path="${backlight_devices[0]%/brightness}"
             brightness_tool="sysfs"
@@ -490,9 +500,12 @@ function energy_screen_brightness() {
             ;;
         "sysfs")
             if [[ -f "$brightness_path/brightness" && -f "$brightness_path/max_brightness" ]]; then
-                local current=$(cat "$brightness_path/brightness")
-                local max=$(cat "$brightness_path/max_brightness")
-                local percent=$((current * 100 / max))
+                local current
+                current=$(cat "$brightness_path/brightness")
+                local max
+                max=$(cat "$brightness_path/max_brightness")
+                local percent
+                percent=$((current * 100 / max))
                 echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'ENERGY_BRIGHTNESS_SYSFS_INFO' "$current" "$max" "$percent")${LH_COLOR_RESET}"
             fi
             ;;
@@ -510,7 +523,7 @@ function energy_screen_brightness() {
     echo ""
     
     local choice
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET} ")" choice
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET} ")" choice
     
     local brightness_value=""
     
@@ -553,7 +566,8 @@ function energy_screen_brightness() {
                     if [[ -f "$brightness_path/max_brightness" ]]; then
                         local max_brightness
                         max_brightness=$(cat "$brightness_path/max_brightness")
-                        local target_brightness=$((brightness_value * max_brightness / 100))
+                        local target_brightness
+                        target_brightness=$((brightness_value * max_brightness / 100))
                         if echo "$target_brightness" | $LH_SUDO_CMD tee "$brightness_path/brightness" >/dev/null 2>&1; then
                             success=true
                         fi
@@ -591,23 +605,28 @@ function energy_power_stats() {
         for battery in /sys/class/power_supply/BAT*; do
             if [[ -d "$battery" ]]; then
                 battery_found=true
-                local battery_name=$(basename "$battery")
+                local battery_name
+                battery_name=$(basename "$battery")
                 
                 echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'ENERGY_STATS_BATTERY_DEVICE' "$battery_name")${LH_COLOR_RESET}"
                 
                 if [[ -f "$battery/capacity" ]]; then
-                    local capacity=$(cat "$battery/capacity")
+                    local capacity
+                    capacity=$(cat "$battery/capacity")
                     echo -e "  $(lh_msg 'ENERGY_STATS_BATTERY_CAPACITY'): ${capacity}%"
                 fi
                 
                 if [[ -f "$battery/status" ]]; then
-                    local status=$(cat "$battery/status")
+                    local status
+                    status=$(cat "$battery/status")
                     echo -e "  $(lh_msg 'ENERGY_STATS_BATTERY_STATUS'): $status"
                 fi
                 
                 if [[ -f "$battery/energy_now" && -f "$battery/energy_full" ]]; then
-                    local energy_now=$(cat "$battery/energy_now")
-                    local energy_full=$(cat "$battery/energy_full")
+                    local energy_now
+                    energy_now=$(cat "$battery/energy_now")
+                    local energy_full
+                    energy_full=$(cat "$battery/energy_full")
                     echo -e "  $(lh_msg 'ENERGY_STATS_BATTERY_ENERGY'): $energy_now / $energy_full μWh"
                 fi
                 echo ""
@@ -636,10 +655,12 @@ function energy_power_stats() {
         for adapter in /sys/class/power_supply/A{C,DP}*; do
             if [[ -d "$adapter" ]]; then
                 ac_found=true
-                local adapter_name=$(basename "$adapter")
+                local adapter_name
+                adapter_name=$(basename "$adapter")
                 
                 if [[ -f "$adapter/online" ]]; then
-                    local online=$(cat "$adapter/online")
+                    local online
+                    online=$(cat "$adapter/online")
                     if [[ "$online" == "1" ]]; then
                         echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'ENERGY_STATS_AC_CONNECTED' "$adapter_name")${LH_COLOR_RESET}"
                     else
@@ -663,12 +684,16 @@ function energy_power_stats() {
     if [[ -d /sys/class/thermal ]]; then
         for thermal in /sys/class/thermal/thermal_zone*; do
             if [[ -d "$thermal" && -f "$thermal/temp" ]]; then
-                local zone_name=$(basename "$thermal")
-                local temp=$(cat "$thermal/temp")
-                local temp_celsius=$((temp / 1000))
+                local zone_name
+                zone_name=$(basename "$thermal")
+                local temp
+                temp=$(cat "$thermal/temp")
+                local temp_celsius
+                temp_celsius=$((temp / 1000))
                 
                 if [[ -f "$thermal/type" ]]; then
-                    local type=$(cat "$thermal/type")
+                    local type
+                    type=$(cat "$thermal/type")
                     echo -e "  $zone_name ($type): ${temp_celsius}°C"
                 else
                     echo -e "  $zone_name: ${temp_celsius}°C"
@@ -700,7 +725,7 @@ function energy_main_menu() {
 
         local choice
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET} ")" choice
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET} ")" choice
 
         case $choice in
             1)

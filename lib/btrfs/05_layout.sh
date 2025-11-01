@@ -24,26 +24,30 @@ btrfs_backup_base_dir() {
 # Path helpers ---------------------------------------------------------------
 
 btrfs_backup_snapshot_root() {
-    local root="$(btrfs_backup_base_dir)"
+    local root
+    root="$(btrfs_backup_base_dir)"
     btrfs_layout_debug "Snapshot root requested (base: $root)"
     printf "%s/snapshots" "$root"
 }
 
 btrfs_backup_incoming_root() {
-    local root="$(btrfs_backup_base_dir)"
+    local root
+    root="$(btrfs_backup_base_dir)"
     btrfs_layout_debug "Incoming root requested (base: $root)"
     printf "%s/incoming" "$root"
 }
 
 btrfs_backup_meta_root() {
-    local root="$(btrfs_backup_base_dir)"
+    local root
+    root="$(btrfs_backup_base_dir)"
     btrfs_layout_debug "Meta root requested (base: $root)"
     printf "%s/meta" "$root"
 }
 
 btrfs_bundle_path() {
     local bundle="$1"
-    local path="$(btrfs_backup_snapshot_root)/$bundle"
+    local path
+    path="$(btrfs_backup_snapshot_root)/$bundle"
     btrfs_layout_debug "Bundle path for $bundle -> $path"
     printf '%s' "$path"
 }
@@ -51,7 +55,8 @@ btrfs_bundle_path() {
 btrfs_bundle_subvol_path() {
     local bundle="$1"
     local subvol="$2"
-    local path="$(btrfs_bundle_path "$bundle")/$subvol"
+    local path
+    path="$(btrfs_bundle_path "$bundle")/$subvol"
     btrfs_layout_debug "Subvolume path for $bundle/$subvol -> $path"
     printf '%s' "$path"
 }
@@ -59,15 +64,19 @@ btrfs_bundle_subvol_path() {
 btrfs_bundle_subvol_marker() {
     local bundle="$1"
     local subvol="$2"
-    local marker="$(btrfs_bundle_subvol_path "$bundle" "$subvol").backup_complete"
+    local marker
+    marker="$(btrfs_bundle_subvol_path "$bundle" "$subvol").backup_complete"
     btrfs_layout_debug "Marker path for $bundle/$subvol -> $marker"
     printf '%s' "$marker"
 }
 
 btrfs_ensure_backup_layout() {
-    local snapshot_root="$(btrfs_backup_snapshot_root)"
-    local incoming_root="$(btrfs_backup_incoming_root)"
-    local meta_root="$(btrfs_backup_meta_root)"
+    local snapshot_root
+    snapshot_root="$(btrfs_backup_snapshot_root)"
+    local incoming_root
+    incoming_root="$(btrfs_backup_incoming_root)"
+    local meta_root
+    meta_root="$(btrfs_backup_meta_root)"
 
     ${LH_SUDO_CMD:-} mkdir -p "$snapshot_root" "$incoming_root" "$meta_root"
     btrfs_layout_debug "Ensured layout directories: snapshot=$snapshot_root incoming=$incoming_root meta=$meta_root"
@@ -82,7 +91,8 @@ btrfs_is_valid_bundle_name() {
 }
 
 btrfs_list_bundle_names_desc() {
-    local snapshot_root="$(btrfs_backup_snapshot_root)"
+    local snapshot_root
+    snapshot_root="$(btrfs_backup_snapshot_root)"
     btrfs_layout_debug "Listing bundle names under: $snapshot_root"
     [[ -d "$snapshot_root" ]] || return 0
 
@@ -94,7 +104,8 @@ btrfs_list_bundle_names_desc() {
 btrfs_find_latest_subvol_snapshot() {
     local subvol="$1"
     local current_bundle="$2"
-    local snapshot_root="$(btrfs_backup_snapshot_root)"
+    local snapshot_root
+    snapshot_root="$(btrfs_backup_snapshot_root)"
     local bundle
 
     btrfs_layout_debug "Searching latest snapshot for subvol $subvol (excluding bundle: ${current_bundle:-<none>})"
@@ -114,7 +125,8 @@ btrfs_find_latest_subvol_snapshot() {
 
 btrfs_list_subvol_backups_desc() {
     local subvol="$1"
-    local snapshot_root="$(btrfs_backup_snapshot_root)"
+    local snapshot_root
+    snapshot_root="$(btrfs_backup_snapshot_root)"
 
     btrfs_layout_debug "Listing snapshots for subvol $subvol under $snapshot_root"
     [[ -d "$snapshot_root" ]] || return 0
@@ -155,7 +167,8 @@ btrfs_collect_bundle_inventory() {
     fi
 
     while IFS= read -r -d '' bundle_dir; do
-        local bundle_name="$(basename "$bundle_dir")"
+        local bundle_name
+        bundle_name="$(basename "$bundle_dir")"
         if ! btrfs_is_valid_bundle_name "$bundle_name"; then
             continue
         fi
@@ -184,7 +197,8 @@ btrfs_collect_bundle_inventory() {
         local -a bundle_subvol_records=()
 
         while IFS= read -r -d '' subvol_path; do
-            local subvol_name="$(basename "$subvol_path")"
+            local subvol_name
+            subvol_name="$(basename "$subvol_path")"
 
             local subvol_show
             if [[ -n "${LH_SUDO_CMD:-}" ]]; then

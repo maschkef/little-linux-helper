@@ -10,7 +10,17 @@
 # Sub-module for RSYNC backup operations
 
 # Load common library
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
+LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
@@ -52,7 +62,7 @@ if ! declare -f backup_log_msg > /dev/null; then
         if [ -n "$LH_BACKUP_LOG" ] && [ ! -f "$LH_BACKUP_LOG" ]; then
             # Try to create the file if it doesn't exist yet.
             lh_log_msg "DEBUG" "Creating backup log file: $LH_BACKUP_LOG"
-            touch "$LH_BACKUP_LOG" || echo "$(lh_msg 'BACKUP_LOG_WARN_CREATE' "$LH_BACKUP_LOG")" >&2
+            touch "$LH_BACKUP_LOG" || lh_msgln 'BACKUP_LOG_WARN_CREATE' "$LH_BACKUP_LOG" >&2
         fi
         echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$LH_BACKUP_LOG"
         
@@ -86,7 +96,7 @@ rsync_backup() {
     lh_log_msg "DEBUG" "RSYNC command is available"
     
     # Check backup target and adapt for this session if necessary
-    echo "$(lh_msg 'BACKUP_CURRENT_TARGET' "$LH_BACKUP_ROOT")"
+    lh_msgln 'BACKUP_CURRENT_TARGET' "$LH_BACKUP_ROOT"
     local change_backup_root_for_session=false
     local prompt_for_new_path_message="" # Used by lh_ask_for_input
 
@@ -117,8 +127,7 @@ rsync_backup() {
 
             if [ ! -d "$new_backup_root_path" ]; then
                 if lh_confirm_action "$(lh_msg 'BACKUP_DIR_NOT_EXISTS' "$new_backup_root_path")" "y"; then
-                    $LH_SUDO_CMD mkdir -p "$new_backup_root_path"
-                    if [ $? -eq 0 ]; then
+                    if $LH_SUDO_CMD mkdir -p "$new_backup_root_path"; then
                         LH_BACKUP_ROOT="$new_backup_root_path"
                         backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_TARGET_CREATED' "$LH_BACKUP_ROOT")"
                         break 
@@ -165,14 +174,33 @@ rsync_backup() {
     echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BACKUP_OPTION_CUSTOM')${LH_COLOR_RESET}"
     
     lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') (1-3) ${LH_COLOR_RESET}")" choice
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') (1-3) ${LH_COLOR_RESET}")" choice
     lh_log_msg "DEBUG" "User selected option: '$choice'"
     
     local source_dirs=()
     # Standard exclusions
-    local exclude_options_base="--exclude=/proc --exclude=/sys --exclude=/tmp --exclude=/dev --exclude=/mnt --exclude=/media --exclude=/run --exclude=/var/cache --exclude=/var/tmp"
+    local -a exclude_args=(
+        "--exclude=/proc"
+        "--exclude=/sys"
+        "--exclude=/tmp"
+        "--exclude=/dev"
+        "--exclude=/mnt"
+        "--exclude=/media"
+        "--exclude=/run"
+        "--exclude=/var/cache"
+        "--exclude=/var/tmp"
+    )
+    local exclude_options_base="${exclude_args[*]}"
     # Add configured exclusions
-    local exclude_options="$exclude_options_base $(echo "$LH_RSYNC_EXCLUDES" | sed 's/\S\+/--exclude=&/g')"
+    if [[ -n "$LH_RSYNC_EXCLUDES" ]]; then
+        local -a configured_excludes=()
+        read -r -a configured_excludes <<< "$LH_RSYNC_EXCLUDES"
+        for exclude in "${configured_excludes[@]}"; do
+            [[ -z "$exclude" ]] && continue
+            exclude_args+=("--exclude=$exclude")
+        done
+    fi
+    local exclude_options="${exclude_args[*]}"
     lh_log_msg "DEBUG" "Base exclude options: $exclude_options_base"
     lh_log_msg "DEBUG" "Configured RSYNC excludes: $LH_RSYNC_EXCLUDES"
     lh_log_msg "DEBUG" "Final exclude options: $exclude_options"
@@ -185,13 +213,19 @@ rsync_backup() {
         2) 
             lh_log_msg "DEBUG" "Taking path: Full system backup"
             source_dirs=("/")
-            exclude_options="$exclude_options --exclude=/lost+found --exclude=/var/lib/lxcfs --exclude=/.snapshots* --exclude=/swapfile"
+            exclude_args+=(
+                "--exclude=/lost+found"
+                "--exclude=/var/lib/lxcfs"
+                "--exclude=/.snapshots*"
+                "--exclude=/swapfile"
+            )
             # Exclude backup target if it's under /
             if [ -n "$LH_BACKUP_ROOT" ] && [[ "$LH_BACKUP_ROOT" == /* ]]; then
-                 exclude_options="$exclude_options --exclude=$LH_BACKUP_ROOT"
+                 exclude_args+=("--exclude=$LH_BACKUP_ROOT")
                  lh_log_msg "DEBUG" "Added backup root to exclusions: $LH_BACKUP_ROOT"
             fi
-            lh_log_msg "DEBUG" "Full system exclude options: $exclude_options"
+            local full_system_excludes="${exclude_args[*]}"
+            lh_log_msg "DEBUG" "Full system exclude options: $full_system_excludes"
             ;;
         3)
             lh_log_msg "DEBUG" "Taking path: Custom directories"
@@ -206,6 +240,8 @@ rsync_backup() {
             return 1
             ;;
     esac
+
+    exclude_options="${exclude_args[*]}"
     
     lh_log_msg "DEBUG" "Selected source directories: ${source_dirs[*]}"
     lh_log_msg "DEBUG" "Number of directories: ${#source_dirs[@]}"
@@ -253,15 +289,23 @@ rsync_backup() {
             if [ -n "$LH_BACKUP_ROOT" ] && [ "$LH_BACKUP_ROOT" != "/" ] && [[ "$dir_to_backup" == "/" || "$LH_BACKUP_ROOT" == "$dir_to_backup"* ]]; then
                 du_exclude_opt="--exclude=$LH_BACKUP_ROOT"
             fi
-            estimated_size_val=$(du -sb $du_exclude_opt "$dir_to_backup" 2>/dev/null | awk '{print $1}')
+            # Handle optional exclude option properly
+            if [ -n "$du_exclude_opt" ]; then
+                estimated_size_val=$(du -sb "$du_exclude_opt" "$dir_to_backup" 2>/dev/null | awk '{print $1}')
+            else
+                estimated_size_val=$(du -sb "$dir_to_backup" 2>/dev/null | awk '{print $1}')
+            fi
             if [[ "$estimated_size_val" =~ ^[0-9]+$ ]]; then required_space_bytes=$((required_space_bytes + estimated_size_val)); else backup_log_msg "WARN" "$(lh_msg 'BACKUP_LOG_SIZE_UNAVAILABLE' "$dir_to_backup")"; fi
         done
         
         local margin_percentage=110 # 10% margin for RSYNC (for full backup)
-        local required_with_margin=$((required_space_bytes * margin_percentage / 100))
+        local required_with_margin
+        required_with_margin=$((required_space_bytes * margin_percentage / 100))
 
-        local available_hr=$(format_bytes_for_display "$available_space_bytes")
-        local required_hr=$(format_bytes_for_display "$required_with_margin")
+        local available_hr
+        available_hr=$(format_bytes_for_display "$available_space_bytes")
+        local required_hr
+        required_hr=$(format_bytes_for_display "$required_with_margin")
 
         backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_SPACE_DETAILS' "$available_hr" "$required_hr")"
 
@@ -281,8 +325,7 @@ rsync_backup() {
     fi
 
     # Create backup directory
-    $LH_SUDO_CMD mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
-    if [ $? -ne 0 ]; then
+    if ! $LH_SUDO_CMD mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"; then
         backup_log_msg "ERROR" "$(lh_msg 'BACKUP_ERROR_CREATE_DIR')"
         return 1
     fi
@@ -294,7 +337,7 @@ rsync_backup() {
     echo -e "  ${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'BACKUP_RSYNC_INCREMENTAL_OPTION')${LH_COLOR_RESET}"
     
     lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" backup_type
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" backup_type
     lh_log_msg "DEBUG" "User selected backup type: '$backup_type'"
     
     # Additional exclusions
@@ -307,22 +350,23 @@ rsync_backup() {
         lh_log_msg "DEBUG" "User entered additional exclusions: '$additional_excludes'"
         for exclude in $additional_excludes; do
             lh_log_msg "DEBUG" "Adding exclusion: $exclude"
-            exclude_options="$exclude_options --exclude=$exclude"
+            exclude_args+=("--exclude=$exclude")
         done
+        exclude_options="${exclude_args[*]}"
         lh_log_msg "DEBUG" "Final exclude options with additional exclusions: $exclude_options"
     else
         lh_log_msg "DEBUG" "User chose not to add additional exclusions"
     fi
     
     # Create backup
-    local timestamp=$(date +%Y-%m-%d_%H-%M-%S)
+    local timestamp
+    timestamp=$(date +%Y-%m-%d_%H-%M-%S)
     local rsync_dest="$LH_BACKUP_ROOT$LH_BACKUP_DIR/rsync_backup_${timestamp}"
     lh_log_msg "DEBUG" "Timestamp: $timestamp"
     lh_log_msg "DEBUG" "RSYNC destination: $rsync_dest"
     
     lh_log_msg "DEBUG" "Creating destination directory"
-    mkdir -p "$rsync_dest"
-    if [ $? -ne 0 ]; then
+    if ! mkdir -p "$rsync_dest"; then
         lh_log_msg "DEBUG" "Failed to create destination directory"
         return 1
     fi
@@ -331,51 +375,63 @@ rsync_backup() {
     backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_RSYNC_STARTING' "$rsync_dest")"
     
     # Execute RSYNC
-    local rsync_options="-avxHS --numeric-ids --no-whole-file" # --inplace can interfere with dry-run
-    lh_log_msg "DEBUG" "Base RSYNC options: $rsync_options"
+    local -a rsync_options=(-avxHS --numeric-ids --no-whole-file) # --inplace can interfere with dry-run
+    local rsync_options_display="${rsync_options[*]}"
+    lh_log_msg "DEBUG" "Base RSYNC options: $rsync_options_display"
     
     if [ "$dry_run" = true ]; then
-        rsync_options="$rsync_options --dry-run"
+        rsync_options+=(--dry-run)
         lh_log_msg "DEBUG" "Added --dry-run to RSYNC options"
     fi
-    lh_log_msg "DEBUG" "Final RSYNC options: $rsync_options"
+    rsync_options_display="${rsync_options[*]}"
+    lh_log_msg "DEBUG" "Final RSYNC options: $rsync_options_display"
         
     if [ "$backup_type" = "1" ]; then
         # Full backup
         lh_log_msg "DEBUG" "Executing full RSYNC backup"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_RSYNC_FULL_CREATING')${LH_COLOR_RESET}"
         backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_RSYNC_FULL')"
-        local cmd="$LH_SUDO_CMD rsync $rsync_options $exclude_options ${source_dirs[*]} \"$rsync_dest/\""
+        local cmd="$LH_SUDO_CMD rsync ${rsync_options[*]} ${exclude_args[*]} ${source_dirs[*]} \"$rsync_dest/\""
         lh_log_msg "DEBUG" "RSYNC command: $cmd"
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_BACKUP' "$(lh_msg 'BACKUP_RSYNC_FULL_CREATING')")"
-        $LH_SUDO_CMD rsync $rsync_options $exclude_options "${source_dirs[@]}" "$rsync_dest/" 2>"$LH_BACKUP_LOG.tmp"
+        $LH_SUDO_CMD rsync "${rsync_options[@]}" "${exclude_args[@]}" "${source_dirs[@]}" "$rsync_dest/" 2>"$LH_BACKUP_LOG.tmp"
         local rsync_status=$?
     else
         # Incremental backup
         lh_log_msg "DEBUG" "Executing incremental RSYNC backup"
         backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_RSYNC_INCREMENTAL')"
-        local link_dest=""
-        local last_backup=$(ls -1d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/rsync_backup_"* 2>/dev/null | sort -r | head -n1)
-        if [ -n "$last_backup" ]; then
-            link_dest="--link-dest=$last_backup"
+        local -a link_dest_args=()
+        local last_backup=""
+        local -a existing_backups=()
+
+        shopt -s nullglob
+        existing_backups=("$LH_BACKUP_ROOT$LH_BACKUP_DIR"/rsync_backup_*)
+        shopt -u nullglob
+
+        if ((${#existing_backups[@]} > 0)); then
+            mapfile -t existing_backups < <(printf '%s\n' "${existing_backups[@]}" | sort -r)
+            last_backup="${existing_backups[0]}"
+            link_dest_args=("--link-dest=$last_backup")
             lh_log_msg "DEBUG" "Found previous backup for incremental: $last_backup"
-            lh_log_msg "DEBUG" "Using link-dest option: $link_dest"
+            lh_log_msg "DEBUG" "Using link-dest option: ${link_dest_args[*]}"
             backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_INCREMENTAL_BASE' "$last_backup")"
         else
             lh_log_msg "DEBUG" "No previous backup found, creating full backup instead"
         fi
         
         echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_RSYNC_INCREMENTAL_CREATING')${LH_COLOR_RESET}"
-        local cmd="$LH_SUDO_CMD rsync $rsync_options $exclude_options $link_dest ${source_dirs[*]} \"$rsync_dest/\""
+        local cmd="$LH_SUDO_CMD rsync ${rsync_options[*]} ${exclude_args[*]} ${link_dest_args[*]} ${source_dirs[*]} \"$rsync_dest/\""
         lh_log_msg "DEBUG" "RSYNC command: $cmd"
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_BACKUP' "$(lh_msg 'BACKUP_RSYNC_INCREMENTAL_CREATING')")"
-        $LH_SUDO_CMD rsync $rsync_options $exclude_options $link_dest "${source_dirs[@]}" "$rsync_dest/" 2>"$LH_BACKUP_LOG.tmp" # Corrected variable
+        $LH_SUDO_CMD rsync "${rsync_options[@]}" "${exclude_args[@]}" "${link_dest_args[@]}" "${source_dirs[@]}" "$rsync_dest/" 2>"$LH_BACKUP_LOG.tmp"
         local rsync_status=$?
     fi
 
     lh_log_msg "DEBUG" "RSYNC command finished with exit code: $rsync_status"
-    local end_time=$(date +%s)
-    local duration=$((end_time - BACKUP_START_TIME))
+    local end_time
+    end_time=$(date +%s)
+    local duration
+    duration=$((end_time - BACKUP_START_TIME))
     lh_log_msg "DEBUG" "Backup duration: ${duration}s"
     
     # Evaluate results
@@ -384,18 +440,18 @@ rsync_backup() {
     if [ $rsync_status -eq 0 ]; then
         lh_log_msg "DEBUG" "RSYNC backup completed successfully"
         backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_RSYNC_SUCCESS' "$rsync_dest")"   
-        local success_msg="$(lh_msg 'BACKUP_RSYNC_SUCCESS')"
         if [ "$dry_run" = true ]; then 
-            success_msg="$(lh_msg 'BACKUP_RSYNC_DRY_RUN_SUCCESS')"
             lh_log_msg "DEBUG" "Dry-run completed successfully"
         fi
     
-        local backup_size=$(du -sh "$rsync_dest" | cut -f1)
+        local backup_size
+        backup_size=$(du -sh "$rsync_dest" | cut -f1)
         lh_log_msg "DEBUG" "Final backup size: $backup_size"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'SIZE'):${LH_COLOR_RESET} $backup_size"
         
         # Backup type for notification
-        local backup_type_desc="$(lh_msg 'BACKUP_RSYNC_FULL')"
+        local backup_type_desc
+        backup_type_desc="$(lh_msg 'BACKUP_RSYNC_FULL')"
         if [ "$backup_type" = "2" ]; then
             backup_type_desc="$(lh_msg 'BACKUP_RSYNC_INCREMENTAL')"
         fi
@@ -423,7 +479,8 @@ rsync_backup() {
             "$(lh_msg 'BACKUP_NOTIFICATION_FAILED_DETAILS' "$rsync_status" "$timestamp" "$(basename "$LH_BACKUP_LOG")")"
         
         # Desktop notification for error
-        local error_title="$(lh_msg 'BACKUP_NOTIFICATION_RSYNC_FAILED')"
+        local error_title
+        error_title="$(lh_msg 'BACKUP_NOTIFICATION_RSYNC_FAILED')"
         if [ "$dry_run" = true ]; then 
             error_title="❌ RSYNC $(lh_msg 'BACKUP_RSYNC_DRY_RUN') $(lh_msg 'FAILED')"
             lh_log_msg "DEBUG" "Dry-run failed"
@@ -458,18 +515,35 @@ rsync_backup() {
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_DIRECTORIES')${LH_COLOR_RESET} ${source_dirs[*]}"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'RESTORE_TARGET_DIRECTORY'):${LH_COLOR_RESET} $(basename "$rsync_dest")"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'SIZE'):${LH_COLOR_RESET} $backup_size"
-    local duration=$((end_time - BACKUP_START_TIME)); echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_DURATION')${LH_COLOR_RESET} $(printf '%02dh %02dm %02ds' $((duration/3600)) $((duration%3600/60)) $((duration%60)))${LH_COLOR_RESET}"
-    echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_MODE'):${LH_COLOR_RESET} $(if [ "$dry_run" = true ]; then echo "$(lh_msg 'BACKUP_MODE_DRY_RUN')"; else echo "$(lh_msg 'BACKUP_MODE_REAL')"; fi)${LH_COLOR_RESET}"
+    local duration
+    duration=$((end_time - BACKUP_START_TIME)); echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_DURATION')${LH_COLOR_RESET} $(printf '%02dh %02dm %02ds' $((duration/3600)) $((duration%3600/60)) $((duration%60)))${LH_COLOR_RESET}"
+    echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_MODE'):${LH_COLOR_RESET} $(if [ "$dry_run" = true ]; then lh_msg 'BACKUP_MODE_DRY_RUN'; else lh_msg 'BACKUP_MODE_REAL'; fi)${LH_COLOR_RESET}"
     
     # Clean up old backups
     lh_log_msg "DEBUG" "Starting cleanup of old RSYNC backups"
     lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_CLEANUP' "RSYNC")"
     backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_RSYNC_CLEANUP')"
-    ls -1d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/rsync_backup_"* 2>/dev/null | sort -r | tail -n +$((LH_RETENTION_BACKUP+1)) | while read backup; do
-        lh_log_msg "DEBUG" "Removing old backup: $backup"
-        backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_RSYNC_CLEANUP_REMOVE' "$backup")"
-        rm -rf "$backup"
-    done
+    
+    # Compile list of RSYNC backups (timestamped names sort newest-first lexicographically)
+    local -a rsync_backups=()
+    local -a sorted_rsync_backups=()
+
+    shopt -s nullglob
+    rsync_backups=("$LH_BACKUP_ROOT$LH_BACKUP_DIR"/rsync_backup_*)
+    shopt -u nullglob
+
+    if ((${#rsync_backups[@]} > LH_RETENTION_BACKUP)); then
+        mapfile -t sorted_rsync_backups < <(printf '%s\n' "${rsync_backups[@]}" | sort -r)
+        for ((i=LH_RETENTION_BACKUP; i<${#sorted_rsync_backups[@]}; i++)); do
+            local backup="${sorted_rsync_backups[$i]}"
+            lh_log_msg "DEBUG" "Removing old backup: $backup"
+            backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_RSYNC_CLEANUP_REMOVE' "$backup")"
+            rm -rf "$backup"
+        done
+    else
+        lh_log_msg "DEBUG" "No RSYNC backups exceed the retention limit"
+    fi
+
     lh_log_msg "DEBUG" "Old backup cleanup completed"
     
     lh_log_msg "DEBUG" "=== Finished rsync_backup function successfully ==="

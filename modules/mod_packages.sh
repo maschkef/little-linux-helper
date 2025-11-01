@@ -11,7 +11,17 @@
 
 # Load common library
 # Use BASH_SOURCE to get the correct path when sourced
-source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
@@ -239,6 +249,7 @@ function pkg_update_alternative() {
         nix)
             echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_UPDATE_NIX)${LH_COLOR_RESET}"
             if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+                # shellcheck source=/dev/null
                 source "$HOME/.nix-profile/etc/profile.d/nix.sh"
             fi
             nix-env -u
@@ -270,19 +281,19 @@ function pkg_find_orphans() {
     fi
 
     echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_SEARCHING_ORPHANS)${LH_COLOR_RESET}"
-    local orphaned_packages=""
+    local -a orphaned_packages=()
 
     case $LH_PKG_MANAGER in
         pacman)
-            orphaned_packages=$(pacman -Qdtq)
-            if [ -n "$orphaned_packages" ]; then
+            mapfile -t orphaned_packages < <(pacman -Qdtq)
+            if ((${#orphaned_packages[@]} > 0)); then
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_ORPHANS_FOUND)${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
-                echo "$orphaned_packages"
+                printf '%s\n' "${orphaned_packages[@]}"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
                 if lh_confirm_action "$(lh_msg PKG_PROMPT_REMOVE_ORPHANS)" "n"; then
-                    $LH_SUDO_CMD pacman -Rns $orphaned_packages
+                    $LH_SUDO_CMD pacman -Rns "${orphaned_packages[@]}"
                     lh_log_msg "INFO" "$(lh_msg PKG_SUCCESS_ORPHANS_REMOVED)"
                 else
                     lh_log_msg "INFO" "$(lh_msg PKG_INFO_ORPHANS_CANCELLED)"
@@ -319,15 +330,15 @@ function pkg_find_orphans() {
             fi
             ;;
         yay)
-            orphaned_packages=$(yay -Qtdq)
-            if [ -n "$orphaned_packages" ]; then
+            mapfile -t orphaned_packages < <(yay -Qtdq)
+            if ((${#orphaned_packages[@]} > 0)); then
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_ORPHANS_FOUND)${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
-                echo "$orphaned_packages"
+                printf '%s\n' "${orphaned_packages[@]}"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
                 if lh_confirm_action "$(lh_msg PKG_PROMPT_REMOVE_ORPHANS)" "n"; then
-                    yay -Rns $orphaned_packages
+                    yay -Rns "${orphaned_packages[@]}"
                     lh_log_msg "INFO" "$(lh_msg PKG_SUCCESS_ORPHANS_REMOVED)"
                 else
                     lh_log_msg "INFO" "$(lh_msg PKG_INFO_ORPHANS_CANCELLED)"
@@ -379,7 +390,8 @@ function pkg_find_orphans_alternative() {
             ;;
         snap)
             echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_CHECK_OLD_SNAPS)${LH_COLOR_RESET}"
-            local old_snaps=$(snap list --all | awk '{if($2 != "Revision") print $1}' | sort | uniq -d)
+            local old_snaps
+            old_snaps=$(snap list --all | awk '{if($2 != "Revision") print $1}' | sort | uniq -d)
             if [ -n "$old_snaps" ]; then
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_OLD_SNAPS_FOUND)${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
@@ -390,7 +402,9 @@ function pkg_find_orphans_alternative() {
 
                 if lh_confirm_action "$(lh_msg PKG_PROMPT_REMOVE_OLD_SNAPS)" "n"; then
                     for snap_name in $old_snaps; do
-                        $LH_SUDO_CMD snap remove "$snap_name" --revision=$(snap list "$snap_name" --all | awk 'NR>1 {print $3}' | sort -rn | tail -n +2 | head -1)
+                        local old_revision
+                        old_revision=$(snap list "$snap_name" --all | awk 'NR>1 {print $3}' | sort -rn | tail -n +2 | head -1)
+                        $LH_SUDO_CMD snap remove "$snap_name" --revision="$old_revision"
                     done
                     lh_log_msg "INFO" "$(lh_msg PKG_SUCCESS_OLD_SNAPS_REMOVED)"
                 fi
@@ -401,6 +415,7 @@ function pkg_find_orphans_alternative() {
         nix)
             echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_NIX_GARBAGE_COLLECTION)${LH_COLOR_RESET}"
             if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+                # shellcheck source=/dev/null
                 source "$HOME/.nix-profile/etc/profile.d/nix.sh"
             fi
 
@@ -454,7 +469,7 @@ function pkg_clean_cache() {
             echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_PACMAN_CLEAN_2)${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_PACMAN_CLEAN_3)${LH_COLOR_RESET}"
 
-            read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION "3") ${LH_COLOR_RESET}")" clean_option
+            read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION "3") ${LH_COLOR_RESET}")" clean_option
 
             case $clean_option in
                 1)
@@ -492,7 +507,7 @@ function pkg_clean_cache() {
             echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_YAY_CLEAN_2)${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_YAY_CLEAN_3)${LH_COLOR_RESET}"
 
-            read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION "3") ${LH_COLOR_RESET}")" clean_option
+            read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION "3") ${LH_COLOR_RESET}")" clean_option
 
             case $clean_option in
                 1)
@@ -548,6 +563,7 @@ function pkg_clean_cache_alternative() {
         nix)
             echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_CLEANING_NIX_CACHE)${LH_COLOR_RESET}"
             if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+                # shellcheck source=/dev/null
                 source "$HOME/.nix-profile/etc/profile.d/nix.sh"
             fi
 
@@ -581,7 +597,8 @@ function pkg_search_install() {
         return 1
     fi
 
-    local package=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_ENTER_PACKAGE_NAME)")
+    local package
+    package=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_ENTER_PACKAGE_NAME)")
 
     if [ -z "$package" ]; then
         echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_NO_INPUT_ABORT)${LH_COLOR_RESET}"
@@ -593,7 +610,8 @@ function pkg_search_install() {
     case $LH_PKG_MANAGER in
         pacman)
             $LH_SUDO_CMD pacman -Ss "$package"
-            local install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_EXACT_PACKAGE_NAME)")
+            local install_pkg
+            install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_EXACT_PACKAGE_NAME)")
 
             if [ "$install_pkg" = "$(lh_msg CANCEL)" ]; then
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_INSTALLATION_CANCELLED)${LH_COLOR_RESET}"
@@ -606,7 +624,8 @@ function pkg_search_install() {
             ;;
         apt)
             $LH_SUDO_CMD apt search "$package"
-            local install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_EXACT_PACKAGE_NAME)")
+            local install_pkg
+            install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_EXACT_PACKAGE_NAME)")
 
             if [ "$install_pkg" = "$(lh_msg CANCEL)" ]; then
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_INSTALLATION_CANCELLED)${LH_COLOR_RESET}"
@@ -619,7 +638,8 @@ function pkg_search_install() {
             ;;
         dnf)
             $LH_SUDO_CMD dnf search "$package"
-            local install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_EXACT_PACKAGE_NAME)")
+            local install_pkg
+            install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_EXACT_PACKAGE_NAME)")
 
             if [ "$install_pkg" = "$(lh_msg CANCEL)" ]; then
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_INSTALLATION_CANCELLED)${LH_COLOR_RESET}"
@@ -632,7 +652,8 @@ function pkg_search_install() {
             ;;
         yay)
             yay -Ss "$package"
-            local install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_EXACT_PACKAGE_NAME)")
+            local install_pkg
+            install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_EXACT_PACKAGE_NAME)")
 
             if [ "$install_pkg" = "$(lh_msg CANCEL)" ]; then
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_INSTALLATION_CANCELLED)${LH_COLOR_RESET}"
@@ -672,7 +693,7 @@ function pkg_search_install_alternative() {
     done
     echo -e "${LH_COLOR_MENU_NUMBER}0.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg BACK)${LH_COLOR_RESET}"
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_SOURCE \"$((${#LH_ALT_PKG_MANAGERS[@]}))\"): ${LH_COLOR_RESET}")" choice
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_SOURCE \"$((${#LH_ALT_PKG_MANAGERS[@]}))\"): ${LH_COLOR_RESET}")" choice
 
     if [ "$choice" -eq 0 ]; then
         return 0
@@ -687,7 +708,8 @@ function pkg_search_install_alternative() {
                 if flatpak search "$package" | grep -q .; then
                     flatpak search "$package"
 
-                    local install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_FLATPAK_APP_ID)")
+                    local install_pkg
+                    install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_FLATPAK_APP_ID)")
 
                     if [ "$install_pkg" != "$(lh_msg CANCEL)" ]; then
                         if lh_confirm_action "$(lh_msg PKG_PROMPT_INSTALL_FLATPAK "$install_pkg")" "y"; then
@@ -702,7 +724,8 @@ function pkg_search_install_alternative() {
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_SEARCHING_SNAP "$package")${LH_COLOR_RESET}"
                 snap find "$package"
 
-                local install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_SNAP_NAME)")
+                local install_pkg
+                install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_SNAP_NAME)")
 
                 if [ "$install_pkg" != "$(lh_msg CANCEL)" ]; then
                     if lh_confirm_action "$(lh_msg PKG_PROMPT_INSTALL_SNAP "$install_pkg")" "y"; then
@@ -713,12 +736,14 @@ function pkg_search_install_alternative() {
             nix)
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_SEARCHING_NIX "$package")${LH_COLOR_RESET}"
                 if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+                    # shellcheck source=/dev/null
                     source "$HOME/.nix-profile/etc/profile.d/nix.sh"
                 fi
 
                 nix search nixpkgs "$package"
 
-                local install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_NIX_PACKAGE_NAME)")
+                local install_pkg
+                install_pkg=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_NIX_PACKAGE_NAME)")
 
                 if [ "$install_pkg" != "$(lh_msg CANCEL)" ]; then
                     if lh_confirm_action "$(lh_msg PKG_PROMPT_INSTALL_NIX "$install_pkg")" "y"; then
@@ -756,7 +781,7 @@ function pkg_list_installed() {
     echo -e "${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_ALT_PACKAGES)${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_MENU_NUMBER}5.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg PKG_MENU_CANCEL)${LH_COLOR_RESET}"
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION \"1-5\") ${LH_COLOR_RESET}")" list_option
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_OPTION \"1-5\") ${LH_COLOR_RESET}")" list_option
 
     case $list_option in
         1)
@@ -790,7 +815,8 @@ function pkg_list_installed() {
             esac
             ;;
         2)
-            local search_term=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_SEARCH_TERM)")
+            local search_term
+            search_term=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_SEARCH_TERM)")
             if [ -z "$search_term" ]; then
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_NO_INPUT_ABORT)${LH_COLOR_RESET}"
                 return 1
@@ -834,7 +860,7 @@ function pkg_list_installed() {
                     fi
                     ;;
                 apt)
-                    echo "$(lh_msg PKG_INFO_RECENT_PACKAGES_APT)"
+                    lh_msg PKG_INFO_RECENT_PACKAGES_APT
                     grep " install " /var/log/dpkg.log | tail -n 20
                     ;;
                 dnf)
@@ -889,7 +915,7 @@ function pkg_list_installed_alternative() {
     done
     echo -e "${LH_COLOR_MENU_NUMBER}0.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg BACK)${LH_COLOR_RESET}"
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_SOURCE \"$((${#LH_ALT_PKG_MANAGERS[@]}))\"): ${LH_COLOR_RESET}")" choice
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_SOURCE \"$((${#LH_ALT_PKG_MANAGERS[@]}))\"): ${LH_COLOR_RESET}")" choice
 
     if [ "$choice" -eq 0 ]; then
         return 0
@@ -918,6 +944,7 @@ function pkg_list_installed_alternative() {
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_INSTALLED_NIX)${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}-----------------------${LH_COLOR_RESET}"
                 if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+                    # shellcheck source=/dev/null
                     source "$HOME/.nix-profile/etc/profile.d/nix.sh"
                 fi
                 nix-env -q | less
@@ -958,7 +985,8 @@ function pkg_show_logs() {
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
                 if lh_confirm_action "$(lh_msg PKG_PROMPT_SEARCH_PACKAGE_LOG)" "n"; then
-                    local package=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_ENTER_PACKAGE_NAME_LOG)")
+                    local package
+                    package=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_ENTER_PACKAGE_NAME_LOG)")
                     echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_ENTRIES_FOR_PACKAGE "$package")${LH_COLOR_RESET}"
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                     grep "$package" /var/log/pacman.log | tail -n 50
@@ -990,7 +1018,7 @@ function pkg_show_logs() {
                 echo -e "${LH_COLOR_MENU_NUMBER}$((i+1)).${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}${apt_logs[$i]}${LH_COLOR_RESET}"
             done
 
-            read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_LOG \"${#apt_logs[@]}\"): ${LH_COLOR_RESET}")" log_choice
+            read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_LOG \"${#apt_logs[@]}\"): ${LH_COLOR_RESET}")" log_choice
 
             if ! [[ "$log_choice" =~ ^[0-9]+$ ]] || [ "$log_choice" -lt 1 ] || [ "$log_choice" -gt ${#apt_logs[@]} ]; then
                 echo -e "${LH_COLOR_ERROR}$(lh_msg PKG_ERROR_INVALID_LOG_SELECTION)${LH_COLOR_RESET}"
@@ -1004,7 +1032,8 @@ function pkg_show_logs() {
             echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
             if lh_confirm_action "$(lh_msg PKG_PROMPT_SEARCH_PACKAGE_LOG)" "n"; then
-                local package=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_ENTER_PACKAGE_NAME_LOG)")
+                local package
+                package=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_ENTER_PACKAGE_NAME_LOG)")
                 echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_ENTRIES_FOR_PACKAGE "$package")${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 grep "$package" "$selected_log" | tail -n 50
@@ -1017,7 +1046,8 @@ function pkg_show_logs() {
                 ls -la /var/log/dnf/
 
                 if lh_confirm_action "$(lh_msg PKG_PROMPT_SHOW_NEWEST_LOG)" "y"; then
-                    local newest_log=$(ls -t /var/log/dnf/dnf.log* | head -n 1)
+                    local newest_log
+                    newest_log=$(find /var/log/dnf -maxdepth 1 -type f -name 'dnf.log*' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n 1 | cut -d' ' -f2-)
                     echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_LAST_ENTRIES "$(basename "$newest_log")")${LH_COLOR_RESET}"
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                     tail -n 50 "$newest_log"
@@ -1025,7 +1055,8 @@ function pkg_show_logs() {
                 fi
 
                 if lh_confirm_action "$(lh_msg PKG_PROMPT_SEARCH_PACKAGE_LOG)" "n"; then
-                    local package=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_ENTER_PACKAGE_NAME_LOG)")
+                    local package
+                    package=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_ENTER_PACKAGE_NAME_LOG)")
                     echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_ENTRIES_FOR_PACKAGE "$package")${LH_COLOR_RESET}"
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                     grep "$package" /var/log/dnf/dnf.log* | tail -n 50
@@ -1044,7 +1075,8 @@ function pkg_show_logs() {
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
                 if lh_confirm_action "$(lh_msg PKG_PROMPT_SEARCH_PACKAGE_LOG)" "n"; then
-                    local package=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_ENTER_PACKAGE_NAME_LOG)")
+                    local package
+                    package=$(lh_ask_for_input "$(lh_msg PKG_PROMPT_ENTER_PACKAGE_NAME_LOG)")
                     echo -e "${LH_COLOR_INFO}$(lh_msg PKG_INFO_ENTRIES_FOR_PACKAGE "$package")${LH_COLOR_RESET}"
                     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                     grep "$package" /var/log/pacman.log | tail -n 50
@@ -1081,7 +1113,7 @@ function pkg_show_logs_alternative() {
     done
     echo -e "${LH_COLOR_MENU_NUMBER}0.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg BACK)${LH_COLOR_RESET}"
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_SOURCE \"$((${#LH_ALT_PKG_MANAGERS[@]}))\"): ${LH_COLOR_RESET}")" choice
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_SOURCE \"$((${#LH_ALT_PKG_MANAGERS[@]}))\"): ${LH_COLOR_RESET}")" choice
 
     if [ "$choice" -eq 0 ]; then
         return 0
@@ -1197,7 +1229,7 @@ function package_management_menu() {
         fi
 
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_OPTION) ${LH_COLOR_RESET}")" option
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg PKG_PROMPT_CHOOSE_OPTION) ${LH_COLOR_RESET}")" option
         
         case $option in
             1)

@@ -28,8 +28,11 @@ function lh_detect_package_manager() {
 
     if [ -n "$LH_PKG_MANAGER" ]; then
         # Use English fallback before translation system is loaded
-        local msg="${MSG[LIB_PKG_MANAGER_DETECTED]:-Detected package manager: %s}"
-        lh_log_msg "DEBUG" "$(printf "$msg" "$LH_PKG_MANAGER")"
+        local msg_template msg
+        msg_template="${MSG[LIB_PKG_MANAGER_DETECTED]:-Detected package manager: %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$LH_PKG_MANAGER"
+        lh_log_msg "DEBUG" "$msg"
     fi
 }
 
@@ -55,8 +58,11 @@ function lh_detect_alternative_managers() {
     fi
 
     # Use English fallback before translation system is loaded
-    local msg="${MSG[LIB_ALT_PKG_MANAGERS_DETECTED]:-Detected alternative package managers: %s}"
-    lh_log_msg "DEBUG" "$(printf "$msg" "${LH_ALT_PKG_MANAGERS[*]}")"
+    local msg_template msg
+    msg_template="${MSG[LIB_ALT_PKG_MANAGERS_DETECTED]:-Detected alternative package managers: %s}"
+    # shellcheck disable=SC2059  # translation templates supply %s placeholders
+    printf -v msg "$msg_template" "${LH_ALT_PKG_MANAGERS[*]}"
+    lh_log_msg "DEBUG" "$msg"
 }
 
 # Map a program name to the package name for the current package manager
@@ -104,17 +110,23 @@ function lh_check_command() {
         if ! command -v python3 >/dev/null 2>&1; then
             lh_log_msg "ERROR" "${MSG[LIB_PYTHON_NOT_INSTALLED]:-Python3 ist nicht installiert, aber für diese Funktion erforderlich.}"
             if [ "$install_prompt_if_missing" = "true" ] && [ -n "$LH_PKG_MANAGER" ]; then
-                read -p "$(lh_msg 'LIB_INSTALL_PROMPT' "Python3")" install_choice
+                read -r -p "$(lh_msg 'LIB_INSTALL_PROMPT' "Python3")" install_choice
                 if [[ $install_choice == "y" ]]; then
-                    case $LH_PKG_MANAGER in
+                    case "$LH_PKG_MANAGER" in
                         pacman|yay)
-                            $LH_SUDO_CMD $LH_PKG_MANAGER -S --noconfirm python || lh_log_msg "ERROR" "${MSG[LIB_PYTHON_INSTALL_ERROR]:-Fehler beim Installieren von Python}"
+                            if ! $LH_SUDO_CMD "$LH_PKG_MANAGER" -S --noconfirm python; then
+                                lh_log_msg "ERROR" "${MSG[LIB_PYTHON_INSTALL_ERROR]:-Fehler beim Installieren von Python}"
+                            fi
                             ;;
                         apt)
-                            $LH_SUDO_CMD apt update && $LH_SUDO_CMD apt install -y python3 || lh_log_msg "ERROR" "${MSG[LIB_PYTHON_INSTALL_ERROR]:-Fehler beim Installieren von Python}"
+                            if ! ($LH_SUDO_CMD apt update && $LH_SUDO_CMD apt install -y python3); then
+                                lh_log_msg "ERROR" "${MSG[LIB_PYTHON_INSTALL_ERROR]:-Fehler beim Installieren von Python}"
+                            fi
                             ;;
                         dnf)
-                            $LH_SUDO_CMD dnf install -y python3 || lh_log_msg "ERROR" "${MSG[LIB_PYTHON_INSTALL_ERROR]:-Fehler beim Installieren von Python}"
+                            if ! $LH_SUDO_CMD dnf install -y python3; then
+                                lh_log_msg "ERROR" "${MSG[LIB_PYTHON_INSTALL_ERROR]:-Fehler beim Installieren von Python}"
+                            fi
                             ;;
                     esac
                 else
@@ -139,19 +151,26 @@ function lh_check_command() {
         lh_log_msg "WARN" "$(lh_msg 'LIB_PROGRAM_NOT_INSTALLED' "$command_name")"
 
         if [ "$install_prompt_if_missing" = "true" ] && [ -n "$LH_PKG_MANAGER" ]; then
-            local package_name=$(lh_map_program_to_package "$command_name")
-            read -p "$(lh_msg 'LIB_INSTALL_PROMPT' "$package_name")" install_choice
+            local package_name
+            package_name=$(lh_map_program_to_package "$command_name")
+            read -r -p "$(lh_msg 'LIB_INSTALL_PROMPT' "$package_name")" install_choice
 
             if [[ $install_choice == "y" ]]; then
-                case $LH_PKG_MANAGER in
+                case "$LH_PKG_MANAGER" in
                     pacman|yay)
-                        $LH_SUDO_CMD $LH_PKG_MANAGER -S --noconfirm "$package_name" || lh_log_msg "ERROR" "$(lh_msg 'LIB_INSTALL_ERROR' "$package_name")"
+                        if ! $LH_SUDO_CMD "$LH_PKG_MANAGER" -S --noconfirm "$package_name"; then
+                            lh_log_msg "ERROR" "$(lh_msg 'LIB_INSTALL_ERROR' "$package_name")"
+                        fi
                         ;;
                     apt)
-                        $LH_SUDO_CMD apt update && $LH_SUDO_CMD apt install -y "$package_name" || lh_log_msg "ERROR" "$(lh_msg 'LIB_INSTALL_ERROR' "$package_name")"
+                        if ! ($LH_SUDO_CMD apt update && $LH_SUDO_CMD apt install -y "$package_name"); then
+                            lh_log_msg "ERROR" "$(lh_msg 'LIB_INSTALL_ERROR' "$package_name")"
+                        fi
                         ;;
                     dnf)
-                        $LH_SUDO_CMD dnf install -y "$package_name" || lh_log_msg "ERROR" "$(lh_msg 'LIB_INSTALL_ERROR' "$package_name")"
+                        if ! $LH_SUDO_CMD dnf install -y "$package_name"; then
+                            lh_log_msg "ERROR" "$(lh_msg 'LIB_INSTALL_ERROR' "$package_name")"
+                        fi
                         ;;
                 esac
 

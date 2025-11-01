@@ -12,15 +12,16 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export LH_ROOT_DIR="${LH_ROOT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
-if [ -f "$LH_ROOT_DIR/lib/lib_common.sh" ]; then
-    # shellcheck source=/dev/null
-    source "$LH_ROOT_DIR/lib/lib_common.sh"
+LIB_COMMON_PATH="$LH_ROOT_DIR/lib/lib_common.sh"
+if [[ -r "$LIB_COMMON_PATH" ]]; then
+    # shellcheck source=lib/lib_common.sh
+    source "$LIB_COMMON_PATH"
     # Best-effort package manager detection for install prompts
     if type -t lh_detect_package_manager >/dev/null 2>&1; then
         lh_detect_package_manager || true
     fi
 else
-    echo "[WARN] lib_common.sh not found at '$LH_ROOT_DIR/lib/lib_common.sh'. Proceeding with basic checks only."
+    echo "[WARN] lib_common.sh not found at '$LIB_COMMON_PATH'. Proceeding with basic checks only."
 fi
 
 # Simple version compare: returns 0 if $1 >= $2 (semver-ish for go/node simple major.minor)

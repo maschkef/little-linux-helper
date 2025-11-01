@@ -171,6 +171,7 @@ function lh_ensure_config_files_exist() {
 # --- Session registry helpers -------------------------------------------------
 
 # Blocking categories for session conflict detection
+# shellcheck disable=SC2034  # Blocking constants are exported and used by modules via lh_finalize_initialization()
 if [ -z "${LH_BLOCK_FILESYSTEM_WRITE:-}" ]; then
     readonly LH_BLOCK_FILESYSTEM_WRITE="FILESYSTEM_WRITE"
     readonly LH_BLOCK_SYSTEM_CRITICAL="SYSTEM_CRITICAL"
@@ -531,8 +532,7 @@ lh_wait_for_clear_with_override() {
     local override_prompt="${4:-Type 'SKIP' to force operation anyway}"
 
     while true; do
-        local result
-        result=$(lh_check_blocking_conflicts "$required_categories" "$calling_location" "false" 2>&1)
+        lh_check_blocking_conflicts "$required_categories" "$calling_location" "false" > /dev/null 2>&1
         local rc=$?
 
         if [ $rc -eq 0 ]; then
@@ -619,6 +619,8 @@ lh_begin_module_session() {
     existing_trap=$(trap -p EXIT | awk -F"'" '{print $2}')
 
     if [[ -n "$existing_trap" ]]; then
+        # Use eval to properly chain traps with delayed expansion
+        # shellcheck disable=SC2064  # We want $existing_trap to expand now, but lh_session_exit_handler to be called at EXIT
         trap "$existing_trap; lh_session_exit_handler" EXIT
     else
         trap 'lh_session_exit_handler' EXIT

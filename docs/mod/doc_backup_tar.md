@@ -92,7 +92,7 @@ This specialized module provides comprehensive TAR archive-based backup function
 *   **Archive Format:** `tar_backup_YYYY-MM-DD_HH-MM-SS.tar.gz`
 *   **Compression:** GZIP compression for space efficiency
 *   **Location:** `$LH_BACKUP_ROOT$LH_BACKUP_DIR/`
-*   **Retention:** Automatic cleanup based on `LH_RETENTION_BACKUP` setting
+*   **Retention:** Automatic cleanup based on `LH_RETENTION_BACKUP` setting using timestamped filenames (no GNU-specific utilities required)
 *   **Metadata:** Detailed logging of contents, size, and creation parameters
 
 **6. Configuration Integration:**

@@ -11,7 +11,17 @@
 
 # Load common library
 # Use BASH_SOURCE to get the correct path when sourced
-source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
@@ -729,7 +739,7 @@ function docker_check_sensitive_data() {
     local found_sensitive=false
     
     while IFS= read -r line; do
-        if echo "$line" | grep -qE "$sensitive_patterns" && ! echo "$line" | grep -q '\${'; then
+        if echo "$line" | grep -qE "$sensitive_patterns" && ! echo "$line" | grep -q "\${"; then
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_SENSITIVE_DATA_FOUND' "$line")${LH_COLOR_RESET}"
             found_sensitive=true
         fi
@@ -978,10 +988,12 @@ function security_check_docker() {
                 ((total_issues++))
                 ((issue_counts_by_type["env-permissions"]++))
                 # Collect specific .env issues
-                local env_files=$(find "$compose_dir" -maxdepth 1 -name ".env*" 2>/dev/null)
+                local env_files
+                env_files=$(find "$compose_dir" -maxdepth 1 -name ".env*" 2>/dev/null)
                 while IFS= read -r env_file; do
                     if [ -f "$env_file" ]; then
-                        local perms=$(stat -c "%a" "$env_file" 2>/dev/null)
+                        local perms
+                        perms=$(stat -c "%a" "$env_file" 2>/dev/null)
                         if [ "$perms" != "600" ]; then
                             env_permission_issues+=("$(basename "$env_file"): $perms")
                         fi
@@ -1019,7 +1031,8 @@ function security_check_docker() {
                     ((issue_counts_by_type["latest-images"]++))
                     while IFS= read -r line; do
                         if [[ "$line" =~ image:[[:space:]]*([^:]+)(:latest)?[[:space:]]*$ ]]; then
-                            local image_name=$(echo "$line" | sed -E 's/.*image:[[:space:]]*([^:]+).*/\1/')
+                            local image_name
+                            image_name=$(echo "$line" | sed -E 's/.*image:[[:space:]]*([^:]+).*/\1/')
                             latest_image_details+=("$image_name")
                         fi
                     done < <(grep -E "image:\s*[^:]+$|image:\s*[^:]+:latest" "$compose_file" || true)
@@ -1198,7 +1211,7 @@ function security_check_docker() {
         local info_types=("exposed-ports" "latest-images" "update-labels")
         
         for type in "${critical_types[@]}"; do
-            if [ ${issue_counts_by_type[$type]} -gt 0 ]; then
+            if [ "${issue_counts_by_type[$type]}" -gt 0 ]; then
                 case $type in
                     "default-passwords") echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_ISSUE_DEFAULT_PASSWORDS' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
                     "sensitive-data")    echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_ISSUE_SENSITIVE_DATA' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
@@ -1209,7 +1222,7 @@ function security_check_docker() {
         done
         
         for type in "${warning_types[@]}"; do
-            if [ ${issue_counts_by_type[$type]} -gt 0 ]; then
+            if [ "${issue_counts_by_type[$type]}" -gt 0 ]; then
                 case $type in
                     "host-volumes")      echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_ISSUE_HOST_VOLUMES' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
                     "capabilities")      echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_ISSUE_CAPABILITIES' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
@@ -1220,7 +1233,7 @@ function security_check_docker() {
         done
         
         for type in "${info_types[@]}"; do
-            if [ ${issue_counts_by_type[$type]} -gt 0 ]; then
+            if [ "${issue_counts_by_type[$type]}" -gt 0 ]; then
                 case $type in
                     "exposed-ports")     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_ISSUE_EXPOSED_PORTS' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
                     "latest-images")     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_ISSUE_LATEST_IMAGES' "${issue_counts_by_type[$type]}")${LH_COLOR_RESET}" ;;
@@ -1272,57 +1285,57 @@ function security_check_docker() {
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_NEXT_STEPS_PRIORITIZED')${LH_COLOR_RESET}"
         
         local step=1
-        if [ ${issue_counts_by_type["default-passwords"]} -gt 0 ]; then
+        if [ "${issue_counts_by_type["default-passwords"]}" -gt 0 ]; then
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_STEP_REPLACE_PASSWORDS' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
-        if [ ${issue_counts_by_type["sensitive-data"]} -gt 0 ]; then
+        if [ "${issue_counts_by_type["sensitive-data"]}" -gt 0 ]; then
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_STEP_REMOVE_SENSITIVE_DATA' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
-        if [ ${issue_counts_by_type["security-opt"]} -gt 0 ]; then
+        if [ "${issue_counts_by_type["security-opt"]}" -gt 0 ]; then
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_STEP_ENABLE_SECURITY' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
-        if [ ${issue_counts_by_type["privileged"]} -gt 0 ]; then
+        if [ "${issue_counts_by_type["privileged"]}" -gt 0 ]; then
             echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_STEP_REMOVE_PRIVILEGED' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
-        if [ ${issue_counts_by_type["capabilities"]} -gt 0 ]; then
+        if [ "${issue_counts_by_type["capabilities"]}" -gt 0 ]; then
             echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_STEP_REVIEW_CAPABILITIES' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
-        if [ ${issue_counts_by_type["env-permissions"]} -gt 0 ]; then
+        if [ "${issue_counts_by_type["env-permissions"]}" -gt 0 ]; then
             echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_STEP_FIX_ENV_PERMISSIONS' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
-        if [ ${issue_counts_by_type["dir-permissions"]} -gt 0 ]; then
+        if [ "${issue_counts_by_type["dir-permissions"]}" -gt 0 ]; then
             echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_STEP_FIX_PERMISSIONS' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
-        if [ ${issue_counts_by_type["host-volumes"]} -gt 0 ]; then
+        if [ "${issue_counts_by_type["host-volumes"]}" -gt 0 ]; then
             echo -e "${LH_COLOR_WARNING}$(lh_msg 'DOCKER_STEP_REVIEW_HOST_VOLUMES' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
-        if [ ${issue_counts_by_type["exposed-ports"]} -gt 0 ]; then
+        if [ "${issue_counts_by_type["exposed-ports"]}" -gt 0 ]; then
             echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_STEP_BIND_LOCALHOST' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
-        if [ ${issue_counts_by_type["latest-images"]} -gt 0 ]; then
+        if [ "${issue_counts_by_type["latest-images"]}" -gt 0 ]; then
             echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_STEP_PIN_IMAGE_VERSIONS' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
         
-        if [ ${issue_counts_by_type["update-labels"]} -gt 0 ]; then
+        if [ "${issue_counts_by_type["update-labels"]}" -gt 0 ]; then
             echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_STEP_ADD_UPDATE_LABELS' "$step")${LH_COLOR_RESET}"
             ((step++))
         fi
@@ -1366,7 +1379,7 @@ function docker_security_menu() {
         lh_print_gui_hidden_menu_item 0 "$(lh_msg 'DOCKER_MENU_BACK_MAIN')"
         echo ""
 
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DOCKER_MENU_CHOOSE_OPTION')${LH_COLOR_RESET}")" option
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DOCKER_MENU_CHOOSE_OPTION')${LH_COLOR_RESET}")" option
         
         # Check for empty input
         if [ -z "$option" ]; then

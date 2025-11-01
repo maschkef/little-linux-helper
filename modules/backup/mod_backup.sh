@@ -11,7 +11,17 @@
 
 # Load common library
 # Use BASH_SOURCE to get the correct path when sourced
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
+LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
@@ -55,7 +65,7 @@ backup_log_msg() {
     if [ -n "$LH_BACKUP_LOG" ] && [ ! -f "$LH_BACKUP_LOG" ]; then
         # Try to create the file if it doesn't exist yet.
         lh_log_msg "DEBUG" "Creating backup log file: $LH_BACKUP_LOG"
-        touch "$LH_BACKUP_LOG" || echo "$(lh_msg 'BACKUP_LOG_WARN_CREATE' "$LH_BACKUP_LOG")" >&2
+        touch "$LH_BACKUP_LOG" || lh_msgln 'BACKUP_LOG_WARN_CREATE' "$LH_BACKUP_LOG" >&2
     fi
     echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$LH_BACKUP_LOG"
     
@@ -78,7 +88,7 @@ restore_menu() {
         echo ""
         
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" option
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" option
         lh_log_msg "DEBUG" "User selected option: '$option'"
         
         case $option in
@@ -138,7 +148,8 @@ configure_backup() {
         echo -e "${LH_COLOR_INFO}$(lh_msg 'CONFIG_CURRENT_VALUE')${LH_COLOR_RESET} $LH_BACKUP_ROOT"
         if lh_confirm_action "$(lh_msg 'CONFIG_CHANGE_QUESTION_SHORT')" "n"; then
             lh_log_msg "DEBUG" "User wants to change backup target"
-            local new_backup_root=$(lh_ask_for_input "$(lh_msg 'CONFIG_ENTER_NEW_TARGET')")
+            local new_backup_root
+            new_backup_root=$(lh_ask_for_input "$(lh_msg 'CONFIG_ENTER_NEW_TARGET')")
             if [ -n "$new_backup_root" ]; then
                 lh_log_msg "DEBUG" "New backup root: '$new_backup_root'"
                 LH_BACKUP_ROOT="$new_backup_root"
@@ -156,7 +167,8 @@ configure_backup() {
         echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CONFIG_BACKUP_DIR_TITLE')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'CONFIG_CURRENT_VALUE')${LH_COLOR_RESET} $LH_BACKUP_DIR"
         if lh_confirm_action "$(lh_msg 'CONFIG_CHANGE_QUESTION_SHORT')" "n"; then
-            local new_backup_dir=$(lh_ask_for_input "$(lh_msg 'CONFIG_ENTER_NEW_DIR')")
+            local new_backup_dir
+            new_backup_dir=$(lh_ask_for_input "$(lh_msg 'CONFIG_ENTER_NEW_DIR')")
             if [ -n "$new_backup_dir" ]; then
                 # Ensure path starts with /
                 if [[ ! "$new_backup_dir" == /* ]]; then
@@ -173,7 +185,8 @@ configure_backup() {
         echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CONFIG_TEMP_SNAPSHOT_TITLE')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'CONFIG_CURRENT_VALUE')${LH_COLOR_RESET} $LH_TEMP_SNAPSHOT_DIR"
         if lh_confirm_action "$(lh_msg 'CONFIG_CHANGE_QUESTION_SHORT')" "n"; then
-            local new_temp_snapshot_dir=$(lh_ask_for_input "$(lh_msg 'CONFIG_ENTER_NEW_TEMP')")
+            local new_temp_snapshot_dir
+            new_temp_snapshot_dir=$(lh_ask_for_input "$(lh_msg 'CONFIG_ENTER_NEW_TEMP')")
             if [ -n "$new_temp_snapshot_dir" ]; then
                 LH_TEMP_SNAPSHOT_DIR="$new_temp_snapshot_dir"
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'CONFIG_NEW_TEMP')${LH_COLOR_RESET} $LH_TEMP_SNAPSHOT_DIR"
@@ -186,7 +199,8 @@ configure_backup() {
         echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CONFIG_RETENTION_TITLE')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'CONFIG_CURRENT_VALUE')${LH_COLOR_RESET} $LH_RETENTION_BACKUP"
         if lh_confirm_action "$(lh_msg 'CONFIG_CHANGE_QUESTION_SHORT')" "n"; then
-            local new_retention=$(lh_ask_for_input "$(lh_msg 'CONFIG_ENTER_NEW_RETENTION')" "^[0-9]+$" "$(lh_msg 'CONFIG_VALIDATION_NUMBER')")
+            local new_retention
+            new_retention=$(lh_ask_for_input "$(lh_msg 'CONFIG_ENTER_NEW_RETENTION')" "^[0-9]+$" "$(lh_msg 'CONFIG_VALIDATION_NUMBER')")
             if [ -n "$new_retention" ]; then
                 LH_RETENTION_BACKUP="$new_retention"
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'CONFIG_NEW_RETENTION')${LH_COLOR_RESET} $LH_RETENTION_BACKUP"
@@ -199,7 +213,8 @@ configure_backup() {
         echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CONFIG_TAR_EXCLUDES_TITLE')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'CONFIG_CURRENT_VALUE')${LH_COLOR_RESET} $LH_TAR_EXCLUDES"
         if lh_confirm_action "$(lh_msg 'CONFIG_CHANGE_QUESTION_SHORT')" "n"; then
-            local new_tar_excludes=$(lh_ask_for_input "$(lh_msg 'CONFIG_ENTER_NEW_EXCLUDES')")
+            local new_tar_excludes
+            new_tar_excludes=$(lh_ask_for_input "$(lh_msg 'CONFIG_ENTER_NEW_EXCLUDES')")
             # Remove leading/trailing spaces
             new_tar_excludes=$(echo "$new_tar_excludes" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
             LH_TAR_EXCLUDES="$new_tar_excludes"
@@ -220,13 +235,13 @@ configure_backup() {
             if lh_confirm_action "$(lh_msg 'CONFIG_SAVE_PERMANENTLY')" "y"; then
                 lh_log_msg "DEBUG" "User chose to save configuration permanently"
                 lh_save_backup_config # Function from lib_common.sh
-                echo "$(lh_msg 'CONFIG_SAVED' "$LH_BACKUP_CONFIG_FILE")"
+                lh_msgln 'CONFIG_SAVED' "$LH_BACKUP_CONFIG_FILE"
             else
                 lh_log_msg "DEBUG" "User chose not to save configuration permanently"
             fi
         else
             lh_log_msg "DEBUG" "No configuration changes were made"
-            echo "$(lh_msg 'CONFIG_NO_CHANGES')"
+            lh_msgln 'CONFIG_NO_CHANGES'
         fi
     else
         lh_log_msg "DEBUG" "User chose not to modify configuration"
@@ -262,8 +277,10 @@ show_backup_status() {
     
     # Free disk space
     lh_log_msg "DEBUG" "Checking disk space for backup root"
-    local free_space=$(df -h "$LH_BACKUP_ROOT" | awk 'NR==2 {print $4}')
-    local total_space=$(df -h "$LH_BACKUP_ROOT" | awk 'NR==2 {print $2}')
+    local free_space
+    free_space=$(df -h "$LH_BACKUP_ROOT" | awk 'NR==2 {print $4}')
+    local total_space
+    total_space=$(df -h "$LH_BACKUP_ROOT" | awk 'NR==2 {print $2}')
     lh_log_msg "DEBUG" "Disk space: $free_space free of $total_space total"
     echo -e "${LH_COLOR_INFO}$(lh_msg 'STATUS_FREE_SPACE')${LH_COLOR_RESET} $free_space / $total_space"
     
@@ -279,7 +296,8 @@ show_backup_status() {
         local btrfs_count=0
         for subvol in @ @home; do
             if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" ]; then
-                local count=$(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" 2>/dev/null | grep -v '\.backup_complete$' | wc -l)
+                local count
+                count=$(find "$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol" -mindepth 1 -maxdepth 1 ! -name '*.backup_complete' -print 2>/dev/null | wc -l | awk '{print $1}')
                 lh_log_msg "DEBUG" "BTRFS subvolume $subvol: $count snapshots"
                 echo -e "  ${LH_COLOR_INFO}$subvol:${LH_COLOR_RESET} $(lh_msg 'STATUS_BTRFS_SNAPSHOTS' "$count")"
                 btrfs_count=$((btrfs_count + count))
@@ -291,7 +309,11 @@ show_backup_status() {
         lh_log_msg "DEBUG" "Checking TAR backups"
         echo ""
         echo -e "${LH_COLOR_INFO}$(lh_msg 'STATUS_TAR_BACKUPS')${LH_COLOR_RESET}"
-        local tar_count=$(ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | wc -l)
+        local -a tar_files=()
+        shopt -s nullglob
+        tar_files=("$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz)
+        shopt -u nullglob
+        local tar_count=${#tar_files[@]}
         lh_log_msg "DEBUG" "Found $tar_count TAR backups"
         echo -e "  ${LH_COLOR_INFO}$(lh_msg 'STATUS_BTRFS_TOTAL')${LH_COLOR_RESET} $(lh_msg 'STATUS_TAR_TOTAL' "$tar_count")"
         
@@ -299,7 +321,11 @@ show_backup_status() {
         lh_log_msg "DEBUG" "Checking RSYNC backups"
         echo ""
         echo -e "${LH_COLOR_INFO}$(lh_msg 'STATUS_RSYNC_BACKUPS')${LH_COLOR_RESET}"
-        local rsync_count=$(ls -1d "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/rsync_backup_* 2>/dev/null | wc -l)
+        local -a rsync_dirs=()
+        shopt -s nullglob
+        rsync_dirs=("$LH_BACKUP_ROOT$LH_BACKUP_DIR"/rsync_backup_*)
+        shopt -u nullglob
+        local rsync_count=${#rsync_dirs[@]}
         lh_log_msg "DEBUG" "Found $rsync_count RSYNC backups"
         echo -e "  ${LH_COLOR_INFO}$(lh_msg 'STATUS_BTRFS_TOTAL')${LH_COLOR_RESET} $(lh_msg 'STATUS_RSYNC_TOTAL' "$rsync_count")"
         
@@ -307,9 +333,24 @@ show_backup_status() {
         lh_log_msg "DEBUG" "Finding newest backups"
         echo ""
         echo -e "${LH_COLOR_HEADER}$(lh_msg 'STATUS_NEWEST_BACKUPS')${LH_COLOR_RESET}"
-        local newest_btrfs=$(find "$LH_BACKUP_ROOT$LH_BACKUP_DIR" -name "*-20*" -type d 2>/dev/null | sort -r | head -n1)
-        local newest_tar=$(ls -1t "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | head -n1)
-        local newest_rsync=$(ls -1td "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/rsync_backup_* 2>/dev/null | head -n1)
+        local newest_btrfs
+        newest_btrfs=$(find "$LH_BACKUP_ROOT$LH_BACKUP_DIR" -name "*-20*" -type d 2>/dev/null | sort -r | head -n1)
+        local newest_tar=""
+        if (( tar_count > 0 )); then
+            local newest_tar_entry
+            newest_tar_entry=$(find "$LH_BACKUP_ROOT$LH_BACKUP_DIR" -maxdepth 1 -type f -name 'tar_backup_*.tar.gz' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n1)
+            if [[ -n "$newest_tar_entry" ]]; then
+                newest_tar="${newest_tar_entry#* }"
+            fi
+        fi
+        local newest_rsync=""
+        if (( rsync_count > 0 )); then
+            local newest_rsync_entry
+            newest_rsync_entry=$(find "$LH_BACKUP_ROOT$LH_BACKUP_DIR" -maxdepth 1 -type d -name 'rsync_backup_*' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n1)
+            if [[ -n "$newest_rsync_entry" ]]; then
+                newest_rsync="${newest_rsync_entry#* }"
+            fi
+        fi
         
         if [ -n "$newest_btrfs" ]; then
             lh_log_msg "DEBUG" "Newest BTRFS backup: $(basename "$newest_btrfs")"
@@ -327,9 +368,10 @@ show_backup_status() {
         # Total backup size
         lh_log_msg "DEBUG" "Calculating total backup size"
         echo ""
-        echo "$(lh_msg 'STATUS_BACKUP_SIZES')"
+        lh_msgln 'STATUS_BACKUP_SIZES'
         if [ -d "$LH_BACKUP_ROOT$LH_BACKUP_DIR" ]; then
-            local total_size=$(du -sh "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | cut -f1)
+            local total_size
+            total_size=$(du -sh "$LH_BACKUP_ROOT$LH_BACKUP_DIR" 2>/dev/null | cut -f1)
             lh_log_msg "DEBUG" "Total backup directory size: $total_size"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'STATUS_TOTAL_SIZE')${LH_COLOR_RESET} $total_size"
         fi
@@ -371,7 +413,7 @@ backup_menu() {
         echo ""
         
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg "CHOOSE_OPTION") ${LH_COLOR_RESET}")" option
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg "CHOOSE_OPTION") ${LH_COLOR_RESET}")" option
         lh_log_msg "DEBUG" "User selected option: '$option'"
         
         case $option in

@@ -36,25 +36,34 @@ function lh_send_notification() {
         esac
     fi
     
-    local msg="${MSG[LIB_NOTIFICATION_TRYING_SEND]:-Trying to send desktop notification: [%s] %s - %s}"
-    lh_log_msg "DEBUG" "$(printf "$msg" "$notification_type" "$title" "$message")"
+    local msg_template msg
+    msg_template="${MSG[LIB_NOTIFICATION_TRYING_SEND]:-Trying to send desktop notification: [%s] %s - %s}"
+    # shellcheck disable=SC2059  # translation templates supply %s placeholders
+    printf -v msg "$msg_template" "$notification_type" "$title" "$message"
+    lh_log_msg "DEBUG" "$msg"
     
     # Get target user info (uses the existing framework)
     if ! lh_get_target_user_info; then
-        local msg="${MSG[LIB_NOTIFICATION_USER_INFO_FAILED]:-Could not determine target user info, desktop notification will be skipped}"
-        lh_log_msg "WARN" "$msg"
+        local msg2="${MSG[LIB_NOTIFICATION_USER_INFO_FAILED]:-Could not determine target user info, desktop notification will be skipped}"
+        lh_log_msg "WARN" "$msg2"
         return 1
     fi
     
     local target_user="${LH_TARGET_USER_INFO[TARGET_USER]}"
     if [ -z "$target_user" ] || [ "$target_user" = "root" ]; then
-        local msg="${MSG[LIB_NOTIFICATION_NO_VALID_USER]:-No valid target user found for desktop notification (User: '%s')}"
-        lh_log_msg "WARN" "$(printf "$msg" "$target_user")"
+        local msg3
+        msg_template="${MSG[LIB_NOTIFICATION_NO_VALID_USER]:-No valid target user found for desktop notification (User: '%s')}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg3 "$msg_template" "$target_user"
+        lh_log_msg "WARN" "$msg3"
         return 1
     fi
     
-    local msg="${MSG[LIB_NOTIFICATION_SENDING_AS_USER]:-Sending notification as user: %s}"
-    lh_log_msg "DEBUG" "$(printf "$msg" "$target_user")"
+    local msg4
+    msg_template="${MSG[LIB_NOTIFICATION_SENDING_AS_USER]:-Sending notification as user: %s}"
+    # shellcheck disable=SC2059  # translation templates supply %s placeholders
+    printf -v msg4 "$msg_template" "$target_user"
+    lh_log_msg "DEBUG" "$msg4"
     
     # Set icon based on type
     local icon=""
@@ -81,8 +90,10 @@ function lh_send_notification() {
             notify_cmd="$notify_cmd --icon='$icon'"
         fi
         # Escape quotes in title and message for shell execution
-        local escaped_title=$(printf '%q' "$title")
-        local escaped_message=$(printf '%q' "$message")
+        local escaped_title
+        escaped_title=$(printf '%q' "$title")
+        local escaped_message
+        escaped_message=$(printf '%q' "$message")
         notify_cmd="$notify_cmd $escaped_title $escaped_message"
         
         if lh_run_command_as_target_user "$notify_cmd"; then
@@ -100,7 +111,8 @@ function lh_send_notification() {
         local msg="${MSG[LIB_NOTIFICATION_USING_ZENITY]:-Using zenity for desktop notification}"
         lh_log_msg "DEBUG" "$msg"
         
-        local escaped_text=$(printf '%q' "$title: $message")
+        local escaped_text
+        escaped_text=$(printf '%q' "$title: $message")
         local zenity_cmd="zenity --notification --text=$escaped_text"
         
         if lh_run_command_as_target_user "$zenity_cmd"; then
@@ -118,7 +130,8 @@ function lh_send_notification() {
         local msg="${MSG[LIB_NOTIFICATION_USING_KDIALOG]:-Using kdialog for desktop notification}"
         lh_log_msg "DEBUG" "$msg"
         
-        local escaped_text=$(printf '%q' "$title: $message")
+        local escaped_text
+        escaped_text=$(printf '%q' "$title: $message")
         local kdialog_cmd="kdialog --passivepopup $escaped_text 10"
         
         if lh_run_command_as_target_user "$kdialog_cmd"; then
@@ -160,45 +173,66 @@ function lh_check_notification_tools() {
     
     # Check notify-send
     if lh_run_command_as_target_user "command -v notify-send >/dev/null 2>&1"; then
-        local msg="${MSG[LIB_NOTIFICATION_TOOL_AVAILABLE]:-✓ %s available}"
-        echo -e "${LH_COLOR_SUCCESS}$(printf "$msg" "notify-send")${LH_COLOR_RESET}"
+        local msg
+        msg_template="${MSG[LIB_NOTIFICATION_TOOL_AVAILABLE]:-✓ %s available}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "notify-send"
+        echo -e "${LH_COLOR_SUCCESS}${msg}${LH_COLOR_RESET}"
         available_tools+=("notify-send")
         tools_available=true
     else
-        local msg="${MSG[LIB_NOTIFICATION_TOOL_NOT_AVAILABLE]:-✗ %s not available}"
-        echo -e "${LH_COLOR_WARNING}$(printf "$msg" "notify-send")${LH_COLOR_RESET}"
+        local msg
+        msg_template="${MSG[LIB_NOTIFICATION_TOOL_NOT_AVAILABLE]:-✗ %s not available}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "notify-send"
+        echo -e "${LH_COLOR_WARNING}${msg}${LH_COLOR_RESET}"
         missing_tools+=("libnotify-bin/libnotify")
     fi
     
     # Check zenity
     if lh_run_command_as_target_user "command -v zenity >/dev/null 2>&1"; then
-        local msg="${MSG[LIB_NOTIFICATION_TOOL_AVAILABLE]:-✓ %s available}"
-        echo -e "${LH_COLOR_SUCCESS}$(printf "$msg" "zenity")${LH_COLOR_RESET}"
+        local msg
+        msg_template="${MSG[LIB_NOTIFICATION_TOOL_AVAILABLE]:-✓ %s available}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "zenity"
+        echo -e "${LH_COLOR_SUCCESS}${msg}${LH_COLOR_RESET}"
         available_tools+=("zenity")
         tools_available=true
     else
-        local msg="${MSG[LIB_NOTIFICATION_TOOL_NOT_AVAILABLE]:-✗ %s not available}"
-        echo -e "${LH_COLOR_WARNING}$(printf "$msg" "zenity")${LH_COLOR_RESET}"
+        local msg
+        msg_template="${MSG[LIB_NOTIFICATION_TOOL_NOT_AVAILABLE]:-✗ %s not available}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "zenity"
+        echo -e "${LH_COLOR_WARNING}${msg}${LH_COLOR_RESET}"
         missing_tools+=("zenity")
     fi
     
     # Check kdialog
     if lh_run_command_as_target_user "command -v kdialog >/dev/null 2>&1"; then
-        local msg="${MSG[LIB_NOTIFICATION_TOOL_AVAILABLE]:-✓ %s available}"
-        echo -e "${LH_COLOR_SUCCESS}$(printf "$msg" "kdialog")${LH_COLOR_RESET}"
+        local msg
+        msg_template="${MSG[LIB_NOTIFICATION_TOOL_AVAILABLE]:-✓ %s available}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "kdialog"
+        echo -e "${LH_COLOR_SUCCESS}${msg}${LH_COLOR_RESET}"
         available_tools+=("kdialog")
         tools_available=true
     else
-        local msg="${MSG[LIB_NOTIFICATION_TOOL_NOT_AVAILABLE]:-✗ %s not available}"
-        echo -e "${LH_COLOR_WARNING}$(printf "$msg" "kdialog")${LH_COLOR_RESET}"
+        local msg
+        msg_template="${MSG[LIB_NOTIFICATION_TOOL_NOT_AVAILABLE]:-✗ %s not available}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "kdialog"
+        echo -e "${LH_COLOR_WARNING}${msg}${LH_COLOR_RESET}"
         missing_tools+=("kdialog")
     fi
     
     # Summary
     echo ""
     if [ "$tools_available" = true ]; then
-        local msg="${MSG[LIB_NOTIFICATION_TOOLS_AVAILABLE]:-Desktop notifications are available via: %s}"
-        echo -e "${LH_COLOR_SUCCESS}$(printf "$msg" "${available_tools[*]}")${LH_COLOR_RESET}"
+        local msg
+        msg_template="${MSG[LIB_NOTIFICATION_TOOLS_AVAILABLE]:-Desktop notifications are available via: %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "${available_tools[*]}"
+        echo -e "${LH_COLOR_SUCCESS}${msg}${LH_COLOR_RESET}"
         
         # Offer test notification
         local prompt="${MSG[LIB_NOTIFICATION_TEST_PROMPT]:-Would you like to send a test notification?}"
@@ -208,15 +242,18 @@ function lh_check_notification_tools() {
         fi
     else
         local msg1="${MSG[LIB_NOTIFICATION_NO_TOOLS_FOUND]:-No desktop notification tools found.}"
-        local msg2="${MSG[LIB_NOTIFICATION_MISSING_TOOLS]:-Missing tools: %s}"
+        local msg2
+        msg_template="${MSG[LIB_NOTIFICATION_MISSING_TOOLS]:-Missing tools: %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg2 "$msg_template" "${missing_tools[*]}"
         echo -e "${LH_COLOR_WARNING}$msg1${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_INFO}$(printf "$msg2" "${missing_tools[*]}")${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_INFO}${msg2}${LH_COLOR_RESET}"
         
         local prompt="${MSG[LIB_NOTIFICATION_INSTALL_TOOLS]:-Would you like to install notification tools?}"
         if lh_confirm_action "$prompt" "y"; then
-            case $LH_PKG_MANAGER in
+            case "$LH_PKG_MANAGER" in
                 pacman|yay)
-                    $LH_SUDO_CMD $LH_PKG_MANAGER -S --noconfirm libnotify zenity
+                    $LH_SUDO_CMD "$LH_PKG_MANAGER" -S --noconfirm libnotify zenity
                     ;;
                 apt)
                     $LH_SUDO_CMD apt update && $LH_SUDO_CMD apt install -y libnotify-bin zenity
@@ -225,10 +262,13 @@ function lh_check_notification_tools() {
                     $LH_SUDO_CMD dnf install -y libnotify zenity
                     ;;
                 *)
-                    local msg1="${MSG[LIB_NOTIFICATION_AUTO_INSTALL_NOT_AVAILABLE]:-Automatic installation for %s not available.}"
-                    local msg2="${MSG[LIB_NOTIFICATION_MANUAL_INSTALL]:-Please install manually: libnotify-bin/libnotify and zenity}"
-                    echo -e "${LH_COLOR_WARNING}$(printf "$msg1" "$LH_PKG_MANAGER")${LH_COLOR_RESET}"
-                    echo -e "${LH_COLOR_INFO}$msg2${LH_COLOR_RESET}"
+                    local msg_auto
+                    msg_template="${MSG[LIB_NOTIFICATION_AUTO_INSTALL_NOT_AVAILABLE]:-Automatic installation for %s not available.}"
+                    # shellcheck disable=SC2059  # translation templates supply %s placeholders
+                    printf -v msg_auto "$msg_template" "$LH_PKG_MANAGER"
+                    local msg_manual="${MSG[LIB_NOTIFICATION_MANUAL_INSTALL]:-Please install manually: libnotify-bin/libnotify and zenity}"
+                    echo -e "${LH_COLOR_WARNING}${msg_auto}${LH_COLOR_RESET}"
+                    echo -e "${LH_COLOR_INFO}$msg_manual${LH_COLOR_RESET}"
                     ;;
             esac
             

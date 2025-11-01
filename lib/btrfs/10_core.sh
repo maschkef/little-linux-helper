@@ -152,7 +152,8 @@ atomic_receive_with_validation() {
     lh_log_msg "DEBUG" "  Final destination: $final_destination"
     
     local send_result=0
-    local source_snapshot_name=$(basename "$source_snapshot")
+    local source_snapshot_name
+    source_snapshot_name=$(basename "$source_snapshot")
     local staging_suffix=".receiving_$$"
     local staging_snapshot_name="${source_snapshot_name}${staging_suffix}"
     local staging_snapshot_path="${backup_base_dir}/${staging_snapshot_name}"
@@ -280,8 +281,7 @@ atomic_receive_with_validation() {
             local error_details
             error_details=$($LH_SUDO_CMD dmesg | tail -10 | grep -i "btrfs\|error" || echo "No specific BTRFS errors in dmesg")
 
-            local error_analysis_result
-            error_analysis_result=$(handle_btrfs_error "$error_details" "incremental send/receive" "$send_result")
+            handle_btrfs_error "$error_details" "incremental send/receive" "$send_result"
             local error_code=$?
 
             case $error_code in
@@ -514,9 +514,8 @@ validate_parent_snapshot_chain() {
     fi
     
     # Step 4: Check generation numbers for proper sequence
-    local source_gen dest_gen current_gen
+    local source_gen current_gen
     source_gen=$(btrfs subvolume show "$source_parent" | grep "Generation:" | awk '{print $2}' || echo "0")
-    dest_gen=$(btrfs subvolume show "$dest_parent" | grep "Generation:" | awk '{print $2}' || echo "0")
     current_gen=$(btrfs subvolume show "$current_snapshot" | grep "Generation:" | awk '{print $2}' || echo "0")
     
     # Validate generation sequence (current should be newer than parent)
@@ -867,11 +866,7 @@ check_btrfs_space() {
     lh_log_msg "DEBUG" "$usage_output"
     
     # Parse filesystem usage for critical metrics
-    local device_size device_allocated unallocated data_free metadata_free
-    
-    # Extract device size and allocated space
-    device_size=$(echo "$usage_output" | grep "Device size:" | awk '{print $3}' | sed 's/[^0-9.]//g')
-    device_allocated=$(echo "$usage_output" | grep "Device allocated:" | awk '{print $3}' | sed 's/[^0-9.]//g')
+    local unallocated data_free metadata_free
     unallocated=$(echo "$usage_output" | grep "Device unallocated:" | awk '{print $3}' | sed 's/[^0-9.]//g')
     
     # Extract free space for data and metadata
@@ -1004,8 +999,10 @@ get_btrfs_available_space() {
     local free_space_bytes=0
     if [[ -n "$free_space" ]]; then
         # Use sed to extract number and unit parts
-        local number=$(echo "$free_space" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\1/p')
-        local unit=$(echo "$free_space" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\2/p')
+        local number
+        number=$(echo "$free_space" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\1/p')
+        local unit
+        unit=$(echo "$free_space" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\2/p')
         
         if [[ -n "$number" && -n "$unit" ]]; then
             case "$unit" in
@@ -1025,8 +1022,10 @@ get_btrfs_available_space() {
         
         if [[ -n "$unallocated" ]]; then
             # Use sed to extract number and unit parts
-            local number=$(echo "$unallocated" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\1/p')
-            local unit=$(echo "$unallocated" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\2/p')
+            local number
+            number=$(echo "$unallocated" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\1/p')
+            local unit
+            unit=$(echo "$unallocated" | sed -n 's/^\([0-9.]*\)\([KMGTPE]*i*B*\)$/\2/p')
             
             if [[ -n "$number" && -n "$unit" ]]; then
                 case "$unit" in
@@ -1228,7 +1227,7 @@ handle_btrfs_error() {
         
     elif echo "$error_output" | grep -qi "no space left on device"; then
         # Critical: Distinguish between metadata exhaustion and general space issues
-        local recent_dmesg filesystem_usage
+        local recent_dmesg
         recent_dmesg=$(dmesg | tail -20 | grep -i "btrfs.*metadata\|btrfs.*ENOSPC\|btrfs.*chunk" || echo "")
         
         # Check for metadata-specific exhaustion patterns
@@ -1737,8 +1736,9 @@ detect_btrfs_subvolumes() {
     
     # Sort and remove duplicates
     if [[ ${#detected_subvolumes[@]} -gt 0 ]]; then
-        IFS=$'\n' detected_subvolumes=($(sort -u <<<"${detected_subvolumes[*]}"))
-        unset IFS
+        local sorted_subvolumes=()
+        mapfile -t sorted_subvolumes < <(printf '%s\n' "${detected_subvolumes[@]}" | sort -u)
+        detected_subvolumes=("${sorted_subvolumes[@]}")
         lh_log_msg "INFO" "Auto-detected subvolumes: ${detected_subvolumes[*]}" >&2
         printf '%s\n' "${detected_subvolumes[@]}"
     else
@@ -1804,8 +1804,9 @@ get_btrfs_subvolumes() {
     
     # Sort the final list
     if [[ ${#final_subvolumes[@]} -gt 0 ]]; then
-        IFS=$'\n' final_subvolumes=($(sort <<<"${final_subvolumes[*]}"))
-        unset IFS
+        local sorted_final=()
+        mapfile -t sorted_final < <(printf '%s\n' "${final_subvolumes[@]}" | sort)
+        final_subvolumes=("${sorted_final[@]}")
         lh_log_msg "INFO" "Final subvolumes for $operation_type: ${final_subvolumes[*]}" >&2
         printf '%s\n' "${final_subvolumes[@]}"
     else

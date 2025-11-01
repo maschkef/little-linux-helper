@@ -11,7 +11,17 @@
 
 # Load common library
 # Use BASH_SOURCE to get the correct path when sourced
-source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
@@ -38,7 +48,8 @@ function logs_last_minutes_current() {
 
     local minutes_str
     local minutes_default="30"
-    local prompt_text="$(lh_msg 'LOG_PROMPT_MINUTES' "$minutes_default")"
+    local prompt_text
+    prompt_text="$(lh_msg 'LOG_PROMPT_MINUTES' "$minutes_default")"
 
     minutes_str=$(lh_ask_for_input "$prompt_text" "^[0-9]*$" "$(lh_msg 'LOG_ERROR_INVALID_INPUT')")
     local minutes=${minutes_str:-$minutes_default} # Apply default if empty
@@ -54,7 +65,8 @@ function logs_last_minutes_current() {
 
     if command -v journalctl >/dev/null 2>&1; then
         # systemd-based systems with journalctl
-        local start_time=$(date --date="$minutes minutes ago" '+%Y-%m-%d %H:%M:%S')
+        local start_time
+        start_time=$(date --date="$minutes minutes ago" '+%Y-%m-%d %H:%M:%S')
         
         echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_LOGS_FROM_MINUTES' "$minutes" "$start_time")${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
@@ -69,7 +81,8 @@ function logs_last_minutes_current() {
         fi
 
         if lh_confirm_action "$(lh_msg 'LOG_CONFIRM_SAVE_LOGS')" "n"; then
-            local log_backup_file="$LH_LOG_DIR/logs_last_${minutes}min_$(date '+%Y%m%d-%H%M').log"
+            local log_backup_file
+            log_backup_file="$LH_LOG_DIR/logs_last_${minutes}min_$(date '+%Y%m%d-%H%M').log"
             $LH_SUDO_CMD journalctl --no-pager --since "$start_time" > "$log_backup_file"
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'LOG_SUCCESS_SAVED' "$log_backup_file")${LH_COLOR_RESET}"
         fi
@@ -85,12 +98,14 @@ function logs_last_minutes_current() {
             return 1
         fi
 
-        local start_time_epoch=$(date +%s -d "$minutes minutes ago")
+        local start_time_epoch
+        start_time_epoch=$(date +%s -d "$minutes minutes ago")
 
         echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_LOGS_FROM_FILE' "$minutes" "$log_file")${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
-        $LH_SUDO_CMD awk -v stime=$start_time_epoch '{
-            cmd="date +%s -d \""$1" "$2"\"";
+        # shellcheck disable=SC2016  # $1/$2 refer to AWK fields, not shell variables
+        $LH_SUDO_CMD awk -v stime="$start_time_epoch" '{
+            cmd = "date +%s -d \"" $1 " " $2 "\"";
             cmd | getline timestamp;
             close(cmd);
             if (timestamp >= stime) print
@@ -98,9 +113,11 @@ function logs_last_minutes_current() {
         echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
 
         if lh_confirm_action "$(lh_msg 'LOG_CONFIRM_SAVE_LOGS')" "n"; then
-            local log_backup_file="$LH_LOG_DIR/logs_last_${minutes}min_$(date '+%Y%m%d-%H%M').log"
-            $LH_SUDO_CMD awk -v stime=$start_time_epoch '{
-                cmd="date +%s -d \""$1" "$2"\"";
+            local log_backup_file
+            log_backup_file="$LH_LOG_DIR/logs_last_${minutes}min_$(date '+%Y%m%d-%H%M').log"
+            # shellcheck disable=SC2016  # $1/$2 refer to AWK fields, not shell variables
+            $LH_SUDO_CMD awk -v stime="$start_time_epoch" '{
+                cmd = "date +%s -d \"" $1 " " $2 "\"";
                 cmd | getline timestamp;
                 close(cmd);
                 if (timestamp >= stime) print
@@ -121,7 +138,8 @@ function logs_last_minutes_previous() {
 
     local minutes_str
     local minutes_default="30"
-    local prompt_text="$(lh_msg 'LOG_PROMPT_MINUTES' "$minutes_default")"
+    local prompt_text
+    prompt_text="$(lh_msg 'LOG_PROMPT_MINUTES' "$minutes_default")"
 
     minutes_str=$(lh_ask_for_input "$prompt_text" "^[0-9]*$" "$(lh_msg 'LOG_ERROR_INVALID_INPUT')")
     local minutes=${minutes_str:-$minutes_default}
@@ -135,8 +153,10 @@ function logs_last_minutes_previous() {
     fi
 
     # Determine the start and end time of the previous boot
-    local prev_boot_start_epoch=$($LH_SUDO_CMD journalctl -b -1 --output=short-unix | head -n 1 | awk '{print $1}' | cut -d'.' -f1)
-    local prev_boot_end_epoch=$($LH_SUDO_CMD journalctl -b -1 --output=short-unix | tail -n 1 | awk '{print $1}' | cut -d'.' -f1)
+    local prev_boot_start_epoch
+    prev_boot_start_epoch=$($LH_SUDO_CMD journalctl -b -1 --output=short-unix | head -n 1 | awk '{print $1}' | cut -d'.' -f1)
+    local prev_boot_end_epoch
+    prev_boot_end_epoch=$($LH_SUDO_CMD journalctl -b -1 --output=short-unix | tail -n 1 | awk '{print $1}' | cut -d'.' -f1)
 
     if [[ -z "$prev_boot_start_epoch" || -z "$prev_boot_end_epoch" ]]; then
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'LOG_ERROR_NO_BOOT_TIMES')${LH_COLOR_RESET}"
@@ -144,15 +164,18 @@ function logs_last_minutes_previous() {
     fi
 
     # Calculate the start time for the log query
-    local start_time_epoch=$((prev_boot_end_epoch - minutes * 60))
+    local start_time_epoch
+    start_time_epoch=$((prev_boot_end_epoch - minutes * 60))
     # Ensure that the start time does not precede the beginning of the previous boot
     if [[ $start_time_epoch -lt $prev_boot_start_epoch ]]; then
         start_time_epoch=$prev_boot_start_epoch
     fi
 
     # Convert the times to readable format
-    local start_time=$(date -d "@$start_time_epoch" '+%Y-%m-%d %H:%M:%S')
-    local end_time=$(date -d "@$prev_boot_end_epoch" '+%Y-%m-%d %H:%M:%S')
+    local start_time
+    start_time=$(date -d "@$start_time_epoch" '+%Y-%m-%d %H:%M:%S')
+    local end_time
+    end_time=$(date -d "@$prev_boot_end_epoch" '+%Y-%m-%d %H:%M:%S')
 
     echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_LOGS_PREVIOUS_BOOT' "$minutes" "$start_time" "$end_time")${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
@@ -167,7 +190,8 @@ function logs_last_minutes_previous() {
     fi
 
     if lh_confirm_action "$(lh_msg 'LOG_CONFIRM_SAVE_LOGS')" "n"; then
-        local log_backup_file="$LH_LOG_DIR/logs_previous_boot_last_${minutes}min_$(date '+%Y%m%d-%H%M').log"
+        local log_backup_file
+        log_backup_file="$LH_LOG_DIR/logs_previous_boot_last_${minutes}min_$(date '+%Y%m%d-%H%M').log"
         $LH_SUDO_CMD journalctl --no-pager -b -1 --since "$start_time" --until "$end_time" > "$log_backup_file"
         echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'LOG_SUCCESS_SAVED' "$log_backup_file")${LH_COLOR_RESET}"
     fi
@@ -189,7 +213,8 @@ function logs_specific_service() {
     echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_FIRST_20_SERVICES')${LH_COLOR_RESET}"
 
-    local service_name=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_SERVICE_NAME')")
+    local service_name
+    service_name=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_SERVICE_NAME')")
 
     if [ -z "$service_name" ]; then
         lh_print_boxed_message \
@@ -207,7 +232,9 @@ function logs_specific_service() {
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'LOG_ERROR_SERVICE_NOT_FOUND' "$service_name")${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_INFO_SIMILAR_SERVICES')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
-        $LH_SUDO_CMD systemctl list-units --type=service --all | grep -i "$(echo $service_name | sed 's/\.service$//')"
+        # Remove .service suffix for search - use bash parameter expansion instead of sed
+        local search_name="${service_name%.service}"
+        $LH_SUDO_CMD systemctl list-units --type=service --all | grep -i "$search_name"
         echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
         return 1
     fi
@@ -221,7 +248,7 @@ function logs_specific_service() {
 
     local time_option_prompt
     time_option_prompt="$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'LOG_PROMPT_CHOOSE_OPTION')${LH_COLOR_RESET}")"
-    read -p "$time_option_prompt" time_option
+    read -r -p "$time_option_prompt" time_option
 
     local journalctl_base_cmd=("$LH_SUDO_CMD" "journalctl" "-u" "$service_name")
     local journalctl_time_opts=()
@@ -237,7 +264,8 @@ function logs_specific_service() {
         3)
             local hours_default="24"
             local hours_str
-            local hours_prompt="$(lh_msg 'LOG_PROMPT_HOURS' "$hours_default")"
+            local hours_prompt
+            hours_prompt="$(lh_msg 'LOG_PROMPT_HOURS' "$hours_default")"
             hours_str=$(lh_ask_for_input "$hours_prompt" "^[0-9]*$" "$(lh_msg 'LOG_ERROR_INVALID_INPUT')")
             local hours=${hours_str:-$hours_default}
 
@@ -253,7 +281,8 @@ function logs_specific_service() {
         4)
             local days_default="7"
             local days_str
-            local days_prompt="$(lh_msg 'LOG_PROMPT_DAYS' "$days_default")"
+            local days_prompt
+            days_prompt="$(lh_msg 'LOG_PROMPT_DAYS' "$days_default")"
             days_str=$(lh_ask_for_input "$days_prompt" "^[0-9]*$" "$(lh_msg 'LOG_ERROR_INVALID_INPUT')")
             local days=${days_str:-$days_default}
 
@@ -286,7 +315,8 @@ function logs_specific_service() {
     echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
 
     if lh_confirm_action "$(lh_msg 'LOG_CONFIRM_SAVE_LOGS')" "n"; then
-        local log_backup_file="$LH_LOG_DIR/logs_${service_name}_$(date '+%Y%m%d-%H%M').log"
+        local log_backup_file
+        log_backup_file="$LH_LOG_DIR/logs_${service_name}_$(date '+%Y%m%d-%H%M').log"
         "${journalctl_base_cmd[@]}" "${journalctl_time_opts[@]}" "${journalctl_filter_opts[@]}" --no-pager > "$log_backup_file"
         echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'LOG_SUCCESS_SAVED' "$log_backup_file")${LH_COLOR_RESET}"
     fi
@@ -340,7 +370,7 @@ function logs_show_xorg() {
 
         local xorg_option_prompt
         xorg_option_prompt="$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'LOG_PROMPT_CHOOSE_OPTION')${LH_COLOR_RESET}")"
-        read -p "$xorg_option_prompt" xorg_option
+        read -r -p "$xorg_option_prompt" xorg_option
 
         case $xorg_option in
             2)
@@ -369,7 +399,8 @@ function logs_show_xorg() {
         esac
 
         if lh_confirm_action "$(lh_msg 'LOG_CONFIRM_SAVE_LOGS')" "n"; then
-            local log_backup_file="$LH_LOG_DIR/xorg_logs_$(date '+%Y%m%d-%H%M').log"
+            local log_backup_file
+            log_backup_file="$LH_LOG_DIR/xorg_logs_$(date '+%Y%m%d-%H%M').log"
             $LH_SUDO_CMD cp "$xorg_log_path" "$log_backup_file"
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'LOG_SUCCESS_SAVED' "$log_backup_file")${LH_COLOR_RESET}"
         fi
@@ -393,18 +424,18 @@ function logs_show_dmesg() {
 
     local dmesg_option_prompt
     dmesg_option_prompt="$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'LOG_PROMPT_CHOOSE_OPTION')${LH_COLOR_RESET}")"
-    read -p "$dmesg_option_prompt" dmesg_option
+    read -r -p "$dmesg_option_prompt" dmesg_option
 
     local lines # Declare for case 2
     local keyword # Declare for case 3
-    local dmesg_cmd_display_args=()
     local dmesg_cmd_save_args=()
 
     case $dmesg_option in
         2)
             local lines_default="50"
             local lines_str
-            local lines_prompt="$(lh_msg 'LOG_PROMPT_LINES' "$lines_default")"
+            local lines_prompt
+            lines_prompt="$(lh_msg 'LOG_PROMPT_LINES' "$lines_default")"
 
             lines_str=$(lh_ask_for_input "$lines_prompt" "^[0-9]*$" "$(lh_msg 'LOG_ERROR_INVALID_INPUT')")
             lines=${lines_str:-$lines_default} # lines is already declared here
@@ -458,13 +489,15 @@ function logs_show_dmesg() {
             ;;
     esac
 
-    # Only ask if output was actually produced (e.g. not for aborted keyword input)
+    # Only ask if output was actually produced (e.g. not for aborted keyword input).
+    # Keyword availability is already validated earlier.
     if [ "$dmesg_option" == "1" ] || \
-       ([ "$dmesg_option" == "2" ] && [ -n "$lines" ]) || \
-       ([ "$dmesg_option" == "3" ] && [ -n "$keyword" ]) || \ # keyword check is already done, this is fine
+       { [ "$dmesg_option" == "2" ] && [ -n "$lines" ]; } || \
+       { [ "$dmesg_option" == "3" ] && [ -n "$keyword" ]; } || \
        [ "$dmesg_option" == "4" ]; then
         if lh_confirm_action "$(lh_msg 'LOG_CONFIRM_SAVE_DISPLAYED')" "n"; then
-            local log_backup_file="$LH_LOG_DIR/dmesg_$(date '+%Y%m%d-%H%M').log"
+            local log_backup_file
+            log_backup_file="$LH_LOG_DIR/dmesg_$(date '+%Y%m%d-%H%M').log"
             case $dmesg_option in
                 2)
                     $LH_SUDO_CMD dmesg | tail -n "$lines" > "$log_backup_file"
@@ -521,7 +554,7 @@ function logs_show_package_manager() {
                 log_file="/var/log/dnf.rpm.log"
             elif [ -d "/var/log/dnf" ]; then
                 # Use latest log file
-                log_file=$(ls -t /var/log/dnf/dnf.log* 2>/dev/null | head -n 1)
+                log_file=$(find /var/log/dnf -maxdepth 1 -type f -name 'dnf.log*' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n 1 | cut -d' ' -f2-)
             else
                 lh_print_boxed_message \
                     --preset warning \
@@ -556,7 +589,7 @@ function logs_show_package_manager() {
 
     local pkg_log_option_prompt
     pkg_log_option_prompt="$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'LOG_PROMPT_CHOOSE_OPTION')${LH_COLOR_RESET}")"
-    read -p "$pkg_log_option_prompt" pkg_log_option
+    read -r -p "$pkg_log_option_prompt" pkg_log_option
 
     case $pkg_log_option in
         2)
@@ -626,7 +659,8 @@ function logs_show_package_manager() {
             echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'LOG_SEPARATOR')${LH_COLOR_RESET}"
             ;;
         5)
-            local package=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_PACKAGE_NAME')")
+            local package
+            package=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_PACKAGE_NAME')")
 
             if [ -z "$package" ]; then
         lh_print_boxed_message \
@@ -649,7 +683,8 @@ function logs_show_package_manager() {
     esac
 
     if lh_confirm_action "$(lh_msg 'LOG_CONFIRM_SAVE_DISPLAYED')" "n"; then
-        local log_backup_file="$LH_LOG_DIR/${LH_PKG_MANAGER}_logs_$(date '+%Y%m%d-%H%M').log"
+        local log_backup_file
+        log_backup_file="$LH_LOG_DIR/${LH_PKG_MANAGER}_logs_$(date '+%Y%m%d-%H%M').log"
         case $pkg_log_option in
             2)
                 case $LH_PKG_MANAGER in
@@ -798,7 +833,7 @@ function logs_advanced_analysis() {
 
     local log_source_option_prompt
     log_source_option_prompt="$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'LOG_PROMPT_CHOOSE_OPTION')${LH_COLOR_RESET}")"
-    read -p "$log_source_option_prompt" log_source_option
+    read -r -p "$log_source_option_prompt" log_source_option
 
 
     local log_file=""
@@ -841,23 +876,26 @@ function logs_advanced_analysis() {
 
             local journal_option_prompt
             journal_option_prompt="$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'LOG_PROMPT_CHOOSE_OPTION')${LH_COLOR_RESET}")"
-            read -p "$journal_option_prompt" journal_option
+            read -r -p "$journal_option_prompt" journal_option
 
-            local journal_file="$LH_LOG_DIR/journalctl_export_$(date '+%Y%m%d-%H%M').log"
+            local journal_file
+            journal_file="$LH_LOG_DIR/journalctl_export_$(date '+%Y%m%d-%H%M').log"
 
             case $journal_option in
                 1)
                     $LH_SUDO_CMD journalctl -b > "$journal_file"
                     ;;
                 2)
-                    local hours=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_HOURS' "24")")
+                    local hours
+                    hours=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_HOURS' "24")")
                     if [ -z "$hours" ]; then
                         hours="24"
                     fi
                     $LH_SUDO_CMD journalctl --since "$hours hours ago" > "$journal_file"
                     ;;
                3)
-                   local service=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_SERVICE_NAME')")
+                   local service
+                   service=$(lh_ask_for_input "$(lh_msg 'LOG_PROMPT_SERVICE_NAME')")
                    $LH_SUDO_CMD journalctl -u "$service" > "$journal_file"
                    ;;
                *)
@@ -924,7 +962,7 @@ function logs_advanced_analysis() {
 
                 local log_choice_prompt
                 log_choice_prompt="$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'LOG_ANALYSIS_SELECT_LOG' "$((i-1))")${LH_COLOR_RESET}")"
-                read -p "$log_choice_prompt" log_choice
+                read -r -p "$log_choice_prompt" log_choice
 
                 if ! [[ "$log_choice" =~ ^[0-9]+$ ]] || [ "$log_choice" -lt 1 ] || [ "$log_choice" -gt $((i-1)) ]; then
                     lh_print_boxed_message \
@@ -956,7 +994,7 @@ function logs_advanced_analysis() {
     echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'LOG_ANALYSIS_OPTION_SUMMARY')${LH_COLOR_RESET}"
     local analysis_option_prompt
     analysis_option_prompt="$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'LOG_PROMPT_CHOOSE_OPTION')${LH_COLOR_RESET}")"
-    read -p "$analysis_option_prompt" analysis_option
+    read -r -p "$analysis_option_prompt" analysis_option
 
     local analysis_args=""
 
@@ -973,9 +1011,7 @@ function logs_advanced_analysis() {
     esac
 
     echo -e "${LH_COLOR_INFO}$(lh_msg 'LOG_STATUS_STARTING_ANALYSIS' "$log_file")${LH_COLOR_RESET}"
-    $LH_SUDO_CMD "$python_cmd" "$python_script" "$log_file" --format "$log_format" $analysis_args
-
-    if [ $? -ne 0 ]; then
+    if ! $LH_SUDO_CMD "$python_cmd" "$python_script" "$log_file" --format "$log_format" $analysis_args; then
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'LOG_ERROR_ANALYSIS_FAILED')${LH_COLOR_RESET}"
     fi
 }
@@ -999,7 +1035,7 @@ function log_analyzer_menu() {
         local option_prompt
         option_prompt="$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET} ")"
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-        read -p "$option_prompt" option
+        read -r -p "$option_prompt" option
 
         case $option in
             1)

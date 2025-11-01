@@ -69,7 +69,17 @@ if [[ "$gui_mode" == true ]]; then
 fi
 
 # Load library with common functions
-source "$LH_ROOT_DIR/lib/lib_common.sh"
+LIB_COMMON_PATH="$LH_ROOT_DIR/lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Initializations
 lh_ensure_config_files_exist  # Ensure configuration files exist

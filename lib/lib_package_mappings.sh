@@ -7,6 +7,7 @@
 # Package name mappings for different package managers
 
 # Mapping of program names to package names for different package managers
+# shellcheck disable=SC2034  # arrays exported for consumption by lib/lib_packages.sh
 declare -A package_names_pacman=(
     ["smartctl"]="smartmontools"
     ["lsof"]="lsof"
@@ -74,7 +75,6 @@ declare -A package_names_pacman=(
     ["nodejs"]="nodejs"
     ["npm"]="npm"
 )
-
 declare -A package_names_apt=(
     ["smartctl"]="smartmontools"
     ["lsof"]="lsof"

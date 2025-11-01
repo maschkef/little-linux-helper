@@ -25,8 +25,29 @@
 # following best practices for safe operations.
 
 # Load common library and BTRFS library
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_btrfs.sh"
+LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
+
+LIB_BTRFS_PATH="$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_btrfs.sh"
+if [[ ! -r "$LIB_BTRFS_PATH" ]]; then
+    echo "Missing required library: $LIB_BTRFS_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_btrfs.sh
+source "$LIB_BTRFS_PATH"
 
 
 # Function to get the final list of subvolumes for restore operations
@@ -499,7 +520,7 @@ btrfs_restore_find_subvol_path_by_uuid() {
 
     local line
     for line in "${RESTORE_BUNDLE_INVENTORY_CACHE[@]}"; do
-        IFS='|' read -r record_type bundle_name subvol_name subvol_path size_bytes marker_present received_uuid meta_has_error meta_size_bytes meta_size_human subvol_uuid parent_uuid <<<"$line"
+        IFS='|' read -r record_type bundle_name subvol_name subvol_path size_bytes _ received_uuid meta_has_error _ meta_size_human _ _ <<<"$line"
         if [[ "$record_type" != "subvol" ]]; then
             continue
         fi
@@ -1032,7 +1053,8 @@ check_restore_space() {
             local available_bytes
             available_bytes=$(get_btrfs_available_space "$target_filesystem" 2>/dev/null)
             if [[ -n "$available_bytes" && "$available_bytes" =~ ^[0-9]+$ ]]; then
-                local available_gb=$((available_bytes / 1024 / 1024 / 1024))
+                local available_gb
+                available_gb=$((available_bytes / 1024 / 1024 / 1024))
                 restore_log_msg "INFO" "Available space: ${available_gb}GB"
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_AVAILABLE_SPACE' "${available_gb}GB")${LH_COLOR_RESET}"
                 
@@ -1045,9 +1067,11 @@ check_restore_space() {
                         multiplier=3
                     fi
                     restore_log_msg "DEBUG" "Atomic workflow space multiplier: x$multiplier"
-                    local required_bytes=$((estimated_snapshot_size * multiplier))
+                    local required_bytes
+                    required_bytes=$((estimated_snapshot_size * multiplier))
                     if [[ $available_bytes -lt $required_bytes ]]; then
-                        local required_gb=$((required_bytes / 1024 / 1024 / 1024))
+                        local required_gb
+                        required_gb=$((required_bytes / 1024 / 1024 / 1024))
                         restore_log_msg "WARN" "Insufficient space for atomic workflow: need ~${required_gb}GB, have ${available_gb}GB"
                         echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_INSUFFICIENT_ATOMIC_SPACE' "${required_gb}GB" "${available_gb}GB")${LH_COLOR_RESET}"
                         
@@ -1134,7 +1158,8 @@ display_safety_warnings() {
 
     lh_print_header "$(lh_msg 'RESTORE_SAFETY_WARNINGS')"
 
-    local title="$(lh_msg 'RESTORE_WARNING_CRITICAL_HEADING')"
+    local title
+    title="$(lh_msg 'RESTORE_WARNING_CRITICAL_HEADING')"
     local warning_lines=(
         "$(lh_msg 'RESTORE_WARNING_DESTRUCTIVE')"
         "$(lh_msg 'RESTORE_WARNING_BACKUP')"
@@ -1176,7 +1201,8 @@ detect_backup_drives() {
     
     # Scan all mounted BTRFS filesystems for backup directories
     while IFS= read -r mount_line; do
-        local mount_point=$(echo "$mount_line" | awk '{print $3}')
+        local mount_point
+        mount_point=$(echo "$mount_line" | awk '{print $3}')
         local backup_path="${mount_point}/${LH_BACKUP_DIR}"
         
         # Check for new bundle-based layout
@@ -1200,7 +1226,8 @@ detect_target_drives() {
     
     # Scan all mounted BTRFS filesystems for standard subvolumes
     while IFS= read -r mount_line; do
-        local mount_point=$(echo "$mount_line" | awk '{print $3}')
+        local mount_point
+        mount_point=$(echo "$mount_line" | awk '{print $3}')
         
         # Check for BTRFS subvolume layout using dynamic detection
         local has_subvolumes=false
@@ -1229,7 +1256,8 @@ setup_restore_environment() {
     # Step 1: Configure backup source
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_SETUP_BACKUP_SOURCE')${LH_COLOR_RESET}"
     
-    local -a backup_drives=($(detect_backup_drives))
+    local -a backup_drives
+    mapfile -t backup_drives < <(detect_backup_drives)
     
     if [[ ${#backup_drives[@]} -gt 0 ]]; then
         echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_AUTO_DETECTED_BACKUPS'):${LH_COLOR_RESET}"
@@ -1283,7 +1311,8 @@ setup_restore_environment() {
     echo ""
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_SETUP_TARGET_SYSTEM')${LH_COLOR_RESET}"
     
-    local -a target_drives=($(detect_target_drives))
+    local -a target_drives
+    mapfile -t target_drives < <(detect_target_drives)
     
     if [[ ${#target_drives[@]} -gt 0 ]]; then
         echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_AUTO_DETECTED_TARGETS'):${LH_COLOR_RESET}"
@@ -1371,7 +1400,13 @@ setup_restore_environment() {
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_BACKUP_SOURCE'):${LH_COLOR_RESET} ${BACKUP_ROOT}/${LH_BACKUP_DIR}"
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_TARGET_SYSTEM'):${LH_COLOR_RESET} $TARGET_ROOT"
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_TEMP_DIR'):${LH_COLOR_RESET} $TEMP_SNAPSHOT_DIR"
-    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_OPERATION_MODE'):${LH_COLOR_RESET} $([ "$DRY_RUN" == "true" ] && echo "$(lh_msg 'RESTORE_DRY_RUN')" || echo "$(lh_msg 'RESTORE_ACTUAL')")"
+    local mode_label
+    if [[ "$DRY_RUN" == "true" ]]; then
+        mode_label=$(lh_msg 'RESTORE_DRY_RUN')
+    else
+        mode_label=$(lh_msg 'RESTORE_ACTUAL')
+    fi
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_OPERATION_MODE'):${LH_COLOR_RESET} $mode_label"
     echo ""
 
     if ! display_safety_warnings "auto"; then
@@ -1508,7 +1543,8 @@ safely_replace_subvolume() {
     
     if [[ "$DRY_RUN" == "false" ]]; then
         # Check if existing subvolume has received_uuid (critical for BTRFS)
-        local existing_received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$existing_subvol" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+        local existing_received_uuid
+        existing_received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$existing_subvol" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
         
         if [[ -n "$existing_received_uuid" && "$existing_received_uuid" != "-" ]]; then
             restore_log_msg "WARN" "Existing subvolume has received_uuid: $existing_received_uuid"
@@ -1542,7 +1578,8 @@ safely_replace_subvolume() {
         fi
     else
         # Enhanced dry-run logging with received_uuid awareness
-        local existing_received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$existing_subvol" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+        local existing_received_uuid
+        existing_received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$existing_subvol" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
         
         if [[ -n "$existing_received_uuid" && "$existing_received_uuid" != "-" ]]; then
             restore_log_msg "INFO" "DRY-RUN: Would create BTRFS snapshot $existing_subvol -> $backup_name (preserving received_uuid: $existing_received_uuid)"
@@ -1583,7 +1620,8 @@ perform_subvolume_restore() {
     fi
     
     # Create timestamp for this operation
-    local operation_timestamp=$(date '+%Y%m%d_%H%M%S')
+    local operation_timestamp
+    operation_timestamp=$(date '+%Y%m%d_%H%M%S')
     
     # Handle existing subvolume replacement
     local target_path="${TARGET_ROOT}/${target_subvol_name}"
@@ -1603,7 +1641,8 @@ perform_subvolume_restore() {
     local estimated_size_bytes=0
     if command -v du >/dev/null 2>&1; then
         estimated_size_bytes=$(du -sb "$snapshot_to_use" 2>/dev/null | cut -f1 || echo "0")
-        local estimated_size_human=$(du -sh "$snapshot_to_use" 2>/dev/null | cut -f1)
+        local estimated_size_human
+        estimated_size_human=$(du -sh "$snapshot_to_use" 2>/dev/null | cut -f1)
         if [[ -n "$estimated_size_human" ]]; then
             echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_ESTIMATED_SIZE' "$estimated_size_human")${LH_COLOR_RESET}"
         fi
@@ -1643,7 +1682,8 @@ perform_subvolume_restore() {
             return 1
         fi
 
-        local expected_received_path="${TEMP_SNAPSHOT_DIR}/$(basename "$snapshot_to_use")"
+        local expected_received_path
+        expected_received_path="${TEMP_SNAPSHOT_DIR}/$(basename "$snapshot_to_use")"
 
         if [[ -d "$expected_received_path" ]]; then
             if [[ "$LH_RESTORE_KEEP_ANCHOR" == "true" ]]; then
@@ -1843,7 +1883,7 @@ list_available_snapshots() {
 
     local line
     for line in "${RESTORE_BUNDLE_INVENTORY_CACHE[@]}"; do
-        IFS='|' read -r record_type field2 field3 field4 field5 field6 field7 field8 field9 field10 field11 field12 <<<"$line"
+        IFS='|' read -r record_type field2 field3 field4 field5 _ field7 field8 field9 field10 _ _ <<<"$line"
         if [[ "$record_type" == "bundle" ]]; then
             bundle_dates["$field2"]="$field9"
             continue
@@ -1857,10 +1897,8 @@ list_available_snapshots() {
         local subvol_name="$field3"
         local subvol_path="$field4"
         local size_bytes="$field5"
-        local marker_present="$field6"
         local received_uuid="$field7"
         local meta_has_error="$field8"
-        local meta_size_bytes="$field9"
         local meta_size_human="$field10"
 
         if [[ "$subvol_name" != "$subvolume" ]]; then
@@ -1994,7 +2032,8 @@ select_restore_type_and_snapshot() {
             for first_snap in "${first_snapshots[@]}"; do
                 # Extract bundle name (timestamp) from snapshot path
                 # New structure: /snapshots/<bundle_timestamp>/<subvolume>
-                local bundle_name=$(basename $(dirname "$first_snap"))
+                local bundle_name
+                bundle_name=$(basename "$(dirname "$first_snap")")
                 
                 # Skip if we've already processed this bundle
                 if [[ -n "${seen_bundles[$bundle_name]:-}" ]]; then
@@ -2012,7 +2051,8 @@ select_restore_type_and_snapshot() {
                         local found_match=false
                         
                         for snap in "${subvol_snapshots[@]}"; do
-                            local snap_bundle=$(basename $(dirname "$snap"))
+                            local snap_bundle
+                            snap_bundle=$(basename "$(dirname "$snap")")
                             # Match by bundle timestamp
                             if [[ "$snap_bundle" == "$bundle_name" ]]; then
                                 matching_set="$matching_set|$subvol:$snap"
@@ -2046,7 +2086,8 @@ select_restore_type_and_snapshot() {
                 # Get bundle name from first snapshot in the set
                 local first_snap="${subvol_snapshots[0]}"
                 IFS=':' read -r _ snap_path <<< "$first_snap"
-                local bundle_name=$(basename $(dirname "$snap_path"))
+                local bundle_name
+                bundle_name=$(basename "$(dirname "$snap_path")")
                 
                 # Display bundle name and subvolume count
                 echo "$bundle_name (${#subvol_snapshots[@]} subvolumes)"
@@ -2133,8 +2174,10 @@ select_restore_type_and_snapshot() {
             # Get bundle name for display
             local first_subvol="${restore_subvols[0]}"
             local first_snapshot="${selected_snapshots[$first_subvol]}"
-            local bundle_name=$(basename $(dirname "$first_snapshot"))
-            local bundle_path=$(dirname "$first_snapshot")
+            local bundle_name
+            bundle_name=$(basename "$(dirname "$first_snapshot")")
+            local bundle_path
+            bundle_path=$(dirname "$first_snapshot")
             
             # Set global marker file path for bootloader configuration
             restore_log_msg "DEBUG" "First snapshot path: $first_snapshot"
@@ -2143,7 +2186,8 @@ select_restore_type_and_snapshot() {
             
             # Marker files are stored in backups/meta/ directory with timestamp as filename
             # Extract BACKUP_ROOT properly by removing /snapshots/timestamp from bundle_path
-            local backups_base=$(dirname $(dirname "$bundle_path"))
+            local backups_base
+            backups_base=$(dirname "$(dirname "$bundle_path")")
             RESTORE_MARKER_FILE="${backups_base}/meta/${bundle_name}.json"
             restore_log_msg "DEBUG" "Looking for marker file at: $RESTORE_MARKER_FILE"
             
@@ -2180,19 +2224,21 @@ select_restore_type_and_snapshot() {
             
             # Perform atomic complete system restore with rollback capability
             restore_log_msg "INFO" "Starting atomic complete system restore for subvolumes: ${restore_subvols[*]}"
-            local restore_timestamp=$(date '+%Y%m%d_%H%M%S')
+            local restore_timestamp
+            restore_timestamp=$(date '+%Y%m%d_%H%M%S')
             declare -A backup_created
-            declare -A original_backups
             local bootloader_modified="false"
             local restore_success=true
             local current_phase=1
-            local total_phases=$((${#restore_subvols[@]} + 1))  # +1 for bootloader
+            local total_phases
+            total_phases=$((${#restore_subvols[@]} + 1))  # +1 for bootloader
             
             # Initialize backup tracking
             for subvol in "${restore_subvols[@]}"; do
                 backup_created["$subvol"]="false"
-                original_backups["$subvol"]="${TARGET_ROOT}/${subvol}.backup_before_restore_${restore_timestamp}"
             done
+            local tracked_subvols=("${!backup_created[@]}")
+            restore_log_msg "DEBUG" "Initialized backup tracking for subvolumes: ${tracked_subvols[*]}"
             
             # Perform restore for each subvolume in order
             for subvol in "${restore_subvols[@]}"; do
@@ -2254,7 +2300,8 @@ select_restore_type_and_snapshot() {
             
         *)
             # Single subvolume restore - handle dynamic options
-            local subvol_index=$((restore_type - 2))
+            local subvol_index
+            subvol_index=$((restore_type - 2))
             
             if [[ "$subvol_index" -lt 0 || "$subvol_index" -ge ${#available_subvols[@]} ]]; then
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
@@ -2262,7 +2309,8 @@ select_restore_type_and_snapshot() {
             fi
             
             local subvolume="${available_subvols[$subvol_index]}"
-            local restore_name="$(lh_msg 'RESTORE_SUBVOLUME' "$subvolume")"
+            local restore_name
+            restore_name="$(lh_msg 'RESTORE_SUBVOLUME' "$subvolume")"
             
             echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_SINGLE_SUBVOLUME_SELECTED' "$restore_name")${LH_COLOR_RESET}"
             
@@ -2308,14 +2356,14 @@ select_restore_type_and_snapshot() {
                     potential_parent=$(btrfs_restore_find_subvol_path_by_uuid "$received_uuid" "$subvolume") || potential_parent=""
 
                     if [[ -n "$potential_parent" ]]; then
-                        restore_log_msg "DEBUG" "Found matching parent snapshot: $(basename $(dirname "$potential_parent"))"
+                        restore_log_msg "DEBUG" "Found matching parent snapshot: $(basename "$(dirname "$potential_parent")")"
 
                         if validate_parent_snapshot_chain "$potential_parent" "$selected_snapshot" "$selected_snapshot"; then
                             restore_log_msg "DEBUG" "Parent chain validation passed"
                             RESTORE_VERIFIED_RECEIVED_UUID["$selected_snapshot"]="${received_uuid,,}"
                             found_parent=true
                         else
-                            restore_log_msg "WARN" "Parent chain validation failed for: $(basename $(dirname "$potential_parent"))"
+                            restore_log_msg "WARN" "Parent chain validation failed for: $(basename "$(dirname "$potential_parent")")"
                         fi
                     fi
                 fi
@@ -2355,11 +2403,6 @@ select_restore_type_and_snapshot() {
                 echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTORE_SINGLE_SUBVOLUME_FAILED' "$restore_name")${LH_COLOR_RESET}"
                 return 1
             fi
-            ;;
-            
-        *)
-            echo -e "${LH_COLOR_ERROR}$(lh_msg 'INVALID_SELECTION')${LH_COLOR_RESET}"
-            return 1
             ;;
     esac
     
@@ -2659,12 +2702,13 @@ detect_boot_configuration() {
     DETECTED_FSTAB_USES_SUBVOL="$fstab_uses_subvol"
     DETECTED_GRUB_USES_SUBVOL="$grub_uses_subvol"
     DETECTED_CURRENT_DEFAULT="$current_default_subvol"
-    DETECTED_BOOT_METHOD="$detection_method"
     DETECTED_BOOT_CONFIG_RESULT="$boot_config_result"  # Store the full analysis result
     
     restore_log_msg "INFO" "Boot configuration analysis completed via $detection_method"
     restore_log_msg "DEBUG" "Detected strategy: $boot_strategy"
     restore_log_msg "DEBUG" "Global variable DETECTED_BOOT_STRATEGY set to: $DETECTED_BOOT_STRATEGY"
+    restore_log_msg "DEBUG" "Global variable DETECTED_FSTAB_USES_SUBVOL set to: $DETECTED_FSTAB_USES_SUBVOL"
+    restore_log_msg "DEBUG" "Global variable DETECTED_GRUB_USES_SUBVOL set to: $DETECTED_GRUB_USES_SUBVOL"
     
     # Also output to stdout for backward compatibility
     echo -e "$boot_config_result"
@@ -2674,11 +2718,12 @@ detect_boot_configuration() {
 # Create backup of critical bootloader files before modification
 backup_bootloader_files() {
     local target_root="$1"
-    local backup_suffix="_pre_restore_$(date '+%Y%m%d_%H%M%S')"
+    local backup_suffix
+    backup_suffix="_pre_restore_$(date '+%Y%m%d_%H%M%S')"
     
     restore_log_msg "INFO" "Creating bootloader configuration backups"
     
-    local backup_created="false"
+    local backups_created="false"
     local backup_files=()
     
     # Backup fstab
@@ -2688,13 +2733,13 @@ backup_bootloader_files() {
             if $LH_SUDO_CMD cp "$fstab_path" "${fstab_path}${backup_suffix}"; then
                 restore_log_msg "INFO" "Backed up fstab: ${fstab_path}${backup_suffix}"
                 backup_files+=("${fstab_path}${backup_suffix}")
-                backup_created="true"
+                backups_created="true"
             else
                 restore_log_msg "WARN" "Failed to backup fstab: $fstab_path"
             fi
         else
             restore_log_msg "INFO" "DRY-RUN: Would backup fstab to ${fstab_path}${backup_suffix}"
-            backup_created="true"
+            backups_created="true"
         fi
     fi
     
@@ -2705,7 +2750,7 @@ backup_bootloader_files() {
             if $LH_SUDO_CMD cp "$grub_cfg_path" "${grub_cfg_path}${backup_suffix}"; then
                 restore_log_msg "INFO" "Backed up GRUB config: ${grub_cfg_path}${backup_suffix}"
                 backup_files+=("${grub_cfg_path}${backup_suffix}")
-                backup_created="true"
+                backups_created="true"
             else
                 restore_log_msg "WARN" "Failed to backup GRUB config: $grub_cfg_path"
             fi
@@ -2715,7 +2760,7 @@ backup_bootloader_files() {
     fi
     
     # Store backup file list for potential rollback
-    if [[ "$backup_created" == "true" ]]; then
+    if [[ "$backups_created" == "true" ]]; then
         BOOTLOADER_BACKUP_FILES=("${backup_files[@]}")
         restore_log_msg "INFO" "Bootloader backup completed: ${#backup_files[@]} files backed up"
         return 0
@@ -3214,8 +3259,8 @@ handle_bootloader_configuration() {
     
     # Initialize global variables for detection results
     DETECTED_BOOT_STRATEGY=""
-    DETECTED_FSTAB_USES_SUBVOL=""
-    DETECTED_GRUB_USES_SUBVOL=""
+    unset DETECTED_FSTAB_USES_SUBVOL
+    unset DETECTED_GRUB_USES_SUBVOL
     DETECTED_CURRENT_DEFAULT=""
     BOOTLOADER_BACKUP_FILES=()
     
@@ -3233,8 +3278,6 @@ handle_bootloader_configuration() {
             root_subvol="@root"
         fi
     done
-    
-    local restored_root="${TARGET_ROOT}/${root_subvol}"
     
     # Execute the enhanced boot strategy selection
     if choose_boot_strategy "$TARGET_ROOT" "$root_subvol"; then
@@ -3318,7 +3361,13 @@ post_restore_verification() {
             # Offer to open in editor
             local editor="${EDITOR:-nano}"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_OPENING_EDITOR' "$editor")${LH_COLOR_RESET}"
-            $LH_SUDO_CMD $editor "$fstab_path"
+            local -a edit_cmd=()
+            if [ -n "$LH_SUDO_CMD" ]; then
+                # shellcheck disable=SC2206  # intentional split of LH_SUDO_CMD into words
+                edit_cmd=( $LH_SUDO_CMD )
+            fi
+            edit_cmd+=("$editor" "$fstab_path")
+            "${edit_cmd[@]}"
             echo -e "${LH_COLOR_SUCCESS}✓ $(lh_msg 'RESTORE_FSTAB_UPDATED')${LH_COLOR_RESET}"
         else
             echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_FSTAB_SKIPPED')${LH_COLOR_RESET}"
@@ -3538,7 +3587,8 @@ restore_folder_from_snapshot() {
         echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTORE_TARGET_FOLDER_EXISTS' "$target_folder")${LH_COLOR_RESET}"
         
         if lh_confirm_action "$(lh_msg 'RESTORE_BACKUP_EXISTING_FOLDER')" "y"; then
-            local backup_folder="${target_folder}.backup_$(date '+%Y%m%d_%H%M%S')"
+            local backup_folder
+            backup_folder="${target_folder}.backup_$(date '+%Y%m%d_%H%M%S')"
             
             if [[ "$DRY_RUN" == "false" ]]; then
                 if $LH_SUDO_CMD mv "$target_folder" "$backup_folder"; then
@@ -3573,7 +3623,8 @@ restore_folder_from_snapshot() {
     
     if [[ "$DRY_RUN" == "false" ]]; then
         # Create parent directory if needed
-        local parent_dir=$(dirname "$target_folder")
+        local parent_dir
+        parent_dir=$(dirname "$target_folder")
         mkdir -p "$parent_dir"
         
         # Copy with preserved attributes
@@ -3626,7 +3677,7 @@ cleanup_old_restore_artifacts() {
             if [[ $(find "$artifact" -maxdepth 0 -mtime +$retention_days -print 2>/dev/null) ]]; then
                 old_artifacts+=("$artifact")
             fi
-        done < <(find "$cleanup_dir" -maxdepth 1 -name "*restore*" -o -name "*backup*" -o -name "*.receiving" -print0 2>/dev/null)
+        done < <(find "$cleanup_dir" -maxdepth 1 \( -name "*restore*" -o -name "*backup*" -o -name "*.receiving" \) -print0 2>/dev/null)
         
         for artifact in "${old_artifacts[@]}"; do
             restore_log_msg "INFO" "Removing old restore artifact: $(basename "$artifact")"
@@ -3708,7 +3759,8 @@ show_disk_information() {
             local available_bytes
             available_bytes=$(get_btrfs_available_space "$TARGET_ROOT" 2>/dev/null)
             if [[ -n "$available_bytes" && "$available_bytes" =~ ^[0-9]+$ ]]; then
-                local available_gb=$((available_bytes / 1024 / 1024 / 1024))
+                local available_gb
+                available_gb=$((available_bytes / 1024 / 1024 / 1024))
                 echo -e "    💾 Available space: ${available_gb}GB"
             fi
         else
@@ -3759,7 +3811,13 @@ show_restore_menu() {
             echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_CURRENT_CONFIG'):${LH_COLOR_RESET}"
             echo -e "  $(lh_msg 'RESTORE_BACKUP_SOURCE'): ${BACKUP_ROOT}/${LH_BACKUP_DIR}"
             echo -e "  $(lh_msg 'RESTORE_TARGET_SYSTEM'): $TARGET_ROOT"
-            echo -e "  $(lh_msg 'RESTORE_MODE'): $([ "$DRY_RUN" == "true" ] && echo "$(lh_msg 'RESTORE_DRY_RUN')" || echo "$(lh_msg 'RESTORE_ACTUAL')")"
+            local mode_text
+            if [[ "$DRY_RUN" == "true" ]]; then
+                mode_text=$(lh_msg 'RESTORE_DRY_RUN')
+            else
+                mode_text=$(lh_msg 'RESTORE_ACTUAL')
+            fi
+            echo -e "  $(lh_msg 'RESTORE_MODE'): $mode_text"
             echo ""
         fi
         
@@ -3775,7 +3833,7 @@ show_restore_menu() {
         echo ""
 
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET}")" option
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET}")" option
 
         case $option in
             1)

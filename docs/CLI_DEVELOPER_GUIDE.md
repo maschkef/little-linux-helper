@@ -627,6 +627,143 @@ The modular library system provides several significant advantages:
 - Custom loading orders can be implemented for specialized requirements
 - Components can be easily mocked or stubbed for testing purposes
 
+#### 6.5 Spellcheck (“spellcheck”) Workflow
+
+“Spellcheck” is our short-hand for running [ShellCheck](https://www.shellcheck.net/) on Little Linux Helper scripts. We treat it as a quality gate: zero errors, warnings fixed or explicitly justified. The rules below capture our project conventions learned from hardening the codebase.
+
+##### Runbook
+
+- Full sweep (JSON for tooling)
+    ```bash
+    find lib modules scripts lang -name '*.sh' -print0 \
+        | xargs -0 shellcheck -x -s bash -f json1
+    ```
+    Run from repo root. Store the raw report under `temp/` for review context.
+
+- Quick status summary
+    ```bash
+    find lib modules scripts lang -name '*.sh' -print0 \
+        | xargs -0 shellcheck -x -s bash -f json1 \
+        | jq -r '
+                .comments
+                | group_by(.level)
+                | map({(.[0].level): length})
+                | add
+                | {error: (.error//0), warning: (.warning//0), info: (.info//0), style: (.style//0)}
+                | to_entries[]
+                | [.key, (.value|tostring)]
+                | @tsv
+            '
+    ```
+    Paste this four-line summary into review notes.
+
+- Focused iterations while coding
+    ```bash
+    shellcheck -x modules/backup/mod_restore_tar.sh
+    shellcheck -x scripts/analyze_language_tags.sh
+    ```
+    Use targeted runs during edits; finish with the full sweep.
+
+##### Rules-to-commit checklist (with codes)
+
+- Quoting and assignment
+    - [SC2155] Don’t assign with command substitution in the same `local`/`declare` line. Use two steps:
+        - `local v; v=$(cmd)`
+    - [SC2086] Quote all parameter expansions unless you really want word splitting or globbing.
+    - [SC2162] Use `read -r` (and `-p` for prompts) so backslashes aren’t eaten.
+
+- Command success and flow
+    - [SC2181] Prefer `if cmd; then ... fi` instead of checking `$?`.
+    - Use `[[ ... ]]` for tests; quote variables inside arithmetic/string comparisons.
+
+- Arrays and word-splitting safety
+    - [SC2207] Don’t use `arr=($(cmd))` — it breaks on spaces/newlines. Prefer:
+        - `mapfile -t arr < <(cmd)`
+    - Build commands as arrays and expand with `${arr[@]}` to preserve argument boundaries.
+    - When intentionally splitting a variable like `LH_SUDO_CMD`, document it and (if needed) allow a local `# shellcheck disable=SC2206` with a short comment.
+
+- Parsing and text processing
+    - [SC2012] Don’t parse `ls`. Use `find ... -printf` + `sort`, and make sorting locale-stable with `LC_ALL=C`.
+    - Group `find` alternations with parentheses: `find ... \( -name 'a' -o -name 'b' \)`.
+    - [SC2001] Prefer parameter expansion for trivial prefix/suffix changes: `${name%.service}` instead of `sed`.
+    - [SC2016] In AWK snippets, when using `$1`, `$2`, etc., add `# shellcheck disable=SC2016` above and pass shell vars with `-v var="$value"`.
+    - [SC2059] Avoid format-string injection. Build the message first, then `printf '%s\n' "$msg"`, or use `lh_msg` directly.
+
+- Reading structured lines
+    - Use `IFS='|' read -r a b _ c ...` and bind unused fields to `_` to avoid unused-var noise and keep future-proofing.
+
+- Dynamic sources and includes
+    - [SC1090, SC1091] For dynamic `source` paths, check readability and annotate the expected source for ShellCheck:
+        ```bash
+        LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+        if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+            echo "Missing required library: $LIB_COMMON_PATH" >&2; return 1
+        fi
+        # shellcheck source=lib/lib_common.sh
+        source "$LIB_COMMON_PATH"
+        ```
+
+- Associative arrays and arithmetic
+    - Quote lookups in numeric tests to avoid “unary operator expected”: `[ "${cnt[$k]}" -gt 0 ]`.
+    - For computed integers, assign in two steps (see SC2155) and use `$(( ... ))` on a separate line.
+
+- Locale and sorting
+    - Use `LC_ALL=C sort` for deterministic ordering in UIs and logs.
+
+- Printing and translations
+    - Prefer `lh_msg` for formatting translated strings; don’t nest `printf` around `lh_msg` with format placeholders.
+    - For colored output, compose with `echo -e "${LH_COLOR_INFO}$(lh_msg 'KEY' args...)${LH_COLOR_RESET}"` or build the message then `printf`.
+
+##### Acceptable, documented suppressions
+
+- [SC2034] Locale dictionaries and large static maps (e.g., translation arrays, package mappings) — add a single file-scoped suppression with a comment.
+- [SC1090, SC1091] Dynamic `source` paths when guarded by existence checks — add one directive per site and explain the runtime path.
+- [SC2016] Intentional AWK `$1`/`$2` usage — add a short comment and pass variables with `-v`.
+- [SC2206] Intentional word-splitting of a multi-word variable into an array (rare; document why).
+
+All other findings should be fixed in code. If you discover a legitimate false positive, add a one-line justification next to the suppression and reference this section.
+
+##### Ready-made snippets
+
+- Safe library include (dynamic path + annotation)
+    ```bash
+    LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+    if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+        echo "Missing required library: $LIB_COMMON_PATH" >&2; exit 1
+    fi
+    # shellcheck source=lib/lib_common.sh
+    source "$LIB_COMMON_PATH"
+    ```
+
+- Safe input
+    ```bash
+    read -r -p "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION')${LH_COLOR_RESET} " option
+    ```
+
+- Safe array capture
+    ```bash
+    mapfile -t backups < <(find "$LH_BACKUP_ROOT$LH_BACKUP_DIR" -maxdepth 1 -type d -name 'rsync_backup_*' -print 2>/dev/null | LC_ALL=C sort -r)
+    ```
+
+- Color + translation printing
+    ```bash
+    echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_SUCCESS')${LH_COLOR_RESET}"
+    ```
+
+##### Optional: pre-commit helper
+
+You can add a local pre-commit hook to fail on any ShellCheck finding during development:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+mapfile -t files < <(git ls-files -- lib modules scripts lang | grep -E '\\.sh$')
+[[ ${#files[@]} -eq 0 ]] && exit 0
+shellcheck -x -s bash "${files[@]}"
+```
+
+
+
 ### 7. External Dependencies (System Commands)
 
 The project uses a number of standard Linux commands. Some of the most important ones are:
@@ -709,6 +846,12 @@ When creating a new module for the Little Linux Helper, follow these essential s
    # Test English  
    export LH_LANG="en" && ./modules/mod_your_feature.sh
    ```
+
+5. **Validate with ShellCheck** (required before submitting):
+   ```bash
+   shellcheck -x modules/mod_your_feature.sh
+   ```
+   Finish with the full project sweep from [Section 6.5](#65-spellcheck-spellcheck-workflow) to ensure no regressions slip into other scripts.
 
 ### Essential Functions for Modules
 - `lh_msg "KEY"` or `lh_t "KEY"` - Get translated text

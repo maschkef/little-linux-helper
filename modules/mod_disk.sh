@@ -11,7 +11,17 @@
 
 # Load common library
 # Use BASH_SOURCE to get the correct path when sourced
-source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
@@ -85,7 +95,7 @@ function disk_smart_values() {
     done
     echo -e "${LH_COLOR_MENU_NUMBER}$i)${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_SMART_CHECK_ALL')${LH_COLOR_RESET}"
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_SMART_SELECT_DRIVE' "$i") ${LH_COLOR_RESET}")" drive_choice
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_SMART_SELECT_DRIVE' "$i") ${LH_COLOR_RESET}")" drive_choice
 
     if ! [[ "$drive_choice" =~ ^[0-9]+$ ]] || [ "$drive_choice" -lt 1 ] || [ "$drive_choice" -gt "$i" ]; then
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_INVALID_SELECTION')${LH_COLOR_RESET}"
@@ -117,7 +127,8 @@ function disk_check_file_access() {
         return 1
     fi
 
-    local folder_path=$(lh_ask_for_input "$(lh_msg 'DISK_ACCESS_ENTER_PATH')")
+    local folder_path
+    folder_path=$(lh_ask_for_input "$(lh_msg 'DISK_ACCESS_ENTER_PATH')")
 
     if [ ! -d "$folder_path" ]; then
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_ACCESS_PATH_NOT_EXIST')${LH_COLOR_RESET}"
@@ -142,13 +153,15 @@ function disk_check_usage() {
     # Check if ncdu is installed and offer it if available
     if lh_check_command "ncdu" false; then
         if lh_confirm_action "$(lh_msg 'DISK_USAGE_NCDU_START')" "y"; then
-            local path_to_analyze=$(lh_ask_for_input "$(lh_msg 'DISK_USAGE_ANALYZE_PATH')" "/")
+            local path_to_analyze
+            path_to_analyze=$(lh_ask_for_input "$(lh_msg 'DISK_USAGE_ANALYZE_PATH')" "/")
             $LH_SUDO_CMD ncdu "$path_to_analyze"
         fi
     else
         if lh_confirm_action "$(lh_msg 'DISK_USAGE_NCDU_INSTALL')" "y"; then
             if lh_check_command "ncdu" true; then
-                local path_to_analyze=$(lh_ask_for_input "$(lh_msg 'DISK_USAGE_ANALYZE_PATH')" "/")
+                local path_to_analyze
+                path_to_analyze=$(lh_ask_for_input "$(lh_msg 'DISK_USAGE_ANALYZE_PATH')" "/")
                 $LH_SUDO_CMD ncdu "$path_to_analyze"
             fi
         else
@@ -183,7 +196,8 @@ function disk_speed_test() {
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_SPEED_AVAILABLE_DEVICES')${LH_COLOR_RESET}"
     lsblk -d -o NAME,SIZE,MODEL,VENDOR | grep -v "loop"
 
-    local drive=$(lh_ask_for_input "$(lh_msg 'DISK_SPEED_ENTER_DRIVE')")
+    local drive
+    drive=$(lh_ask_for_input "$(lh_msg 'DISK_SPEED_ENTER_DRIVE')")
 
     if [ ! -b "$drive" ]; then
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_SPEED_NOT_BLOCK_DEVICE')${LH_COLOR_RESET}"
@@ -235,7 +249,8 @@ function disk_check_filesystem() {
         "$(lh_msg 'DISK_FSCK_WARNING_LIVECD')"
 
     if lh_confirm_action "$(lh_msg 'DISK_FSCK_CONTINUE_ANYWAY')" "n"; then
-        local partition=$(lh_ask_for_input "$(lh_msg 'DISK_FSCK_ENTER_PARTITION')")
+        local partition
+        partition=$(lh_ask_for_input "$(lh_msg 'DISK_FSCK_ENTER_PARTITION')")
 
         if [ ! -b "$partition" ]; then
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_FSCK_NOT_BLOCK_DEVICE')${LH_COLOR_RESET}"
@@ -268,7 +283,7 @@ function disk_check_filesystem() {
         echo -e "${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_FSCK_OPTION_AUTO_COMPLEX')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_MENU_NUMBER}5.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_FSCK_OPTION_DEFAULT')${LH_COLOR_RESET}"
 
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_FSCK_SELECT_OPTION') ${LH_COLOR_RESET}")" fsck_option
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_FSCK_SELECT_OPTION') ${LH_COLOR_RESET}")" fsck_option
 
         local fsck_param=""
         case $fsck_option in
@@ -361,7 +376,7 @@ function disk_check_health() {
             i=$((i+1))
         done
 
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_HEALTH_SELECT_DRIVE' "$((i-1))") ${LH_COLOR_RESET}")" drive_choice
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_HEALTH_SELECT_DRIVE' "$((i-1))") ${LH_COLOR_RESET}")" drive_choice
 
         if ! [[ "$drive_choice" =~ ^[0-9]+$ ]] || [ "$drive_choice" -lt 1 ] || [ "$drive_choice" -gt $((i-1)) ]; then
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_INVALID_SELECTION')${LH_COLOR_RESET}"
@@ -380,7 +395,7 @@ function disk_check_health() {
         echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_HEALTH_ATTRIBUTES')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_HEALTH_BACK')${LH_COLOR_RESET}"
 
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_HEALTH_SELECT_TEST') ${LH_COLOR_RESET}")" test_option
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_HEALTH_SELECT_TEST') ${LH_COLOR_RESET}")" test_option
 
         case $test_option in
             1)
@@ -422,17 +437,19 @@ function disk_show_largest_files() {
         return 1
     fi
 
-    local search_path=$(lh_ask_for_input "$(lh_msg 'DISK_LARGEST_ENTER_PATH')" "/home")
+    local search_path
+    search_path=$(lh_ask_for_input "$(lh_msg 'DISK_LARGEST_ENTER_PATH')" "/home")
 
     if [ ! -d "$search_path" ]; then
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_LARGEST_PATH_NOT_EXIST')${LH_COLOR_RESET}"
         return 1
     fi
 
-    local file_count_prompt="$(lh_msg 'DISK_LARGEST_FILE_COUNT')"
+    local file_count_prompt
+    file_count_prompt="$(lh_msg 'DISK_LARGEST_FILE_COUNT')"
     local file_count_regex="^[1-9][0-9]*$" # Regex for positive integers
-    local file_count_error="$(lh_msg 'DISK_LARGEST_INVALID_NUMBER')"
-    local file_count_default="20"
+    local file_count_error
+    file_count_error="$(lh_msg 'DISK_LARGEST_INVALID_NUMBER')"
     local file_count
 
     # Call lh_ask_for_input correctly
@@ -466,7 +483,7 @@ function disk_show_largest_files() {
     echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_LARGEST_METHOD_DU')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_LARGEST_METHOD_FIND')${LH_COLOR_RESET}"
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_LARGEST_SELECT_METHOD_PROMPT') ${LH_COLOR_RESET}")" method_choice
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_LARGEST_SELECT_METHOD_PROMPT') ${LH_COLOR_RESET}")" method_choice
 
     case $method_choice in
         1)
@@ -501,7 +518,7 @@ function disk_tools_menu() {
         echo ""
 
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" option
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" option
 
         case $option in
             1)

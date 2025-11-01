@@ -7,6 +7,7 @@
 # German common language strings
 
 # Declare MSG_DE as associative array
+# shellcheck disable=SC2034  # consumed by lib/lib_i18n.sh when populating MSG
 declare -A MSG_DE
 
 # General UI elements

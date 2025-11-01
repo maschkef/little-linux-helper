@@ -11,7 +11,17 @@
 
 # Load common library
 # Use BASH_SOURCE to get the correct path when sourced
-source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
@@ -78,7 +88,7 @@ function security_show_failed_logins() {
     echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'SECURITY_FAILED_LOGINS_ALL')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'CANCEL')${LH_COLOR_RESET}"
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'SECURITY_OPTION_1_TO_4')${LH_COLOR_RESET}")" login_option
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'SECURITY_OPTION_1_TO_4')${LH_COLOR_RESET}")" login_option
 
     case $login_option in
         1)
@@ -186,7 +196,7 @@ function security_check_rootkits() {
     echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'SECURITY_ROOTKIT_PROP_UPDATE')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'CANCEL')${LH_COLOR_RESET}"
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'SECURITY_OPTION_1_TO_4')${LH_COLOR_RESET}")" rkhunter_option
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'SECURITY_OPTION_1_TO_4')${LH_COLOR_RESET}")" rkhunter_option
 
     case $rkhunter_option in
         1)
@@ -352,7 +362,8 @@ function security_check_updates() {
         pacman)
             $LH_SUDO_CMD pacman -Sy >/dev/null 2>&1  # Synchronize packages
 
-            local updates=$($LH_SUDO_CMD pacman -Qu 2>/dev/null)
+            local updates
+            updates=$($LH_SUDO_CMD pacman -Qu 2>/dev/null)
             if [ -n "$updates" ]; then
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'SECURITY_UPDATES_AVAILABLE')${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
@@ -377,7 +388,8 @@ function security_check_updates() {
             $LH_SUDO_CMD apt list --upgradable 2>/dev/null | grep -i security
             echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 
-            local all_updates=$($LH_SUDO_CMD apt list --upgradable 2>/dev/null | grep -v "Auflistung..." | wc -l)
+            local all_updates
+            all_updates=$($LH_SUDO_CMD apt list --upgradable 2>/dev/null | awk '!/^(Listing|Auflistung)/ {count++} END {print count+0}')
             if [ "$all_updates" -gt 0 ]; then
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'SECURITY_UPDATES_TOTAL_COUNT' "$all_updates")${LH_COLOR_RESET}"
 
@@ -399,7 +411,8 @@ function security_check_updates() {
             # Fedora/RHEL do not specifically highlight security updates, all updates are considered security improvements
             $LH_SUDO_CMD dnf check-update --refresh >/dev/null 2>&1
 
-            local all_updates=$($LH_SUDO_CMD dnf check-update --quiet 2>/dev/null | wc -l)
+            local all_updates
+            all_updates=$($LH_SUDO_CMD dnf check-update --quiet 2>/dev/null | awk 'NF {count++} END {print count+0}')
             if [ "$all_updates" -gt 0 ]; then
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'SECURITY_UPDATES_AVAILABLE')${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
@@ -416,7 +429,8 @@ function security_check_updates() {
         yay)
             yay -Sy >/dev/null 2>&1  # Synchronize packages
 
-            local updates=$(yay -Qu 2>/dev/null)
+            local updates
+            updates=$(yay -Qu 2>/dev/null)
             if [ -n "$updates" ]; then
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'SECURITY_UPDATES_AVAILABLE')${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
@@ -480,7 +494,8 @@ function security_check_password_policy() {
     else
         echo -e "\n${LH_COLOR_INFO}$(lh_msg 'SECURITY_PASSWORD_NO_PASSWORD_CHECK')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
-        local users_without_password=$($LH_SUDO_CMD passwd -S -a | grep -v "L" | grep "NP" 2>/dev/null || echo "$(lh_msg 'SECURITY_PASSWORD_NO_PASSWORD_FOUND')")
+        local users_without_password
+        users_without_password=$($LH_SUDO_CMD passwd -S -a | grep -v "L" | grep "NP" 2>/dev/null || lh_msg 'SECURITY_PASSWORD_NO_PASSWORD_FOUND')
         if [ -n "$users_without_password" ] && [ "$users_without_password" != "$(lh_msg 'SECURITY_PASSWORD_NO_PASSWORD_FOUND')" ]; then
             echo "$users_without_password"
             echo ""
@@ -498,7 +513,7 @@ function security_check_password_policy() {
     if lh_confirm_action "$(lh_msg 'SECURITY_PASSWORD_ACCOUNT_DETAILS')" "y"; then
         echo -e "\n${LH_COLOR_INFO}$(lh_msg 'SECURITY_PASSWORD_ACCOUNT_INFO')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
-        $LH_SUDO_CMD passwd -S -a 2>/dev/null || echo "$(lh_msg 'SECURITY_PASSWORD_INFO_UNAVAILABLE')"
+        $LH_SUDO_CMD passwd -S -a 2>/dev/null || lh_msgln 'SECURITY_PASSWORD_INFO_UNAVAILABLE'
         echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
     fi
 }
@@ -520,7 +535,7 @@ function security_checks_menu() {
         echo ""
 
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'SECURITY_CHOOSE_OPTION')${LH_COLOR_RESET}")" option
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'SECURITY_CHOOSE_OPTION')${LH_COLOR_RESET}")" option
 
         case $option in
             1)

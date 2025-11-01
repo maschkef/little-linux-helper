@@ -29,7 +29,6 @@ declare -r COLOR_RESET="\033[0m"
 
 # Default values
 DEFAULT_LANG="en"
-DEFAULT_MODULE=""
 
 # Show usage information
 show_usage() {
@@ -144,26 +143,8 @@ extract_language_tags() {
     } | grep -vE '^\$' | sort -u || true  # Filter out variable references starting with $
 }
 
-# Load keys from a specific language file into an associative array
-load_language_file_keys() {
-    local lang_file="$1"
-    local -n keys_array="$2"
-    
-    # Extract all MSG_XX[KEY] assignments from the file
-    while IFS= read -r line; do
-        if [[ "$line" =~ MSG_[A-Z]+\[([^]]+)\] ]]; then
-            local key="${BASH_REMATCH[1]}"
-            # Remove quotes if present
-            key="${key#[\'\"]}"
-            key="${key%[\'\"]}"
-            keys_array["$key"]=1
-        fi
-    done < "$lang_file"
-}
-
 # Global associative arrays to store all language keys and their sources
 declare -gA all_language_keys=()
-declare -gA key_sources=()
 
 # Load all available keys from all language files for a language
 load_all_language_keys() {
@@ -172,21 +153,26 @@ load_all_language_keys() {
     
     # Clear the global arrays
     all_language_keys=()
-    key_sources=()
     
     # Dynamically discover and load all .sh files in the language directory (including subdirectories)
     while IFS= read -r -d '' lang_file; do
-        local relative_path="${lang_file#$lang_dir/}"
+        local relative_path="${lang_file#"${lang_dir}/"}"
         echo -e "${COLOR_INFO}Loading language keys from $relative_path...${COLOR_RESET}"
         
         # Create a temporary array for this file's keys
         declare -A temp_keys=()
-        load_language_file_keys "$lang_file" temp_keys
-        
-        # Add keys to global array and track their source
+        while IFS= read -r line; do
+            if [[ "$line" =~ MSG_[A-Z]+\[([^]]+)\] ]]; then
+                local key="${BASH_REMATCH[1]}"
+                key="${key#[\'\"]}"
+                key="${key%[\'\"]}"
+                temp_keys["$key"]=1
+            fi
+        done < "$lang_file"
+
+        # Add keys to global array
         for key in "${!temp_keys[@]}"; do
             all_language_keys["$key"]=1
-            key_sources["$key"]="$relative_path"
         done
     done < <(find "$lang_dir" -type f -name "*.sh" -print0 | sort -z)
 }
@@ -199,16 +185,6 @@ key_exists_in_language() {
     [[ ${all_language_keys["$key"]+_} ]] && return 0
     
     return 1
-}
-
-# Find which language file(s) contain a specific key
-# Find which language file contains a specific key
-find_key_location() {
-    local key="$1"
-    
-    if [[ ${key_sources["$key"]+_} ]]; then
-        echo "${key_sources["$key"]}"
-    fi
 }
 
 # Analyze a single module file
@@ -279,7 +255,8 @@ get_module_name() {
     # modules/backup/mod_xxx.sh -> backup (or xxx)
     # lib/lib_xxx.sh -> lib (for library files)
     
-    local basename=$(basename "$file_path" .sh)
+    local basename
+    basename=$(basename "$file_path" .sh)
     
     # Check if it's a library file
     if [[ "$file_path" =~ /lib/ ]]; then
@@ -293,8 +270,10 @@ get_module_name() {
     fi
     
     # Check if it's in a subdirectory
-    local dirname=$(dirname "$file_path")
-    local parent_dir=$(basename "$dirname")
+    local dirname
+    dirname=$(dirname "$file_path")
+    local parent_dir
+    parent_dir=$(basename "$dirname")
     
     if [[ "$parent_dir" != "modules" ]]; then
         echo "$parent_dir"

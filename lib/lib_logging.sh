@@ -15,12 +15,16 @@
 
 # Function to initialize logging
 function lh_initialize_logging() {
+    local msg msg_template
     # Ensure that the (monthly) log directory exists
     if [ ! -d "$LH_LOG_DIR" ]; then
         mkdir -p "$LH_LOG_DIR" || { 
             # Use English fallback before translation system is loaded
-            local msg="${MSG[LIB_LOG_DIR_CREATE_ERROR]:-ERROR: Could not create log directory: %s}"
-            echo "$(printf "$msg" "$LH_LOG_DIR")" >&2
+            local msg
+            local msg_template="${MSG[LIB_LOG_DIR_CREATE_ERROR]:-ERROR: Could not create log directory: %s}"
+            # shellcheck disable=SC2059  # translation templates supply %s placeholders
+            printf -v msg "$msg_template" "$LH_LOG_DIR"
+            echo "$msg" >&2
             LH_LOG_FILE=""
             return 1
         }
@@ -36,8 +40,11 @@ function lh_initialize_logging() {
             # Try to create it again if it no longer exists for some reason
             mkdir -p "$LH_LOG_DIR" || { 
                 # Use English fallback before translation system is loaded
-                local msg="${MSG[LIB_LOG_DIR_CREATE_ERROR]:-ERROR: Could not create log directory: %s}"
-                echo "$(printf "$msg" "$LH_LOG_DIR")" >&2
+                local msg
+                msg_template="${MSG[LIB_LOG_DIR_CREATE_ERROR]:-ERROR: Could not create log directory: %s}"
+                # shellcheck disable=SC2059  # translation templates supply %s placeholders
+                printf -v msg "$msg_template" "$LH_LOG_DIR"
+                echo "$msg" >&2
                 LH_LOG_FILE=""
                 return 1
             }
@@ -49,28 +56,40 @@ function lh_initialize_logging() {
 
         if ! touch "$LH_LOG_FILE"; then
             # Use English fallback before translation system is loaded
-            local msg="${MSG[LIB_LOG_FILE_CREATE_ERROR]:-ERROR: Could not create log file: %s}"
-            echo "$(printf "$msg" "$LH_LOG_FILE")" >&2
+            local msg
+            msg_template="${MSG[LIB_LOG_FILE_CREATE_ERROR]:-ERROR: Could not create log file: %s}"
+            # shellcheck disable=SC2059  # translation templates supply %s placeholders
+            printf -v msg "$msg_template" "$LH_LOG_FILE"
+            echo "$msg" >&2
             LH_LOG_FILE="" 
             return 1
         fi
         # Fix ownership when running with sudo
         lh_fix_ownership "$LH_LOG_FILE"
         # Use English fallback before translation system is loaded
-        local msg="${MSG[LIB_LOG_INITIALIZED]:-Logging initialized. Log file: %s}"
-        lh_log_msg "INFO" "$(printf "$msg" "$LH_LOG_FILE")"
+        local msg
+        msg_template="${MSG[LIB_LOG_INITIALIZED]:-Logging initialized. Log file: %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$LH_LOG_FILE"
+        lh_log_msg "INFO" "$msg"
     else
         # If LH_LOG_FILE is set, ensure the file still exists
         if [ ! -f "$LH_LOG_FILE" ] && [ -n "$LH_LOG_DIR" ] && [ -d "$(dirname "$LH_LOG_FILE")" ]; then
              if ! touch "$LH_LOG_FILE"; then
                 # Use English fallback before translation system is loaded
-                local msg="${MSG[LIB_LOG_FILE_TOUCH_ERROR]:-Could not touch existing log file: %s}"
-                lh_log_msg "WARN" "$(printf "$msg" "$LH_LOG_FILE")"
+                local msg
+                msg_template="${MSG[LIB_LOG_FILE_TOUCH_ERROR]:-Could not touch existing log file: %s}"
+                # shellcheck disable=SC2059  # translation templates supply %s placeholders
+                printf -v msg "$msg_template" "$LH_LOG_FILE"
+                lh_log_msg "WARN" "$msg"
              fi
         fi
         # Use English fallback before translation system is loaded
-        local msg="${MSG[LIB_LOG_ALREADY_INITIALIZED]:-Logging already initialized. Using log file: %s}"
-        lh_log_msg "DEBUG" "$(printf "$msg" "$LH_LOG_FILE")"
+        local msg
+        msg_template="${MSG[LIB_LOG_ALREADY_INITIALIZED]:-Logging already initialized. Using log file: %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$LH_LOG_FILE"
+        lh_log_msg "DEBUG" "$msg"
     fi
 }
 
@@ -78,6 +97,7 @@ function lh_initialize_logging() {
 function lh_log_msg() {
     local level="$1"
     local message="$2"
+    local msg msg_template
     
     # Check if this message should be logged (except during initialization)
     if [ -n "${LH_LOG_LEVEL:-}" ] && ! lh_should_log "$level"; then
@@ -130,7 +150,8 @@ function lh_log_msg() {
     
     if [[ "$show_file_info" == "true" ]]; then
         local calling_script="${BASH_SOURCE[1]:-unknown}"
-        local script_name=$(basename "$calling_script")
+        local script_name
+        script_name=$(basename "$calling_script")
         script_info="[$script_name] "
     fi
     
@@ -178,8 +199,11 @@ function lh_log_msg() {
     elif [ "${LH_LOG_TO_FILE:-true}" = "true" ] && [ -n "$LH_LOG_FILE" ] && [ ! -d "$(dirname "$LH_LOG_FILE")" ]; then
         # Fallback if log directory doesn't exist but LH_LOG_FILE is set
         # Use English fallback before translation system is loaded
-        local msg="${MSG[LIB_LOG_DIR_NOT_FOUND]:-Log directory for %s not found.}"
-        echo "$(printf "$msg" "$LH_LOG_FILE")" >&2
+        local msg
+        msg_template="${MSG[LIB_LOG_DIR_NOT_FOUND]:-Log directory for %s not found.}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$LH_LOG_FILE"
+        echo "$msg" >&2
     fi
 }
 

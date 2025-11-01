@@ -11,7 +11,17 @@
 
 # Load common library
 # Use BASH_SOURCE to get the correct path when sourced
-source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
@@ -35,7 +45,6 @@ function check_docker_installation() {
     
     local docker_installed=false
     local docker_compose_installed=false
-    local docker_compose_command=""
     
     # Check Docker
     if command -v docker >/dev/null 2>&1; then
@@ -44,8 +53,8 @@ function check_docker_installation() {
         echo -e "${LH_COLOR_SUCCESS}✓ $(lh_msg 'DOCKER_SETUP_DOCKER_FOUND')${LH_COLOR_RESET}"
         
         # Show Docker version
-        local docker_version=$(docker --version 2>/dev/null)
-        if [ $? -eq 0 ]; then
+        local docker_version
+        if docker_version=$(docker --version 2>/dev/null); then
             echo -e "  ${LH_COLOR_INFO}$docker_version${LH_COLOR_RESET}"
         fi
     else
@@ -56,25 +65,23 @@ function check_docker_installation() {
     # Check Docker Compose (new syntax)
     if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
         docker_compose_installed=true
-        docker_compose_command="docker compose"
         lh_log_msg "INFO" "$(lh_msg 'DOCKER_SETUP_COMPOSE_FOUND') (docker compose)"
         echo -e "${LH_COLOR_SUCCESS}✓ $(lh_msg 'DOCKER_SETUP_COMPOSE_FOUND') (docker compose)${LH_COLOR_RESET}"
         
         # Show Docker Compose version
-        local compose_version=$(docker compose version 2>/dev/null)
-        if [ $? -eq 0 ]; then
+        local compose_version
+        if compose_version=$(docker compose version 2>/dev/null); then
             echo -e "  ${LH_COLOR_INFO}$compose_version${LH_COLOR_RESET}"
         fi
     # Check Docker Compose (old syntax)
     elif command -v docker-compose >/dev/null 2>&1; then
         docker_compose_installed=true
-        docker_compose_command="docker-compose"
         lh_log_msg "INFO" "$(lh_msg 'DOCKER_SETUP_COMPOSE_FOUND') (docker-compose)"
         echo -e "${LH_COLOR_SUCCESS}✓ $(lh_msg 'DOCKER_SETUP_COMPOSE_FOUND') (docker-compose)${LH_COLOR_RESET}"
         
         # Show Docker Compose version
-        local compose_version=$(docker-compose --version 2>/dev/null)
-        if [ $? -eq 0 ]; then
+        local compose_version
+        if compose_version=$(docker-compose --version 2>/dev/null); then
             echo -e "  ${LH_COLOR_INFO}$compose_version${LH_COLOR_RESET}"
         fi
     else
@@ -116,8 +123,7 @@ function install_docker_components() {
     # Install Docker if needed
     if [ "$docker_installed" = false ]; then
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_SETUP_INSTALLING_DOCKER')${LH_COLOR_RESET}"
-        install_docker
-        if [ $? -eq 0 ]; then
+        if install_docker; then
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_SETUP_DOCKER_INSTALLED')${LH_COLOR_RESET}"
             docker_installed=true
         else
@@ -129,8 +135,7 @@ function install_docker_components() {
     # Install Docker Compose if needed
     if [ "$docker_compose_installed" = false ]; then
         echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_SETUP_INSTALLING_COMPOSE')${LH_COLOR_RESET}"
-        install_docker_compose
-        if [ $? -eq 0 ]; then
+        if install_docker_compose; then
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_SETUP_COMPOSE_INSTALLED')${LH_COLOR_RESET}"
         else
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_SETUP_COMPOSE_INSTALL_FAILED')${LH_COLOR_RESET}"
@@ -246,17 +251,23 @@ function install_docker_compose_manual() {
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DOCKER_SETUP_DOWNLOADING_VERSION'): $compose_version${LH_COLOR_RESET}"
     
     # Download and installation
-    local download_url="https://github.com/docker/compose/releases/download/${compose_version}/docker-compose-$(uname -s)-$(uname -m)"
+    local download_url
+    download_url="https://github.com/docker/compose/releases/download/${compose_version}/docker-compose-$(uname -s)-$(uname -m)"
     
+    local download_success=false
     if command -v curl >/dev/null 2>&1; then
-        $LH_SUDO_CMD curl -L "$download_url" -o /usr/local/bin/docker-compose
+        if $LH_SUDO_CMD curl -L "$download_url" -o /usr/local/bin/docker-compose; then
+            download_success=true
+        fi
     elif command -v wget >/dev/null 2>&1; then
-        $LH_SUDO_CMD wget -O /usr/local/bin/docker-compose "$download_url"
+        if $LH_SUDO_CMD wget -O /usr/local/bin/docker-compose "$download_url"; then
+            download_success=true
+        fi
     else
         return 1
     fi
     
-    if [ $? -eq 0 ]; then
+    if [ "$download_success" = true ]; then
         $LH_SUDO_CMD chmod +x /usr/local/bin/docker-compose
         echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'DOCKER_SETUP_COMPOSE_DOWNLOAD_SUCCESS')${LH_COLOR_RESET}"
         return 0
@@ -293,7 +304,8 @@ function post_install_setup() {
     elif [ -n "$USER" ] && [ "$USER" != "root" ]; then
         local target_user="$USER"
     else
-        local target_user=$(whoami)
+        local target_user
+        target_user=$(whoami)
     fi
     
     if [ "$target_user" != "root" ]; then

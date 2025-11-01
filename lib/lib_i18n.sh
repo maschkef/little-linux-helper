@@ -15,7 +15,6 @@
 # Default language: English (en)
 # Fallback language: English (en) - for missing language directories/files
 
-# Load language file and populate MSG array
 function lh_load_language() {
     local lang_code="${1:-$LH_LANG}"
     local original_lang_code="$lang_code"
@@ -29,6 +28,7 @@ function lh_load_language() {
             if [[ -d "$category_dir" ]]; then
                 for lang_file in "$category_dir"/*.sh; do
                     if [[ -f "$lang_file" ]]; then
+                        # shellcheck disable=SC1090
                         source "$lang_file"
                     fi
                 done
@@ -38,6 +38,7 @@ function lh_load_language() {
         # Fallback to old flat structure if no files found in new structure
         for lang_file in "$en_dir"/*.sh; do
             if [[ -f "$lang_file" ]]; then
+                # shellcheck disable=SC1090
                 source "$lang_file"
             fi
         done
@@ -52,8 +53,11 @@ function lh_load_language() {
     if [[ "$lang_code" != "en" ]]; then
         if [[ ! -d "$lang_dir" ]]; then
             # Fallback to English if specified language directory doesn't exist
-            local msg="${MSG[LIB_I18N_LANG_DIR_NOT_FOUND]:-Language directory for '%s' not found, falling back to English}"
-            lh_log_msg "WARN" "$(printf "$msg" "$lang_code")"
+            local msg
+            local msg_template="${MSG[LIB_I18N_LANG_DIR_NOT_FOUND]:-Language directory for '%s' not found, falling back to English}"
+            # shellcheck disable=SC2059  # translation templates supply %s placeholders
+            printf -v msg "$msg_template" "$lang_code"
+            lh_log_msg "WARN" "$msg"
             # For non-English languages that don't exist, we already have English loaded, so we're done
             export LH_LANG="en"
             export MSG
@@ -67,6 +71,7 @@ function lh_load_language() {
             if [[ -d "$category_dir" ]]; then
                 for lang_file in "$category_dir"/*.sh; do
                     if [[ -f "$lang_file" ]]; then
+                        # shellcheck disable=SC1090
                         source "$lang_file"
                     fi
                 done
@@ -76,6 +81,7 @@ function lh_load_language() {
         # Fallback to old flat structure if needed
         for lang_file in "$lang_dir"/*.sh; do
             if [[ -f "$lang_file" ]]; then
+                # shellcheck disable=SC1090
                 source "$lang_file"
             fi
         done
@@ -98,16 +104,22 @@ function lh_load_language() {
                 done
                 ;;
             *)
-                local msg="${MSG[LIB_I18N_UNSUPPORTED_LANG]:-Unsupported language code: %s}"
-                lh_log_msg "ERROR" "$(printf "$msg" "$original_lang_code")"
+                local msg msg_template
+                msg_template="${MSG[LIB_I18N_UNSUPPORTED_LANG]:-Unsupported language code: %s}"
+                # shellcheck disable=SC2059  # translation templates supply %s placeholders
+                printf -v msg "$msg_template" "$original_lang_code"
+                lh_log_msg "ERROR" "$msg"
                 return 1
                 ;;
         esac
     else
         # For English, check if English directory exists
         if [[ ! -d "$en_dir" ]]; then
-            local msg="${MSG[LIB_I18N_DEFAULT_LANG_NOT_FOUND]:-Default language directory (en) not found at: %s}"
-            lh_log_msg "ERROR" "$(printf "$msg" "$en_dir")"
+            local msg msg_template
+            msg_template="${MSG[LIB_I18N_DEFAULT_LANG_NOT_FOUND]:-Default language directory (en) not found at: %s}"
+            # shellcheck disable=SC2059  # translation templates supply %s placeholders
+            printf -v msg "$msg_template" "$en_dir"
+            lh_log_msg "ERROR" "$msg"
             return 1
         fi
         # English is already loaded above
@@ -148,12 +160,14 @@ function lh_load_language_module() {
     
     # Load English fallback (try new structure first, then old)
     if [[ -f "$en_file" ]]; then
+        # shellcheck disable=SC1090
         source "$en_file"
         # Copy English module translations to MSG array as fallback base
         for key in "${!MSG_EN[@]}"; do
             MSG["$key"]="${MSG_EN[$key]}"
         done
     elif [[ -f "$en_file_fallback" ]]; then
+        # shellcheck disable=SC1090
         source "$en_file_fallback"
         # Copy English module translations to MSG array as fallback base
         for key in "${!MSG_EN[@]}"; do
@@ -173,8 +187,11 @@ function lh_load_language_module() {
         
         if [[ -z "$target_file" ]]; then
             # Fallback to English if specified language file doesn't exist
-            local msg="${MSG[LIB_I18N_LANG_FILE_NOT_FOUND]:-Language file for module '%s' in '%s' not found, trying English}"
-            lh_log_msg "WARN" "$(printf "$msg" "$module_name" "$lang_code")"
+            local msg msg_template
+            msg_template="${MSG[LIB_I18N_LANG_FILE_NOT_FOUND]:-Language file for module '%s' in '%s' not found, trying English}"
+            # shellcheck disable=SC2059  # translation templates supply %s placeholders
+            printf -v msg "$msg_template" "$module_name" "$lang_code"
+            lh_log_msg "WARN" "$msg"
             # For non-English modules that don't exist, we already have English loaded, so we're done
             export MSG
             lh_log_msg "DEBUG" "Language module loaded: $module_name ($original_lang_code fallback to English)"
@@ -182,6 +199,7 @@ function lh_load_language_module() {
         fi
         
         # Source the module language file
+        # shellcheck disable=SC1090
         source "$target_file"
         
         # Copy the language-specific array to the global MSG array (overriding English fallbacks)
@@ -212,8 +230,11 @@ function lh_load_language_module() {
         fi
         
         if [[ -z "$en_target_file" ]]; then
-            local msg="${MSG[LIB_I18N_MODULE_FILE_NOT_FOUND]:-Language file for module '%s' not found: %s}"
-            lh_log_msg "WARN" "$(printf "$msg" "$module_name" "$en_file (or $en_file_fallback)")"
+            local msg msg_template
+            msg_template="${MSG[LIB_I18N_MODULE_FILE_NOT_FOUND]:-Language file for module '%s' not found: %s}"
+            # shellcheck disable=SC2059  # translation templates supply %s placeholders
+            printf -v msg "$msg_template" "$module_name" "$en_file (or $en_file_fallback)"
+            lh_log_msg "WARN" "$msg"
             return 1
         fi
         # English is already loaded above
@@ -232,7 +253,11 @@ function lh_msg() {
     # Check if key exists and has a non-empty value
     if [[ -v MSG[$key] && -n "${MSG[$key]}" ]]; then
         # Use printf to handle format strings with parameters
-        printf "${MSG[$key]}" "$@"
+        local template="${MSG[$key]}"
+        local formatted
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v formatted "$template" "$@"
+        printf '%s' "$formatted"
     else
         # Fallback: return the key itself as placeholder if message not found or empty
         echo "[$key]"
@@ -326,7 +351,8 @@ function lh_initialize_i18n() {
         # Load language configuration from general.conf
         if [[ -f "$LH_GENERAL_CONFIG_FILE" ]]; then
             # Extract only the language setting to avoid overriding other variables
-            local cfg_lang=$(grep "^CFG_LH_LANG=" "$LH_GENERAL_CONFIG_FILE" | sed 's/^CFG_LH_LANG="//' | sed 's/"$//')
+            local cfg_lang
+            cfg_lang=$(grep "^CFG_LH_LANG=" "$LH_GENERAL_CONFIG_FILE" | sed 's/^CFG_LH_LANG="//' | sed 's/"$//')
             if [[ -n "$cfg_lang" ]]; then
                 if [[ "$cfg_lang" == "auto" ]]; then
                     lh_detect_system_language
@@ -358,19 +384,27 @@ load_language_file_with_fallback() {
     local category="${3:-}"
     
     local lang_file=""
-    
+    local base_lang_dir="${LH_LANG_DIR:-$LANG_DIR}"
+
+    # Set default base directory if neither variable is defined
+    if [[ -z "$base_lang_dir" ]]; then
+        base_lang_dir="./lang"
+    fi
+
     # Try new structure first (with category)
     if [[ -n "$category" ]]; then
-        lang_file="$LANG_DIR/$lang/$category/$filename"
+        lang_file="$base_lang_dir/$lang/$category/$filename"
         if [[ -f "$lang_file" ]]; then
+            # shellcheck disable=SC1090
             source "$lang_file"
             return 0
         fi
     fi
-    
+
     # Fallback to old flat structure
-    lang_file="$LANG_DIR/$lang/$filename" 
+    lang_file="$base_lang_dir/$lang/$filename" 
     if [[ -f "$lang_file" ]]; then
+        # shellcheck disable=SC1090
         source "$lang_file"
         return 0
     fi

@@ -106,10 +106,11 @@ This specialized module provides comprehensive RSYNC-based backup functionality 
 *   **Location:** `$LH_BACKUP_ROOT$LH_BACKUP_DIR/`
 *   **Structure:** Complete directory trees for each backup session
 *   **Hardlinks:** Incremental backups hardlink unchanged files to save space
-*   **Retention:** Automatic cleanup based on `LH_RETENTION_BACKUP` setting
+*   **Retention:** Automatic cleanup based on `LH_RETENTION_BACKUP` setting using timestamped directory names (portable across GNU/BSD toolchains)
 
 **8. Incremental Backup Intelligence:**
 *   **Previous Backup Detection:** Automatically finds most recent backup directory
+*   **Portable Ordering:** Relies on timestamped names for newest-first detection, avoiding GNU-specific `find`/`stat` options
 *   **Hardlink Optimization:** Uses `--link-dest` to create hardlinks for unchanged files
 *   **Space Efficiency:** Only changed files consume additional space
 *   **Complete Accessibility:** Each backup directory appears as a complete backup

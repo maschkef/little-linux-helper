@@ -26,8 +26,17 @@ fi
 
 # Ensure common library is available for logging and shared helpers
 if ! declare -f lh_log_msg >/dev/null 2>&1; then
-    # shellcheck source=/dev/null
-    source "$LH_ROOT_DIR/lib/lib_common.sh"
+    LIB_COMMON_PATH="$LH_ROOT_DIR/lib/lib_common.sh"
+    if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+        echo "Missing required library: $LIB_COMMON_PATH" >&2
+        if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+            exit 1
+        else
+            return 1
+        fi
+    fi
+    # shellcheck source=lib/lib_common.sh
+    source "$LIB_COMMON_PATH"
 fi
 
 set -o pipefail
@@ -37,12 +46,16 @@ BTRFS_LIB_DIR="$LH_ROOT_DIR/lib/btrfs"
 if [[ -z "${LH_BTRFS_LIBS_LOADED:-}" ]]; then
     if [[ ! -d "$BTRFS_LIB_DIR" ]]; then
         lh_log_msg "ERROR" "BTRFS library directory missing: $BTRFS_LIB_DIR"
-        return 1 2>/dev/null || exit 1
+        if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+            exit 1
+        else
+            return 1
+        fi
     fi
 
     # Load BTRFS helper modules in lexical order
     while IFS= read -r -d '' lib_file; do
-        # shellcheck disable=SC1090
+        # shellcheck disable=SC1090  # load helper modules discovered at runtime
         source "$lib_file"
     done < <(find "$BTRFS_LIB_DIR" -maxdepth 1 -type f -name '*.sh' -print0 | sort -z)
 
@@ -53,4 +66,3 @@ fi
 if declare -f ensure_pipefail >/dev/null 2>&1; then
     ensure_pipefail
 fi
-

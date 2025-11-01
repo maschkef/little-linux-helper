@@ -76,8 +76,8 @@ The menu provides a centralized access point while maintaining clean separation 
         *   **System Status:** Shows backup destination (`$LH_BACKUP_ROOT`) availability and online/offline status
         *   **Space Analysis:** Displays free/total disk space using `df -h`
         *   **BTRFS Backup Summary:** Counts snapshots for `@` and `@home` subvolumes, shows total BTRFS snapshots
-        *   **TAR Backup Summary:** Lists count of `tar_backup_*.tar.gz` archives and newest TAR backup
-        *   **RSYNC Backup Summary:** Lists count of `rsync_backup_*` directories and newest RSYNC backup  
+        *   **TAR Backup Summary:** Lists count of `tar_backup_*.tar.gz` archives and newest TAR backup via timestamp-based sorting (no GNU-specific tooling)
+        *   **RSYNC Backup Summary:** Lists count of `rsync_backup_*` directories and newest RSYNC backup using portable timestamp ordering  
         *   **Storage Usage:** Shows total size of all backups in `$LH_BACKUP_ROOT$LH_BACKUP_DIR`
         *   **Recent Activity:** Displays last 5 log entries containing "backup" from `$LH_BACKUP_LOG`
     *   **Architecture:** Provides unified view across all backup methodologies managed by the system

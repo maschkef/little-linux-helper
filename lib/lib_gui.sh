@@ -18,28 +18,38 @@ function lh_gui_create_config_backup() {
     local backup_file="${config_file}.gui_backup_${backup_suffix}"
     
     if [ ! -f "$config_file" ]; then
-        local msg="${MSG[LIB_GUI_CONFIG_FILE_NOT_EXISTS]:-Configuration file %s does not exist, no backup created}"
-        lh_log_msg "WARN" "$(printf "$msg" "$config_file")"
+        local msg_template msg
+        msg_template="${MSG[LIB_GUI_CONFIG_FILE_NOT_EXISTS]:-Configuration file %s does not exist, no backup created}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$config_file"
+        lh_log_msg "WARN" "$msg"
         return 1
     fi
     
     # Additional security check - only allow config files in the config directory
-    local config_dir="$(dirname "$config_file")"
+    local config_dir
+    config_dir="$(dirname "$config_file")"
     local expected_config_dir="$LH_ROOT_DIR/config"
     if [ "$(realpath "$config_dir" 2>/dev/null)" != "$(realpath "$expected_config_dir" 2>/dev/null)" ]; then
-        local msg="${MSG[LIB_GUI_CONFIG_INVALID_PATH]:-Invalid configuration file path: %s (must be in %s)}"
-        lh_log_msg "ERROR" "$(printf "$msg" "$config_file" "$expected_config_dir")"
+        msg_template="${MSG[LIB_GUI_CONFIG_INVALID_PATH]:-Invalid configuration file path: %s (must be in %s)}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$config_file" "$expected_config_dir"
+        lh_log_msg "ERROR" "$msg"
         return 1
     fi
     
     if cp "$config_file" "$backup_file"; then
-        local msg="${MSG[LIB_GUI_CONFIG_BACKUP_CREATED]:-Configuration backup created: %s}"
-        lh_log_msg "INFO" "$(printf "$msg" "$backup_file")"
+        msg_template="${MSG[LIB_GUI_CONFIG_BACKUP_CREATED]:-Configuration backup created: %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$backup_file"
+        lh_log_msg "INFO" "$msg"
         echo "$backup_file" # Return backup file path for caller
         return 0
     else
-        local msg="${MSG[LIB_GUI_CONFIG_BACKUP_FAILED]:-Failed to create configuration backup for %s}"
-        lh_log_msg "ERROR" "$(printf "$msg" "$config_file")"
+        msg_template="${MSG[LIB_GUI_CONFIG_BACKUP_FAILED]:-Failed to create configuration backup for %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$config_file"
+        lh_log_msg "ERROR" "$msg"
         return 1
     fi
 }
@@ -49,34 +59,46 @@ function lh_gui_remove_config_backup() {
     local backup_file="$1"
     
     if [ ! -f "$backup_file" ]; then
-        local msg="${MSG[LIB_GUI_CONFIG_BACKUP_NOT_EXISTS]:-Backup file %s does not exist}"
-        lh_log_msg "WARN" "$(printf "$msg" "$backup_file")"
+        local msg_template msg
+        msg_template="${MSG[LIB_GUI_CONFIG_BACKUP_NOT_EXISTS]:-Backup file %s does not exist}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$backup_file"
+        lh_log_msg "WARN" "$msg"
         return 1
     fi
     
     # Additional safety checks - only remove files that look like GUI backups
     if [[ "$backup_file" != *.gui_backup_* ]]; then
-        local msg="${MSG[LIB_GUI_CONFIG_BACKUP_INVALID_NAME]:-Invalid GUI backup file name: %s (must contain '.gui_backup_')}"
-        lh_log_msg "ERROR" "$(printf "$msg" "$backup_file")"
+        msg_template="${MSG[LIB_GUI_CONFIG_BACKUP_INVALID_NAME]:-Invalid GUI backup file name: %s (must contain '.gui_backup_')}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$backup_file"
+        lh_log_msg "ERROR" "$msg"
         return 1
     fi
     
     # Security check - ensure backup is in config directory
-    local backup_dir="$(dirname "$backup_file")"
+    local backup_dir
+    backup_dir="$(dirname "$backup_file")"
     local expected_config_dir="$LH_ROOT_DIR/config"
     if [ "$(realpath "$backup_dir" 2>/dev/null)" != "$(realpath "$expected_config_dir" 2>/dev/null)" ]; then
-        local msg="${MSG[LIB_GUI_CONFIG_BACKUP_INVALID_PATH]:-Invalid backup file path: %s (must be in %s)}"
-        lh_log_msg "ERROR" "$(printf "$msg" "$backup_file" "$expected_config_dir")"
+        msg_template="${MSG[LIB_GUI_CONFIG_BACKUP_INVALID_PATH]:-Invalid backup file path: %s (must be in %s)}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$backup_file" "$expected_config_dir"
+        lh_log_msg "ERROR" "$msg"
         return 1
     fi
     
     if rm "$backup_file"; then
-        local msg="${MSG[LIB_GUI_CONFIG_BACKUP_REMOVED]:-Configuration backup removed: %s}"
-        lh_log_msg "INFO" "$(printf "$msg" "$backup_file")"
+        msg_template="${MSG[LIB_GUI_CONFIG_BACKUP_REMOVED]:-Configuration backup removed: %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$backup_file"
+        lh_log_msg "INFO" "$msg"
         return 0
     else
-        local msg="${MSG[LIB_GUI_CONFIG_BACKUP_REMOVE_FAILED]:-Failed to remove configuration backup: %s}"
-        lh_log_msg "ERROR" "$(printf "$msg" "$backup_file")"
+        msg_template="${MSG[LIB_GUI_CONFIG_BACKUP_REMOVE_FAILED]:-Failed to remove configuration backup: %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$backup_file"
+        lh_log_msg "ERROR" "$msg"
         return 1
     fi
 }
@@ -96,12 +118,12 @@ function lh_gui_ensure_edit_marker() {
     local tmp_file
     tmp_file="$(mktemp)" || return 1
 
-    # shellcheck disable=SC2064
+    # shellcheck disable=SC2064  # ensure cleanup trap captures current temp file path
     trap "rm -f '$tmp_file'" EXIT
 
     local updated=0
     local inserted=0
-    local line has_marker
+    local line
 
     while IFS= read -r line || [ -n "$line" ]; do
         if [[ "$line" == "${marker_prefix}"* ]]; then
@@ -143,14 +165,19 @@ function lh_gui_ensure_edit_marker() {
 # Function to list GUI configuration backups for a specific config file
 function lh_gui_list_config_backups() {
     local config_file="$1"
-    local config_dir="$(dirname "$config_file")"
-    local config_basename="$(basename "$config_file")"
+    local config_dir
+    config_dir="$(dirname "$config_file")"
+    local config_basename
+    config_basename="$(basename "$config_file")"
     
     # Security check - ensure we're only looking in the config directory
     local expected_config_dir="$LH_ROOT_DIR/config"
     if [ "$(realpath "$config_dir" 2>/dev/null)" != "$(realpath "$expected_config_dir" 2>/dev/null)" ]; then
-        local msg="${MSG[LIB_GUI_CONFIG_LIST_INVALID_PATH]:-Invalid configuration file path: %s (must be in %s)}"
-        lh_log_msg "ERROR" "$(printf "$msg" "$config_file" "$expected_config_dir")"
+        local msg_template msg
+        msg_template="${MSG[LIB_GUI_CONFIG_LIST_INVALID_PATH]:-Invalid configuration file path: %s (must be in %s)}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$config_file" "$expected_config_dir"
+        lh_log_msg "ERROR" "$msg"
         return 1
     fi
     
@@ -172,37 +199,51 @@ function lh_gui_restore_config_backup() {
     local config_file="${backup_file%.gui_backup_*}" # Remove backup suffix to get original file name
     
     if [ ! -f "$backup_file" ]; then
-        local msg="${MSG[LIB_GUI_CONFIG_BACKUP_NOT_EXISTS]:-Backup file %s does not exist}"
-        lh_log_msg "ERROR" "$(printf "$msg" "$backup_file")"
+        local msg_template msg
+        msg_template="${MSG[LIB_GUI_CONFIG_BACKUP_NOT_EXISTS]:-Backup file %s does not exist}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$backup_file"
+        lh_log_msg "ERROR" "$msg"
         return 1
     fi
     
     # Additional safety checks
     if [[ "$backup_file" != *.gui_backup_* ]]; then
-        local msg="${MSG[LIB_GUI_CONFIG_BACKUP_INVALID_NAME]:-Invalid GUI backup file name: %s (must contain '.gui_backup_')}"
-        lh_log_msg "ERROR" "$(printf "$msg" "$backup_file")"
+        msg_template="${MSG[LIB_GUI_CONFIG_BACKUP_INVALID_NAME]:-Invalid GUI backup file name: %s (must contain '.gui_backup_')}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$backup_file"
+        lh_log_msg "ERROR" "$msg"
         return 1
     fi
     
     # Security check - ensure backup and config are in config directory
-    local backup_dir="$(dirname "$backup_file")"
-    local config_dir="$(dirname "$config_file")"
+    local backup_dir
+    backup_dir="$(dirname "$backup_file")"
+    local config_dir
+    config_dir="$(dirname "$config_file")"
     local expected_config_dir="$LH_ROOT_DIR/config"
     
     if [ "$(realpath "$backup_dir" 2>/dev/null)" != "$(realpath "$expected_config_dir" 2>/dev/null)" ] || \
        [ "$(realpath "$config_dir" 2>/dev/null)" != "$(realpath "$expected_config_dir" 2>/dev/null)" ]; then
-        local msg="${MSG[LIB_GUI_CONFIG_RESTORE_INVALID_PATH]:-Invalid file paths for restore operation (must be in %s)}"
-        lh_log_msg "ERROR" "$(printf "$msg" "$expected_config_dir")"
+        local msg_template msg
+        msg_template="${MSG[LIB_GUI_CONFIG_RESTORE_INVALID_PATH]:-Invalid file paths for restore operation (must be in %s)}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$expected_config_dir"
+        lh_log_msg "ERROR" "$msg"
         return 1
     fi
     
     if cp "$backup_file" "$config_file"; then
-        local msg="${MSG[LIB_GUI_CONFIG_BACKUP_RESTORED]:-Configuration restored from backup: %s -> %s}"
-        lh_log_msg "INFO" "$(printf "$msg" "$backup_file" "$config_file")"
+        msg_template="${MSG[LIB_GUI_CONFIG_BACKUP_RESTORED]:-Configuration restored from backup: %s -> %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$backup_file" "$config_file"
+        lh_log_msg "INFO" "$msg"
         return 0
     else
-        local msg="${MSG[LIB_GUI_CONFIG_BACKUP_RESTORE_FAILED]:-Failed to restore from backup: %s}"
-        lh_log_msg "ERROR" "$(printf "$msg" "$backup_file")"
+        msg_template="${MSG[LIB_GUI_CONFIG_BACKUP_RESTORE_FAILED]:-Failed to restore from backup: %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$backup_file"
+        lh_log_msg "ERROR" "$msg"
         return 1
     fi
 }
@@ -227,7 +268,7 @@ function lh_gui_validate_config_content() {
             char="${line:$i:1}"
             if [ "$char" = '"' ]; then
                 # Check if quote is escaped
-                if [ $i -eq 0 ] || [ "${line:$((i-1)):1}" != '\' ]; then
+                if [ $i -eq 0 ] || [ "${line:$((i-1)):1}" != "\\" ]; then
                     quote_count=$((quote_count + 1))
                 fi
             fi
@@ -288,26 +329,33 @@ function lh_gui_write_config_file() {
     
     # Validate the configuration content first
     if ! lh_gui_validate_config_content "$config_content" "$config_type"; then
-        local msg="${MSG[LIB_GUI_CONFIG_WRITE_VALIDATION_FAILED]:-Configuration validation failed, not writing file: %s}"
-        lh_log_msg "ERROR" "$(printf "$msg" "$config_file")"
+        local msg_template msg
+        msg_template="${MSG[LIB_GUI_CONFIG_WRITE_VALIDATION_FAILED]:-Configuration validation failed, not writing file: %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$config_file"
+        lh_log_msg "ERROR" "$msg"
         return 1
     fi
     
     # Create backup if requested and file exists
     local backup_file=""
     if [ "$create_backup" = "true" ] && [ -f "$config_file" ]; then
-        backup_file=$(lh_gui_create_config_backup "$config_file")
-        if [ $? -ne 0 ]; then
-            local msg="${MSG[LIB_GUI_CONFIG_WRITE_BACKUP_FAILED]:-Failed to create backup before writing: %s}"
-            lh_log_msg "ERROR" "$(printf "$msg" "$config_file")"
+        if ! backup_file=$(lh_gui_create_config_backup "$config_file"); then
+            local msg
+            msg_template="${MSG[LIB_GUI_CONFIG_WRITE_BACKUP_FAILED]:-Failed to create backup before writing: %s}"
+            # shellcheck disable=SC2059  # translation templates supply %s placeholders
+            printf -v msg "$msg_template" "$config_file"
+            lh_log_msg "ERROR" "$msg"
             return 1
         fi
     fi
     
     # Write the configuration content
     if echo "$config_content" > "$config_file"; then
-        local msg="${MSG[LIB_GUI_CONFIG_WRITE_SUCCESS]:-Configuration file written successfully: %s}"
-        lh_log_msg "INFO" "$(printf "$msg" "$config_file")"
+        msg_template="${MSG[LIB_GUI_CONFIG_WRITE_SUCCESS]:-Configuration file written successfully: %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$config_file"
+        lh_log_msg "INFO" "$msg"
 
         lh_gui_ensure_edit_marker "$config_file"
         
@@ -317,13 +365,18 @@ function lh_gui_write_config_file() {
         fi
         return 0
     else
-        local msg="${MSG[LIB_GUI_CONFIG_WRITE_FAILED]:-Failed to write configuration file: %s}"
-        lh_log_msg "ERROR" "$(printf "$msg" "$config_file")"
+        msg_template="${MSG[LIB_GUI_CONFIG_WRITE_FAILED]:-Failed to write configuration file: %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$config_file"
+        lh_log_msg "ERROR" "$msg"
         
         # If backup was created and write failed, restore from backup
         if [ -n "$backup_file" ]; then
-            local msg="${MSG[LIB_GUI_CONFIG_WRITE_RESTORING]:-Write failed, restoring from backup: %s}"
-            lh_log_msg "INFO" "$(printf "$msg" "$backup_file")"
+            local msg2
+            msg_template="${MSG[LIB_GUI_CONFIG_WRITE_RESTORING]:-Write failed, restoring from backup: %s}"
+            # shellcheck disable=SC2059  # translation templates supply %s placeholders
+            printf -v msg2 "$msg_template" "$backup_file"
+            lh_log_msg "INFO" "$msg2"
             lh_gui_restore_config_backup "$backup_file"
         fi
         return 1
@@ -342,20 +395,29 @@ function lh_gui_cleanup_old_backups() {
     done < <(lh_gui_list_config_backups "$config_file")
     
     # If we have more backups than we want to keep, remove the oldest ones
-    if [ ${#backups[@]} -gt $keep_count ]; then
-        local msg="${MSG[LIB_GUI_CONFIG_CLEANUP_START]:-Cleaning up old backups for %s (keeping %d most recent)}"
-        lh_log_msg "INFO" "$(printf "$msg" "$config_file" "$keep_count")"
+    if [ ${#backups[@]} -gt "$keep_count" ]; then
+        local msg_template msg
+        msg_template="${MSG[LIB_GUI_CONFIG_CLEANUP_START]:-Cleaning up old backups for %s (keeping %d most recent)}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg "$msg_template" "$config_file" "$keep_count"
+        lh_log_msg "INFO" "$msg"
         
         # Remove backups beyond the keep count
-        for ((i=$keep_count; i<${#backups[@]}; i++)); do
+        for ((i=keep_count; i<${#backups[@]}; i++)); do
             local backup_to_remove="${backups[$i]}"
-            local msg="${MSG[LIB_GUI_CONFIG_CLEANUP_REMOVING]:-Removing old backup: %s}"
-            lh_log_msg "DEBUG" "$(printf "$msg" "$backup_to_remove")"
+            local msg2
+            msg_template="${MSG[LIB_GUI_CONFIG_CLEANUP_REMOVING]:-Removing old backup: %s}"
+            # shellcheck disable=SC2059  # translation templates supply %s placeholders
+            printf -v msg2 "$msg_template" "$backup_to_remove"
+            lh_log_msg "DEBUG" "$msg2"
             lh_gui_remove_config_backup "$backup_to_remove"
         done
         
-        local msg="${MSG[LIB_GUI_CONFIG_CLEANUP_COMPLETE]:-Backup cleanup complete for %s}"
-        lh_log_msg "INFO" "$(printf "$msg" "$config_file")"
+        local msg3
+        msg_template="${MSG[LIB_GUI_CONFIG_CLEANUP_COMPLETE]:-Backup cleanup complete for %s}"
+        # shellcheck disable=SC2059  # translation templates supply %s placeholders
+        printf -v msg3 "$msg_template" "$config_file"
+        lh_log_msg "INFO" "$msg3"
     fi
 }
 

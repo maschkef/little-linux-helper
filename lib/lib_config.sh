@@ -56,10 +56,10 @@ lh_config_set_assignment() {
         if grep -q -E "^${key}=" "$fragment_file" 2>/dev/null; then
             sed -i "s|^${key}=.*|${key}=\"${escaped}\"|" "$fragment_file"
         else
-            {
-                [ -s "$fragment_file" ] && echo ""
-                echo "${key}=\"${value}\""
-            } >>"$fragment_file"
+            if [ -s "$fragment_file" ]; then
+                printf '\n' >>"$fragment_file"
+            fi
+            printf '%s="%s"\n' "$key" "$value" >>"$fragment_file"
         fi
         return
     fi
@@ -203,22 +203,25 @@ function lh_load_backup_config() {
     mapfile -t backup_config_sources < <(lh_config_list_fragments "$LH_BACKUP_CONFIG_DIR")
 
     if [ ${#backup_config_sources[@]} -gt 0 ]; then
-        local msg="${MSG[LIB_BACKUP_CONFIG_LOADED]:-Loading backup configuration from %s}"
-        lh_log_msg "DEBUG" "$(printf "$msg" "$LH_BACKUP_CONFIG_DIR")"
+        local msg
+        msg=$(lh_config_format_msg 'LIB_BACKUP_CONFIG_LOADED' 'Loading backup configuration from %s' "$LH_BACKUP_CONFIG_DIR")
+        lh_log_msg "DEBUG" "$msg"
         local fragment
         for fragment in "${backup_config_sources[@]}"; do
             # shellcheck source=/dev/null
             source "$fragment"
         done
     elif [ -f "$LH_BACKUP_CONFIG_FILE" ]; then
-        local msg="${MSG[LIB_BACKUP_CONFIG_LOADED]:-Loading backup configuration from %s}"
-        lh_log_msg "DEBUG" "$(printf "$msg" "$LH_BACKUP_CONFIG_FILE")"
+        local msg
+        msg=$(lh_config_format_msg 'LIB_BACKUP_CONFIG_LOADED' 'Loading backup configuration from %s' "$LH_BACKUP_CONFIG_FILE")
+        lh_log_msg "DEBUG" "$msg"
         # shellcheck source=/dev/null
         source "$LH_BACKUP_CONFIG_FILE"
     else
         # Use English fallback before translation system is loaded
-        local msg="${MSG[LIB_BACKUP_CONFIG_NOT_FOUND]:-No backup configuration file (%s) found. Using internal default values.}"
-        lh_log_msg "INFO" "$(printf "$msg" "$LH_BACKUP_CONFIG_FILE")"
+        local msg
+        msg=$(lh_config_format_msg 'LIB_BACKUP_CONFIG_NOT_FOUND' 'No backup configuration file (%s) found. Using internal default values.' "$LH_BACKUP_CONFIG_FILE")
+        lh_log_msg "INFO" "$msg"
     fi
 
     if [ ${#backup_config_sources[@]} -gt 0 ] || [ -f "$LH_BACKUP_CONFIG_FILE" ]; then
@@ -265,8 +268,9 @@ function lh_load_backup_config() {
     # LH_LOG_DIR already contains the path to the monthly folder.
     LH_BACKUP_LOG="$LH_LOG_DIR/$(date '+%y%m%d-%H%M')_$LH_BACKUP_LOG_BASENAME"
     # Use English fallback before translation system is loaded
-    local msg="${MSG[LIB_BACKUP_LOG_CONFIGURED]:-Backup log file configured as: %s}"
-    lh_log_msg "DEBUG" "$(printf "$msg" "$LH_BACKUP_LOG")"
+    local msg
+    msg=$(lh_config_format_msg 'LIB_BACKUP_LOG_CONFIGURED' 'Backup log file configured as: %s' "$LH_BACKUP_LOG")
+    lh_log_msg "DEBUG" "$msg"
 }
 
 # Function to save backup configuration
@@ -292,8 +296,9 @@ function lh_save_backup_config() {
         lh_config_update_fragment "$LH_BACKUP_CONFIG_DIR/30-subvolumes.conf" "CFG_LH_BACKUP_SUBVOLUMES" "${LH_BACKUP_SUBVOLUMES:-$LH_BACKUP_SUBVOLUMES_DEFAULT}" "$LH_BACKUP_CONFIG_TEMPLATE_DIR"
         lh_config_update_fragment "$LH_BACKUP_CONFIG_DIR/30-subvolumes.conf" "CFG_LH_AUTO_DETECT_SUBVOLUMES" "${LH_AUTO_DETECT_SUBVOLUMES:-$LH_AUTO_DETECT_SUBVOLUMES_DEFAULT}" "$LH_BACKUP_CONFIG_TEMPLATE_DIR"
 
-        local msg="${MSG[LIB_BACKUP_CONFIG_SAVED]:-Backup configuration saved in %s}"
-        lh_log_msg "INFO" "$(printf "$msg" "$LH_BACKUP_CONFIG_DIR")"
+        local msg
+        msg=$(lh_config_format_msg 'LIB_BACKUP_CONFIG_SAVED' 'Backup configuration saved in %s' "$LH_BACKUP_CONFIG_DIR")
+        lh_log_msg "INFO" "$msg"
         return
     fi
 
@@ -349,8 +354,9 @@ function lh_save_backup_config() {
     fi
     
     # Use English fallback before translation system is loaded
-    local msg="${MSG[LIB_BACKUP_CONFIG_SAVED]:-Backup configuration saved in %s}"
-    lh_log_msg "INFO" "$(printf "$msg" "$LH_BACKUP_CONFIG_FILE")"
+    local msg
+    msg=$(lh_config_format_msg 'LIB_BACKUP_CONFIG_SAVED' 'Backup configuration saved in %s' "$LH_BACKUP_CONFIG_FILE")
+    lh_log_msg "INFO" "$msg"
 }
 
 # Function to load general configuration (language, logging, etc.)
@@ -360,9 +366,10 @@ function lh_load_general_config() {
        [[ -n "${LH_LOG_TO_CONSOLE:-}" && "${LH_LOG_TO_CONSOLE}" != "true" ]] ||
        [[ -n "${LH_LOG_TO_FILE:-}" && "${LH_LOG_TO_FILE}" != "true" ]]; then
         # Log configuration already set (probably from parent process)
-        local msg="${MSG[LIB_LOG_CONFIG_INHERITED]:-Log configuration inherited from parent process: Level=%s, Console=%s, File=%s}"
+        local msg
+        msg=$(lh_config_format_msg 'LIB_LOG_CONFIG_INHERITED' 'Log configuration inherited from parent process: Level=%s, Console=%s, File=%s' "$LH_LOG_LEVEL" "${LH_LOG_TO_CONSOLE:-true}" "${LH_LOG_TO_FILE:-true}")
         if [ -n "${LH_LOG_FILE:-}" ]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - [DEBUG] $(printf "$msg" "$LH_LOG_LEVEL" "${LH_LOG_TO_CONSOLE:-true}" "${LH_LOG_TO_FILE:-true}")" >> "$LH_LOG_FILE" 2>/dev/null || true
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - [DEBUG] $msg" >> "$LH_LOG_FILE" 2>/dev/null || true
         fi
         return 0
     fi
@@ -387,8 +394,9 @@ function lh_load_general_config() {
 
     if [ ${#general_config_sources[@]} -gt 0 ]; then
         if [ -n "${LH_LOG_FILE:-}" ]; then
-            local msg="${MSG[LIB_GENERAL_CONFIG_LOADED]:-Loading general configuration from %s}"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - [DEBUG] $(printf "$msg" "$LH_GENERAL_CONFIG_DIR")" >> "$LH_LOG_FILE" 2>/dev/null || true
+            local msg
+            msg=$(lh_config_format_msg 'LIB_GENERAL_CONFIG_LOADED' 'Loading general configuration from %s' "$LH_GENERAL_CONFIG_DIR")
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - [DEBUG] $msg" >> "$LH_LOG_FILE" 2>/dev/null || true
         fi
         local fragment
         for fragment in "${general_config_sources[@]}"; do
@@ -397,8 +405,9 @@ function lh_load_general_config() {
         done
     elif [ -f "$LH_GENERAL_CONFIG_FILE" ]; then
         if [ -n "${LH_LOG_FILE:-}" ]; then
-            local msg="${MSG[LIB_GENERAL_CONFIG_LOADED]:-Loading general configuration from %s}"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - [DEBUG] $(printf "$msg" "$LH_GENERAL_CONFIG_FILE")" >> "$LH_LOG_FILE" 2>/dev/null || true
+            local msg
+            msg=$(lh_config_format_msg 'LIB_GENERAL_CONFIG_LOADED' 'Loading general configuration from %s' "$LH_GENERAL_CONFIG_FILE")
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - [DEBUG] $msg" >> "$LH_LOG_FILE" 2>/dev/null || true
         fi
         # shellcheck source=/dev/null
         source "$LH_GENERAL_CONFIG_FILE"
@@ -434,16 +443,18 @@ function lh_load_general_config() {
         ERROR|WARN|INFO|DEBUG) ;; # Valid levels
         *) 
             if [ -n "${LH_LOG_FILE:-}" ]; then
-                local msg="${MSG[LIB_INVALID_LOG_LEVEL]:-Invalid log level '%s', using default 'INFO'}"
-                echo "$(date '+%Y-%m-%d %H:%M:%S') - [WARN] $(printf "$msg" "$LH_LOG_LEVEL")" >> "$LH_LOG_FILE" 2>/dev/null || true
+                local msg
+                msg=$(lh_config_format_msg 'LIB_INVALID_LOG_LEVEL' "Invalid log level '%s', using default 'INFO'" "$LH_LOG_LEVEL")
+                echo "$(date '+%Y-%m-%d %H:%M:%S') - [WARN] $msg" >> "$LH_LOG_FILE" 2>/dev/null || true
             fi
             LH_LOG_LEVEL="INFO"
             ;;
     esac
     
     if [ -n "${LH_LOG_FILE:-}" ]; then
-        local msg="${MSG[LIB_LOG_CONFIG_SET]:-Log configuration: Level=%s, Console=%s, File=%s}"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - [DEBUG] $(printf "$msg" "$LH_LOG_LEVEL" "$LH_LOG_TO_CONSOLE" "$LH_LOG_TO_FILE")" >> "$LH_LOG_FILE" 2>/dev/null || true
+        local msg
+    msg=$(lh_config_format_msg 'LIB_LOG_CONFIG_SET' 'Log configuration: Level=%s, Console=%s, File=%s' "$LH_LOG_LEVEL" "$LH_LOG_TO_CONSOLE" "$LH_LOG_TO_FILE")
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - [DEBUG] $msg" >> "$LH_LOG_FILE" 2>/dev/null || true
     fi
 }
 
@@ -471,8 +482,9 @@ function lh_save_general_config() {
 
         lh_config_update_fragment "$LH_GENERAL_CONFIG_DIR/90-release.conf" "CFG_LH_RELEASE_TAG" "${CFG_LH_RELEASE_TAG:-}" "$LH_GENERAL_CONFIG_TEMPLATE_DIR"
 
-        local msg="${MSG[LIB_GENERAL_CONFIG_SAVED]:-General configuration saved to %s}"
-        lh_log_msg "INFO" "$(printf "$msg" "$LH_GENERAL_CONFIG_DIR")"
+        local msg
+        msg=$(lh_config_format_msg 'LIB_GENERAL_CONFIG_SAVED' 'General configuration saved to %s' "$LH_GENERAL_CONFIG_DIR")
+        lh_log_msg "INFO" "$msg"
         return
     fi
     
@@ -521,8 +533,9 @@ function lh_save_general_config() {
         } > "$LH_GENERAL_CONFIG_FILE"
     fi
     
-    local msg="${MSG[LIB_GENERAL_CONFIG_SAVED]:-General configuration saved to %s}"
-    lh_log_msg "INFO" "$(printf "$msg" "$LH_GENERAL_CONFIG_FILE")"
+    local msg
+    msg=$(lh_config_format_msg 'LIB_GENERAL_CONFIG_SAVED' 'General configuration saved to %s' "$LH_GENERAL_CONFIG_FILE")
+    lh_log_msg "INFO" "$msg"
 }
 
 # Function to load Docker configuration
@@ -687,4 +700,15 @@ function lh_save_docker_config() {
 
     lh_log_msg "INFO" "${MSG[DOCKER_CONFIG_UPDATED]:-Docker configuration updated in %s}" "$LH_DOCKER_CONFIG_FILE"
     return 0
+}
+# Format a message using translation templates with safe fallbacks.
+lh_config_format_msg() {
+    local key="$1"
+    local fallback="$2"
+    shift 2
+    local template="${MSG[$key]:-$fallback}"
+    local formatted=""
+    # shellcheck disable=SC2059  # translation templates intentionally contain format tokens
+    printf -v formatted "$template" "$@"
+    printf '%s' "$formatted"
 }

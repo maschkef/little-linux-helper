@@ -7,6 +7,7 @@
 # Spanish common language strings
 
 # Declare MSG_ES as associative array
+# shellcheck disable=SC2034  # consumed by lib/lib_i18n.sh when populating MSG
 declare -A MSG_ES
 
 # General UI elements

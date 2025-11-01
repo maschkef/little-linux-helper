@@ -6,6 +6,7 @@
 #
 # Color definitions for console output
 
+# shellcheck disable=SC2034  # Color variables are exported and used by modules via lh_finalize_initialization()
 # Colors for output
 LH_COLOR_RESET='\e[0m'
 LH_COLOR_BLACK='\e[0;30m'

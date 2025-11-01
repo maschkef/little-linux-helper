@@ -218,7 +218,7 @@ function lh_confirm_action() {
         prompt_suffix="[${LH_COLOR_PROMPT}y${LH_COLOR_RESET}/${LH_COLOR_BOLD_WHITE}N${LH_COLOR_RESET}]"
     fi
 
-    read -p "$(echo -e "${LH_COLOR_PROMPT}${prompt_message}${LH_COLOR_RESET} ${prompt_suffix}: ")" response
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}${prompt_message}${LH_COLOR_RESET} ${prompt_suffix}: ")" response
 
 
     # If no input, use default choice
@@ -267,7 +267,7 @@ function lh_ask_for_input() {
     local user_input=""
 
     while true; do
-        read -p "$(echo -e "${LH_COLOR_PROMPT}${prompt_message}${LH_COLOR_RESET}: ")" user_input
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}${prompt_message}${LH_COLOR_RESET}: ")" user_input
 
         # If no regex specified, accept any input
         if [ -z "$validation_regex" ]; then
@@ -298,6 +298,6 @@ function lh_press_any_key() {
     fi
     
     # Show prompt in CLI mode
-    read -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg "$message_key")${LH_COLOR_RESET}")" -n1 -s
+    read -r -p "$(echo -e "${LH_COLOR_INFO}$(lh_msg "$message_key")${LH_COLOR_RESET}")" -n1 -s
     echo  # Add newline after the prompt
 }

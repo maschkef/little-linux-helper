@@ -88,7 +88,17 @@ done
 # CLI parsing completed - debug logging will be done after initialization
 
 # Load library system
-source "$LH_ROOT_DIR/lib/lib_common.sh"
+LIB_COMMON_PATH="$LH_ROOT_DIR/lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Complete initialization sequence
 lh_ensure_config_files_exist

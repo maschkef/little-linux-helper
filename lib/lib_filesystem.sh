@@ -28,8 +28,10 @@ function lh_get_disk_space() {
             df --output=avail -B1 "$path" 2>/dev/null | tail -n1
             ;;
         "both")
-            local available_bytes=$(df --output=avail -B1 "$path" 2>/dev/null | tail -n1)
-            local human_readable=$(df -h "$path" | awk 'NR==2 {print $4 "/" $2}')
+            local available_bytes
+            available_bytes=$(df --output=avail -B1 "$path" 2>/dev/null | tail -n1)
+            local human_readable
+            human_readable=$(df -h "$path" | awk 'NR==2 {print $4 "/" $2}')
             echo "$available_bytes|$human_readable"
             ;;
     esac
@@ -57,8 +59,10 @@ function lh_get_directory_size() {
             $du_cmd -sb "${du_opts[@]}" "$path" 2>/dev/null | cut -f1
             ;;
         "both")
-            local size_bytes=$($du_cmd -sb "${du_opts[@]}" "$path" 2>/dev/null | cut -f1)
-            local size_human=$($du_cmd -sh "${du_opts[@]}" "$path" 2>/dev/null | cut -f1)
+            local size_bytes
+            size_bytes=$($du_cmd -sb "${du_opts[@]}" "$path" 2>/dev/null | cut -f1)
+            local size_human
+            size_human=$($du_cmd -sh "${du_opts[@]}" "$path" 2>/dev/null | cut -f1)
             echo "$size_bytes|$size_human"
             ;;
     esac
@@ -140,8 +144,7 @@ function lh_ensure_directory() {
     local permissions="${2:-755}"
     
     if [ ! -d "$dir_path" ]; then
-        mkdir -p "$dir_path"
-        if [ $? -eq 0 ]; then
+        if mkdir -p "$dir_path"; then
             chmod "$permissions" "$dir_path"
             lh_log_msg "DEBUG" "Created directory: $dir_path"
             return 0

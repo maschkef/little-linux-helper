@@ -191,11 +191,13 @@ function lh_get_target_user_info() {
     # Try to find the active graphical session via loginctl (when running as root)
     if command -v loginctl >/dev/null && [ "$EUID" -eq 0 ]; then
         # Takes the first found active graphical session
-        local SESSION_DETAILS=$(loginctl list-sessions --no-legend | grep 'graphical' | grep -v 'seat-c' | head -n 1)
+        local SESSION_DETAILS
+        SESSION_DETAILS=$(loginctl list-sessions --no-legend | grep 'graphical' | grep -v 'seat-c' | head -n 1)
 
         if [ -n "$SESSION_DETAILS" ]; then
             TARGET_USER=$(echo "$SESSION_DETAILS" | awk '{print $3}')
-            local SESSION_ID=$(echo "$SESSION_DETAILS" | awk '{print $1}')
+            local SESSION_ID
+            SESSION_ID=$(echo "$SESSION_DETAILS" | awk '{print $1}')
 
             if [ -n "$SESSION_ID" ]; then
                 USER_DISPLAY=$(loginctl show-session "$SESSION_ID" -p Display --value)
@@ -214,20 +216,21 @@ function lh_get_target_user_info() {
             # Extended fallback methods for TTY sessions
             # 1. Try via loginctl (even without root)
             if command -v loginctl >/dev/null; then
-                TARGET_USER=$(loginctl list-sessions --no-legend 2>/dev/null | grep -E 'seat|tty' | head -n 1 | awk '{print $3}' | head -n 1)
+                TARGET_USER=$(loginctl list-sessions --no-legend 2>/dev/null | awk '/seat|tty/ {print $3; exit}')
             fi
             
             # 2. Try via active X/Wayland processes
             if [ -z "$TARGET_USER" ] || [ "$TARGET_USER" = "root" ]; then
-                TARGET_USER=$(ps -eo user,command | grep -E "Xorg|Xwayland|kwin|plasmashell|gnome-shell" | grep -v "grep\|root" | head -n 1 | awk '{print $1}')
+                TARGET_USER=$(ps -eo user=,command= | awk '$2 ~ /(Xorg|Xwayland|kwin|plasmashell|gnome-shell)/ && $1 != "root" {print $1; exit}')
             fi
             
             # 3. Try via /tmp/.X11-unix files
             if [ -z "$TARGET_USER" ] || [ "$TARGET_USER" = "root" ]; then
                 for xsocket in /tmp/.X11-unix/X*; do
                     if [ -S "$xsocket" ]; then
-                        local display_num=$(basename "$xsocket" | sed 's/X//')
-                        TARGET_USER=$(ps -eo user,command | grep "DISPLAY=:$display_num" | grep -v "grep\|root" | head -n 1 | awk '{print $1}')
+                        local display_num
+                        display_num=$(basename "$xsocket" | sed 's/X//')
+                        TARGET_USER=$(ps -eo user=,command= | awk -v pattern="DISPLAY=:$display_num" '$2 ~ pattern && $1 != "root" {print $1; exit}')
                         if [ -n "$TARGET_USER" ] && [ "$TARGET_USER" != "root" ]; then
                             break
                         fi
@@ -237,7 +240,7 @@ function lh_get_target_user_info() {
         
         # 4. Last resort: who command
         if [ -z "$TARGET_USER" ] || [ "$TARGET_USER" = "root" ]; then
-            TARGET_USER=$(who | grep '(:[0-9])' | awk '{print $1}' | head -n 1)
+            TARGET_USER=$(who | awk '/\(:[0-9]\)/ {print $1; exit}')
         fi
     fi
 fi
@@ -277,10 +280,12 @@ fi
         
         # Fallback 2: Search for D-Bus processes
         if [ -z "$USER_DBUS_SESSION_BUS_ADDRESS" ]; then
-            local dbus_address=$(ps -u "$TARGET_USER" -o pid,command | grep "dbus-daemon.*--session" | head -n 1 | awk '{print $1}')
+            local dbus_address
+            dbus_address=$(ps -u "$TARGET_USER" -o pid=,command= | awk '/dbus-daemon.*--session/ {print $1; exit}')
             if [ -n "$dbus_address" ]; then
                 # Try to extract the address from the process environment variables
-                local dbus_env=$(cat "/proc/$dbus_address/environ" 2>/dev/null | tr '\0' '\n' | grep "^DBUS_SESSION_BUS_ADDRESS=" | cut -d= -f2-)
+                local dbus_env
+                dbus_env=$(cat "/proc/$dbus_address/environ" 2>/dev/null | tr '\0' '\n' | grep "^DBUS_SESSION_BUS_ADDRESS=" | cut -d= -f2-)
                 if [ -n "$dbus_env" ]; then
                     USER_DBUS_SESSION_BUS_ADDRESS="$dbus_env"
                 fi
@@ -316,8 +321,7 @@ function lh_run_command_as_target_user() {
 
     # Check if user info is already filled
     if [ -z "${LH_TARGET_USER_INFO[TARGET_USER]}" ]; then
-        lh_get_target_user_info
-        if [ $? -ne 0 ]; then
+        if ! lh_get_target_user_info; then
             lh_log_msg "ERROR" "${MSG[LIB_USER_INFO_ERROR]:-Konnte keine Benutzerinfos ermitteln. Befehl kann nicht ausgeführt werden.}"
             return 1
         fi

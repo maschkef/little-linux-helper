@@ -10,7 +10,17 @@
 # Sub-module for TAR backup operations
 
 # Load common library
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
+LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
@@ -52,7 +62,7 @@ if ! declare -f backup_log_msg > /dev/null; then
         if [ -n "$LH_BACKUP_LOG" ] && [ ! -f "$LH_BACKUP_LOG" ]; then
             # Try to create the file if it doesn't exist yet.
             lh_log_msg "DEBUG" "Creating backup log file: $LH_BACKUP_LOG"
-            touch "$LH_BACKUP_LOG" || echo "$(lh_msg 'BACKUP_LOG_WARN_CREATE' "$LH_BACKUP_LOG")" >&2
+            touch "$LH_BACKUP_LOG" || lh_msgln 'BACKUP_LOG_WARN_CREATE' "$LH_BACKUP_LOG" >&2
         fi
         echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$LH_BACKUP_LOG"
         
@@ -87,7 +97,7 @@ tar_backup() {
 
     # Check backup target and adapt for this session if necessary
     lh_log_msg "DEBUG" "Checking backup target availability"
-    echo "$(lh_msg 'BACKUP_CURRENT_TARGET' "$LH_BACKUP_ROOT")"
+    lh_msgln 'BACKUP_CURRENT_TARGET' "$LH_BACKUP_ROOT"
     local change_backup_root_for_session=false
     local prompt_for_new_path_message="" # Used by lh_ask_for_input
 
@@ -124,8 +134,7 @@ tar_backup() {
 
             if [ ! -d "$new_backup_root_path" ]; then
                 if lh_confirm_action "$(lh_msg 'BACKUP_DIR_NOT_EXISTS' "$new_backup_root_path")" "y"; then
-                    $LH_SUDO_CMD mkdir -p "$new_backup_root_path"
-                    if [ $? -eq 0 ]; then
+                    if $LH_SUDO_CMD mkdir -p "$new_backup_root_path"; then
                         LH_BACKUP_ROOT="$new_backup_root_path"
                         backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_TARGET_CREATED' "$LH_BACKUP_ROOT")"
                         break 
@@ -160,17 +169,36 @@ tar_backup() {
     echo -e "  ${LH_COLOR_MENU_NUMBER}5.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg "BACKUP_OPTION_CUSTOM")${LH_COLOR_RESET}"
     
     lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg "CHOOSE_OPTION")${LH_COLOR_RESET}")" choice
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg "CHOOSE_OPTION")${LH_COLOR_RESET}")" choice
     lh_log_msg "DEBUG" "User selected option: '$choice'"
     
     local backup_dirs=()
     # Standard exclusions
-    local exclude_list_base="--exclude=/proc --exclude=/sys --exclude=/tmp --exclude=/dev --exclude=/mnt --exclude=/media --exclude=/run --exclude=/var/cache --exclude=/var/tmp"
+    local -a exclude_args=(
+        "--exclude=/proc"
+        "--exclude=/sys"
+        "--exclude=/tmp"
+        "--exclude=/dev"
+        "--exclude=/mnt"
+        "--exclude=/media"
+        "--exclude=/run"
+        "--exclude=/var/cache"
+        "--exclude=/var/tmp"
+    )
+    local exclude_list_base="${exclude_args[*]}"
     # Add configured exclusions
-    local exclude_list="$exclude_list_base $(echo "$LH_TAR_EXCLUDES" | sed 's/\S\+/--exclude=&/g')"
+    if [[ -n "$LH_TAR_EXCLUDES" ]]; then
+        local -a configured_excludes=()
+        read -r -a configured_excludes <<< "$LH_TAR_EXCLUDES"
+        for exclude in "${configured_excludes[@]}"; do
+            [[ -z "$exclude" ]] && continue
+            exclude_args+=("--exclude=$exclude")
+        done
+    fi
+    local final_exclude_list="${exclude_args[*]}"
     lh_log_msg "DEBUG" "Base exclude list: $exclude_list_base"
     lh_log_msg "DEBUG" "Configured TAR excludes: $LH_TAR_EXCLUDES"
-    lh_log_msg "DEBUG" "Final exclude list: $exclude_list"
+    lh_log_msg "DEBUG" "Final exclude list: $final_exclude_list"
         
     case $choice in
         1) 
@@ -185,13 +213,19 @@ tar_backup() {
         4) 
             lh_log_msg "DEBUG" "Taking path: Full system backup"
             backup_dirs=("/")
-            exclude_list="$exclude_list --exclude=/lost+found --exclude=/var/lib/lxcfs --exclude=/.snapshots* --exclude=/swapfile"
+            exclude_args+=(
+                "--exclude=/lost+found"
+                "--exclude=/var/lib/lxcfs"
+                "--exclude=/.snapshots*"
+                "--exclude=/swapfile"
+            )
             # Exclude backup target if it's under /
             if [ -n "$LH_BACKUP_ROOT" ] && [[ "$LH_BACKUP_ROOT" == /* ]]; then
-                 exclude_list="$exclude_list --exclude=$LH_BACKUP_ROOT"
+                 exclude_args+=("--exclude=$LH_BACKUP_ROOT")
                  lh_log_msg "DEBUG" "Added backup root to exclusions: $LH_BACKUP_ROOT"
             fi
-            lh_log_msg "DEBUG" "Full system exclude list: $exclude_list"
+            local full_system_excludes="${exclude_args[*]}"
+            lh_log_msg "DEBUG" "Full system exclude list: $full_system_excludes"
             ;;
         5)
             lh_log_msg "DEBUG" "Taking path: Custom directories"
@@ -265,7 +299,12 @@ tar_backup() {
                 du_exclude_opt="--exclude=$LH_BACKUP_ROOT"
                 lh_log_msg "DEBUG" "Using exclude option for du: $du_exclude_opt"
             fi
-            estimated_size_val=$(du -sb $du_exclude_opt "$dir_to_backup" 2>/dev/null | awk '{print $1}')
+            # Handle optional exclude option properly
+            if [ -n "$du_exclude_opt" ]; then
+                estimated_size_val=$(du -sb "$du_exclude_opt" "$dir_to_backup" 2>/dev/null | awk '{print $1}')
+            else
+                estimated_size_val=$(du -sb "$dir_to_backup" 2>/dev/null | awk '{print $1}')
+            fi
             if [[ "$estimated_size_val" =~ ^[0-9]+$ ]]; then 
                 required_space_bytes=$((required_space_bytes + estimated_size_val))
                 lh_log_msg "DEBUG" "Directory size: $estimated_size_val bytes, total required: $required_space_bytes bytes"
@@ -276,11 +315,14 @@ tar_backup() {
         done
         
         local margin_percentage=110 # 10% margin for TAR
-        local required_with_margin=$((required_space_bytes * margin_percentage / 100))
+        local required_with_margin
+        required_with_margin=$((required_space_bytes * margin_percentage / 100))
         lh_log_msg "DEBUG" "Required space with 10% margin: $required_with_margin bytes"
 
-        local available_hr=$(format_bytes_for_display "$available_space_bytes")
-        local required_hr=$(format_bytes_for_display "$required_with_margin")
+        local available_hr
+        available_hr=$(format_bytes_for_display "$available_space_bytes")
+        local required_hr
+        required_hr=$(format_bytes_for_display "$required_with_margin")
         lh_log_msg "DEBUG" "Space comparison - Available: $available_hr, Required: $required_hr"
 
         backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_SPACE_DETAILS' "$available_hr" "$required_hr")"
@@ -302,8 +344,7 @@ tar_backup() {
     fi
 
     # Create backup directory
-    $LH_SUDO_CMD mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"
-    if [ $? -ne 0 ]; then
+    if ! $LH_SUDO_CMD mkdir -p "$LH_BACKUP_ROOT$LH_BACKUP_DIR"; then
         backup_log_msg "ERROR" "$(lh_msg 'BACKUP_ERROR_CREATE_DIR')"
         return 1
     fi
@@ -318,16 +359,18 @@ tar_backup() {
             lh_log_msg "DEBUG" "User entered additional exclusions: '$additional_excludes'"
             for exclude in $additional_excludes; do
                 lh_log_msg "DEBUG" "Adding exclusion: $exclude"
-                exclude_list="$exclude_list --exclude=$exclude"
+                exclude_args+=("--exclude=$exclude")
             done
-            lh_log_msg "DEBUG" "Final exclude list with additional exclusions: $exclude_list"
+            local exclude_list_with_custom="${exclude_args[*]}"
+            lh_log_msg "DEBUG" "Final exclude list with additional exclusions: $exclude_list_with_custom"
         else
             lh_log_msg "DEBUG" "User chose not to add additional exclusions"
         fi
     fi
     
     # Create backup
-    local timestamp=$(date +%Y-%m-%d_%H-%M-%S)
+    local timestamp
+    timestamp=$(date +%Y-%m-%d_%H-%M-%S)
     local tar_file="$LH_BACKUP_ROOT$LH_BACKUP_DIR/tar_backup_${timestamp}.tar.gz"
     lh_log_msg "DEBUG" "Timestamp: $timestamp"
     lh_log_msg "DEBUG" "TAR file path: $tar_file"
@@ -336,9 +379,10 @@ tar_backup() {
     backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_STARTING' "TAR" "$tar_file")"
     
     # Use a temporary script for the exclude list
-    local exclude_file="/tmp/tar_excludes_$$_$(date +%s)" # Unique name
+    local exclude_file
+    exclude_file="/tmp/tar_excludes_$$_$(date +%s)" # Unique name
     lh_log_msg "DEBUG" "Creating temporary exclude file: $exclude_file"
-    echo "$exclude_list" | tr ' ' '\n' | sed 's/--exclude=//' | grep -v '^$' > "$exclude_file"
+    printf '%s\n' "${exclude_args[@]}" | sed 's/^--exclude=//' | grep -v '^$' > "$exclude_file"
     lh_log_msg "DEBUG" "Exclude file contents:"
     lh_log_msg "DEBUG" "$(cat "$exclude_file" 2>/dev/null || echo 'Failed to read exclude file')"
     
@@ -359,8 +403,10 @@ tar_backup() {
     lh_log_msg "DEBUG" "Cleaning up temporary exclude file: $exclude_file"
     rm -f "$exclude_file"
 
-    local end_time=$(date +%s)
-    local duration=$((end_time - BACKUP_START_TIME))
+    local end_time
+    end_time=$(date +%s)
+    local duration
+    duration=$((end_time - BACKUP_START_TIME))
     lh_log_msg "DEBUG" "Backup duration: ${duration}s"
     
     # Evaluate results
@@ -385,7 +431,8 @@ tar_backup() {
             backup_log_msg "WARN" "$(lh_msg 'BACKUP_LOG_CHECKSUM_FAILED' "$tar_file")"
         fi
         
-        local file_size=$(du -sh "$tar_file" | cut -f1)
+        local file_size
+        file_size=$(du -sh "$tar_file" | cut -f1)
         lh_log_msg "DEBUG" "Final TAR file size: $file_size"
         
         # Desktop notification for success
@@ -420,7 +467,8 @@ tar_backup() {
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_DIRECTORIES')${LH_COLOR_RESET} ${backup_dirs[*]}"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_ARCHIVE')${LH_COLOR_RESET} $(basename "$tar_file")"
     echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_SIZE')${LH_COLOR_RESET} $file_size"
-    local duration=$((end_time - BACKUP_START_TIME)); echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_DURATION')${LH_COLOR_RESET} $(printf '%02dh %02dm %02ds' $((duration/3600)) $((duration%3600/60)) $((duration%60)))${LH_COLOR_RESET}"
+    local duration
+    duration=$((end_time - BACKUP_START_TIME)); echo -e "  ${LH_COLOR_INFO}$(lh_msg 'BACKUP_SUMMARY_DURATION')${LH_COLOR_RESET} $(printf '%02dh %02dm %02ds' $((duration/3600)) $((duration%3600/60)) $((duration%60)))${LH_COLOR_RESET}"
 
     # Include temporary log file
     lh_log_msg "DEBUG" "Processing temporary log file"
@@ -437,11 +485,27 @@ tar_backup() {
     lh_log_msg "DEBUG" "Starting cleanup of old TAR backups"
     lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_CLEANUP' "TAR")"
     backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_CLEANUP' "TAR")"
-    ls -1 "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz 2>/dev/null | sort -r | tail -n +$((LH_RETENTION_BACKUP+1)) | while read backup; do
-        lh_log_msg "DEBUG" "Removing old backup: $backup"
-        backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_CLEANUP_REMOVE' "TAR" "$backup")"
-        rm -f "$backup"
-    done
+    
+    # Compile list of TAR backups (timestamped names sort newest-first lexicographically)
+    local -a tar_backups=()
+    local -a sorted_tar_backups=()
+
+    shopt -s nullglob
+    tar_backups=("$LH_BACKUP_ROOT$LH_BACKUP_DIR"/tar_backup_*.tar.gz)
+    shopt -u nullglob
+
+    if ((${#tar_backups[@]} > LH_RETENTION_BACKUP)); then
+        mapfile -t sorted_tar_backups < <(printf '%s\n' "${tar_backups[@]}" | sort -r)
+        for ((i=LH_RETENTION_BACKUP; i<${#sorted_tar_backups[@]}; i++)); do
+            local backup="${sorted_tar_backups[$i]}"
+            lh_log_msg "DEBUG" "Removing old backup: $backup"
+            backup_log_msg "INFO" "$(lh_msg 'BACKUP_LOG_CLEANUP_REMOVE' "TAR" "$backup")"
+            rm -f "$backup"
+        done
+    else
+        lh_log_msg "DEBUG" "No TAR backups exceed the retention limit"
+    fi
+
     lh_log_msg "DEBUG" "Old backup cleanup completed"
     
     lh_log_msg "DEBUG" "=== Finished tar_backup function successfully ==="

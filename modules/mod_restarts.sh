@@ -11,7 +11,17 @@
 
 # Load common library
 # Use BASH_SOURCE to get the correct path when sourced
-source "$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
@@ -93,7 +103,8 @@ function restart_login_manager_action() {
 
     # Fallback for SysVinit or if systemd method fails
     if [ -z "$DM_SERVICE" ] && [ -f /etc/X11/default-display-manager ]; then
-        local dm_path=$(cat /etc/X11/default-display-manager)
+        local dm_path
+        dm_path=$(cat /etc/X11/default-display-manager)
         DM_SERVICE=$(basename "$dm_path") # e.g. /usr/sbin/gdm3 -> gdm3
         lh_log_msg "INFO" "$(lh_msg 'RESTART_DM_SERVICE_DEFAULT_FILE' "$DM_SERVICE")"
     fi
@@ -180,8 +191,7 @@ function restart_sound_system_action() {
     local sound_restarted=false
 
     # Get user info
-    lh_get_target_user_info
-    if [ $? -ne 0 ]; then
+    if ! lh_get_target_user_info; then
         lh_log_msg "WARN" "$(lh_msg 'RESTART_SOUND_USER_CONTEXT_ERROR')"
     fi
 
@@ -212,7 +222,7 @@ function restart_sound_system_action() {
         lh_log_msg "INFO" "$(lh_msg 'RESTART_SOUND_ALSA_AVAILABLE')"
     fi
 
-    echo "$(lh_msg 'RESTART_SOUND_DETECTED_COMPONENTS')"
+    lh_msgln 'RESTART_SOUND_DETECTED_COMPONENTS'
     if $has_pipewire; then echo -e "${LH_COLOR_INFO}- PipeWire${LH_COLOR_RESET}"; fi
     if $has_pulseaudio; then echo -e "${LH_COLOR_INFO}- PulseAudio${LH_COLOR_RESET}"; fi
     if $has_alsa; then echo -e "${LH_COLOR_INFO}- ALSA${LH_COLOR_RESET}"; fi
@@ -226,7 +236,8 @@ function restart_sound_system_action() {
         local pipewire_services=""
 
         # Temporary file for the raw output of the command
-        local tmpfile=$(mktemp)
+        local tmpfile
+        tmpfile=$(mktemp)
 
         # Execute the command and redirect output to tmpfile.
         # This output could contain debug information from lh_run_command_as_target_user.
@@ -412,8 +423,7 @@ function restart_desktop_environment_action() {
     lh_log_msg "INFO" "$(lh_msg 'RESTART_DE_STARTING')"
 
     # Get user info
-    lh_get_target_user_info
-    if [ $? -ne 0 ]; then
+    if ! lh_get_target_user_info; then
         lh_log_msg "ERROR" "$(lh_msg 'RESTART_DE_USER_ERROR')"
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTART_DE_ERROR_NO_USER')${LH_COLOR_RESET}"
         return 1
@@ -481,7 +491,7 @@ function restart_desktop_environment_action() {
     echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTART_DE_CHOOSE_TYPE')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'RESTART_DE_SOFT_RESTART')${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'RESTART_DE_HARD_RESTART')${LH_COLOR_RESET}"
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTART_DE_CHOOSE_OPTION')${LH_COLOR_RESET}")" restart_type
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTART_DE_CHOOSE_OPTION')${LH_COLOR_RESET}")" restart_type
 
     case $DESKTOP_ENVIRONMENT in
         kde|plasma)
@@ -623,7 +633,8 @@ function restart_desktop_environment_action() {
         gnome)
             lh_log_msg "INFO" "$(lh_msg 'RESTART_DE_GNOME_STARTING' "$TARGET_USER")"
             # Determine XDG_SESSION_TYPE
-            local SESSION_TYPE=$(lh_run_command_as_target_user "printenv XDG_SESSION_TYPE 2>/dev/null")
+            local SESSION_TYPE
+            SESSION_TYPE=$(lh_run_command_as_target_user "printenv XDG_SESSION_TYPE 2>/dev/null")
 
             if [ "$SESSION_TYPE" = "wayland" ]; then
                 lh_log_msg "INFO" "$(lh_msg 'RESTART_DE_GNOME_WAYLAND_DETECTED')"
@@ -842,7 +853,7 @@ function restart_network_services_action() {
     echo ""
 
     local net_choice
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTART_NET_CHOOSE_SERVICE' "$(( ${#active_services_names[@]} + 2 ))")${LH_COLOR_RESET}")" net_choice
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTART_NET_CHOOSE_SERVICE' "$(( ${#active_services_names[@]} + 2 ))")${LH_COLOR_RESET}")" net_choice
 
     if ! [[ "$net_choice" =~ ^[0-9]+$ ]] || [ "$net_choice" -lt 1 ] || [ "$net_choice" -gt $(( ${#services_to_consider[@]} + 2 )) ]; then
         lh_log_msg "WARN" "$(lh_msg 'RESTART_NET_INVALID_SELECTION')"
@@ -962,7 +973,7 @@ function restart_firewall_services_action() {
     echo ""
 
     local fw_choice
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTART_FW_CHOOSE_SERVICE' "$(( ${#fw_display_names[@]} + 1 ))")${LH_COLOR_RESET}")" fw_choice
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTART_FW_CHOOSE_SERVICE' "$(( ${#fw_display_names[@]} + 1 ))")${LH_COLOR_RESET}")" fw_choice
 
     if ! [[ "$fw_choice" =~ ^[0-9]+$ ]]; then
         lh_log_msg "WARN" "$(lh_msg 'RESTART_FW_INVALID_SELECTION')"
@@ -986,7 +997,8 @@ function restart_firewall_services_action() {
         sel_names=("${fw_display_names[@]}")
         lh_log_msg "INFO" "$(lh_msg 'RESTART_FW_ALL_RESTARTING')"
     elif [ "$fw_choice" -ge 1 ] && [ "$fw_choice" -le ${#fw_display_names[@]} ]; then
-        local idx=$((fw_choice-1))
+        local idx
+        idx=$((fw_choice-1))
         sel_types+=("${fw_types[$idx]}")
         sel_services+=("${fw_services[$idx]}")
         sel_names+=("${fw_display_names[$idx]}")
@@ -1114,7 +1126,6 @@ function restart_firewall_services_action() {
 function restart_bluetooth_services_action() {
     lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_STARTING')"
     
-    local bluetooth_restarted=false
     local services_restarted=0
     local services_attempted=0
     
@@ -1129,7 +1140,6 @@ function restart_bluetooth_services_action() {
             lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_SERVICE_SUCCESS')"
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTART_BLUETOOTH_SERVICE_SUCCESS')${LH_COLOR_RESET}"
             ((services_restarted++))
-            bluetooth_restarted=true
         else
             lh_log_msg "ERROR" "$(lh_msg 'RESTART_BLUETOOTH_SERVICE_ERROR')"
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'RESTART_BLUETOOTH_SERVICE_ERROR')${LH_COLOR_RESET}"
@@ -1160,7 +1170,6 @@ function restart_bluetooth_services_action() {
                 lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_ADAPTER_SUCCESS' "$bt_adapter")"
                 echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTART_BLUETOOTH_ADAPTER_SUCCESS' "$bt_adapter")${LH_COLOR_RESET}"
                 ((services_restarted++))
-                bluetooth_restarted=true
             else
                 lh_log_msg "WARN" "$(lh_msg 'RESTART_BLUETOOTH_ADAPTER_ERROR' "$bt_adapter")"
                 echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_BLUETOOTH_ADAPTER_ERROR' "$bt_adapter")${LH_COLOR_RESET}"
@@ -1174,8 +1183,7 @@ function restart_bluetooth_services_action() {
     fi
     
     # Check for and restart user-level bluetooth services
-    lh_get_target_user_info
-    if [ $? -eq 0 ]; then
+    if lh_get_target_user_info; then
         local TARGET_USER="${LH_TARGET_USER_INFO[TARGET_USER]}"
         lh_log_msg "DEBUG" "Checking user-level Bluetooth services for user: $TARGET_USER"
         
@@ -1197,7 +1205,6 @@ function restart_bluetooth_services_action() {
                 lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_PULSEAUDIO_SUCCESS')"
                 echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTART_BLUETOOTH_PULSEAUDIO_SUCCESS')${LH_COLOR_RESET}"
                 ((services_restarted++))
-                bluetooth_restarted=true
             else
                 lh_log_msg "WARN" "$(lh_msg 'RESTART_BLUETOOTH_PULSEAUDIO_ERROR')"
                 echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_BLUETOOTH_PULSEAUDIO_ERROR')${LH_COLOR_RESET}"
@@ -1218,7 +1225,6 @@ function restart_bluetooth_services_action() {
                 lh_log_msg "INFO" "$(lh_msg 'RESTART_BLUETOOTH_PIPEWIRE_SUCCESS')"
                 echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTART_BLUETOOTH_PIPEWIRE_SUCCESS')${LH_COLOR_RESET}"
                 ((services_restarted++))
-                bluetooth_restarted=true
             else
                 lh_log_msg "WARN" "$(lh_msg 'RESTART_BLUETOOTH_PIPEWIRE_ERROR')"
                 echo -e "${LH_COLOR_WARNING}$(lh_msg 'RESTART_BLUETOOTH_PIPEWIRE_ERROR')${LH_COLOR_RESET}"
@@ -1259,15 +1265,16 @@ function restart_graphics_system_action() {
     local compositor=""
     
     # Detect display server type
-    lh_get_target_user_info
-    if [ $? -eq 0 ]; then
+    if lh_get_target_user_info; then
         local TARGET_USER="${LH_TARGET_USER_INFO[TARGET_USER]}"
         local USER_DISPLAY="${LH_TARGET_USER_INFO[USER_DISPLAY]}"
         
         # Determine session type
-        local SESSION_TYPE_TMP=$(mktemp)
+        local SESSION_TYPE_TMP
+        SESSION_TYPE_TMP=$(mktemp)
         lh_run_command_as_target_user "printenv XDG_SESSION_TYPE 2>/dev/null" > "$SESSION_TYPE_TMP"
-        local SESSION_TYPE=$(cat "$SESSION_TYPE_TMP" | grep -v "^\[" | tail -n 1)
+        local SESSION_TYPE
+        SESSION_TYPE=$(cat "$SESSION_TYPE_TMP" | grep -v "^\[" | tail -n 1)
         rm -f "$SESSION_TYPE_TMP"
         
         if [ "$SESSION_TYPE" = "wayland" ]; then
@@ -1419,7 +1426,7 @@ function power_management_action() {
         lh_print_menu_item 0 "$(lh_msg 'POWER_BACK')"
         echo ""
         
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'POWER_CHOOSE_OPTION')${LH_COLOR_RESET}")" power_option
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'POWER_CHOOSE_OPTION')${LH_COLOR_RESET}")" power_option
         
         case $power_option in
             1)
@@ -1471,7 +1478,7 @@ function power_management_action() {
             5)
                 # Delayed shutdown
                 echo -e "${LH_COLOR_PROMPT}$(lh_msg 'POWER_ENTER_MINUTES')${LH_COLOR_RESET}"
-                read -p ": " minutes
+                read -r -p ": " minutes
                 if [[ "$minutes" =~ ^[0-9]+$ ]] && [ "$minutes" -gt 0 ]; then
                     if lh_confirm_action "$(lh_msg 'POWER_CONFIRM_DELAYED_SHUTDOWN' "$minutes")" "n"; then
                         lh_log_msg "INFO" "$(lh_msg 'POWER_SCHEDULING_SHUTDOWN' "$minutes")"
@@ -1489,7 +1496,7 @@ function power_management_action() {
             6)
                 # Delayed restart
                 echo -e "${LH_COLOR_PROMPT}$(lh_msg 'POWER_ENTER_MINUTES')${LH_COLOR_RESET}"
-                read -p ": " minutes
+                read -r -p ": " minutes
                 if [[ "$minutes" =~ ^[0-9]+$ ]] && [ "$minutes" -gt 0 ]; then
                     if lh_confirm_action "$(lh_msg 'POWER_CONFIRM_DELAYED_RESTART' "$minutes")" "n"; then
                         lh_log_msg "INFO" "$(lh_msg 'POWER_SCHEDULING_RESTART' "$minutes")"
@@ -1538,7 +1545,7 @@ function restart_module_menu() {
         echo ""
 
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTART_CHOOSE_OPTION_PROMPT')${LH_COLOR_RESET}")" option
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTART_CHOOSE_OPTION_PROMPT')${LH_COLOR_RESET}")" option
 
         case $option in
             1)

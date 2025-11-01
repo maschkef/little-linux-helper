@@ -7,6 +7,7 @@
 # French common language strings
 
 # Declare MSG_FR as associative array
+# shellcheck disable=SC2034  # consumed by lib/lib_i18n.sh when populating MSG
 declare -A MSG_FR
 
 # General UI elements

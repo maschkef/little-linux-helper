@@ -10,7 +10,17 @@
 # Sub-module for RSYNC restore operations
 
 # Load common library
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
+LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
+if [[ ! -r "$LIB_COMMON_PATH" ]]; then
+    echo "Missing required library: $LIB_COMMON_PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+        exit 1
+    else
+        return 1
+    fi
+fi
+# shellcheck source=lib/lib_common.sh
+source "$LIB_COMMON_PATH"
 
 # Complete initialization when run directly (not via help_master.sh)
 if [[ -z "${LH_INITIALIZED:-}" ]]; then
@@ -52,7 +62,7 @@ if ! declare -f backup_log_msg > /dev/null; then
         if [ -n "$LH_BACKUP_LOG" ] && [ ! -f "$LH_BACKUP_LOG" ]; then
             # Try to create the file if it doesn't exist yet.
             lh_log_msg "DEBUG" "Creating backup log file: $LH_BACKUP_LOG"
-            touch "$LH_BACKUP_LOG" || echo "$(lh_msg 'BACKUP_LOG_WARN_CREATE' "$LH_BACKUP_LOG")" >&2
+            touch "$LH_BACKUP_LOG" || lh_msgln 'BACKUP_LOG_WARN_CREATE' "$LH_BACKUP_LOG" >&2
         fi
         echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$LH_BACKUP_LOG"
         
@@ -79,7 +89,8 @@ restore_rsync() {
     fi
     
     echo -e "${LH_COLOR_INFO}$(lh_msg 'RESTORE_AVAILABLE_RSYNC')${LH_COLOR_RESET}"
-    local backups=($(ls -1d "$LH_BACKUP_ROOT$LH_BACKUP_DIR"/rsync_backup_* 2>/dev/null | sort -r))
+    local backups=()
+    mapfile -t backups < <(find "$LH_BACKUP_ROOT$LH_BACKUP_DIR" -maxdepth 1 -type d -name 'rsync_backup_*' -print 2>/dev/null | LC_ALL=C sort -r)
     lh_log_msg "DEBUG" "Found ${#backups[@]} RSYNC backups"
     
     if [ ${#backups[@]} -eq 0 ]; then
@@ -96,16 +107,20 @@ restore_rsync() {
     echo -e "${LH_COLOR_SEPARATOR}$(lh_msg 'RESTORE_TABLE_SEPARATOR')${LH_COLOR_RESET}"
     for i in "${!backups[@]}"; do
         local backup="${backups[i]}"
-        local basename=$(basename "$backup")
-        local timestamp_part=$(echo "$basename" | sed 's/rsync_backup_//')
-        local formatted_date=$(echo "$timestamp_part" | sed 's/_/ /g' | sed 's/-/:/g' | cut -c1-19)
-        local size=$(du -sh "$backup" | cut -f1)
+        local basename
+        basename=$(basename "$backup")
+        local timestamp_part
+        timestamp_part="${basename#rsync_backup_}"
+        local formatted_date
+        formatted_date=$(echo "$timestamp_part" | sed 's/_/ /g' | sed 's/-/:/g' | cut -c1-19)
+        local size
+        size=$(du -sh "$backup" | cut -f1)
         printf "${LH_COLOR_MENU_NUMBER}%3d${LH_COLOR_RESET}  ${LH_COLOR_INFO}%s${LH_COLOR_RESET}  ${LH_COLOR_MENU_TEXT}%-30s${LH_COLOR_RESET}  ${LH_COLOR_INFO}(%s)${LH_COLOR_RESET}\n" "$((i+1))" "$formatted_date" "$basename" "$size"
         lh_log_msg "DEBUG" "Backup $((i+1)): $basename ($size)"
     done
     
     lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-    read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTORE_SELECT_RSYNC' "${#backups[@]}"): ${LH_COLOR_RESET}")" choice
+    read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'RESTORE_SELECT_RSYNC' "${#backups[@]}"): ${LH_COLOR_RESET}")" choice
     lh_log_msg "DEBUG" "User selected backup number: '$choice'"
     
     if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#backups[@]}" ]; then
@@ -120,7 +135,7 @@ restore_rsync() {
         echo -e "  ${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'RESTORE_OPTION_CUSTOM')${LH_COLOR_RESET}"
         
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_WAITING')"
-        read -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" restore_choice
+        read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'CHOOSE_OPTION') ${LH_COLOR_RESET}")" restore_choice
         lh_log_msg "DEBUG" "User selected restore option: '$restore_choice'"
         
         local restore_path="/"
@@ -176,9 +191,8 @@ restore_rsync() {
         local cmd="$LH_SUDO_CMD rsync -avxHS --progress \"$selected_backup/\" \"$restore_path/\""
         lh_log_msg "DEBUG" "RSYNC restore command: $cmd"
         lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_RESTORE' "$(basename "$selected_backup")")"
-        $LH_SUDO_CMD rsync -avxHS --progress "$selected_backup/" "$restore_path/"
         
-        if [ $? -eq 0 ]; then
+        if $LH_SUDO_CMD rsync -avxHS --progress "$selected_backup/" "$restore_path/"; then
             lh_log_msg "DEBUG" "RSYNC restore completed successfully"
             echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'RESTORE_SUCCESS')${LH_COLOR_RESET}"
             backup_log_msg "INFO" "RSYNC backup restored: $selected_backup -> $restore_path"
