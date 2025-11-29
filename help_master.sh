@@ -245,18 +245,19 @@ while true; do
 
     echo -e "${LH_COLOR_BOLD_MAGENTA}$(lh_msg "CATEGORY_DIAGNOSIS")${LH_COLOR_RESET}"
     lh_print_menu_item 2 "$(lh_msg "MENU_SYSTEM_INFO")"
-    lh_print_menu_item 3 "$(lh_msg "MENU_DISK_TOOLS")"
-    lh_print_menu_item 4 "$(lh_msg "MENU_LOG_ANALYSIS")"
+    lh_print_menu_item 3 "$(lh_msg "MENU_NETWORK_TOOLS")"
+    lh_print_menu_item 4 "$(lh_msg "MENU_DISK_TOOLS")"
+    lh_print_menu_item 5 "$(lh_msg "MENU_LOG_ANALYSIS")"
 
     echo -e "${LH_COLOR_BOLD_MAGENTA}$(lh_msg "CATEGORY_MAINTENANCE")${LH_COLOR_RESET}"
-    lh_print_menu_item 5 "$(lh_msg "MENU_PACKAGE_MGMT")"
-    lh_print_menu_item 6 "$(lh_msg "MENU_SECURITY")"
-    lh_print_menu_item 7 "$(lh_msg "MENU_BACKUP")"
-    lh_print_menu_item 8 "$(lh_msg "MENU_DOCKER")"
-    lh_print_menu_item 9 "$(lh_msg "MENU_ENERGY")"
+    lh_print_menu_item 6 "$(lh_msg "MENU_PACKAGE_MGMT")"
+    lh_print_menu_item 7 "$(lh_msg "MENU_SECURITY")"
+    lh_print_menu_item 8 "$(lh_msg "MENU_BACKUP")"
+    lh_print_menu_item 9 "$(lh_msg "MENU_DOCKER")"
+    lh_print_menu_item 10 "$(lh_msg "MENU_ENERGY")"
 
     echo -e "${LH_COLOR_BOLD_MAGENTA}$(lh_msg "CATEGORY_SPECIAL")${LH_COLOR_RESET}"
-    lh_print_menu_item 10 "$(lh_msg "MENU_DEBUG_BUNDLE")"
+    lh_print_menu_item 11 "$(lh_msg "MENU_DEBUG_BUNDLE")"
 
     echo ""
     lh_print_menu_item 0 "$(lh_msg "EXIT")"
@@ -274,27 +275,30 @@ while true; do
             bash "$LH_ROOT_DIR/modules/mod_system_info.sh"
             ;;
         3)
-            bash "$LH_ROOT_DIR/modules/mod_disk.sh"
+            bash "$LH_ROOT_DIR/modules/mod_network.sh"
             ;;
         4)
-            bash "$LH_ROOT_DIR/modules/mod_logs.sh"
+            bash "$LH_ROOT_DIR/modules/mod_disk.sh"
             ;;
         5)
-            bash "$LH_ROOT_DIR/modules/mod_packages.sh"
+            bash "$LH_ROOT_DIR/modules/mod_logs.sh"
             ;;
         6)
-            bash "$LH_ROOT_DIR/modules/mod_security.sh"
+            bash "$LH_ROOT_DIR/modules/mod_packages.sh"
             ;;
         7)
-            bash "$LH_ROOT_DIR/modules/backup/mod_backup.sh"
+            bash "$LH_ROOT_DIR/modules/mod_security.sh"
             ;;
         8)
-            bash "$LH_ROOT_DIR/modules/mod_docker.sh"
+            bash "$LH_ROOT_DIR/modules/backup/mod_backup.sh"
             ;;
         9)
-            bash "$LH_ROOT_DIR/modules/mod_energy.sh"
+            bash "$LH_ROOT_DIR/modules/mod_docker.sh"
             ;;
         10)
+            bash "$LH_ROOT_DIR/modules/mod_energy.sh"
+            ;;
+        11)
             create_debug_bundle
             ;;
         0)

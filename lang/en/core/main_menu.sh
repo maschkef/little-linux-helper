@@ -24,6 +24,7 @@ MSG_EN[CATEGORY_SPECIAL]="[Special Functions]"
 # Menu items
 MSG_EN[MENU_RESTARTS]="Services & Desktop Restart Options"
 MSG_EN[MENU_SYSTEM_INFO]="Display System Information"
+MSG_EN[MENU_NETWORK_TOOLS]="Network Diagnostics & Tools"
 MSG_EN[MENU_DISK_TOOLS]="Disk Tools"
 MSG_EN[MENU_LOG_ANALYSIS]="Log Analysis Tools"
 MSG_EN[MENU_PACKAGE_MGMT]="Package Management & Updates"

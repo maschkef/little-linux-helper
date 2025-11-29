@@ -24,6 +24,7 @@ MSG_DE[CATEGORY_SPECIAL]="[Spezialfunktionen]"
 # Menu items
 MSG_DE[MENU_RESTARTS]="Dienste & Desktop Neustart-Optionen"
 MSG_DE[MENU_SYSTEM_INFO]="Systeminformationen anzeigen"
+MSG_DE[MENU_NETWORK_TOOLS]="Netzwerkdiagnose & Werkzeuge"
 MSG_DE[MENU_DISK_TOOLS]="Festplatten-Werkzeuge"
 MSG_DE[MENU_LOG_ANALYSIS]="Log-Analyse Werkzeuge"
 MSG_DE[MENU_PACKAGE_MGMT]="Paketverwaltung & Updates"

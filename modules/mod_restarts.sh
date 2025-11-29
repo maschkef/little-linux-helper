@@ -1605,6 +1605,12 @@ function restart_module_menu() {
     done
 }
 
-# Start module
-restart_module_menu
-exit $?
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    if [[ "${1:-}" == "--network-only" ]]; then
+        restart_network_services_action
+        exit $?
+    fi
+
+    restart_module_menu
+    exit $?
+fi
