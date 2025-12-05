@@ -1407,6 +1407,14 @@ func getModules(c *fiber.Ctx) error {
 			SubmoduleCount: 9,
 		},
 		{
+			ID:             "network",
+			Name:           "Network Diagnostics & Tools",
+			Description:    "Network status dashboards, connectivity checks, routing and DNS insights",
+			Path:           "modules/mod_network.sh",
+			Category:       "System Diagnosis & Analysis",
+			SubmoduleCount: 6,
+		},
+		{
 			ID:             "disk",
 			Name:           "Disk Tools",
 			Description:    "Disk utilities and storage analysis tools",
@@ -1497,6 +1505,8 @@ var documentationFiles = map[string]string{
 	"mod_restarts":    "mod/doc_restarts.md",
 	"system_info":     "mod/doc_system_info.md",
 	"mod_system_info": "mod/doc_system_info.md",
+	"network":         "mod/doc_network.md",
+	"mod_network":     "mod/doc_network.md",
 	"disk":            "mod/doc_disk.md",
 	"mod_disk":        "mod/doc_disk.md",
 	"logs":            "mod/doc_logs.md",

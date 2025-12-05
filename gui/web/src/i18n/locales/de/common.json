@@ -68,6 +68,7 @@
     "names": {
       "restarts": "Dienste, Desktop & Energieverwaltung",
       "system_info": "Systeminformationen anzeigen",
+      "network": "Netzwerkdiagnose & Werkzeuge",
       "disk": "Festplatten-Tools",
       "logs": "Log-Analyse-Tools",
       "packages": "Paketverwaltung & Updates",
@@ -87,6 +88,7 @@
     "descriptions": {
       "restarts": "Systemdienste und Desktop-Umgebungskomponenten neustarten",
       "system_info": "Umfassende Systeminformationen und Hardware-Details anzeigen",
+      "network": "Netzwerkstatus, Konnektivitätstests und Dienstüberwachung",
       "disk": "Festplatten-Utilities und Speicher-Analyse-Tools",
       "logs": "System-Logs analysieren und Probleme beheben",
       "packages": "Pakete und System-Updates verwalten",

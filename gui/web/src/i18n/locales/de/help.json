@@ -41,6 +41,23 @@
       "Alle Informationen sind schreibgeschützt - dies ändert keine Systemeinstellungen"
     ]
   },
+  "network": {
+    "overview": "Diagnostiziert Netzwerkprobleme mit einem gebündelten Überblick über Schnittstellen, Routing, DNS und Dienstzustände. Beinhaltet Schnellaktionen zum Neustart von Netzwerkdiensten und zum Leeren von DNS-Caches.",
+    "options": [
+      "1. Status-Dashboard - Zeigt alle Schnittstellen mit MAC-Adresse, IPv4/IPv6, Trägerstatus und Verbindungstyp (inklusive NetworkManager-Metadaten, falls verfügbar)",
+      "2. Konnektivität prüfen - Ping zum Standard-Gateway und zu bekannten Internetzielen sowie DNS-Auflösungstests",
+      "3. Routing & DNS-Ansicht - Zeigt Standardroute, Routing-Tabelle und Resolver-Konfiguration (resolvectl, systemd-resolve oder Fallback auf /etc/resolv.conf)",
+      "4. Dienststatus-Übersicht - Anzeige des systemctl-Status für häufige Netzwerkdienste wie NetworkManager, systemd-networkd, wpa_supplicant, systemd-resolved und connman",
+      "5. Netzwerkdienste neu starten - Nutzt den Ablauf des Restart-Moduls, um ausgewählte oder alle erkannten Netzwerkdienste neu zu starten",
+      "6. DNS-Cache leeren - Leert Caches von systemd-resolved, dnsmasq, nscd und BIND/rndc, sofern die Dienste aktiv sind"
+    ],
+    "notes": [
+      "Benötigt Standard-Netzwerkwerkzeuge (ip, ping, getent); fehlende Tools werden mit Hinweis gemeldet",
+      "Neustarts und DNS-Cache-Löschungen verwenden sudo und können die Verbindung kurzzeitig unterbrechen",
+      "NetworkManager-spezifische Details erscheinen nur mit installiertem nmcli; WLAN-Kennzeichnungen setzen das Tool iw voraus",
+      "Status- und Routing-Ansichten sind schreibgeschützt, solange keine Neustart- oder Cache-Lösch-Aktionen gewählt werden"
+    ]
+  },
   "disk": {
     "overview": "Tools zur Verwaltung und Analyse Ihrer Speichergeräte und des Festplattenplatzes. Überprüfen Sie die Laufwerksgesundheit, finden Sie große Dateien, überwachen Sie die Festplattennutzung und führen Sie Festplattendiagnosen durch.",
     "options": [

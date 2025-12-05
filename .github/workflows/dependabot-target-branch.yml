@@ -1,0 +1,17 @@
+name: Dependabot Target Branch Guard
+
+on:
+  pull_request:
+    types: [opened, reopened, edited, synchronize]
+
+jobs:
+  prevent-main-target:
+    if: >
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Block Dependabot PRs targeting main
+        run: |
+          echo "::error::Dependabot PRs must target the develop branch. Please change the base branch from main to develop."
+          exit 1
