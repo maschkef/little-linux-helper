@@ -2,15 +2,13 @@
 #
 # lib/lib_i18n.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # Internationalization support functions
 #
 # Supported languages:
 # - de (German): Full translation support
-# - en (English): Full translation support  
-# - es (Spanish): Library translations only (lib/* files)
-# - fr (French): Library translations only (lib/* files)
+# - en (English): Full translation support
 #
 # Default language: English (en)
 # Fallback language: English (en) - for missing language directories/files
@@ -149,17 +147,26 @@ function lh_load_language_module() {
             ;;
     esac
     
-    # Try new categorized structure first
+    # Try new categorized structure first (core modules in lang/, mods in mods/lang/)
     local lang_file="$LH_LANG_DIR/${lang_code}/${category}/${module_name}.sh"
+    local mods_lang_file="$LH_ROOT_DIR/mods/lang/${lang_code}/${module_name}.sh"
     # Fallback to old flat structure
     local lang_file_fallback="$LH_LANG_DIR/${lang_code}/${module_name}.sh"
     
     # Always try to load English first as fallback base for this module
     local en_file="$LH_LANG_DIR/en/${category}/${module_name}.sh"
+    local mods_en_file="$LH_ROOT_DIR/mods/lang/en/${module_name}.sh"
     local en_file_fallback="$LH_LANG_DIR/en/${module_name}.sh"
     
-    # Load English fallback (try new structure first, then old)
-    if [[ -f "$en_file" ]]; then
+    # Load English fallback (try mods/lang first, then core lang/, then old flat structure)
+    if [[ -f "$mods_en_file" ]]; then
+        # shellcheck disable=SC1090
+        source "$mods_en_file"
+        # Copy English module translations to MSG array as fallback base
+        for key in "${!MSG_EN[@]}"; do
+            MSG["$key"]="${MSG_EN[$key]}"
+        done
+    elif [[ -f "$en_file" ]]; then
         # shellcheck disable=SC1090
         source "$en_file"
         # Copy English module translations to MSG array as fallback base
@@ -177,9 +184,11 @@ function lh_load_language_module() {
     
     # If target language is not English, overlay it on top of English
     if [[ "$lang_code" != "en" ]]; then
-        # Try new structure first, then fallback to old structure
+        # Try mods/lang first, then core lang/ new structure, then fallback to old structure
         local target_file=""
-        if [[ -f "$lang_file" ]]; then
+        if [[ -f "$mods_lang_file" ]]; then
+            target_file="$mods_lang_file"
+        elif [[ -f "$lang_file" ]]; then
             target_file="$lang_file"
         elif [[ -f "$lang_file_fallback" ]]; then
             target_file="$lang_file_fallback"
@@ -221,9 +230,11 @@ function lh_load_language_module() {
                 ;;
         esac
     else
-        # For English, check if English module file exists (try new structure first)
+        # For English, check if English module file exists (try mods/lang first, then new structure, then old)
         local en_target_file=""
-        if [[ -f "$en_file" ]]; then
+        if [[ -f "$mods_en_file" ]]; then
+            en_target_file="$mods_en_file"
+        elif [[ -f "$en_file" ]]; then
             en_target_file="$en_file"
         elif [[ -f "$en_file_fallback" ]]; then
             en_target_file="$en_file_fallback"
@@ -233,7 +244,7 @@ function lh_load_language_module() {
             local msg msg_template
             msg_template="${MSG[LIB_I18N_MODULE_FILE_NOT_FOUND]:-Language file for module '%s' not found: %s}"
             # shellcheck disable=SC2059  # translation templates supply %s placeholders
-            printf -v msg "$msg_template" "$module_name" "$en_file (or $en_file_fallback)"
+            printf -v msg "$msg_template" "$module_name" "$mods_en_file or $en_file (or $en_file_fallback)"
             lh_log_msg "WARN" "$msg"
             return 1
         fi

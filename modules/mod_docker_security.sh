@@ -2,10 +2,10 @@
 #
 # modules/mod_docker_security.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # This script is part of the 'little-linux-helper' collection.
-# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+# Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 #
 # Module for Docker Security Operations
 
@@ -1248,6 +1248,7 @@ function security_check_docker() {
     
     # Critical issues details
     if [ ${#critical_issues_by_dir[@]} -gt 0 ]; then
+        echo ""
         echo -e "${LH_COLOR_ERROR}$(lh_msg 'DOCKER_CRITICAL_SECURITY_ISSUES')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_SEPARATOR}═══════════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
         for dir_path in "${!critical_issues_by_dir[@]}"; do

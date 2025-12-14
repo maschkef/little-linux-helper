@@ -2,12 +2,17 @@
 #
 # little-linux-helper/lang/en/energy.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # English language strings for energy management module
 
 # Conditional declaration for module files
 [[ ! -v MSG_EN ]] && declare -A MSG_EN
+
+# Help content
+MSG_EN[ENERGY_HELP_OVERVIEW]="Power management and energy optimization for Linux systems. Provides sleep control, CPU frequency scaling, screen brightness adjustment, and power monitoring capabilities."
+MSG_EN[ENERGY_HELP_OPTIONS]="1. Disable Sleep/Hibernate - Temporarily prevent system sleep and hibernation with options for duration control|2. CPU Governor - Manage CPU frequency scaling policies (performance, powersave, ondemand, conservative, custom)|3. Screen Brightness - Control display backlight brightness levels (25%, 50%, 75%, 100%, or custom percentage)|4. Power Statistics - Display battery status, AC adapter information, and thermal sensor readings"
+MSG_EN[ENERGY_HELP_NOTES]="Sleep control uses systemd-inhibit for temporary power management|CPU governor changes require cpupower tool and may need sudo privileges|Brightness control supports brightnessctl, xbacklight, or direct sysfs manipulation|Power statistics read from /sys/class/power_supply/ and /sys/class/thermal/ interfaces|Module integrates with library power management system for consistent behavior|Desktop notifications provided for significant power management changes"
 
 # Menu items and headers
 MSG_EN[ENERGY_MENU_TITLE]="Energy Management"
@@ -167,8 +172,6 @@ MSG_EN[ENERGY_QUICK_ACTION_RETURN]="Return to energy menu"
 MSG_EN[ENERGY_QUICK_CHOOSE_ACTION]="Choose action (r/Enter):"
 
 # Additional missing keys from analysis
-MSG_EN[ENERGY_LOG_SLEEP_DISABLED]="Sleep disabled successfully"
-MSG_EN[ENERGY_LOG_SLEEP_DISABLED_TIME]="Sleep disabled for %s minutes"
-MSG_EN[ENERGY_LOG_SLEEP_DISABLED_PID]="Sleep disabled with inhibit process PID: %s"
-MSG_EN[ENERGY_LOG_SLEEP_DISABLED_TIME_PID]="Sleep disabled for %s with inhibit process PID: %s"
-MSG_EN[ENERGY_STATUS_OUR_INHIBIT_NONE]="No Little Linux Helper sleep inhibit found."
+MSG_EN[ENERGY_LOG_SLEEP_DISABLED]="Sleep/standby successfully disabled"
+MSG_EN[ENERGY_LOG_SLEEP_DISABLED_TIME]="Sleep/standby disabled for %s minutes"
+

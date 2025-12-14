@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "id": "backup",
+  "entry": "modules/backup/mod_backup.sh",
+  "category": {
+    "id": "backup"
+  },
+  "order": 80,
+  "docs": "modules/doc_backup.md",
+  "display": {
+    "name_key": "BACKUP_MODULE_NAME",
+    "description_key": "BACKUP_MODULE_DESC",
+    "fallback_name": "Backup & Recovery",
+    "fallback_description": "Backup and restore operations"
+  },
+  "i18n": {
+    "module_name": "backup"
+  },
+  "expose": {
+    "cli": true,
+    "gui": true
+  },
+  "enabled": true,
+  "requires_root": true,
+  "tags": ["backup", "restore", "recovery"],
+  "help": {
+    "overview_key": "BACKUP_HELP_OVERVIEW",
+    "options_key": "BACKUP_HELP_OPTIONS",
+    "notes_key": "BACKUP_HELP_NOTES"
+  },
+  "submodules": [
+    {
+      "schema_version": 1,
+      "id": "btrfs_backup",
+      "entry": "modules/backup/mod_btrfs_backup.sh",
+      "order": 10,
+      "docs": "modules/doc_btrfs_backup.md",
+      "display": {
+        "name_key": "BTRFS_BACKUP_MODULE_NAME",
+        "description_key": "BTRFS_BACKUP_MODULE_DESC",
+        "fallback_name": "BTRFS Backup",
+        "fallback_description": "Advanced BTRFS snapshot-based backup system with maintenance tools"
+      },
+      "expose": {
+        "cli": true,
+        "gui": true
+      },
+      "enabled": true,
+      "requires_root": true,
+      "tags": ["btrfs", "snapshot", "backup"],
+      "help": {
+        "overview_key": "BTRFS_BACKUP_HELP_OVERVIEW",
+        "options_key": "BTRFS_BACKUP_HELP_OPTIONS",
+        "notes_key": "BTRFS_BACKUP_HELP_NOTES"
+      }
+    },
+    {
+      "schema_version": 1,
+      "id": "btrfs_restore",
+      "entry": "modules/backup/mod_btrfs_restore.sh",
+      "order": 20,
+      "docs": "modules/doc_btrfs_restore.md",
+      "display": {
+        "name_key": "BTRFS_RESTORE_MODULE_NAME",
+        "description_key": "BTRFS_RESTORE_MODULE_DESC",
+        "fallback_name": "BTRFS Restore",
+        "fallback_description": "BTRFS snapshot restoration with dry-run support"
+      },
+      "expose": {
+        "cli": true,
+        "gui": true
+      },
+      "enabled": true,
+      "requires_root": true,
+      "tags": ["btrfs", "snapshot", "restore"],
+      "help": {
+        "overview_key": "BTRFS_RESTORE_HELP_OVERVIEW",
+        "options_key": "BTRFS_RESTORE_HELP_OPTIONS",
+        "notes_key": "BTRFS_RESTORE_HELP_NOTES"
+      }
+    },
+    {
+      "schema_version": 1,
+      "id": "backup_rsync",
+      "entry": "modules/backup/mod_backup_rsync.sh",
+      "order": 30,
+      "docs": "modules/doc_backup_rsync.md",
+      "display": {
+        "name_key": "BACKUP_RSYNC_MODULE_NAME",
+        "description_key": "BACKUP_RSYNC_MODULE_DESC",
+        "fallback_name": "Rsync Backup",
+        "fallback_description": "Rsync-based backup operations"
+      },
+      "expose": {
+        "cli": true,
+        "gui": true
+      },
+      "enabled": true,
+      "requires_root": true,
+      "tags": ["rsync", "backup"]
+    },
+    {
+      "schema_version": 1,
+      "id": "restore_rsync",
+      "entry": "modules/backup/mod_restore_rsync.sh",
+      "order": 40,
+      "docs": "modules/doc_restore_rsync.md",
+      "display": {
+        "name_key": "RESTORE_RSYNC_MODULE_NAME",
+        "description_key": "RESTORE_RSYNC_MODULE_DESC",
+        "fallback_name": "Rsync Restore",
+        "fallback_description": "Rsync-based restore operations"
+      },
+      "expose": {
+        "cli": true,
+        "gui": true
+      },
+      "enabled": true,
+      "requires_root": true,
+      "tags": ["rsync", "restore"]
+    },
+    {
+      "schema_version": 1,
+      "id": "backup_tar",
+      "entry": "modules/backup/mod_backup_tar.sh",
+      "order": 50,
+      "docs": "modules/doc_backup_tar.md",
+      "display": {
+        "name_key": "BACKUP_TAR_MODULE_NAME",
+        "description_key": "BACKUP_TAR_MODULE_DESC",
+        "fallback_name": "TAR Backup",
+        "fallback_description": "TAR archive-based backup operations"
+      },
+      "expose": {
+        "cli": true,
+        "gui": true
+      },
+      "enabled": true,
+      "requires_root": true,
+      "tags": ["tar", "backup", "archive"]
+    },
+    {
+      "schema_version": 1,
+      "id": "restore_tar",
+      "entry": "modules/backup/mod_restore_tar.sh",
+      "order": 60,
+      "docs": "modules/doc_restore_tar.md",
+      "display": {
+        "name_key": "RESTORE_TAR_MODULE_NAME",
+        "description_key": "RESTORE_TAR_MODULE_DESC",
+        "fallback_name": "TAR Restore",
+        "fallback_description": "TAR archive-based restore operations"
+      },
+      "expose": {
+        "cli": true,
+        "gui": true
+      },
+      "enabled": true,
+      "requires_root": true,
+      "tags": ["tar", "restore", "archive"]
+    }
+  ]
+}

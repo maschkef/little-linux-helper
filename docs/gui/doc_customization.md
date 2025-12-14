@@ -1,10 +1,10 @@
 <!--
 File: docs/gui/doc_customization.md
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
-Licensed under the MIT License. See the LICENSE file in the project root for more information.
+Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 -->
 
 # GUI Customization Guide
@@ -134,13 +134,10 @@ const languages = [
   { code: 'de', name: 'Deutsch', flag: '🇩🇪' }
 ];
 
-// To add more languages, modify the array:
+// To add more languages, modify the array and create corresponding translation files:
 const languages = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
-  { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-  // Note: Adding languages below requires creating corresponding translation files
-  // { code: 'es', name: 'Español', flag: '🇪🇸' },  // Would need translation files in gui/web/src/i18n/locales/es/
-  // { code: 'fr', name: 'Français', flag: '🇫🇷' } // Would need translation files in gui/web/src/i18n/locales/fr/
+  { code: 'de', name: 'Deutsch', flag: '🇩🇪' }
 ];
 ```
 

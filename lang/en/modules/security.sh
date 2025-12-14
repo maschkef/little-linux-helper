@@ -2,12 +2,17 @@
 #
 # lang/en/security.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # English security module language strings
 
 # Declare MSG_EN as associative array if not already declared
 [[ ! -v MSG_EN ]] && declare -A MSG_EN
+
+# Help content
+MSG_EN[SECURITY_HELP_OVERVIEW]="Comprehensive security audit toolkit for Linux systems. Performs various security checks including network analysis, login monitoring, malware detection, firewall status, and system hardening verification."
+MSG_EN[SECURITY_HELP_OPTIONS]="1. Show Open Ports - Lists TCP/UDP listening ports with ss, optional nmap localhost scan (1-1000)|2. Failed Login Attempts - Analyzes SSH/PAM failures from journalctl or log files, shows lastb output|3. Rootkit Detection - Runs rkhunter (quick/full scan) and optionally chkrootkit for malware detection|4. Firewall Status - Checks UFW, firewalld, or iptables status, shows rules and activation help|5. Security Updates - Scans for available security patches using your package manager|6. Password Security - Reviews password policies, aging settings, and accounts without passwords|7. Docker Security Check - Comprehensive security audit of Docker containers, images, and configurations"
+MSG_EN[SECURITY_HELP_NOTES]="Most functions require sudo privileges for log access and system scanning|Missing tools (ss, nmap, rkhunter, chkrootkit) will be offered for installation|Rootkit scans can be time-consuming and may require user interaction|Port scanning of localhost is safe but external scans may trigger alerts|Failed login analysis covers SSH, PAM, and systemd login services|Password policy checks examine /etc/security/pwquality.conf and PAM configuration"
 
 # Security module main menu
 MSG_EN[SECURITY_TITLE]="Security Checks"

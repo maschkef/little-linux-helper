@@ -2,7 +2,7 @@
 #
 # lib/lib_json.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # JSON helper functions for little-linux-helper. These wrappers rely on Python
 # for robust JSON processing while keeping Bash call-sites simple.

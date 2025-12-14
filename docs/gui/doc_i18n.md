@@ -1,10 +1,10 @@
 <!--
 File: docs/gui/doc_i18n.md
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
-Licensed under the MIT License. See the LICENSE file in the project root for more information.
+Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 -->
 
 # GUI Internationalization (i18n) System
@@ -18,8 +18,6 @@ The GUI internationalization system handles translation for both frontend (React
 **Supported Languages:**
 - **German (de)**: Complete translation support for both GUI and CLI
 - **English (en)**: Complete translation support for both GUI and CLI (default and fallback)
-
-**Note**: Currently only English and German are fully supported with complete translation files in the GUI. The CLI system supports additional languages (Spanish and French) which can be found in the `lang/` directory, but GUI support would require creating corresponding translation files in `gui/web/src/i18n/locales/`.
 
 ## Frontend Internationalization (React i18next)
 
@@ -716,13 +714,9 @@ touch src/i18n/locales/fr/help.json
 **3. Update i18n Configuration:**
 ```javascript
 // src/i18n/index.js
-import frCommon from './locales/fr/common.json';
-import frHelp from './locales/fr/help.json';
-
 const resources = {
     en: { common: enCommon, help: enHelp },
-    de: { common: deCommon, help: deHelp },
-    fr: { common: frCommon, help: frHelp } // Example: Add French (requires translation files)
+    de: { common: deCommon, help: deHelp }
 };
 ```
 
@@ -730,23 +724,11 @@ const resources = {
 ```jsx
 const languages = [
     { code: 'en', name: 'English', flag: '🇺🇸' },
-    { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-    { code: 'fr', name: 'Français', flag: '🇫🇷' } // Example: Add French (requires translation files)
+    { code: 'de', name: 'Deutsch', flag: '🇩🇪' }
 ];
 ```
 
-**Note**: This is an example for adding French. Currently only English (en) and German (de) are fully supported with complete translation resources.
-
-**5. Update CLI Language Support:**
-```bash
-# Create CLI translation files (if not already existing)
-mkdir -p lang/fr
-# Copy and translate CLI language files
-cp lang/en/* lang/fr/
-# Translate content in French files
-```
-
-**6. Test New Language:**
+**5. Test New Language:**
 - Switch to new language in GUI
 - Test all components display correctly
 - Verify CLI modules receive correct language

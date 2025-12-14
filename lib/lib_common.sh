@@ -2,10 +2,10 @@
 #
 # lib/lib_common.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # This script is part of the 'little-linux-helper' collection.
-# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+# Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 #
 # Central library for common functions and variables
 
@@ -46,7 +46,7 @@ declare -A LH_TARGET_USER_INFO
 
 # Internationalization support
 # Note: Default language is now set to English (en) in lh_initialize_i18n()
-# Supported: de (German, full), en (English, full), es (Spanish, lib only), fr (French, lib only)
+# Supported: de (German, full), en (English, full)
 LH_LANG_DIR="$LH_ROOT_DIR/lang"
 declare -A MSG # Global message array
 
@@ -60,6 +60,7 @@ source "$LH_ROOT_DIR/lib/lib_config_schema.sh"
 source "$LH_ROOT_DIR/lib/lib_config.sh"
 source "$LH_ROOT_DIR/lib/lib_logging.sh"
 source "$LH_ROOT_DIR/lib/lib_json.sh"
+source "$LH_ROOT_DIR/lib/lib_modules.sh"
 source "$LH_ROOT_DIR/lib/lib_packages.sh"
 source "$LH_ROOT_DIR/lib/lib_system.sh"
 source "$LH_ROOT_DIR/lib/lib_filesystem.sh"

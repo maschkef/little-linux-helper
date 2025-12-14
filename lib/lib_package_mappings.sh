@@ -2,7 +2,7 @@
 #
 # lib/lib_package_mappings.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # Package name mappings for different package managers
 

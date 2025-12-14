@@ -1,10 +1,10 @@
 <!--
 File: docs/CLI_DEVELOPER_GUIDE.md
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
-Licensed under the MIT License. See the LICENSE file in the project root for more information.
+Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 -->
 
 # Little Linux Helper - Developer Guide
@@ -51,14 +51,16 @@ The primary goal of this project is to be as compatible as possible across a wid
 11. `lh_detect_package_manager`: Detects the primary package manager and sets `LH_PKG_MANAGER` (see description in `lib_common.sh`).
 12. `lh_detect_alternative_managers`: Detects alternative package managers and sets `LH_ALT_PKG_MANAGERS` (see description in `lib_common.sh`).
 13. `lh_finalize_initialization`: Executes final library initialization steps, particularly loading the backup configuration, initializing the internationalization system, and exporting important variables (see description in `lib_common.sh`).
+14. **`lh_modules_load_registry`**: Loads the module registry from cache or rebuilds it from metadata files in `modules/meta/` and `mods/meta/`. The registry contains module metadata used for menu generation and module discovery. Uses SHA256 hashing to detect changes and rebuild when needed. Failures fall back to last-known-good cache with warnings.
 
 **Main Menu and Navigation:**
-After initialization, the script enters an infinite loop that displays the main menu.
-- It uses the library functions `lh_print_header` and `lh_print_menu_item` for formatting the output.
+After initialization, the script generates the main menu dynamically from the loaded module registry.
+- It uses `lh_modules_get_module_list "cli"` to get CLI-enabled modules organized by categories.
+- The menu is rendered using library functions `lh_print_header` and `lh_print_menu_item` for formatting.
 - All user-facing text is internationalized using the `lh_t` function for translation.
 - User input is captured with `read`.
 - A `case` statement branches to different actions based on the input:
-    - Calling external module scripts (`mod_restarts.sh`, `mod_system_info.sh`, etc.) using `bash <path_to_module_script>`. The modules run in a sub-shell but have access to exported variables including language settings.
+    - Calling module scripts from the registry using `bash <entry_path>`. The modules run in a sub-shell but have access to exported variables including language settings.
     - Calling the internal function `create_debug_bundle`.
     - Exiting the script when '0' is entered.
 - After executing an option, a pause is introduced (`read -p ...`) to give the user time to read the output.
@@ -133,6 +135,40 @@ The library system is split into the following specialized modules:
 - `lh_send_notification()`
 - `lh_check_notification_tools()`
 
+##### `lib/lib_modules.sh` (600+ lines)
+**Purpose:** Module registry system for dynamic module discovery and loading
+**Contains:**
+- `lh_modules_load_registry()` - Main registry loader function
+- `lh_modules_build_cache()` - Build registry cache from metadata files
+- `lh_modules_read_cache()` - Read existing registry cache
+- `lh_modules_should_rebuild_cache()` - Determine if cache rebuild needed
+- `lh_modules_compute_metadata_hash()` - SHA256 hash of metadata files
+- `lh_modules_get_module_list()` - Get filtered list of modules for menu
+- `lh_modules_get_categories()` - Get sorted list of categories
+- `lh_modules_find_module_by_id()` - Look up module by ID
+- `lh_modules_validate_module()` - Validate module metadata and files
+
+**Key Features:**
+- **Automatic Discovery:** Scans `modules/meta/*.json` and `mods/meta/*.json`
+- **Caching:** SHA256-based cache invalidation in `cache/module-registry.json`
+- **Validation:** Checks entry scripts, docs, required fields, path traversal prevention
+- **Filtering:** Respects `enabled`, `expose.cli`, `expose.gui` flags
+- **Configuration:** Supports global/whitelist/blacklist via config files
+- **Concurrency:** Uses `flock` for safe parallel access with 10-second timeout
+
+**Usage in help_master.sh:**
+```bash
+# After lh_finalize_initialization
+lh_modules_load_registry || {
+    lh_log_msg "ERROR" "Failed to load module registry"
+    exit 1
+}
+
+# Get modules for menu generation
+local modules_json
+modules_json=$(lh_modules_get_module_list "cli")
+```
+
 #### 4.3 Library Loading Order
 
 The modular components are loaded in this specific order in `lib_common.sh`:
@@ -141,6 +177,7 @@ The modular components are loaded in this specific order in `lib_common.sh`:
 3. `lib_i18n.sh` - Internationalization support
 4. `lib_ui.sh` - User interface functions (depends on colors)
 5. `lib_notifications.sh` - Desktop notifications (depends on colors and UI)
+6. `lib_modules.sh` - Module registry system (depends on logging and JSON)
 
 This loading order ensures that dependencies between modules are properly resolved.
 
@@ -356,8 +393,6 @@ The Little Linux Helper includes a comprehensive internationalization (i18n) sys
 **Supported Languages:**
 - **German (`de`)**: Full translation support for all modules and functions
 - **English (`en`)**: Full translation support for all modules and functions (default and fallback language)
-- **Spanish (`es`)**: Library translations only (`lib/*` files) - modules may have missing translations
-- **French (`fr`)**: Library translations only (`lib/*` files) - modules may have missing translations
 
 **Advanced Fallback System:**
 The i18n system implements a sophisticated multi-layer fallback mechanism to ensure maximum compatibility and user experience:
@@ -801,9 +836,23 @@ The Little Linux Helper uses a modular library architecture where functionality 
 - **Automatic loading:** All components are loaded automatically when you source `lib_common.sh`
 
 ### Creating a New Module
+
+**Important:** Little Linux Helper uses a module registry system. All modules must have metadata files that describe their properties. The registry automatically discovers modules, eliminating the need to manually edit menu code.
+
+#### Module Registry System
+
+The module registry is a JSON-based system that automatically discovers and loads modules from metadata files. This provides:
+
+- **Automatic Discovery**: Drop a metadata file in `modules/meta/` and your module appears in menus
+- **Centralized Configuration**: All module properties in one place
+- **CLI/GUI Synchronization**: Both interfaces use the same registry
+- **Third-Party Support**: Mods can be added to `mods/` directory without touching core code
+
+#### Creating a Module with Registry
+
 When creating a new module for the Little Linux Helper, follow these essential steps:
 
-1. **Create the main module script** in the `modules/` directory:
+**1. Create the module script** in the `modules/` directory:
    ```bash
    # modules/mod_your_feature.sh
    #!/bin/bash
@@ -819,26 +868,204 @@ When creating a new module for the Little Linux Helper, follow these essential s
    echo "$(lh_msg 'YOUR_WELCOME_MESSAGE')"
    ```
 
-2. **Create translation files** for all supported languages:
+**2. Create the metadata file** in `modules/meta/`:
+   ```json
+   {
+     "schema_version": 1,
+     "id": "your_feature",
+     "entry": "modules/mod_your_feature.sh",
+     "category": {
+       "id": "system"
+     },
+     "order": 50,
+     "docs": "mod/doc_your_feature.md",
+     "display": {
+       "name_key": "YOUR_FEATURE_MODULE_NAME",
+       "description_key": "YOUR_FEATURE_MODULE_DESC",
+       "fallback_name": "Your Feature",
+       "fallback_description": "Description of your feature"
+     },
+     "i18n": {
+       "module_name": "your_feature"
+     },
+     "expose": {
+       "cli": true,
+       "gui": true
+     },
+     "enabled": true,
+     "requires_root": false,
+     "tags": ["tag1", "tag2"]
+   }
+   ```
+
+**3. Create translation files** for all supported languages:
    ```bash
    # lang/de/your_feature.sh
    #!/bin/bash
    [[ ! -v MSG_DE ]] && declare -A MSG_DE
+   MSG_DE[YOUR_FEATURE_MODULE_NAME]="Ihr Feature"
+   MSG_DE[YOUR_FEATURE_MODULE_DESC]="Beschreibung Ihres Features"
    MSG_DE[YOUR_WELCOME_MESSAGE]="Willkommen zu Ihrem Feature"
    
    # lang/en/your_feature.sh  
    #!/bin/bash
    [[ ! -v MSG_EN ]] && declare -A MSG_EN
+   MSG_EN[YOUR_FEATURE_MODULE_NAME]="Your Feature"
+   MSG_EN[YOUR_FEATURE_MODULE_DESC]="Description of your feature"
    MSG_EN[YOUR_WELCOME_MESSAGE]="Welcome to your feature"
    ```
 
-3. **Add menu entry** in `help_master.sh`:
-   ```bash
-   # Add to the main menu case statement
-   X) bash "$LH_ROOT_DIR/modules/mod_your_feature.sh" ;;
+**4. Create documentation** in `docs/modules/`:
+   ```markdown
+   # Your Feature Module
+   
+   ## Overview
+   This module provides functionality for...
+   
+   ## Usage
+   Select "Your Feature" from the main menu...
    ```
 
-4. **Test the module**:
+**5. Rebuild the registry cache**:
+   ```bash
+   ./scripts/registry_cache_helper.sh rebuild
+   ```
+
+**6. Test the module**:
+   ```bash
+   # The module will now appear in the main menu automatically
+   ./help_master.sh
+   ```
+
+**7. Validate with ShellCheck** (required before submitting):
+   ```bash
+   shellcheck -x modules/mod_your_feature.sh
+   ```
+   
+#### Module Metadata Reference
+
+**Required Fields:**
+- `schema_version`: Must be `1` (integer)
+- `id`: Unique identifier (string, lowercase with underscores)
+- `entry`: Path to module script relative to repo root
+- `category.id`: Category ID (must exist in `_categories.json`)
+- `order`: Display order within category (integer)
+- `docs`: Documentation path relative to `docs/`
+- `display.name_key`: Translation key for module name
+- `display.description_key`: Translation key for module description
+
+**Optional Fields:**
+- `display.fallback_name`: English name (used when translation missing)
+- `display.fallback_description`: English description
+- `i18n.module_name`: Override for language module name (defaults to filename)
+- `expose.cli`: Show in CLI menu (default: true)
+- `expose.gui`: Show in GUI (default: true)
+- `enabled`: Master toggle (default: true)
+- `requires_root`: Hint for permission warnings (default: false)
+- `tags`: Array of strings for categorization/search
+- `version`: Version string (especially useful for mods)
+- `author`: Author name (especially useful for mods)
+
+**Submodules:**
+Modules can have submodules declared in the metadata:
+```json
+{
+  "id": "parent_module",
+  "entry": "modules/mod_parent.sh",
+  ...
+  "submodules": [
+    {
+      "id": "child_module",
+      "entry": "modules/mod_parent.sh",
+      "order": 1,
+      "display": {
+        "name_key": "CHILD_MODULE_NAME",
+        "description_key": "CHILD_MODULE_DESC"
+      },
+      "docs_inherit": true
+    }
+  ]
+}
+```
+
+#### Available Categories
+
+Categories are defined in `modules/meta/_categories.json`:
+- `system`: System information and management
+- `maintenance`: System maintenance and updates  
+- `security`: Security tools and checks
+- `backup`: Backup and restore operations
+- `recovery`: System recovery tools
+- `docker`: Docker management
+- Custom categories can be added as needed
+
+Category display order can be customized via `config/general.d/60-module-categories.conf`.
+
+#### Module Configuration
+
+Modules can be controlled via `config/general.d/50-enable-module.conf`:
+
+**Global Mods Toggle:**
+```bash
+CFG_LH_MODULES_MODS_ENABLE="true"  # Enable/disable all mods
+```
+
+**Whitelist (when mods globally disabled):**
+```bash
+CFG_LH_MODULES_MODS_ENABLE_ONE="mod1 mod2"  # Enable specific mods
+```
+
+**Blacklist (overrides everything):**
+```bash
+CFG_LH_MODULES_DISABLE_ONE="module1 module2"  # Hide specific modules/mods
+```
+
+#### Creating Third-Party Mods
+
+Third-party modules (mods) go in the `mods/` directory:
+
+**1. Create the mod structure:**
+```bash
+mods/
+├── meta/
+│   └── your_mod.json
+├── bin/
+│   └── mod_your_mod.sh
+└── docs/
+    └── your_mod.md
+```
+
+**2. Create metadata** (same format as core modules):
+```json
+{
+  "schema_version": 1,
+  "id": "your_mod",
+  "entry": "mods/bin/mod_your_mod.sh",
+  "category": {"id": "system"},
+  "order": 99,
+  "docs": "your_mod.md",
+  "display": {
+    "name_key": "YOUR_MOD_NAME",
+    "description_key": "YOUR_MOD_DESC",
+    "fallback_name": "Your Mod",
+    "fallback_description": "Your custom mod"
+  },
+  "i18n": {"module_name": "your_mod"},
+  "expose": {"cli": true, "gui": true},
+  "enabled": true,
+  "version": "1.0.0",
+  "author": "Your Name"
+}
+```
+
+**3. Key differences for mods:**
+- Entry path is `mods/bin/` instead of `modules/`
+- Docs path is relative to `mods/docs/` not `docs/`
+- Cannot reuse core module IDs
+- Can be toggled via `CFG_LH_MODULES_MODS_ENABLE`
+
+
+**4. Test the module**:
    ```bash
    # Test German
    export LH_LANG="de" && ./modules/mod_your_feature.sh

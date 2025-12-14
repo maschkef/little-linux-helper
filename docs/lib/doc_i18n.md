@@ -1,7 +1,7 @@
 <!--
 File: docs/lib/doc_i18n.md
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
 Licensed under the MIT License. See the LICENSE file in the project root for more information.
@@ -26,8 +26,6 @@ This library provides comprehensive internationalization (i18n) support for the 
 
 - **German (`de`)**: Full translation support for all modules and functions
 - **English (`en`)**: Full translation support for all modules and functions (default and fallback language)
-- **Spanish (`es`)**: Library translations only (`lib/*` files) - modules may have missing translations
-- **French (`fr`)**: Library translations only (`lib/*` files) - modules may have missing translations
 
 ## Key Functions
 
@@ -154,11 +152,9 @@ lang/
 │   ├── main_menu.sh      # Main menu translations
 │   ├── backup.sh         # Backup module translations
 │   └── ...               # Other module translations
-├── en/                   # English translations (baseline)
-│   ├── common.sh
-│   ├── main_menu.sh
-│   └── ...
-└── es/                   # Spanish (partial support)
+└── en/                   # English translations (baseline)
+    ├── common.sh
+    ├── main_menu.sh
     └── ...
 ```
 

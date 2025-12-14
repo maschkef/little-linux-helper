@@ -2,12 +2,17 @@
 #
 # little-linux-helper/lang/de/energy.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # Deutsche Übersetzungen für das Energieverwaltungsmodul
 
 # Conditional declaration for module files
 [[ ! -v MSG_DE ]] && declare -A MSG_DE
+
+# Help content
+MSG_DE[ENERGY_HELP_OVERVIEW]="Energieverwaltung und Energieoptimierung für Linux-Systeme. Bietet Schlafkontrolle, CPU-Frequenzskalierung, Bildschirmhelligkeitsanpassung und Energieüberwachungsfunktionen."
+MSG_DE[ENERGY_HELP_OPTIONS]="1. Schlaf/Ruhezustand deaktivieren - Verhindert temporär Systemschlaf und Ruhezustand mit Optionen für Dauerkontrolle|2. CPU-Governor - Verwaltet CPU-Frequenzskalierungs-Richtlinien (performance, powersave, ondemand, conservative, custom)|3. Bildschirmhelligkeit - Steuert die Hintergrundbeleuchtung des Displays (25%, 50%, 75%, 100% oder benutzerdefinierter Prozentsatz)|4. Energiestatistiken - Zeigt Batteriestatus, Netzteilinformationen und Thermosensor-Messwerte an"
+MSG_DE[ENERGY_HELP_NOTES]="Schlafkontrolle verwendet systemd-inhibit für temporäre Energieverwaltung|CPU-Governor-Änderungen erfordern das cpupower-Tool und benötigen möglicherweise sudo-Rechte|Helligkeitskontrolle unterstützt brightnessctl, xbacklight oder direkte sysfs-Manipulation|Energiestatistiken lesen aus /sys/class/power_supply/ und /sys/class/thermal/ Schnittstellen|Modul integriert sich mit dem Bibliotheks-Energieverwaltungssystem für konsistentes Verhalten|Desktop-Benachrichtigungen für wichtige Energieverwaltungsänderungen bereitgestellt"
 
 # Menu items and headers
 MSG_DE[ENERGY_MENU_TITLE]="Energieverwaltung"
@@ -169,6 +174,3 @@ MSG_DE[ENERGY_QUICK_CHOOSE_ACTION]="Aktion wählen (r/Enter):"
 # Additional missing keys from analysis
 MSG_DE[ENERGY_LOG_SLEEP_DISABLED]="Standby erfolgreich deaktiviert"
 MSG_DE[ENERGY_LOG_SLEEP_DISABLED_TIME]="Standby für %s Minuten deaktiviert"
-MSG_DE[ENERGY_LOG_SLEEP_DISABLED_PID]="Standby deaktiviert mit Inhibit-Prozess PID: %s"
-MSG_DE[ENERGY_LOG_SLEEP_DISABLED_TIME_PID]="Standby für %s deaktiviert mit Inhibit-Prozess PID: %s"
-MSG_DE[ENERGY_STATUS_OUR_INHIBIT_NONE]="Keine Little Linux Helper Standby-Sperre gefunden."

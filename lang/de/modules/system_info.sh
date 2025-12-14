@@ -2,12 +2,17 @@
 #
 # little-linux-helper/lang/de/system_info.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # German language strings for system_info module
 
 # Conditional declaration for module files
 [[ ! -v MSG_DE ]] && declare -A MSG_DE
+
+# Help content
+MSG_DE[SYSTEM_INFO_HELP_OVERVIEW]="Detaillierte Informationen über Ihr System anzeigen."
+MSG_DE[SYSTEM_INFO_HELP_OPTIONS]="1. Betriebssystem & Kernel - Betriebssystemversion und Kernel-Informationen|2. CPU-Details - Informationen über Ihre Prozessoren|3. Speicher-Info - RAM und Swap-Nutzung|4. Festplatten-Info - Festplattenspeicher und Partitionen|5. Netzwerk-Info - Netzwerkschnittstellen und Konfiguration|6. Grafik-Info - GPU und Bildschirmkonfiguration|7. Batterie-Status - Akku-Informationen (falls zutreffend)"
+MSG_DE[SYSTEM_INFO_HELP_NOTES]="Alle Vorgänge sind schreibgeschützt|Einige Details erfordern zusätzliche Tools|Grafik- und Batterie-Informationen systemabhängig"
 
 # Menu items and headers
 MSG_DE[SYSINFO_MENU_TITLE]="Systeminformationen"

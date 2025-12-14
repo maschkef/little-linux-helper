@@ -2,12 +2,17 @@
 #
 # little-linux-helper/lang/en/restarts.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # English language strings for restart module
 
 # Conditional declaration for module files
 [[ ! -v MSG_EN ]] && declare -A MSG_EN
+
+# Help content
+MSG_EN[RESTARTS_HELP_OVERVIEW]="Restart system services, desktop components, and manage system power safely. Includes comprehensive restart options for all major system components plus power management features."
+MSG_EN[RESTARTS_HELP_OPTIONS]="1. Restart Login Manager - Restarts display manager (GDM, SDDM, etc.)|2. Restart Sound System - Restarts PulseAudio/PipeWire and audio services|3. Restart Desktop Environment - Restarts your desktop session (KDE, GNOME, XFCE, etc.)|4. Restart Network Services - Restarts NetworkManager and network components|5. Restart Firewall - Reloads or restarts firewall components (firewalld, UFW, nftables)|6. Restart Bluetooth Services - Restarts Bluetooth system and user services|7. Restart Graphics System - Restarts graphics drivers and display components|8. Power Management Options - System shutdown, restart, suspend, hibernate with scheduling"
+MSG_EN[RESTARTS_HELP_NOTES]="Most operations require administrator privileges|Desktop and graphics restart may log you out of your session|Network restart may temporarily disconnect your internet|Firewall reload/restart may briefly interrupt network traffic|Bluetooth restart affects all connected devices|Power options include immediate and scheduled actions|Wayland compositor restart will end your desktop session"
 
 # Module title and menu
 MSG_EN[RESTART_MODULE_TITLE]="Services & Desktop Restart Options"

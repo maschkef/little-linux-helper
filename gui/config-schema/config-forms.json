@@ -33,16 +33,6 @@
                   "value": "en",
                   "label": "English",
                   "labelKey": "config.forms.generalLanguage.fields.CFG_LH_LANG.options.en"
-                },
-                {
-                  "value": "es",
-                  "label": "Spanish (partial)",
-                  "labelKey": "config.forms.generalLanguage.fields.CFG_LH_LANG.options.es"
-                },
-                {
-                  "value": "fr",
-                  "label": "French (partial)",
-                  "labelKey": "config.forms.generalLanguage.fields.CFG_LH_LANG.options.fr"
                 }
               ],
               "default": "en"

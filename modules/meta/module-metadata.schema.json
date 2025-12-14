@@ -1,0 +1,324 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/maschkef/little-linux-helper/schemas/module-metadata.json",
+  "title": "Little Linux Helper Module Metadata",
+  "description": "Schema for module metadata files in Little Linux Helper",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "entry",
+    "category",
+    "order",
+    "docs",
+    "display"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "description": "Schema version for compatibility handling",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the module",
+      "pattern": "^[a-z0-9_]+$",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "entry": {
+      "type": "string",
+      "description": "Path to the executable script relative to repository root",
+      "pattern": "^(modules/|mods/bin/).+\\.sh$"
+    },
+    "category": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Category ID (must exist in _categories.json)",
+          "pattern": "^[a-z0-9_]+$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "order": {
+      "type": "integer",
+      "description": "Display order within category (lower numbers appear first)",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "docs": {
+      "type": "string",
+      "description": "Path to documentation file (relative to docs/ or mods/docs/)",
+      "pattern": "^.+\\.md$"
+    },
+    "display": {
+      "type": "object",
+      "required": ["name_key", "description_key"],
+      "properties": {
+        "name_key": {
+          "type": "string",
+          "description": "Translation key for module name",
+          "pattern": "^[A-Z0-9_]+$"
+        },
+        "description_key": {
+          "type": "string",
+          "description": "Translation key for module description",
+          "pattern": "^[A-Z0-9_]+$"
+        },
+        "fallback_name": {
+          "type": "string",
+          "description": "English name when translation missing",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "fallback_description": {
+          "type": "string",
+          "description": "English description when translation missing",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "additionalProperties": false
+    },
+    "i18n": {
+      "type": "object",
+      "properties": {
+        "module_name": {
+          "type": "string",
+          "description": "Override for language module name (defaults to filename)",
+          "pattern": "^[a-z0-9_]+$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "expose": {
+      "type": "object",
+      "properties": {
+        "cli": {
+          "type": "boolean",
+          "description": "Show in CLI menu",
+          "default": true
+        },
+        "gui": {
+          "type": "boolean",
+          "description": "Show in GUI",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "enabled": {
+      "type": "boolean",
+      "description": "Master toggle for the module",
+      "default": true
+    },
+    "requires_root": {
+      "type": "boolean",
+      "description": "Indicates if module requires root privileges",
+      "default": false
+    },
+    "tags": {
+      "type": "array",
+      "description": "Tags for categorization and search",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9_-]+$"
+      },
+      "uniqueItems": true
+    },
+    "version": {
+      "type": "string",
+      "description": "Module version (semantic versioning recommended)",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z0-9.-]+)?(\\+[a-z0-9.-]+)?$"
+    },
+    "author": {
+      "type": "string",
+      "description": "Module author",
+      "maxLength": 100
+    },
+    "help": {
+      "type": "object",
+      "description": "Help content for GUI HelpPanel (optional)",
+      "properties": {
+        "overview_key": {
+          "type": "string",
+          "description": "Translation key for help overview text",
+          "pattern": "^[A-Z0-9_]+$"
+        },
+        "options_key": {
+          "type": "string",
+          "description": "Translation key for help options (pipe-delimited array)",
+          "pattern": "^[A-Z0-9_]+$"
+        },
+        "notes_key": {
+          "type": "string",
+          "description": "Translation key for help notes (pipe-delimited array)",
+          "pattern": "^[A-Z0-9_]+$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "submodules": {
+      "type": "array",
+      "description": "Child modules nested under this module",
+      "items": {
+        "$ref": "#/$defs/submodule"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "submodule": {
+      "type": "object",
+      "required": [
+        "id",
+        "entry",
+        "order",
+        "display"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the submodule",
+          "pattern": "^[a-z0-9_]+$",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "entry": {
+          "type": "string",
+          "description": "Path to the executable script",
+          "pattern": "^(modules/|mods/bin/).+\\.sh$"
+        },
+        "category": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]+$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "order": {
+          "type": "integer",
+          "description": "Display order within parent module",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "docs": {
+          "type": "string",
+          "description": "Path to documentation file",
+          "pattern": "^.+\\.md$"
+        },
+        "docs_inherit": {
+          "type": "boolean",
+          "description": "If true, uses parent's documentation",
+          "default": false
+        },
+        "display": {
+          "type": "object",
+          "required": ["name_key", "description_key"],
+          "properties": {
+            "name_key": {
+              "type": "string",
+              "pattern": "^[A-Z0-9_]+$"
+            },
+            "description_key": {
+              "type": "string",
+              "pattern": "^[A-Z0-9_]+$"
+            },
+            "fallback_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "fallback_description": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          },
+          "additionalProperties": false
+        },
+        "i18n": {
+          "type": "object",
+          "properties": {
+            "module_name": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]+$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "expose": {
+          "type": "object",
+          "properties": {
+            "cli": {
+              "type": "boolean",
+              "default": true
+            },
+            "gui": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "additionalProperties": false
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "requires_root": {
+          "type": "boolean",
+          "default": false
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]+$"
+          },
+          "uniqueItems": true
+        },
+        "help": {
+          "type": "object",
+          "description": "Help content for GUI HelpPanel (optional)",
+          "properties": {
+            "overview_key": {
+              "type": "string",
+              "description": "Translation key for help overview text",
+              "pattern": "^[A-Z0-9_]+$"
+            },
+            "options_key": {
+              "type": "string",
+              "description": "Translation key for help options (pipe-delimited array)",
+              "pattern": "^[A-Z0-9_]+$"
+            },
+            "notes_key": {
+              "type": "string",
+              "description": "Translation key for help notes (pipe-delimited array)",
+              "pattern": "^[A-Z0-9_]+$"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": ["docs", "docs_inherit"],
+            "properties": {
+              "docs_inherit": {
+                "const": true
+              }
+            }
+          }
+        ]
+      },
+      "additionalProperties": false
+    }
+  }
+}

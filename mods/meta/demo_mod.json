@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "demo_mod",
+  "entry": "mods/bin/mod_demo.sh",
+  "category": {
+    "id": "democase"
+  },
+  "order": 99,
+  "docs": "demo_mod.md",
+  "display": {
+    "name_key": "DEMO_MOD_NAME",
+    "description_key": "DEMO_MOD_DESC",
+    "fallback_name": "Library Showcase",
+    "fallback_description": "Interactive demonstration of the most important library functions for mod developers"
+  },
+  "i18n": {
+    "module_name": "demo_mod"
+  },
+  "expose": {
+    "cli": true,
+    "gui": true
+  },
+  "enabled": true,
+  "requires_root": false,
+  "tags": ["demo", "showcase", "developer", "library", "tutorial"],
+  "version": "1.0.0",
+  "author": "maschkef"
+}
+

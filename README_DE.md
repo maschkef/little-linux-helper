@@ -36,7 +36,9 @@ Meine Arbeitsumgebung basiert in der Regel auf Arch (Hauptsystem) oder Debian (v
 
 ## Lizenz
 
-Dieses Projekt steht unter der MIT-Lizenz. Weitere Informationen findest du in der Datei `LICENSE` im Projektstammverzeichnis.
+Dieses Projekt steht unter der Apache-Lizenz 2.0. Weitere Informationen findest du in der Datei `LICENSE` im Projektstammverzeichnis.
+
+Lizenzen von Drittanbieter-Abhängigkeiten sind in `THIRD_PARTY_LICENSES.md` dokumentiert.
 
 <details>
 <summary>❗ Bekannte Probleme und Einschränkungen</summary>
@@ -122,6 +124,26 @@ Die GUI bleibt vollständig kompatibel mit sämtlicher CLI-Funktionalität und b
 
 </details>
 
+### 🔧 **Modul-Registry-System**
+Sowohl CLI- als auch GUI-Oberflächen verwenden ein registry-basiertes Modul-Erkennungssystem, das Folgendes bietet:
+- **Automatische Erkennung**: Neue Module erscheinen automatisch beim Hinzufügen von Metadaten-Dateien - keine Codeänderungen erforderlich
+- **Single Source of Truth**: Beide Oberflächen laden aus demselben JSON-Registry-Cache
+- **Metadatengesteuert**: Modulinformationen, Kategorien und Dokumentationspfade werden in JSON-Metadaten definiert
+- **Erweiterbarkeit**: Unterstützung für Ergänzende Module über die `mods/`-Verzeichnisstruktur
+- **Übersetzungsintegration**: Eingebaute Internationalisierung mit Fallback-Unterstützung
+- **Submodul-Unterstützung**: Hierarchische Modulorganisation für komplexe Funktionen
+
+**Neue Module hinzufügen:**
+1. Modulskript erstellen: `modules/mod_deinmodul.sh`
+2. Metadatendatei hinzufügen: `modules/meta/mod_deinmodul.json`
+3. Übersetzungen hinzufügen: `lang/*/deinmodul.sh`
+4. Dokumentation hinzufügen: `docs/modules/doc_deinmodul.md`
+5. Anwendung neu starten - Modul erscheint automatisch!
+
+Siehe `docs/registry/third_party_module_migration_guide.md` für eine vollständige Anleitung zur Modulentwicklung.
+
+</details>
+
 ---
 
 Beide Oberflächen bieten Zugriff auf die folgenden Module:
@@ -155,7 +177,7 @@ Beide Oberflächen bieten Zugriff auf die folgenden Module:
     * **Restore-Fähigkeiten**: Vollständige Systemwiederherstellung, Wiederherstellung einzelner Subvolumes, Ordner-basierte Wiederherstellung und Bootloader-Integration *(Hinweis: Restore-Funktionen sind implementiert, benötigen aber umfangreiche Tests)*
     * **Sicherheitsfeatures**: Erkennung von Live-Umgebungen, Dateisystem-Gesundheitsprüfungen, Rollback-Funktionen und Dry-Run-Unterstützung
     * **Wartungs-Untermenü**: Dedizierter Bereich für Löschwerkzeuge, Problem-Backup-Bereinigung, Quell-Snapshot-Verwaltung, Prüfung inkrementeller Ketten und Bereinigung verwaister `.receiving_*`-Staging-Snapshots
-    * **Detaillierte Dokumentation**: Siehe `docs/mod/doc_btrfs_backup.md`, `docs/mod/doc_btrfs_restore.md` und `docs/lib/doc_btrfs.md`
+    * **Detaillierte Dokumentation**: Siehe `docs/modules/doc_btrfs_backup.md`, `docs/modules/doc_btrfs_restore.md` und `docs/lib/doc_btrfs.md`
 
 * **TAR Archiv Backup & Restore** (`modules/backup/mod_backup_tar.sh`, `modules/backup/mod_restore_tar.sh`):
     * **Flexible Backup-Optionen**: Nur Home, Systemkonfiguration, vollständiges System oder benutzerdefinierte Verzeichnisse
@@ -163,7 +185,7 @@ Beide Oberflächen bieten Zugriff auf die folgenden Module:
     * **Archivverwaltung**: Komprimierte `.tar.gz`-Archive mit automatischer Bereinigung und Aufbewahrungsrichtlinien
     * **Sichere Wiederherstellung**: Mehrere Zieloptionen mit Sicherheitswarnungen und Bestätigungsabfragen
     * **Session Awareness**: Backup- und Restore-Operationen registrieren sich mit passenden Sperrkategorien
-    * **Dokumentation**: Siehe `docs/mod/doc_backup_tar.md` und `docs/mod/doc_restore_tar.md`
+    * **Dokumentation**: Siehe `docs/modules/doc_backup_tar.md` und `docs/modules/doc_restore_tar.md`
 
 * **RSYNC Inkrementelles Backup & Restore** (`modules/backup/mod_backup_rsync.sh`, `modules/backup/mod_restore_rsync.sh`):
     * **Inkrementelle Intelligenz**: Speicher-effiziente Backups mit Hardlink-Optimierung über `--link-dest`
@@ -171,7 +193,7 @@ Beide Oberflächen bieten Zugriff auf die folgenden Module:
     * **Erweiterte Optionen**: Umfassende RSYNC-Konfiguration mit atomaren Operationen und Fortschrittsüberwachung
     * **Flexible Wiederherstellung**: Echtzeit-Fortschrittsanzeige und vollständige Verzeichnisbaum-Wiederherstellung
     * **Session Awareness**: Backup- und Restore-Operationen registrieren sich mit passenden Sperrkategorien
-    * **Dokumentation**: Siehe `docs/mod/doc_backup_rsync.md` und `docs/mod/doc_restore_rsync.md`
+    * **Dokumentation**: Siehe `docs/modules/doc_backup_rsync.md` und `docs/modules/doc_restore_rsync.md`
 
 </details>
 
@@ -478,8 +500,6 @@ Little Linux Helper unterstützt mehrere Sprachen für die Benutzeroberfläche. 
 **Unterstützte Sprachen:**
 * **Deutsch (de)**: Vollständige Übersetzungsunterstützung für alle Module
 * **Englisch (en)**: Vollständige Übersetzungsunterstützung für alle Module (Standardsprache und Fallback)
-* **Spanisch (es)**: Nur vereinzelte interne Übersetzungen (Logeinträge etc.), praktisch unbrauchbar
-* **Französisch (fr)**: Nur vereinzelte interne Übersetzungen (Logeinträge etc.), praktisch unbrauchbar
 
 **Sprachauswahl:**
 * **Automatische Erkennung**: Die Systemsprache wird automatisch über die Umgebungsvariablen (`LANG`, `LC_ALL`, `LC_MESSAGES`) ermittelt
@@ -492,8 +512,6 @@ Little Linux Helper unterstützt mehrere Sprachen für die Benutzeroberfläche. 
 CFG_LH_LANG="auto"    # Automatische Systemsprache
 CFG_LH_LANG="de"      # Deutsch
 CFG_LH_LANG="en"      # Englisch
-CFG_LH_LANG="es"      # Spanisch (praktisch unbrauchbar, nur interne Meldungen)
-CFG_LH_LANG="fr"      # Französisch (praktisch unbrauchbar, nur interne Meldungen)
 ```
 
 **Technische Details:**

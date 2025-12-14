@@ -2,12 +2,17 @@
 #
 # little-linux-helper/lang/en/system_info.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # English language strings for system_info module
 
 # Conditional declaration for module files
 [[ ! -v MSG_EN ]] && declare -A MSG_EN
+
+# Help content
+MSG_EN[SYSTEM_INFO_HELP_OVERVIEW]="View comprehensive information about your computer's hardware, software, and current system status. Perfect for troubleshooting, system monitoring, or getting to know your Linux system better."
+MSG_EN[SYSTEM_INFO_HELP_OPTIONS]="1. Operating System & Kernel - Shows your Linux distribution, version, and kernel information|2. CPU Details - Display processor information including model, cores, and performance specs|3. RAM Usage - Check memory usage and see how much RAM is available vs used|4. PCI Devices - List hardware components like graphics cards, network adapters, and sound cards|5. USB Devices - Show connected USB devices like keyboards, mice, storage drives, and webcams|6. Disk Overview - View hard drives, SSDs, and storage devices with their mount points and usage|7. Top Processes - See which programs are using the most CPU and memory resources|8. Network Configuration - Display network settings, IP addresses, and active connections|9. Temperatures/Sensors - Monitor hardware temperatures and fan speeds (if sensors are available)"
+MSG_EN[SYSTEM_INFO_HELP_NOTES]="Some detailed information may require administrator privileges|Missing tools will be offered for automatic installation|Hardware sensor readings require the 'sensors' package to be installed|All information is read-only - this won't change any system settings"
 
 # Menu items and headers
 MSG_EN[SYSINFO_MENU_TITLE]="System Information"

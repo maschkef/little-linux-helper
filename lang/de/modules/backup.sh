@@ -2,12 +2,26 @@
 #
 # lang/de/backup.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # German backup module language strings
 
 # Declare MSG_DE as associative array if not already declared
 [[ ! -v MSG_DE ]] && declare -A MSG_DE
+
+# Backup module and submodule names/descriptions
+MSG_DE[BACKUP_TAR_MODULE_NAME]="TAR-Sicherung"
+MSG_DE[BACKUP_TAR_MODULE_DESC]="TAR-Archiv-Sicherungen erstellen"
+MSG_DE[BACKUP_RSYNC_MODULE_NAME]="Rsync-Sicherung"
+MSG_DE[BACKUP_RSYNC_MODULE_DESC]="Inkrementelle Sicherungen mit rsync"
+MSG_DE[BTRFS_BACKUP_MODULE_NAME]="BTRFS-Sicherung"
+MSG_DE[BTRFS_BACKUP_MODULE_DESC]="BTRFS-Snapshot-basierte Sicherungen"
+MSG_DE[RESTORE_TAR_MODULE_NAME]="TAR-Sicherung wiederherstellen"
+MSG_DE[RESTORE_TAR_MODULE_DESC]="Aus TAR-Archiv wiederherstellen"
+MSG_DE[RESTORE_RSYNC_MODULE_NAME]="Rsync-Sicherung wiederherstellen"
+MSG_DE[RESTORE_RSYNC_MODULE_DESC]="Aus rsync-Sicherung wiederherstellen"
+MSG_DE[BTRFS_RESTORE_MODULE_NAME]="BTRFS-Sicherung wiederherstellen"
+MSG_DE[BTRFS_RESTORE_MODULE_DESC]="Aus BTRFS-Snapshots wiederherstellen"
 
 # Backup module main menu
 MSG_DE[BACKUP_TITLE]="Backup & Wiederherstellung"
@@ -777,12 +791,10 @@ MSG_DE[BTRFS_MENU_DEBUG_CHAIN]="Inkrementelle Kette inspizieren (Debug)"
 
 # BTRFS deletion menu
 MSG_DE[BTRFS_DELETE_BACKUPS_HEADER]="BTRFS-Backup-Sitzungen löschen"
-MSG_DE[BTRFS_DELETE_NEEDS_ROOT]="Das Löschen von BTRFS-Backups erfordert Root-Rechte"
 MSG_DE[BTRFS_DELETE_WITH_SUDO]="Backups mit sudo löschen?"
 MSG_DE[BTRFS_SELECT_BUNDLE_DELETE]="Geben Sie die Nummer(n) der zu löschenden Backup-Sitzung(en) ein (einzeln: 3, Bereich: 1-5, mehrere: 1,3,5) oder 0 zum Abbrechen: "
 MSG_DE[BTRFS_CONFIRM_DELETE_BUNDLES]="Sind Sie sicher, dass Sie die ausgewählten Backup-Sitzung(en) löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden!"
 MSG_DE[BTRFS_DELETE_BUNDLE_LIST_INFO]="Die folgenden Sicherungssitzungen werden gelöscht:"
-MSG_DE[BTRFS_NO_BACKUPS_FOUND]="Keine Backup-Sitzungen gefunden"
 
 # BTRFS log messages - problematic cleanup
 MSG_DE[BTRFS_LOG_CLEANUP_PROBLEMATIC_COMPLETE]="Problematische Bereinigung abgeschlossen: %d erfolgreich, %d Fehler"
@@ -947,7 +959,6 @@ MSG_DE[RESTORE_SINGLE_SUBVOLUME_SUCCESS]="Einzelne Subvolume-Wiederherstellung e
 MSG_DE[RESTORE_SINGLE_SUBVOLUME_FAILED]="Einzelne Subvolume-Wiederherstellung fehlgeschlagen: %s"
 
 # Snapshot-Auflistung
-MSG_DE[RESTORE_NO_BACKUP_DIR]="Backup-Verzeichnis nicht gefunden: %s"
 MSG_DE[RESTORE_NO_SNAPSHOTS_FOUND]="Keine Snapshots für Subvolume gefunden: %s"
 MSG_DE[RESTORE_AVAILABLE_SNAPSHOTS]="Verfügbare Snapshots für %s"
 MSG_DE[RESTORE_SELECT_SNAPSHOT]="Snapshot auswählen (1-%d):"
@@ -1044,7 +1055,6 @@ MSG_DE[RESTORE_BACKUP_SUBVOLUMES]="Backup-Subvolumes bei %s"
 MSG_DE[RESTORE_NO_SUBVOLUMES_FOUND]="Keine Subvolumes gefunden"
 
 # Hauptmenü
-MSG_DE[RESTORE_MENU_TITLE]="BTRFS-Wiederherstellung"
 MSG_DE[RESTORE_CURRENT_CONFIG]="Aktuelle Konfiguration"
 MSG_DE[RESTORE_MODE]="Modus"
 MSG_DE[RESTORE_MENU_SETUP]="Wiederherstellungsumgebung einrichten"
@@ -1076,7 +1086,6 @@ MSG_DE[RESTORE_FILESYSTEM_READONLY_OR_CORRUPTED]="Dateisystem ist read-only oder
 MSG_DE[RESTORE_FILESYSTEM_UNKNOWN_ERROR]="Unbekannter Dateisystemfehler während Wiederherstellung"
 MSG_DE[RESTORE_INVALID_SOURCE_SUBVOLUME]="Ungültiges Quell-Subvolume"
 MSG_DE[RESTORE_MAKING_SOURCE_READONLY]="Mache Quell-Subvolume read-only"
-MSG_DE[RESTORE_MENU_CLEANUP]="Wiederherstellungsumgebung bereinigen"
 MSG_DE[RESTORE_METADATA_EXHAUSTION_DETECTED]="Metadaten-Erschöpfung erkannt"
 MSG_DE[RESTORE_METADATA_EXHAUSTION_SOLUTION]="Lösung für Metadaten-Erschöpfung erforderlich"
 MSG_DE[RESTORE_PARENT_VALIDATION_FAILED]="Validierung des übergeordneten Subvolumes fehlgeschlagen"
@@ -1112,7 +1121,6 @@ MSG_DE[RESTORE_BOOTLOADER_CONFIGURATION_INCOMPLETE]="Bootloader-Konfiguration un
 MSG_DE[RESTORE_BOOTLOADER_ENHANCED_INFO]="Erweiterte Bootloader-Konfigurationsdetails"
 MSG_DE[RESTORE_BOOTLOADER_FAILED]="Bootloader-Konfiguration fehlgeschlagen"
 MSG_DE[RESTORE_BOOTLOADER_ROLLBACK_OPTION]="Bootloader-Änderung fehlgeschlagen - Rollback verfügbar"
-MSG_DE[RESTORE_BOOTLOADER_TEST_BOOT]="Boot nach Konfigurationsänderungen testen"
 
 # Boot-Strategie-Analyse
 MSG_DE[RESTORE_BOOT_STRATEGY_ANALYSIS]="Boot-Konfigurations-Strategie-Analyse"
@@ -1352,3 +1360,26 @@ MSG_DE[RESTORE_MISSING_SUBVOLUME_SNAPSHOTS]="Fehlende Subvolume-Snapshots"
 MSG_DE[RESTORE_SUBVOLUME]="Subvolume"
 MSG_DE[RESTORE_SUBVOLUME_DESCRIPTION]="Subvolume: %s"
 MSG_DE[RESTORE_SUBVOLUME_FAILED]="Subvolume-Wiederherstellung fehlgeschlagen: %s"
+
+# === HILFE-INHALTE FÜR GUI ===
+# Hinweis: Diese Datei enthält Hilfeinhalte für das Backup-Modul UND alle seine Submodule
+# Elternmodul: backup
+MSG_DE[BACKUP_HELP_OVERVIEW]="Zentrale Anlaufstelle zum Schutz Ihrer Daten mit mehreren Backup-Methoden. Wählen Sie zwischen BTRFS-Snapshots, TAR-Archiven oder RSYNC inkrementellen Backups je nach Bedarf."
+
+MSG_DE[BACKUP_HELP_OPTIONS]="1. BTRFS-Operationen - Erweiterte snapshot-basierte Backups für BTRFS-Dateisysteme (atomisch, platzsparend)|2. TAR-Backup - Komprimierte Archiv-Backups von Verzeichnissen erstellen (kompatibel mit allen Systemen)|3. RSYNC-Backup - Schnelle inkrementelle Backups, die nur geänderte Dateien kopieren|4. Wiederherstellungsvorgänge - Spezialisierte Wiederherstellungstools für jeden Backup-Typ aufrufen|6. Backup-Status - Umfassenden Status aller Ihrer Backups und Festplattenplatz-Nutzung anzeigen|7. Backup konfigurieren - Backup-Ziele, Aufbewahrungsrichtlinien und andere Einstellungen festlegen"
+
+MSG_DE[BACKUP_HELP_NOTES]="🚨 BTRFS-WARNUNG: BTRFS-Backup ist auf begrenzten Systemen getestet - mit Vorsicht verwenden|🚨 BTRFS-WIEDERHERSTELLUNG: Erfordert Tests - NICHT in Produktion verwenden! Nur zum Debuggen/Testen!|💡 Siehe individuelle BTRFS-Modul-Hilfe (bei direktem Aufruf) für weitere Informationen|Jeder Backup-Typ hat seine eigenen spezialisierten Tools, die über dieses Menü zugänglich sind|BTRFS-Operationen erfordern BTRFS-Dateisystem und bieten die fortschrittlichsten Features|TAR-Backups funktionieren auf jedem Dateisystem, erstellen aber größere Archivdateien|RSYNC ist ideal für regelmäßige Backups, da es schnell und platzsparend ist|Konfigurieren Sie Ihr Backup-Ziel vor dem Erstellen Ihres ersten Backups"
+
+# Submodul: btrfs_backup
+MSG_DE[BTRFS_BACKUP_HELP_OVERVIEW]="Erstellt bundle-basierte BTRFS-Snapshots mit dynamischer Subvolume-Erkennung, Laufzeit-Metadaten und atomischem send/receive, damit jede Sicherung wiederherstellbereit bleibt."
+
+MSG_DE[BTRFS_BACKUP_HELP_OPTIONS]="1. Backup jetzt starten - Alle konfigurierten und automatisch erkannten Subvolumes in ein gemeinsames Zeitstempel-Bundle sichern|2. Bundle-Inventar prüfen - Sicherungshistorie, Marker-Status und Laufzeit-Metadaten anzeigen|3. Backup-Einstellungen anpassen - Ziele, Aufbewahrung, Auto-Erkennung und Subvolume-Liste konfigurieren|4. Quell-Snapshots verwalten - Skript-erstellte Quell-Snapshots bereinigen oder für inkrementelle Ketten beibehalten|5. Problem-Bundles bereinigen - Unterbrochene Backups reparieren und Bundle-Marker erneut validieren|6. Backup-Bundles löschen - Ausgewählte oder automatisch vorgeschlagene Bundles entfernen und Ketten intakt halten|7. Restore-Helfer öffnen - Wiederherstellungs-Workflow mit dem ausgewählten Bundle starten"
+
+MSG_DE[BTRFS_BACKUP_HELP_NOTES]="⚠️ BETA-SOFTWARE: Auf begrenzten Systemen getestet - mit Vorsicht verwenden|Erstellt ein bundle-basiertes Backup-Layout, bei dem jeder Lauf Snapshots, Marker und Metadaten mit identischem Zeitstempel schreibt|Unterstützt flexible BTRFS-Subvolume-Layouts (@, @home, @var, benutzerdefinierte Namen) mit dynamischer Auto-Erkennung|Markerdateien (.backup_complete) liegen neben jedem Subvolume-Snapshot und speichern Status-, Dauer- und Größeninformationen|Laufzeit-Metadaten liegen in meta/<timestamp>.json und speisen das gemeinsame Bundle-Inventar in Backup-/Restore-Menüs|Backup-Ziel muss ein BTRFS-Dateisystem mit ausreichend freiem Speicher für Snapshots und Metadaten sein|Erstellt automatisch inkrementelle Backups, wenn passende Eltern-Snapshots verfügbar sind|Die Beibehaltung von Quell-Snapshots erhält inkrementelle Ketten; Aufbewahrung passend konfigurieren, um unerwartete Löschungen zu vermeiden"
+
+# Submodul: btrfs_restore
+MSG_DE[BTRFS_RESTORE_HELP_OVERVIEW]="⚠️ DESTRUKTIV: Live-Umgebungs-Wiederherstellungs-Workflow, der bundle-basierte Backups mit atomischer Validierung, Bootloader-Integration und received-UUID-Schutz zurückspielt."
+
+MSG_DE[BTRFS_RESTORE_HELP_OPTIONS]="1. Wiederherstellungsumgebung vorbereiten - Backup-/Ziel-Laufwerke erkennen, Mount-Punkte setzen und Live-Sicherheitsprüfungen bestätigen|2. Wiederherstellungsumfang wählen - Gesamtsystem oder einzelne Subvolumes mit zeitstempel-abgeglichenen Bundles zurückspielen|3. Backup-Inhalte durchsuchen - Bundles schreibgeschützt einhängen, um einzelne Dateien oder Ordner herauszuholen|4. Festplatten- & Bundle-Layout prüfen - Ziel-Festplattenlayout, erkannte Subvolumes, Marker und Metadaten-Dateien anzeigen|5. Sicherheits-Checkliste ansehen - Kritische Warnungen, Live-Umgebungs-Erkennung und den dokumentierten 4-Schritte-Workflow lesen|6. Wiederherstellungssitzung bereinigen - Ziele aushängen, temporäre Verzeichnisse entfernen und Wiederherstellungsartefakte aufräumen"
+
+MSG_DE[BTRFS_RESTORE_HELP_NOTES]="🚨 GEFAHR: ERFORDERT TESTS - NICHT in Produktion verwenden! Nur zum Debuggen/Testen!|🚨 Nur fortfahren, wenn Sie BTRFS-Wiederherstellungsabläufe und möglichen Datenverlust vollständig verstehen|⚠️ Muss aus einer Live-Umgebung ausgeführt werden; das Modul überschreibt Ziel-Subvolumes destruktiv|⚠️ Vollständige Wiederherstellungen entfernen bestehende Daten auf Ziel-Subvolumes, bevor neue Snapshots empfangen werden|Verwendet dasselbe Bundle-Layout wie das Backup-Modul (snapshots/<timestamp>/<subvolume>, Marker-Dateien, meta/<timestamp>.json)|Bundle-Inventar sorgt für passende Zeitstempel bei Multi-Subvolume-Wiederherstellungen|Schützt inkrementelle Ketten durch received-UUID-Validierung und fehlerschonende atomare receive-Operationen|Bootloader-Aktualisierung bietet Neuinstallation, Konfigurationsaktualisierung oder Überspringen, falls extern verwaltet"

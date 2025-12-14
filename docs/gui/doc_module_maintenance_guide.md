@@ -1,10 +1,10 @@
 <!--
 File: docs/gui/doc_module_maintenance_guide.md
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
-Licensed under the MIT License. See the LICENSE file in the project root for more information.
+Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 -->
 
 # GUI Module Maintenance Guide
@@ -100,14 +100,14 @@ var moduleDocMap = map[string]string{
 ```
 
 **Documentation File Requirements:**
-- Create corresponding `.md` file in `docs/mod/` directory
+- Create corresponding `.md` file in `docs/modules/` directory
 - Use standard documentation structure (see existing files)
 - Include proper license header
 
 ### When Removing Module Documentation
 
 1. **Remove from `moduleDocMap`** in `getModuleDocs()`
-2. **Delete documentation file** from `docs/mod/`
+2. **Delete documentation file** from `docs/modules/`
 3. **Update DocumentBrowser categories** (see section 7)
 
 ## 3. Frontend Help Content (`gui/web/src/i18n/locales/`)
@@ -393,7 +393,7 @@ cd gui/
    "backup_database": "mod_backup_database.md",
    ```
 
-3. ✅ **Create Documentation File**: `docs/mod/mod_backup_database.md`
+3. ✅ **Create Documentation File**: `docs/modules/mod_backup_database.md`
 
 4. ✅ **Help Content** (`help.json`):
    ```json
@@ -497,7 +497,7 @@ cd gui/
 
 **Documentation Not Loading**:
 - Verify `moduleDocMap` entry exists
-- Check documentation file exists in `docs/mod/`
+- Check documentation file exists in `docs/modules/`
 - Ensure file has proper markdown format
 
 **Missing Translations**:

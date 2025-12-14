@@ -2,12 +2,17 @@
 #
 # little-linux-helper/lang/en/packages.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # English translations for package management module
 
 # Ensure MSG_EN array is declared
 [[ ! -v MSG_EN ]] && declare -A MSG_EN
+
+# Help content
+MSG_EN[PACKAGES_HELP_OVERVIEW]="Manage packages and system updates."
+MSG_EN[PACKAGES_HELP_OPTIONS]="1. System Update - Update all packages|2. Find Orphaned Packages - Detect unused packages|3. Clean Package Cache - Clear cached package files|4. Search & Install - Find and install new packages|5. Docker Setup - Install and configure Docker|6. List Installed - Show installed packages|7. Show Package Logs - Display package manager logs"
+MSG_EN[PACKAGES_HELP_NOTES]="Supports multiple package managers|Automatic detection of available managers|Some operations require internet connection"
 
 # Module headers
 MSG_EN[PKG_HEADER_MAIN]="Package Management & Updates"

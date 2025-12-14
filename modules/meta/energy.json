@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "energy",
+  "entry": "modules/mod_energy.sh",
+  "category": {
+    "id": "maintenance"
+  },
+  "order": 100,
+  "docs": "modules/doc_energy.md",
+  "display": {
+    "name_key": "ENERGY_MODULE_NAME",
+    "description_key": "ENERGY_MODULE_DESC",
+    "fallback_name": "Energy Management",
+    "fallback_description": "Power management and energy optimization"
+  },
+  "i18n": {
+    "module_name": "energy"
+  },
+  "help": {
+    "overview_key": "ENERGY_HELP_OVERVIEW",
+    "options_key": "ENERGY_HELP_OPTIONS",
+    "notes_key": "ENERGY_HELP_NOTES"
+  },
+  "expose": {
+    "cli": true,
+    "gui": true
+  },
+  "enabled": true,
+  "requires_root": true,
+  "tags": ["energy", "power", "battery", "optimization"]
+}

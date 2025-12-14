@@ -2,12 +2,17 @@
 #
 # lang/de/security.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # Deutsche Übersetzungen für das Sicherheitsmodul
 
 # Declare MSG_DE as associative array if not already declared
 [[ ! -v MSG_DE ]] && declare -A MSG_DE
+
+# Help content
+MSG_DE[SECURITY_HELP_OVERVIEW]="Sicherheitsüberprüfungen für Ihr System durchführen."
+MSG_DE[SECURITY_HELP_OPTIONS]="1. Offene Ports anzeigen - Lauschende Netzwerk-Ports auflisten|2. Fehlgeschlagene Anmeldeversuche - Sicherheitsprotokolle prüfen|3. SSH-Einstellungen prüfen - SSH-Konfiguration überprüfen|4. Firewall-Status - Firewall-Status und Regeln anzeigen"
+MSG_DE[SECURITY_HELP_NOTES]="Einige Funktionen erfordern Root-Rechte|SSH-Prüfungen erfordern installiertes OpenSSH|Firewall-Status zeigt aktive Regeln an"
 
 # Security module main menu
 MSG_DE[SECURITY_TITLE]="Sicherheitsüberprüfungen"

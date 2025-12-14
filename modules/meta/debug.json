@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "debug_tool",
+  "entry": "modules/mod_debug.sh",
+  "category": {
+    "id": "debug"
+  },
+  "order": 110,
+  "docs": "modules/debug_tool.md",
+  "display": {
+    "name_key": "DEBUG_MODULE_NAME",
+    "description_key": "DEBUG_MODULE_DESC",
+    "fallback_name": "System Debug Report",
+    "fallback_description": "Generate a comprehensive system debug bundle"
+  },
+  "i18n": {
+    "module_name": "debug"
+  },
+  "expose": {
+    "cli": true,
+    "gui": true
+  },
+  "enabled": true,
+  "requires_root": false,
+  "tags": ["debug", "logs", "system"]
+}

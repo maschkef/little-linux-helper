@@ -2,7 +2,7 @@
 #
 # lib/lib_config_schema.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # Helper functions for configuration template handling, schema comparison,
 # and interactive synchronization between *.conf.example templates and

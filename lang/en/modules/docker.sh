@@ -2,14 +2,19 @@
 #
 # lang/en/docker.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # This script is part of the 'little-linux-helper' collection.
-# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+# Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 #
 # English translations for the Docker module
 
 [[ ! -v MSG_EN ]] && declare -A MSG_EN
+
+# Help content
+MSG_EN[DOCKER_HELP_OVERVIEW]="Manage Docker containers and ensure they're secure. Get container information, install Docker if needed, and run security audits on your containerized applications."
+MSG_EN[DOCKER_HELP_OPTIONS]="1. Show Running Containers - See all active Docker containers with resource usage and status|2. Manage Configuration - Configure Docker security scanning settings and parameters|3. Installation & Setup - Automatically install Docker and Docker Compose on your system|4. Security Audit - Comprehensive security scan of containers, images, and Docker configuration"
+MSG_EN[DOCKER_HELP_NOTES]="Installation option includes complete Docker setup with user permissions|Security audit checks for vulnerabilities, misconfigurations, and best practices|Configuration settings control how thorough security scans will be|Docker must be installed to view and manage containers"
 
 # Docker Module Menu
 MSG_EN[DOCKER_MENU_TITLE]="Docker Functions"
@@ -506,7 +511,6 @@ MSG_EN[DOCKER_MODULE_NOT_INITIALIZED_MESSAGE]="Module not properly initialized. 
 MSG_EN[DOCKER_MODULE_CORRECTLY_INITIALIZED]="Module correctly initialized, showing menu"
 MSG_EN[DOCKER_SHOW_MAIN_MENU]="Showing Docker functions main menu"
 MSG_EN[DOCKER_MENU_TITLE_FUNCTIONS]="Docker Functions"
-MSG_EN[DOCKER_MENU_SECURITY_CHECK]="Docker Security Check"
 MSG_EN[DOCKER_MENU_BACK_MAIN]="Back to Main Menu"
 MSG_EN[DOCKER_MENU_CHOOSE_OPTION]="Choose an option: "
 MSG_EN[DOCKER_USER_SELECTED_OPTION]="User selected option: '%s'"

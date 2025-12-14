@@ -1,10 +1,10 @@
 <!--
 File: docs/GUI_DEVELOPER_GUIDE.md
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
-Licensed under the MIT License. See the LICENSE file in the project root for more information.
+Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 -->
 
 # Little Linux Helper - GUI Developer Guide
@@ -19,7 +19,7 @@ The Little Linux Helper GUI is a modern web-based interface that provides graphi
 
 ### Key Features
 - **Zero CLI Modification**: Existing modules work without changes
-- **Automatic Discovery**: New modules are immediately available in GUI
+- **Registry-Based Discovery**: New modules automatically appear in GUI when metadata file is added to `modules/meta/` or `mods/meta/` - no backend code changes required
 - **Real-time Experience**: Live terminal output and interaction
 - **Multi-language Support**: Complete internationalization system
 - **Responsive Design**: Works on desktop and mobile devices
@@ -83,10 +83,11 @@ This starts:
 - Complete internationalization system
 
 **Module Integration**:
-- Automatic discovery of `mod_*.sh` files
+- Registry-based module discovery from JSON metadata files
+- Automatic loading from `modules/meta/` (core) and `mods/meta/`
 - Environment variable inheritance (LH_ROOT_DIR, LH_GUI_MODE, LH_LANG)
 - GUI-aware behavior (skips interactive prompts and hides CLI-specific menu items)
-- Category-based organization
+- Category-based organization from registry metadata
 
 ### GUI Mode Behavior
 
@@ -181,11 +182,12 @@ LLH_GUI_ALLOWED_ORIGINS=http://localhost:3001
 These safeguards apply transparently to existing modules: no module code changes are required to benefit from authentication.
 
 ### Data Flow
-1. **Module Discovery**: Backend scans filesystem for modules
-2. **Frontend Request**: User selects module to start
-3. **Session Creation**: Backend creates PTY process with proper environment
-4. **Real-time Streaming**: Output streamed via WebSocket to frontend
-5. **Interactive Input**: User input sent back to running module
+1. **Module Registry Loading**: Backend calls registry cache helper script via subprocess to load module metadata from `cache/module-registry.json`
+2. **Module Discovery**: Modules are served from the loaded registry (automatic discovery from `modules/meta/*.json` and `mods/meta/*.json`)
+3. **Frontend Request**: User selects module to start from the registry-provided module list
+4. **Session Creation**: Backend creates PTY process with proper environment using registry entry path
+5. **Real-time Streaming**: Output streamed via WebSocket to frontend
+6. **Interactive Input**: User input sent back to running module
 
 ## Specialized Documentation
 

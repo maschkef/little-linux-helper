@@ -2,10 +2,10 @@
 #
 # modules/backup/mod_btrfs_restore.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # This script is part of the 'little-linux-helper' collection.
-# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+# Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 #
 # Module for BTRFS snapshot-based restore operations
 #
@@ -2962,24 +2962,23 @@ execute_explicit_subvol_strategy() {
     echo ""
     
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo -e "${LH_COLOR_CYAN}═══════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_CYAN}             DRY-RUN: Explicit Subvolume Strategy${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_CYAN}═══════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
-        echo ""
-        echo -e "${LH_COLOR_INFO}📋 What this means:${LH_COLOR_RESET}"
-        echo -e "   Your system uses explicit subvolume references in the bootloader."
-        echo -e "   Example: 'rootflags=subvol=$restored_subvol_name' or 'subvol=$restored_subvol_name' in fstab"
-        echo ""
-        echo -e "${LH_COLOR_SUCCESS}✓ No bootloader changes needed!${LH_COLOR_RESET}"
-        echo -e "   The restored data is already in the correct location ($restored_subvol_name)"
-        echo -e "   Your bootloader configuration already points to this subvolume by name"
-        echo ""
-        echo -e "${LH_COLOR_INFO}What would happen in actual restore:${LH_COLOR_RESET}"
-        echo -e "   • System boots normally using existing bootloader config"
-        echo -e "   • Bootloader looks for subvolume named '$restored_subvol_name'"
-        echo -e "   • Finds the restored data and boots successfully"
-        echo ""
-        echo -e "${LH_COLOR_CYAN}═══════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset info \
+            --min-width 65 \
+            "DRY-RUN: Explicit Subvolume Strategy" \
+            "" \
+            "📋 What this means:" \
+            "   Your system uses explicit subvolume references in the bootloader." \
+            "   Example: 'rootflags=subvol=$restored_subvol_name' or 'subvol=$restored_subvol_name' in fstab" \
+            "" \
+            "✓ No bootloader changes needed!" \
+            "   The restored data is already in the correct location ($restored_subvol_name)" \
+            "   Your bootloader configuration already points to this subvolume by name" \
+            "" \
+            "What would happen in actual restore:" \
+            "   • System boots normally using existing bootloader config" \
+            "   • Bootloader looks for subvolume named '$restored_subvol_name'" \
+            "   • Finds the restored data and boots successfully"
         echo ""
     else
         echo -e "${LH_COLOR_INFO}Your system uses explicit subvolume references.${LH_COLOR_RESET}"
@@ -3008,52 +3007,43 @@ execute_default_subvol_strategy() {
     
     # In dry-run mode or when target doesn't exist, provide detailed simulation
     if [[ "$DRY_RUN" == "true" ]] || [[ ! -d "$target_root" ]]; then
-        echo ""
-        echo -e "${LH_COLOR_CYAN}═══════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_CYAN}             DRY-RUN: Bootloader Configuration Simulation${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_CYAN}═══════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
         restore_log_msg "INFO" "DRY-RUN: Simulating default subvolume strategy"
-        
         echo ""
-        echo -e "${LH_COLOR_INFO}📋 What would happen in ACTUAL restore:${LH_COLOR_RESET}"
-        echo ""
-        echo -e "${LH_COLOR_WARNING}Step 1: Backup existing bootloader configuration${LH_COLOR_RESET}"
-        echo -e "   • Create timestamped backup of /etc/fstab"
-        echo -e "   • Create backup of /boot/grub/grub.cfg (if exists)"
-        echo -e "   • Backup stored at: <file>_pre_restore_YYYYMMDD_HHMMSS"
-        echo ""
-        
-        echo -e "${LH_COLOR_WARNING}Step 2: Query BTRFS filesystem${LH_COLOR_RESET}"
-        echo -e "   • Command: btrfs subvolume list $target_root"
-        echo -e "   • Find subvolume named: '$restored_subvol_name'"
-        echo -e "   • Extract subvolume ID (e.g., 256, 257, etc.)"
-        echo ""
-        
-        echo -e "${LH_COLOR_WARNING}Step 3: Update default subvolume${LH_COLOR_RESET}"
-        echo -e "   • Command: btrfs subvolume set-default <ID> $target_root"
-        echo -e "   • This tells BTRFS which subvolume to mount by default"
-        echo -e "   • The bootloader (GRUB) will use this default if no explicit subvol= is specified"
-        echo ""
-        
-        echo -e "${LH_COLOR_WARNING}Step 4: Verify the change${LH_COLOR_RESET}"
-        echo -e "   • Command: btrfs subvolume get-default $target_root"
-        echo -e "   • Confirm it returns: '$restored_subvol_name'"
-        echo ""
-        
-        echo -e "${LH_COLOR_INFO}🔧 Why this is needed:${LH_COLOR_RESET}"
-        echo -e "   • Your system appears to use BTRFS default subvolume mounting"
-        echo -e "   • No explicit 'subvol=$restored_subvol_name' was found in fstab/GRUB"
-        echo -e "   • Without updating the default, the system would boot the OLD subvolume"
-        echo ""
-        
-        echo -e "${LH_COLOR_INFO}✓ After this operation:${LH_COLOR_RESET}"
-        echo -e "   • System will boot into the restored '$restored_subvol_name' subvolume"
-        echo -e "   • Old subvolume remains intact (can be used for rollback)"
-        echo -e "   • No manual GRUB configuration changes needed"
-        echo ""
-        
-        echo -e "${LH_COLOR_SUCCESS}✓ DRY-RUN: Bootloader strategy simulation complete${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_CYAN}═══════════════════════════════════════════════════════════════${LH_COLOR_RESET}"
+        lh_print_boxed_message \
+            --preset info \
+            --min-width 65 \
+            "DRY-RUN: Bootloader Configuration Simulation" \
+            "" \
+            "📋 What would happen in ACTUAL restore:" \
+            "" \
+            "Step 1: Backup existing bootloader configuration" \
+            "   • Create timestamped backup of /etc/fstab" \
+            "   • Create backup of /boot/grub/grub.cfg (if exists)" \
+            "   • Backup stored at: <file>_pre_restore_YYYYMMDD_HHMMSS" \
+            "" \
+            "Step 2: Query BTRFS filesystem" \
+            "   • Command: btrfs subvolume list $target_root" \
+            "   • Find subvolume named: '$restored_subvol_name'" \
+            "   • Extract subvolume ID (e.g., 256, 257, etc.)" \
+            "" \
+            "Step 3: Update default subvolume" \
+            "   • Command: btrfs subvolume set-default <ID> $target_root" \
+            "   • This tells BTRFS which subvolume to mount by default" \
+            "   • The bootloader (GRUB) will use this default if no explicit subvol= is specified" \
+            "" \
+            "Step 4: Verify the change" \
+            "   • Command: btrfs subvolume get-default $target_root" \
+            "   • Confirm it returns: '$restored_subvol_name'" \
+            "" \
+            "🔧 Why this is needed:" \
+            "   • Your system appears to use BTRFS default subvolume mounting" \
+            "   • No explicit 'subvol=$restored_subvol_name' was found in fstab/GRUB" \
+            "   • Without updating the default, the system would boot the OLD subvolume" \
+            "" \
+            "✓ After this operation:" \
+            "   • System will boot into the restored '$restored_subvol_name' subvolume" \
+            "   • Old subvolume remains intact (can be used for rollback)" \
+            "   • No manual GRUB configuration changes needed"
         echo ""
         
         return 0

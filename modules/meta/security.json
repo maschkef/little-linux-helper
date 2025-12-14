@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "security",
+  "entry": "modules/mod_security.sh",
+  "category": {
+    "id": "maintenance"
+  },
+  "order": 70,
+  "docs": "modules/doc_security.md",
+  "display": {
+    "name_key": "SECURITY_MODULE_NAME",
+    "description_key": "SECURITY_MODULE_DESC",
+    "fallback_name": "Security Checks",
+    "fallback_description": "Perform security audits and checks"
+  },
+  "i18n": {
+    "module_name": "security"
+  },
+  "help": {
+    "overview_key": "SECURITY_HELP_OVERVIEW",
+    "options_key": "SECURITY_HELP_OPTIONS",
+    "notes_key": "SECURITY_HELP_NOTES"
+  },
+  "expose": {
+    "cli": true,
+    "gui": true
+  },
+  "enabled": true,
+  "requires_root": false,
+  "tags": ["security", "audit", "checks", "hardening"]
+}

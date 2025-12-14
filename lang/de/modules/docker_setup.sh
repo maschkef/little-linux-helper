@@ -2,10 +2,10 @@
 #
 # lang/de/docker_setup.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # This script is part of the 'little-linux-helper' collection.
-# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+# Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 #
 # German translations for the Docker Setup module
 
@@ -137,21 +137,12 @@ MSG_DE[DOCKER_SETUP_USER_ADDED]="Benutzer zur docker-Gruppe hinzugefügt"
 MSG_DE[DOCKER_SETUP_USER_LOGOUT_REQUIRED]="Bitte loggen Sie sich aus und wieder ein, damit die Änderungen wirksam werden"
 
 # Extended menu options
-MSG_DE[DOCKER_SETUP_MENU_INSTALL_DOCKER]="Nur Docker installieren"
-MSG_DE[DOCKER_SETUP_MENU_INSTALL_COMPOSE]="Nur Docker Compose installieren"
 MSG_DE[DOCKER_SETUP_MENU_INSTALL_BOTH]="Docker und Docker Compose installieren"
-MSG_DE[DOCKER_SETUP_MENU_UNINSTALL]="Docker deinstallieren"
 MSG_DE[DOCKER_SETUP_MENU_SERVICE_MANAGE]="Docker-Service verwalten"
 
 # Uninstallation
-MSG_DE[DOCKER_SETUP_UNINSTALL_TITLE]="Docker Deinstallation"
-MSG_DE[DOCKER_SETUP_UNINSTALL_CONFIRM]="Sind Sie sicher, dass Sie Docker deinstallieren möchten?"
-MSG_DE[DOCKER_SETUP_UNINSTALL_SUCCESS]="Docker erfolgreich deinstalliert"
-MSG_DE[DOCKER_SETUP_UNINSTALL_FAILED]="Deinstallation fehlgeschlagen"
 
 # Errors and warnings
-MSG_DE[DOCKER_SETUP_ERROR_PERMISSION]="Berechtigung verweigert. Sind Sie root oder haben sudo-Rechte?"
-MSG_DE[DOCKER_SETUP_ERROR_NETWORK]="Netzwerkfehler. Bitte überprüfen Sie Ihre Internetverbindung."
 MSG_DE[DOCKER_SETUP_WARNING_EXPERIMENTAL]="Warnung: Diese Installation ist experimentell"
 MSG_DE[DOCKER_SETUP_WARNING_BETA]="Warnung: Dies ist eine Beta-Version"
 
@@ -169,11 +160,7 @@ MSG_DE[DOCKER_SETUP_INSTALL_DECLINED]="Installation abgelehnt"
 MSG_DE[DOCKER_SETUP_ALL_INSTALLED]="Alle Docker-Komponenten sind installiert"
 
 # Installation process
-MSG_DE[DOCKER_SETUP_INSTALLING_DOCKER]="Installiere Docker..."
-MSG_DE[DOCKER_SETUP_DOCKER_INSTALLED]="Docker erfolgreich installiert"
 MSG_DE[DOCKER_SETUP_DOCKER_INSTALL_FAILED]="Docker-Installation fehlgeschlagen"
-MSG_DE[DOCKER_SETUP_INSTALLING_COMPOSE]="Installiere Docker Compose..."
-MSG_DE[DOCKER_SETUP_COMPOSE_INSTALLED]="Docker Compose erfolgreich installiert"
 MSG_DE[DOCKER_SETUP_COMPOSE_INSTALL_FAILED]="Docker Compose-Installation fehlgeschlagen"
 
 # Installation details
@@ -204,18 +191,12 @@ MSG_DE[DOCKER_SETUP_COMPOSE_DOWNLOAD_FAILED]="Docker Compose-Download fehlgeschl
 
 # Post-installation
 MSG_DE[DOCKER_SETUP_POST_INSTALL_TITLE]="Post-Installation Setup"
-MSG_DE[DOCKER_SETUP_ENABLING_SERVICE]="Aktiviere und starte Docker-Service"
-MSG_DE[DOCKER_SETUP_SERVICE_STARTED]="Docker-Service erfolgreich gestartet"
-MSG_DE[DOCKER_SETUP_SERVICE_START_FAILED]="Docker-Service konnte nicht gestartet werden"
-MSG_DE[DOCKER_SETUP_ADDING_USER_TO_GROUP]="Füge Benutzer zur docker-Gruppe hinzu"
-MSG_DE[DOCKER_SETUP_LOGOUT_REQUIRED]="Bitte melden Sie sich ab und wieder an, damit die Gruppenänderungen wirksam werden."
 
 # Service management
 MSG_DE[DOCKER_SETUP_CHECKING_SERVICE]="Überprüfe Docker-Service Status"
 MSG_DE[DOCKER_SETUP_SERVICE_NOT_ENABLED]="Docker-Service ist nicht aktiviert (kein Autostart)"
 MSG_DE[DOCKER_SETUP_START_SERVICE_PROMPT]="Docker-Service jetzt starten?"
 MSG_DE[DOCKER_SETUP_ENABLE_SERVICE_PROMPT]="Docker-Service für Autostart aktivieren?"
-MSG_DE[DOCKER_SETUP_SERVICE_ENABLED_SUCCESS]="Docker-Service erfolgreich aktiviert"
 MSG_DE[DOCKER_SETUP_NO_SYSTEMCTL]="systemctl nicht verfügbar"
 
 # Main module

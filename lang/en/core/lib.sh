@@ -2,7 +2,7 @@
 #
 # little-linux-helper/lang/en/lib.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # English language strings for lib_common.sh
 

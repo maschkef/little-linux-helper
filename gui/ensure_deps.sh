@@ -4,7 +4,7 @@
 # Shared dependency checks for Little Linux Helper GUI
 # Uses project library helpers to check and optionally install Go and Node.js
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 set -e
 

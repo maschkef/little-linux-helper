@@ -2,14 +2,19 @@
 #
 # lang/en/docker_setup.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # This script is part of the 'little-linux-helper' collection.
-# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+# Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 #
 # English translations for Docker Setup Module
 
 [[ ! -v MSG_EN ]] && declare -A MSG_EN
+
+# Help content
+MSG_EN[DOCKER_SETUP_HELP_OVERVIEW]="Docker installation and setup utilities. Automatically detects, installs, and configures Docker and Docker Compose on your system with proper user permissions."
+MSG_EN[DOCKER_SETUP_HELP_OPTIONS]="Automatically performs these tasks:|• Check if Docker is already installed and show version information|• Install Docker if not present using your system's package manager|• Check if Docker Compose is available (docker-compose or docker compose)|• Install Docker Compose if needed|• Add current user to docker group for non-root Docker usage|• Start and enable Docker service|• Verify installation with test container run"
+MSG_EN[DOCKER_SETUP_HELP_NOTES]="Installation method depends on your Linux distribution|May require logout/login after adding user to docker group|Automatically detects whether to use docker-compose or docker compose command|Starts Docker service and enables it for automatic startup|Performs verification test to ensure Docker is working properly"
 
 # Docker Setup Main
 MSG_EN[DOCKER_SETUP_TITLE]="Docker Installation & Setup"

@@ -3,10 +3,10 @@
 # gui/dev.sh  
 # Development script for Little Linux Helper GUI
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # This project is part of the 'little-linux-helper' collection.
-# Licensed under the MIT License. See the LICENSE file in the project root for more information.
+# Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 #
 # This script starts both backend and frontend in development mode
 
@@ -17,6 +17,8 @@ echo
 
 # Ensure dependencies (Go, Node.js/npm)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 if [ -f "$SCRIPT_DIR/ensure_deps.sh" ]; then
     # shellcheck source=/dev/null
     source "$SCRIPT_DIR/ensure_deps.sh"
@@ -25,6 +27,20 @@ if [ -f "$SCRIPT_DIR/ensure_deps.sh" ]; then
         exit 1
     fi
 fi
+
+# Sync translations from CLI to GUI
+echo "🌍 Synchronizing translations..."
+if [ -f "$PROJECT_ROOT/scripts/sync_gui_translations.sh" ]; then
+    if ! "$PROJECT_ROOT/scripts/sync_gui_translations.sh"; then
+        echo "❌ Translation sync failed!"
+        exit 1
+    fi
+    echo "✅ Translations synchronized"
+else
+    echo "⚠️  Warning: Translation sync script not found at $PROJECT_ROOT/scripts/sync_gui_translations.sh"
+    echo "   Continuing with existing translations..."
+fi
+echo
 
 # Function to kill background processes on exit
 cleanup() {

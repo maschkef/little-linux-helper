@@ -2,12 +2,17 @@
 #
 # lang/de/logs.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # Deutsche Übersetzungen für das Logs-Modul
 
 # Declare MSG_DE as associative array if not already declared
 [[ ! -v MSG_DE ]] && declare -A MSG_DE
+
+# Help content
+MSG_DE[LOGS_HELP_OVERVIEW]="Systemprotokolle finden und analysieren um Probleme zu beheben, Systemgesundheit zu überwachen oder zu untersuchen was bei Abstürzen oder Fehlern passiert ist."
+MSG_DE[LOGS_HELP_OPTIONS]="1. Aktuelle Logs (Aktueller Start) - Was in den letzten Minuten oder Stunden auf Ihrem System passiert ist|2. Aktuelle Logs (Vorheriger Start) - Was vor Ihrem letzten Neustart oder Absturz schief gelaufen ist|3. Dienst-spezifische Logs - Protokolle für spezifische Programme wie SSH, Webserver oder Datenbanken|4. X.org Logs - Grafik-System-Logs zur Fehlerbehebung bei Display- oder Treiberproblemen|5. Kernel-Meldungen - Low-Level-System-Meldungen vom Linux-Kernel (Hardware, Treiber)|6. Paket-Manager-Logs - Historie von Software-Installationen, Updates und Entfernungen|7. Erweiterte Analyse - Python-gestützte Log-Analyse zur automatischen Erkennung von Fehlern und Mustern"
+MSG_DE[LOGS_HELP_NOTES]="Die meisten Logs werden automatisch gefiltert um Fehler und Warnungen zuerst zu zeigen|Sie können jede Log-Ausgabe zur späteren Überprüfung oder zum Teilen in Dateien speichern|Erweiterte Analyse verwendet Python mit Regex-Mustern um Logs zu parsen und Probleme hervorzuheben|Einige System-Logs erfordern Administrator-Rechte für den Zugriff"
 
 # Log module headers
 MSG_DE[LOG_HEADER_LAST_MINUTES_CURRENT]="Logs der letzten X Minuten (aktueller Boot)"
@@ -174,7 +179,6 @@ MSG_DE[LOG_PYTHON_USING_AFTER_ENSURE]="Verwende 'python' als Python 3 Interprete
 MSG_DE[LOG_PYTHON_NOT_FOUND]="Python 3 konnte nicht gefunden oder installiert werden (weder als 'python3' noch als 'python')."
 
 # File operations
-MSG_DE[LOG_INVALID_SELECTION]="Ungültige Auswahl"
 MSG_DE[LOG_BACK_TO_MAIN]="Zurück zum Hauptmenü."
 
 # Error messages for dmesg

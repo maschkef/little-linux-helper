@@ -2,7 +2,7 @@
 #
 # lib/lib_ui.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # User interface functions for formatted output and input handling
 
@@ -136,14 +136,39 @@ function lh_print_boxed_message() {
     local inner_width=$((max_width + 2))
     local horizontal
     printf -v horizontal '%*s' "$inner_width" ""
-    horizontal=${horizontal// /═}
+    
+    # Use ASCII box characters in GUI mode for better compatibility
+    local top_left top_right bottom_left bottom_right horizontal_char vertical_char middle_left middle_right
+    if lh_gui_mode_active; then
+        # ASCII-only characters for GUI compatibility
+        top_left="+"
+        top_right="+"
+        bottom_left="+"
+        bottom_right="+"
+        middle_left="+"
+        middle_right="+"
+        horizontal_char="-"
+        vertical_char="|"
+        horizontal=${horizontal// /-}
+    else
+        # Unicode box-drawing characters for CLI
+        top_left="╔"
+        top_right="╗"
+        bottom_left="╚"
+        bottom_right="╝"
+        middle_left="╠"
+        middle_right="╣"
+        horizontal_char="═"
+        vertical_char="║"
+        horizontal=${horizontal// /═}
+    fi
 
     local title_padding_left=$(( (max_width - ${#title}) / 2 ))
     local title_padding_right=$(( max_width - ${#title} - title_padding_left ))
 
-    printf '%b╔%s╗%b\n' "$border_color" "$horizontal" "$reset"
+    printf '%b%s%s%s%b\n' "$border_color" "$top_left" "$horizontal" "$top_right" "$reset"
 
-    printf '%b║%b ' "$border_color" "$reset"
+    printf '%b%s%b ' "$border_color" "$vertical_char" "$reset"
     printf '%*s' "$title_padding_left" ""
     if [[ -n "$title_color" ]]; then
         printf '%b%s%b' "$title_color" "$title" "$reset"
@@ -152,13 +177,13 @@ function lh_print_boxed_message() {
     fi
     printf '%*s' "$title_padding_right" ""
     printf ' '
-    printf '%b║%b\n' "$border_color" "$reset"
+    printf '%b%s%b\n' "$border_color" "$vertical_char" "$reset"
 
-    printf '%b╠%s╣%b\n' "$border_color" "$horizontal" "$reset"
+    printf '%b%s%s%s%b\n' "$border_color" "$middle_left" "$horizontal" "$middle_right" "$reset"
 
     for line in "${lines[@]}"; do
         local padding=$((max_width - ${#line}))
-        printf '%b║%b ' "$border_color" "$reset"
+        printf '%b%s%b ' "$border_color" "$vertical_char" "$reset"
         if [[ -n "$content_color" ]]; then
             printf '%b%s%b' "$content_color" "$line" "$reset"
         else
@@ -166,10 +191,10 @@ function lh_print_boxed_message() {
         fi
         printf '%*s' "$padding" ""
         printf ' '
-        printf '%b║%b\n' "$border_color" "$reset"
+        printf '%b%s%b\n' "$border_color" "$vertical_char" "$reset"
     done
 
-    printf '%b╚%s╝%b\n' "$border_color" "$horizontal" "$reset"
+    printf '%b%s%s%s%b\n' "$border_color" "$bottom_left" "$horizontal" "$bottom_right" "$reset"
     return 0
 }
 
@@ -235,13 +260,6 @@ function lh_confirm_action() {
             # German: accept j/ja/y/yes
             case "$response" in
                 j|ja|y|yes) return 0 ;;
-                *) return 1 ;;
-            esac
-            ;;
-        "es")
-            # Spanish: accept s/si/sí/y/yes
-            case "$response" in
-                s|si|sí|y|yes) return 0 ;;
                 *) return 1 ;;
             esac
             ;;

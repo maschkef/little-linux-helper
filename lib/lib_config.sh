@@ -2,7 +2,7 @@
 #
 # lib/lib_config.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # Configuration management functions and variables
 #

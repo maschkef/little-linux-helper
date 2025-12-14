@@ -1,10 +1,10 @@
 <!--
 File: docs/gui/doc_backend_api.md
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
-Licensed under the MIT License. See the LICENSE file in the project root for more information.
+Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 -->
 
 # GUI Backend Development - API Reference
@@ -32,15 +32,25 @@ This document provides comprehensive information about developing and extending 
 ### ModuleInfo Structure
 ```go
 type ModuleInfo struct {
-    ID             string `json:"id"`              // Unique module identifier
-    Name           string `json:"name"`            // Display name
-    Description    string `json:"description"`     // Module description
-    Path           string `json:"path"`            // File system path
-    Category       string `json:"category"`        // Module category
-    Parent         string `json:"parent,omitempty"` // Parent module (for hierarchies)
-    SubmoduleCount int    `json:"submodule_count,omitempty"` // Count of sub-modules
+    ID             string   `json:"id"`              // Unique module identifier
+    Name           string   `json:"name"`            // Display name (fallback)
+    Description    string   `json:"description"`     // Module description (fallback)
+    NameKey        string   `json:"name_key"`        // Translation key for name
+    DescriptionKey string   `json:"description_key"` // Translation key for description
+    Path           string   `json:"path"`            // File system path to entry script
+    Category       string   `json:"category"`        // Module category ID
+    Parent         string   `json:"parent,omitempty"` // Parent module ID (for submodules)
+    SubmoduleCount int      `json:"submodule_count,omitempty"` // Count of sub-modules
+    DocsPath       string   `json:"docs_path,omitempty"` // Path to documentation file
 }
 ```
+
+**Notes:**
+- `Name` and `Description` contain fallback strings from registry metadata (`display.fallback_name`, `display.fallback_description`)
+- `NameKey` and `DescriptionKey` are translation keys looked up in frontend i18n system (`display.name_key`, `display.description_key`)
+- `Path` corresponds to `entry` field from registry metadata
+- `Category` uses category ID, not display name (frontend resolves to translated name)
+- `SubmoduleCount` is computed automatically from registry, not manually maintained
 
 ### ModuleSession Structure
 ```go
@@ -93,43 +103,112 @@ type ModuleSession struct {
 ### Module Management
 
 #### `GET /api/modules`
-**Purpose:** Retrieve list of all available modules with metadata
-
-**Response Format:**
-```json
-[
-    {
-        "id": "system_info",
-        "name": "Display System Information",
-        "description": "Show comprehensive system information and hardware details",
-        "path": "modules/mod_system_info.sh",
-        "category": "System Diagnosis & Analysis",
-        "parent": "",
-        "submodule_count": 9
-    }
-]
-```
-
-**Implementation Details:**
-- Returns a direct array of ModuleInfo objects (not wrapped in an object)
-- Uses hardcoded module definitions with predefined categories and submodule counts
-- Includes hierarchical backup modules with parent/child relationships
-- Categories include: "Recovery & Restarts", "System Diagnosis & Analysis", "Maintenance & Security", "Docker & Containers", "Backup & Recovery"
-
-#### `GET /api/modules/:id/docs`
-**Purpose:** Retrieve documentation for a specific module
-
-**Parameters:**
-- `id`: Module identifier
+**Purpose:** Retrieve list of all available modules and categories with metadata
 
 **Response Format:**
 ```json
 {
-    "content": "# Module Documentation\n\nMarkdown content here..."
+    "modules": [
+        {
+            "id": "system_info",
+            "name": "Display System Information",
+            "description": "Show comprehensive system information and hardware details",
+            "name_key": "SYSTEM_INFO_MODULE_NAME",
+            "description_key": "SYSTEM_INFO_MODULE_DESC",
+            "path": "modules/mod_system_info.sh",
+            "category": "system",
+            "parent": "",
+            "submodule_count": 9,
+            "docs_path": "mod/doc_system_info.md"
+        }
+    ],
+    "categories": [
+        {
+            "id": "system",
+            "name_key": "CATEGORY_SYSTEM",
+            "fallback_name": "System Diagnosis & Analysis",
+            "order": 10
+        }
+    ]
 }
 ```
 
-**Documentation Mapping:**
+**Implementation Details:**
+- **Registry-Based:** Reads from module registry cache (`cache/module-registry.json`)
+- Falls back to hardcoded module definitions only if registry loading fails
+- Registry loads via subprocess call to `scripts/registry_cache_helper.sh`
+- Includes modules from both `modules/meta/*.json` (core) and `mods/meta/*.json` (third-party)
+- Modules are flattened (submodules appear as separate entries with `parent` field set)
+- Only returns modules with `enabled: true` and `expose.gui: true` in metadata
+- Returns both `modules` array and `categories` array for complete frontend rendering
+- Translation keys allow frontend to display localized names/descriptions
+- Fallback strings ensure display even without translations
+
+**Response Structure:**
+- `modules`: Array of ModuleInfo objects (see structure above)
+- `categories`: Array of category definitions with translation keys
+- Both arrays are sorted according to registry metadata `order` fields
+
+**Backward Compatibility:**
+- Older frontends expecting bare array still work (server detects API version)
+- New fields (`name_key`, `description_key`) ignored by older clients
+- Fallback strings ensure basic functionality without i18n
+
+#### `POST /api/modules/refresh`
+**Purpose:** Manually reload the module registry from cache
+
+**Authentication:** Required (uses `protectedAPI`)
+
+**Response Format:**
+```json
+{
+    "success": true,
+    "message": "Registry refreshed successfully",
+    "module_count": 12,
+    "category_count": 5,
+    "schema_version": 1,
+    "loader_version": 1
+}
+```
+
+**Error Response:**
+```json
+{
+    "success": false,
+    "error": "Failed to refresh registry: [error details]"
+}
+```
+
+**Status Codes:**
+- `200 OK`: Registry refreshed successfully
+- `401 Unauthorized`: Authentication required
+- `500 Internal Server Error`: Registry reload failed
+
+**Implementation Details:**
+- Calls `scripts/registry_cache_helper.sh rebuild-or-read` via subprocess
+- Updates `appState.registry` with thread-safe mutex locking
+- Logs refresh events for audit trail
+- 30-second timeout for registry helper script
+- Concurrent requests are serialized via mutex (no race conditions)
+
+**Use Cases:**
+- After adding/modifying module metadata files
+- After configuration changes affecting module visibility
+- Manual cache rebuild from admin panel
+- Development/testing scenarios
+
+#### `GET /api/modules/:id/docs`
+**Purpose:** Retrieve documentation content for a specific module
+
+**Parameters:**
+- `id` (path) - Module ID from registry
+
+**Response:** Markdown documentation content
+
+- Supports both module docs (`docs/modules/`) and library docs (`docs/lib/`)
+- Path validation prevents directory traversal
+
+**Documentation Mapping (Fallback):**
 ```go
 var moduleDocMap = map[string]string{
     // Module docs live in docs/mod/

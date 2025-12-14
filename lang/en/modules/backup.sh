@@ -2,12 +2,26 @@
 #
 # lang/en/backup.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # English backup module language strings
 
 # Declare MSG_EN as associative array if not already declared
 [[ ! -v MSG_EN ]] && declare -A MSG_EN
+
+# Backup module and submodule names/descriptions
+MSG_EN[BACKUP_TAR_MODULE_NAME]="TAR Backup"
+MSG_EN[BACKUP_TAR_MODULE_DESC]="Create TAR archive backups"
+MSG_EN[BACKUP_RSYNC_MODULE_NAME]="Rsync Backup"
+MSG_EN[BACKUP_RSYNC_MODULE_DESC]="Incremental backups using rsync"
+MSG_EN[BTRFS_BACKUP_MODULE_NAME]="BTRFS Backup"
+MSG_EN[BTRFS_BACKUP_MODULE_DESC]="BTRFS snapshot-based backups"
+MSG_EN[RESTORE_TAR_MODULE_NAME]="Restore TAR Backup"
+MSG_EN[RESTORE_TAR_MODULE_DESC]="Restore from TAR archive"
+MSG_EN[RESTORE_RSYNC_MODULE_NAME]="Restore Rsync Backup"
+MSG_EN[RESTORE_RSYNC_MODULE_DESC]="Restore from rsync backup"
+MSG_EN[BTRFS_RESTORE_MODULE_NAME]="Restore BTRFS Backup"
+MSG_EN[BTRFS_RESTORE_MODULE_DESC]="Restore from BTRFS snapshots"
 
 # Backup module main menu
 
@@ -58,11 +72,6 @@ MSG_EN[BACKUP_SPACE_AVAILABLE]="Available: %s, Required (estimated for selected 
 MSG_EN[BACKUP_SPACE_CONTINUE_ANYWAY]="Continue with backup anyway?"
 MSG_EN[BACKUP_SPACE_CANCELLED_LOW]="Backup cancelled due to low disk space."
 
-
-# === ADDITIONAL BACKUP SPACE MANAGEMENT ===
-MSG_EN[BACKUP_SPACE_AVAILABLE]="Available backup space"
-MSG_EN[BACKUP_SPACE_CANCELLED_LOW]="Backup cancelled due to low space"
-MSG_EN[BACKUP_SPACE_CONTINUE_ANYWAY]="Continue backup despite space warnings?"
 
 # === GENERAL STATUS MESSAGE ===
 MSG_EN[STATUS]="Status"
@@ -346,7 +355,6 @@ MSG_EN[STATUS_NO_BACKUPS]="No backups available yet."
 MSG_EN[STATUS_RECENT_ACTIVITIES]="=== Recent Backup Activities (from %s) ==="
 
 # Main backup menu
-MSG_EN[MENU_BACKUP]="Backup & Recovery"
 MSG_EN[MENU_BACKUP_TITLE]="Backup & Recovery"
 MSG_EN[MENU_BTRFS_OPERATIONS]="BTRFS Operations (Backup/Restore/Delete)"
 MSG_EN[MENU_TAR_BACKUP]="TAR Archive Backup"
@@ -639,12 +647,10 @@ MSG_EN[BTRFS_MENU_BACK]="Back to previous menu"
 
 # BTRFS deletion menu
 MSG_EN[BTRFS_DELETE_BACKUPS_HEADER]="Delete BTRFS Backup Sessions"
-MSG_EN[BTRFS_DELETE_NEEDS_ROOT]="Deleting BTRFS backups requires root privileges"
 MSG_EN[BTRFS_DELETE_WITH_SUDO]="Delete backups with sudo?"
 MSG_EN[BTRFS_SELECT_BUNDLE_DELETE]="Enter backup session number(s) to delete (single: 3, range: 1-5, multiple: 1,3,5) or 0 to cancel: "
 MSG_EN[BTRFS_CONFIRM_DELETE_BUNDLES]="Are you sure you want to delete the selected backup session(s)? This action cannot be undone!"
 MSG_EN[BTRFS_DELETE_BUNDLE_LIST_INFO]="The following backup session(s) will be deleted:"
-MSG_EN[BTRFS_NO_BACKUPS_FOUND]="No backup sessions found"
 
 # BTRFS log messages - problematic cleanup
 MSG_EN[BTRFS_LOG_CLEANUP_PROBLEMATIC_COMPLETE]="Problematic cleanup complete: %d successful, %d errors"
@@ -775,9 +781,6 @@ MSG_EN[RESTORE_SUBVOLUME_DESCRIPTION]="Restoring subvolume %s from snapshot %s"
 MSG_EN[RESTORE_SUBVOLUME_FAILED]="Failed to restore subvolume %s"
 MSG_EN[RESTORE_SUBVOLUME_SNAPSHOT]="Subvolume snapshot: %s"
 
-# Missing subvolumes
-MSG_EN[RESTORE_MISSING_SUBVOLUME_SNAPSHOTS]="Missing snapshots for one or more subvolumes"
-
 # Restore type selection
 MSG_EN[RESTORE_SELECT_TYPE_AND_SNAPSHOT]="Select Restore Type and Snapshot"
 MSG_EN[RESTORE_TYPE_OPTIONS]="Restore options"
@@ -812,7 +815,6 @@ MSG_EN[RESTORE_SINGLE_SUBVOLUME_SUCCESS]="Single subvolume restore successful: %
 MSG_EN[RESTORE_SINGLE_SUBVOLUME_FAILED]="Single subvolume restore failed: %s"
 
 # Snapshot listing
-MSG_EN[RESTORE_NO_BACKUP_DIR]="Backup directory not found: %s"
 MSG_EN[RESTORE_NO_SNAPSHOTS_FOUND]="No snapshots found for subvolume: %s"
 MSG_EN[RESTORE_AVAILABLE_SNAPSHOTS]="Available snapshots for %s"
 MSG_EN[RESTORE_SELECT_SNAPSHOT]="Select snapshot (1-%d):"
@@ -909,7 +911,6 @@ MSG_EN[RESTORE_BACKUP_SUBVOLUMES]="Backup subvolumes at %s"
 MSG_EN[RESTORE_NO_SUBVOLUMES_FOUND]="No subvolumes found"
 
 # Main menu
-MSG_EN[RESTORE_MENU_TITLE]="BTRFS Restore"
 MSG_EN[RESTORE_CURRENT_CONFIG]="Current configuration"
 MSG_EN[RESTORE_MODE]="Mode"
 MSG_EN[RESTORE_MENU_SETUP]="Setup Restore Environment"
@@ -917,7 +918,6 @@ MSG_EN[RESTORE_MENU_SYSTEM_RESTORE]="System/Subvolume Restore"
 MSG_EN[RESTORE_MENU_FOLDER_RESTORE]="Individual Folder Restore"
 MSG_EN[RESTORE_MENU_DISK_INFO]="Show Disk Information"
 MSG_EN[RESTORE_MENU_SAFETY_CHECK]="Review Safety Information"
-MSG_EN[RESTORE_MENU_CLEANUP]="Cleanup Restore Artifacts"
 MSG_EN[RESTORE_MENU_RETRY_BOOTLOADER]="Retry Bootloader Configuration"
 MSG_EN[RESTORE_MENU_POST_VERIFICATION]="Post-Restore Verification & Bootloader Setup"
 MSG_EN[RESTORE_SETUP_REQUIRED]="Please run environment setup first (option 1)"
@@ -952,7 +952,6 @@ MSG_EN[RESTORE_BOOTLOADER_CONFIGURATION_INCOMPLETE]="Bootloader configuration in
 MSG_EN[RESTORE_BOOTLOADER_ENHANCED_INFO]="Enhanced bootloader configuration details"
 MSG_EN[RESTORE_BOOTLOADER_FAILED]="Bootloader configuration failed"
 MSG_EN[RESTORE_BOOTLOADER_ROLLBACK_OPTION]="Bootloader modification failed - rollback available"
-MSG_EN[RESTORE_BOOTLOADER_TEST_BOOT]="Test boot after configuration changes"
 
 # Boot strategy analysis
 MSG_EN[RESTORE_BOOT_STRATEGY_ANALYSIS]="Boot Configuration Strategy Analysis"
@@ -1189,6 +1188,26 @@ MSG_EN[RESTORE_INVALID_TARGET]="Invalid target root path"
 MSG_EN[RESTORE_TARGET_ROOT]="Target root"
 MSG_EN[RESTORE_UNKNOWN_BOOT_STRATEGY]="Unknown boot strategy: %s"
 MSG_EN[RESTORE_MISSING_SUBVOLUME_SNAPSHOTS]="Missing subvolume snapshots"
-MSG_EN[RESTORE_SUBVOLUME]="Subvolume"
-MSG_EN[RESTORE_SUBVOLUME_DESCRIPTION]="Subvolume: %s"
-MSG_EN[RESTORE_SUBVOLUME_FAILED]="Subvolume restore failed: %s"
+
+# === HELP CONTENT FOR GUI ===
+# Note: This file contains help content for the backup module AND all its submodules
+# Parent module: backup
+MSG_EN[BACKUP_HELP_OVERVIEW]="Central hub for protecting your data with multiple backup methods. Choose from BTRFS snapshots, TAR archives, or RSYNC incremental backups depending on your needs."
+
+MSG_EN[BACKUP_HELP_OPTIONS]="1. BTRFS Operations - Advanced snapshot-based backups for BTRFS filesystems (atomic, space-efficient)|2. TAR Backup - Create compressed archive backups of directories (compatible with all systems)|3. RSYNC Backup - Fast incremental backups that only copy changed files|4. Restore Operations - Access specialized restore tools for each backup type|6. Backup Status - View comprehensive status of all your backups and disk space usage|7. Configure Backup - Set backup destinations, retention policies, and other settings"
+
+MSG_EN[BACKUP_HELP_NOTES]="🚨 BTRFS WARNING: BTRFS backup is tested on limited systems - use with caution|🚨 BTRFS RESTORE: Requires testing - Do NOT use in production! For debugging/testing only!|💡 See individual BTRFS module help (when called directly) for more information|Each backup type has its own specialized tools accessible through this menu|BTRFS operations require BTRFS filesystem and provide the most advanced features|TAR backups work on any filesystem but create larger archive files|RSYNC is ideal for regular backups as it's fast and space-efficient|Configure your backup destination before creating your first backup"
+
+# Submodule: btrfs_backup
+MSG_EN[BTRFS_BACKUP_HELP_OVERVIEW]="Create bundle-based BTRFS snapshots with dynamic subvolume detection, per-run metadata, and atomic send/receive safeguards so every backup stays restore-ready."
+
+MSG_EN[BTRFS_BACKUP_HELP_OPTIONS]="1. Run Backup Now - Capture all configured and auto-detected subvolumes into one timestamped bundle|2. Review Bundle Inventory - View backup history, marker status, and per-run metadata details|3. Adjust Backup Settings - Configure destinations, retention, auto-detection, and subvolume lists|4. Manage Source Snapshots - Clean up script-created source snapshots or preserve them for incremental chains|5. Clean Up Problem Bundles - Repair interrupted backups and re-validate bundle markers|6. Delete Backup Bundles - Remove selected or auto-pruned bundles while keeping chain integrity|7. Open Restore Helper - Jump into the restore workflow with the selected bundle context"
+
+MSG_EN[BTRFS_BACKUP_HELP_NOTES]="⚠️ BETA SOFTWARE: Tested on limited systems - use with caution|Creates bundle-based backup layout where every run writes snapshots, markers, and metadata under the same timestamp|Supports flexible BTRFS subvolume layouts (@, @home, @var, custom names) with dynamic auto-detection|Marker files (.backup_complete) sit next to each subvolume snapshot and store status, duration, and size information|Per-run metadata JSON lives in meta/<timestamp>.json and powers the shared bundle inventory across backup/restore menus|Backup destination must be a BTRFS filesystem with enough free space for snapshots and metadata|Automatically creates incremental backups when compatible parent snapshots are available|Source snapshot preservation keeps incremental chains intact; adjust retention policies to avoid unintended deletions"
+
+# Submodule: btrfs_restore
+MSG_EN[BTRFS_RESTORE_HELP_OVERVIEW]="⚠️ DESTRUCTIVE: Live-environment restore workflow that replays bundle-based backups with atomic validation, bootloader integration, and received UUID protection."
+
+MSG_EN[BTRFS_RESTORE_HELP_OPTIONS]="1. Prepare Restore Environment - Detect backup/target drives, mount points, and confirm live-session safety checks|2. Choose Restore Scope - Restore complete systems or selected subvolumes using timestamp-matched bundles|3. Browse Backup Contents - Mount bundles read-only to recover individual files or folders|4. Inspect Disk & Bundle Layout - Review target disk layout, detected subvolumes, markers, and metadata JSON files|5. Review Safety & Checklist - Read critical warnings, live-environment detection results, and the documented 4-step workflow|6. Clean Up Restore Session - Unmount targets, remove temporary directories, and clear restore artifacts"
+
+MSG_EN[BTRFS_RESTORE_HELP_NOTES]="🚨 DANGER: REQUIRES TESTING - Do NOT use in production! For debugging/testing only!|🚨 Proceed only if you fully understand BTRFS restore procedures and potential data loss|⚠️ Must be executed from a live environment; the module destructively rewrites target subvolumes|⚠️ Full restores remove existing data on target subvolumes before receiving new snapshots|Reads the same bundle layout created by the backup module (snapshots/<timestamp>/<subvolume>, marker files, meta/<timestamp>.json)|Bundle inventory ensures matching timestamps when restoring multi-subvolume systems|Protects incremental chains with received UUID validation and rollback-safe atomic receive operations|Bootloader update options cover reinstall, configuration refresh, or skipping when external boot handling is preferred"

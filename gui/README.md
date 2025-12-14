@@ -310,4 +310,6 @@ This GUI is designed to be extended easily:
 
 ## License
 
-Same as Little Linux Helper - MIT License
+Same as Little Linux Helper - Apache License 2.0
+
+Third-party dependencies and their licenses are documented in `THIRD_PARTY_LICENSES.md` in the project root.

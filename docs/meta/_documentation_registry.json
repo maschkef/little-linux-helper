@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "categories": [
+    {
+      "id": "libraries",
+      "order": 10,
+      "name": "Libraries"
+    },
+    {
+      "id": "development",
+      "order": 11,
+      "name": "Development & Tools"
+    },
+    {
+      "id": "gui_docs",
+      "order": 12,
+      "name": "GUI Documentation"
+    },
+    {
+      "id": "project_info",
+      "order": 13,
+      "name": "Project Information"
+    }
+  ],
+  "documents": [
+    {
+      "id": "lib_btrfs",
+      "name": "BTRFS Library",
+      "description": "Advanced BTRFS operations and utilities",
+      "filename": "lib/doc_btrfs.md",
+      "category": "libraries"
+    },
+    {
+      "id": "lib_common",
+      "name": "Common Functions Library",
+      "description": "Core shared functions and utilities",
+      "filename": "lib/doc_common.md",
+      "category": "libraries"
+    },
+    {
+      "id": "lib_colors",
+      "name": "Color Functions Library",
+      "description": "Terminal color formatting and styling",
+      "filename": "lib/doc_colors.md",
+      "category": "libraries"
+    },
+    {
+      "id": "lib_config",
+      "name": "Configuration Library",
+      "description": "Configuration file handling and management",
+      "filename": "lib/doc_config.md",
+      "category": "libraries"
+    },
+    {
+      "id": "lib_config_schema",
+      "name": "Configuration Schema Library",
+      "description": "Configuration schema validation and type checking",
+      "filename": "lib/doc_config_schema.md",
+      "category": "libraries"
+    },
+    {
+      "id": "lib_filesystem",
+      "name": "Filesystem Library",
+      "description": "File system operations and utilities",
+      "filename": "lib/doc_filesystem.md",
+      "category": "libraries"
+    },
+    {
+      "id": "lib_i18n",
+      "name": "Internationalization Library",
+      "description": "Multi-language support and message handling",
+      "filename": "lib/doc_i18n.md",
+      "category": "libraries"
+    },
+    {
+      "id": "lib_logging",
+      "name": "Logging Library",
+      "description": "Structured logging and error handling",
+      "filename": "lib/doc_logging.md",
+      "category": "libraries"
+    },
+    {
+      "id": "lib_notifications",
+      "name": "Notifications Library",
+      "description": "Desktop notification system integration",
+      "filename": "lib/doc_notifications.md",
+      "category": "libraries"
+    },
+    {
+      "id": "lib_package_mappings",
+      "name": "Package Mappings Library",
+      "description": "Cross-distribution package name mappings",
+      "filename": "lib/doc_package_mappings.md",
+      "category": "libraries"
+    },
+    {
+      "id": "lib_packages",
+      "name": "Package Management Library",
+      "description": "Distribution-agnostic package management",
+      "filename": "lib/doc_packages.md",
+      "category": "libraries"
+    },
+    {
+      "id": "lib_system",
+      "name": "System Information Library",
+      "description": "System detection and hardware information",
+      "filename": "lib/doc_system.md",
+      "category": "libraries"
+    },
+    {
+      "id": "lib_ui",
+      "name": "User Interface Library",
+      "description": "User interface functions and input handling",
+      "filename": "lib/doc_ui.md",
+      "category": "libraries"
+    },
+    {
+      "id": "lib_btrfs_core",
+      "name": "BTRFS Core Library",
+      "description": "Core BTRFS helper functions and routines",
+      "filename": "lib/doc_btrfs_core.md",
+      "category": "libraries"
+    },
+    {
+      "id": "lib_btrfs_layout",
+      "name": "BTRFS Layout Reference",
+      "description": "Reference for BTRFS snapshot and bundle layout",
+      "filename": "lib/doc_btrfs_layout.md",
+      "category": "libraries"
+    },
+    {
+      "id": "DEVELOPER_GUIDE",
+      "name": "CLI Developer Guide",
+      "description": "CLI development guidelines and architecture documentation",
+      "filename": "CLI_DEVELOPER_GUIDE.md",
+      "category": "development"
+    },
+    {
+      "id": "GUI_DEVELOPER_GUIDE",
+      "name": "GUI Developer Guide",
+      "description": "GUI development guidelines and architecture documentation",
+      "filename": "GUI_DEVELOPER_GUIDE.md",
+      "category": "development"
+    },
+    {
+      "id": "advanced_log_analyzer",
+      "name": "Advanced Log Analyzer",
+      "description": "Python-based log analysis tool",
+      "filename": "tools/doc_advanced_log_analyzer.md",
+      "category": "development"
+    },
+    {
+      "id": "mods_structure_guide",
+      "name": "Mods Structure Guide",
+      "description": "Guide for creating and organizing third-party modules",
+      "filename": "mods_structure_guide.md",
+      "category": "development"
+    },
+    {
+      "id": "gui_backend_api",
+      "name": "GUI Backend API",
+      "description": "Go backend development, API endpoints, and data structures",
+      "filename": "gui/doc_backend_api.md",
+      "category": "gui_docs"
+    },
+    {
+      "id": "gui_frontend_react",
+      "name": "GUI React Frontend",
+      "description": "React component development and frontend architecture",
+      "filename": "gui/doc_frontend_react.md",
+      "category": "gui_docs"
+    },
+    {
+      "id": "gui_i18n",
+      "name": "GUI Internationalization",
+      "description": "Internationalization system for frontend and backend",
+      "filename": "gui/doc_i18n.md",
+      "category": "gui_docs"
+    },
+    {
+      "id": "gui_module_integration",
+      "name": "GUI Module Integration",
+      "description": "How CLI modules automatically integrate with GUI",
+      "filename": "gui/doc_module_integration.md",
+      "category": "gui_docs"
+    },
+    {
+      "id": "gui_customization",
+      "name": "GUI Customization",
+      "description": "Theme customization, extensions, and advanced modifications",
+      "filename": "gui/doc_customization.md",
+      "category": "gui_docs"
+    },
+    {
+      "id": "gui_module_maintenance_guide",
+      "name": "GUI Module Maintenance",
+      "description": "Checklist for keeping GUI module metadata in sync",
+      "filename": "gui/doc_module_maintenance_guide.md",
+      "category": "gui_docs"
+    },
+    {
+      "id": "gui",
+      "name": "GUI Documentation",
+      "description": "Web-based graphical interface documentation",
+      "filename": "gui/doc_interface.md",
+      "category": "gui_docs"
+    },
+    {
+      "id": "doc_gui_launcher",
+      "name": "GUI Launcher Guide",
+      "description": "Usage guide for the GUI launcher script",
+      "filename": "doc_gui_launcher.md",
+      "category": "project_info"
+    },
+    {
+      "id": "README",
+      "name": "Project README",
+      "description": "Main project overview, features, and usage guide",
+      "filename": "../README.md",
+      "category": "project_info"
+    },
+    {
+      "id": "README_DE",
+      "name": "Project README (German)",
+      "description": "German project overview, features, and usage guide",
+      "filename": "../README_DE.md",
+      "category": "project_info"
+    },
+    {
+      "id": "gui_README",
+      "name": "GUI README",
+      "description": "GUI-specific setup, development, and usage guide",
+      "filename": "../gui/README.md",
+      "category": "project_info"
+    }
+  ]
+}

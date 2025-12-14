@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "id": "docker_setup",
+  "parent": "docker",
+  "entry": "modules/mod_docker_setup.sh",
+  "category": {
+    "id": "maintenance"
+  },
+  "order": 10,
+  "docs": "modules/doc_docker_setup.md",
+  "display": {
+    "name_key": "DOCKER_SETUP_MODULE_NAME",
+    "description_key": "DOCKER_SETUP_MODULE_DESC",
+    "fallback_name": "Docker Setup",
+    "fallback_description": "Install and configure Docker"
+  },
+  "i18n": {
+    "module_name": "docker_setup"
+  },
+  "help": {
+    "overview_key": "DOCKER_SETUP_HELP_OVERVIEW",
+    "options_key": "DOCKER_SETUP_HELP_OPTIONS",
+    "notes_key": "DOCKER_SETUP_HELP_NOTES"
+  },
+  "expose": {
+    "cli": false,
+    "gui": false
+  },
+  "enabled": true,
+  "requires_root": true,
+  "tags": ["docker", "setup", "installation", "configuration"]
+}

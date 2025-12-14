@@ -2,7 +2,7 @@
 #
 # lang/de/main_menu.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # German main menu language strings
 
@@ -16,12 +16,27 @@ MSG_DE[GUI_MODE_ENABLED]="GUI-Modus aktiv - 'Beliebige Taste' Eingabeaufforderun
 MSG_DE[GOODBYE]="Auf Wiedersehen!"
 
 # Menu categories
-MSG_DE[CATEGORY_RECOVERY]="[Wiederherstellung & Neustarts]"
-MSG_DE[CATEGORY_DIAGNOSIS]="[Systemdiagnose & Analyse]"
+MSG_DE[CATEGORY_SYSTEM]="[Systemdiagnose & Analyse]"
 MSG_DE[CATEGORY_MAINTENANCE]="[Wartung & Sicherheit]"
-MSG_DE[CATEGORY_SPECIAL]="[Spezialfunktionen]"
+MSG_DE[CATEGORY_BACKUP]="[Backup & Wiederherstellung]"
+MSG_DE[CATEGORY_DOCKER]="[Docker-Verwaltung]"
+MSG_DE[CATEGORY_RECOVERY]="[Wiederherstellung & Neustarts]"
+
 
 # Menu items
+MSG_DE[RESTARTS_MODULE_NAME]="Dienste & Desktop Neustart-Optionen"
+MSG_DE[SYSTEM_INFO_MODULE_NAME]="Systeminformationen anzeigen"
+MSG_DE[NETWORK_MODULE_NAME]="Netzwerkdiagnose & Werkzeuge"
+MSG_DE[DISK_MODULE_NAME]="Festplatten-Werkzeuge"
+MSG_DE[LOGS_MODULE_NAME]="Log-Analyse Werkzeuge"
+MSG_DE[PACKAGES_MODULE_NAME]="Paketverwaltung & Updates"
+MSG_DE[SECURITY_MODULE_NAME]="Sicherheitsüberprüfungen"
+MSG_DE[BACKUP_MODULE_NAME]="Backup & Wiederherstellung"
+MSG_DE[DOCKER_MODULE_NAME]="Docker-Funktionen"
+MSG_DE[DOCKER_SETUP_MODULE_NAME]="Docker-Einrichtung & Installation"
+MSG_DE[DOCKER_SECURITY_MODULE_NAME]="Docker-Sicherheitsüberprüfungen"
+MSG_DE[ENERGY_MODULE_NAME]="Energieverwaltung"
+# Legacy menu items (kept for backwards compatibility)
 MSG_DE[MENU_RESTARTS]="Dienste & Desktop Neustart-Optionen"
 MSG_DE[MENU_SYSTEM_INFO]="Systeminformationen anzeigen"
 MSG_DE[MENU_NETWORK_TOOLS]="Netzwerkdiagnose & Werkzeuge"
@@ -33,6 +48,20 @@ MSG_DE[MENU_BACKUP]="Backup & Wiederherstellung"
 MSG_DE[MENU_DOCKER]="Docker-Funktionen"
 MSG_DE[MENU_ENERGY]="Energieverwaltung"
 MSG_DE[MENU_DEBUG_BUNDLE]="Wichtige Debug-Infos in Datei sammeln"
+
+# Module descriptions
+MSG_DE[BACKUP_MODULE_DESC]="Systemsicherungen und Wiederherstellungsvorgänge verwalten"
+MSG_DE[DISK_MODULE_DESC]="Festplattenverwaltung und Wartungstools"
+MSG_DE[DOCKER_MODULE_DESC]="Docker-Container-Verwaltung und -Betrieb"
+MSG_DE[DOCKER_SECURITY_MODULE_DESC]="Sicherheitsscans und Härtung für Docker"
+MSG_DE[DOCKER_SETUP_MODULE_DESC]="Docker und Docker Compose installieren und konfigurieren"
+MSG_DE[ENERGY_MODULE_DESC]="Energieverwaltung und -optimierung"
+MSG_DE[LOGS_MODULE_DESC]="Systemprotokollanalyse und Anzeigetools"
+MSG_DE[NETWORK_MODULE_DESC]="Netzwerkdiagnose und Fehlerbehebung"
+MSG_DE[PACKAGES_MODULE_DESC]="Paketinstallation, Updates und Verwaltung"
+MSG_DE[RESTARTS_MODULE_DESC]="Dienste und Desktop-Komponenten neu starten"
+MSG_DE[SECURITY_MODULE_DESC]="Systemsicherheitsprüfungen und Härtung"
+MSG_DE[SYSTEM_INFO_MODULE_DESC]="Detaillierte Systeminformationen und Status anzeigen"
 
 # Debug bundle messages
 MSG_DE[DEBUG_HEADER]="Debug-Informationen sammeln"

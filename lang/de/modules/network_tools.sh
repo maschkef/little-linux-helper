@@ -2,11 +2,16 @@
 #
 # lang/de/modules/network_tools.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # Deutsche Sprachstrings für das Netzwerk-Tool-Modul
 
 [[ ! -v MSG_DE ]] && declare -A MSG_DE
+
+# Help content
+MSG_DE[NETWORK_HELP_OVERVIEW]="Diagnostiziert Netzwerkprobleme mit einem gebündelten Überblick über Schnittstellen, Routing, DNS und Dienstzustände. Beinhaltet Schnellaktionen zum Neustart von Netzwerkdiensten und zum Leeren von DNS-Caches."
+MSG_DE[NETWORK_HELP_OPTIONS]="1. Status-Dashboard - Zeigt alle Schnittstellen mit MAC-Adresse, IPv4/IPv6, Trägerstatus und Verbindungstyp (inklusive NetworkManager-Metadaten, falls verfügbar)|2. Konnektivität prüfen - Ping zum Standard-Gateway und zu bekannten Internetzielen sowie DNS-Auflösungstests|3. Routing & DNS-Ansicht - Zeigt Standardroute, Routing-Tabelle und Resolver-Konfiguration (resolvectl, systemd-resolve oder Fallback auf /etc/resolv.conf)|4. Dienststatus-Übersicht - Anzeige des systemctl-Status für häufige Netzwerkdienste wie NetworkManager, systemd-networkd, wpa_supplicant, systemd-resolved und connman|5. Netzwerkdienste neu starten - Nutzt den Ablauf des Restart-Moduls, um ausgewählte oder alle erkannten Netzwerkdienste neu zu starten|6. DNS-Cache leeren - Leert Caches von systemd-resolved, dnsmasq, nscd und BIND/rndc, sofern die Dienste aktiv sind"
+MSG_DE[NETWORK_HELP_NOTES]="Benötigt Standard-Netzwerkwerkzeuge (ip, ping, getent); fehlende Tools werden mit Hinweis gemeldet|Neustarts und DNS-Cache-Löschungen verwenden sudo und können die Verbindung kurzzeitig unterbrechen|NetworkManager-spezifische Details erscheinen nur mit installiertem nmcli; WLAN-Kennzeichnungen setzen das Tool iw voraus|Status- und Routing-Ansichten sind schreibgeschützt, solange keine Neustart- oder Cache-Lösch-Aktionen gewählt werden"
 
 # Menüeinträge
 MSG_DE[NETWORK_TOOLS_TITLE]="Netzwerkwerkzeuge"

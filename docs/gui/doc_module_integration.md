@@ -1,10 +1,10 @@
 <!--
 File: docs/gui/doc_module_integration.md
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
-Licensed under the MIT License. See the LICENSE file in the project root for more information.
+Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 -->
 
 # GUI Module Integration Guide
@@ -13,56 +13,97 @@ This document explains how CLI modules automatically integrate with the GUI syst
 
 ## Overview
 
-The Little Linux Helper GUI provides seamless integration with all CLI modules through a well-defined backend interface. While new CLI modules work without modifications once added to the system, they must be registered in the GUI backend to appear in the web interface.
+The Little Linux Helper GUI provides seamless integration with all CLI modules through a registry-based backend interface. New CLI modules are automatically discovered when you add their metadata file - no code changes required in the backend.
 
 **Key Integration Features:**
-- **Zero Code Changes**: Existing modules work without modifications
-- **Manual Registration**: New modules must be added to the backend module list  
+- **Automatic Discovery**: New modules appear automatically when metadata is added
+- **Zero Backend Changes**: No need to edit Go code to add modules
 - **Full CLI Compatibility**: All CLI functionality preserved
 - **Environment Inheritance**: Proper variable passing from GUI to CLI
 - **Real-time Execution**: Live terminal output and interaction
+- **Registry-Based**: Single source of truth for both CLI and GUI
 
 ## Module Discovery Process
 
-### Hardcoded Module Definitions
+### Registry-Based Discovery
 
 **Current Implementation:**
-The GUI backend currently uses a hardcoded list of modules rather than automatic file system scanning. This provides stable, predictable module information with consistent categorization and metadata.
+The GUI backend loads modules from a JSON registry cache that is automatically built from metadata files. This provides stable, predictable module information with automatic discovery of new modules.
+
+The registry cache is loaded via a subprocess call to `scripts/registry_cache_helper.sh`:
 
 ```go
-func getModules(c *fiber.Ctx) error {
-    modules := []ModuleInfo{
-        {
-            ID:             "system_info",
-            Name:           "Display System Information", 
-            Description:    "Show comprehensive system information and hardware details",
-            Path:           "modules/mod_system_info.sh",
-            Category:       "System Diagnosis & Analysis",
-            SubmoduleCount: 9,
-        },
-        // ... additional hardcoded modules
+func loadModuleRegistry() (*RegistryCache, error) {
+    cmd := exec.Command(filepath.Join(lhRootDir, "scripts/registry_cache_helper.sh"), "rebuild-or-read")
+    cmd.Dir = lhRootDir
+    cmd.Env = os.Environ()
+    
+    output, err := cmd.Output()
+    if err != nil {
+        return nil, fmt.Errorf("failed to load registry: %w", err)
     }
-    return c.JSON(modules)
+    
+    cachePath := strings.TrimSpace(string(output))
+    data, err := os.ReadFile(cachePath)
+    // ... parse JSON registry
 }
 ```
 
-**Module Categories (Predefined):**
-- **Recovery & Restarts**: Services and desktop restart utilities  
-- **System Diagnosis & Analysis**: System information, disk tools, log analysis
-- **Maintenance & Security**: Package management, security checks, energy management
-- **Docker & Containers**: Docker management and security tools
-- **Backup & Recovery**: BTRFS, TAR, and RSYNC backup/restore operations
+**Registry Structure:**
+The registry contains:
+- **Modules Array**: All discovered modules with metadata
+- **Categories Array**: Category definitions with ordering
+- **Schema Version**: For compatibility handling
+- **Cache Metadata**: Build time, loader version, validation hash
+
+**Module Categories (Registry-Defined):**
+Categories are defined in `modules/meta/_categories.json` and can be extended by mods:
+- **system**: System Diagnosis & Analysis
+- **maintenance**: Maintenance & Security
+- **backup**: Backup & Recovery
+- **docker**: Docker & Containers  
+- **restart**: Recovery & Restarts
 
 **Adding New Modules:**
-To add a new module to the GUI, you must:
+To add a new module to the GUI:
 1. Create the CLI module script (e.g., `modules/mod_newfeature.sh`)
-2. Add a corresponding entry to the hardcoded modules list in `gui/main.go`
-3. Optionally add documentation mapping in the `getModuleDocs` function
-4. Rebuild and restart the GUI server
+2. Create metadata file: `modules/meta/mod_newfeature.json`
+3. Add translations in `lang/*/newfeature.sh`
+4. Add documentation in `docs/modules/doc_newfeature.md`
+5. Restart the GUI server - module appears automatically!
 
-### Current Module Categories
+No code changes required in the backend!
 
-**Note**: Categories are hardcoded in the `getModules()` function in `gui/main.go`. Each module explicitly defines its category in the ModuleInfo struct.
+### Module Registry API
+
+**Note**: Modules and categories are loaded from the registry cache. The `/api/modules` endpoint returns both modules and categories with translation keys.
+
+**API Response Structure:**
+```json
+{
+  "modules": [
+    {
+      "id": "backup",
+      "name": "Backup Tools",
+      "name_key": "BACKUP_MODULE_NAME",
+      "description": "BTRFS, TAR and RSYNC backup/restore operations",
+      "description_key": "BACKUP_MODULE_DESC",
+      "path": "modules/mod_backup.sh",
+      "category": "backup",
+      "submodule_count": 6,
+      "docs": "mod/doc_backup.md"
+    }
+  ],
+  "categories": [
+    {
+      "id": "backup",
+      "name_key": "CATEGORY_BACKUP",
+      "fallback_name": "Backup & Recovery",
+      "order": 30
+    }
+  ]
+}
+```
 
 **Category Translation Integration:**
 Categories are automatically translated using the GUI's internationalization system:
@@ -210,13 +251,34 @@ echo "$(lh_msg 'WELCOME_MESSAGE')"  # Uses GUI language
 
 ### Step-by-Step Category Addition
 
-**1. Create Category Directory Structure:**
+**1. Add Category to Registry:**
 ```bash
-# Create new category directory
-mkdir -p modules/networking
+# Edit the categories file
+vi modules/meta/_categories.json
 
-# Add sample module
-cat > modules/networking/mod_network_info.sh << 'EOF'
+# Add new category entry
+{
+  "id": "network",
+  "order": 60,
+  "name_key": "CATEGORY_NETWORK",
+  "fallback_name": "Network Tools"
+}
+```
+
+**2. Create Category Translations:**
+```bash
+# Add to common language files
+# lang/en/common.sh
+MSG_EN[CATEGORY_NETWORK]="Network Tools"
+
+# lang/de/common.sh  
+MSG_DE[CATEGORY_NETWORK]="Netzwerk-Tools"
+```
+
+**3. Create Module with New Category:**
+```bash
+# Create module script
+cat > modules/mod_network_info.sh << 'EOF'
 #!/bin/bash
 source "$LH_ROOT_DIR/lib/lib_common.sh"
 lh_detect_package_manager
@@ -228,49 +290,37 @@ echo "$(lh_msg 'NETWORK_INFO_TITLE')"
 # Network information gathering logic here
 EOF
 
-chmod +x modules/networking/mod_network_info.sh
+chmod +x modules/mod_network_info.sh
 ```
 
-**2. Add to Backend Module List:**
-```go
-// Add to the modules array in getModules() function in main.go
+**4. Create Module Metadata:**
+```bash
+cat > modules/meta/mod_network_info.json << 'EOF'
 {
-    ID:             "network_info",
-    Name:           "Network Information",
-    Description:    "Display network configuration and status",
-    Path:           "modules/networking/mod_network_info.sh",
-    Category:       "Network Tools",
-    SubmoduleCount: 0,
-},
-
-// getModules currently returns a hard-coded slice, so every new
-// module is added manually like the struct above.
-```
-
-**3. Add Category Translations:**
-```json
-// src/i18n/locales/en/common.json
-{
-    "modules": {
-        "category": {
-            "network": "Network Tools",
-            "networking": "Network Tools"
-        }
-    }
+  "schema_version": 1,
+  "id": "network_info",
+  "entry": "modules/mod_network_info.sh",
+  "category": {
+    "id": "network"
+  },
+  "order": 10,
+  "docs": "mod/doc_network_info.md",
+  "display": {
+    "name_key": "NETWORK_INFO_MODULE_NAME",
+    "description_key": "NETWORK_INFO_MODULE_DESC",
+    "fallback_name": "Network Information",
+    "fallback_description": "Display network configuration and status"
+  },
+  "expose": {
+    "cli": true,
+    "gui": true
+  },
+  "enabled": true
 }
-
-// src/i18n/locales/de/common.json  
-{
-    "modules": {
-        "category": {
-            "network": "Netzwerk-Tools",
-            "networking": "Netzwerk-Tools"
-        }
-    }
-}
+EOF
 ```
 
-**4. Create Module-Specific Translations:**
+**5. Create Module-Specific Translations:**
 ```bash
 # Create translation files for new modules
 mkdir -p lang/en lang/de
@@ -280,6 +330,8 @@ cat > lang/en/network_info.sh << 'EOF'
 #!/bin/bash
 [[ ! -v MSG_EN ]] && declare -A MSG_EN
 
+MSG_EN[NETWORK_INFO_MODULE_NAME]="Network Information"
+MSG_EN[NETWORK_INFO_MODULE_DESC]="Display network configuration and status"
 MSG_EN[NETWORK_INFO_TITLE]="Network Information Analysis"
 MSG_EN[NETWORK_CONFIG_FOUND]="Network configuration detected"
 EOF
@@ -289,12 +341,14 @@ cat > lang/de/network_info.sh << 'EOF'
 #!/bin/bash
 [[ ! -v MSG_DE ]] && declare -A MSG_DE
 
+MSG_DE[NETWORK_INFO_MODULE_NAME]="Netzwerk-Information"
+MSG_DE[NETWORK_INFO_MODULE_DESC]="Netzwerkkonfiguration und -status anzeigen"
 MSG_DE[NETWORK_INFO_TITLE]="Netzwerk-Informations-Analyse"
 MSG_DE[NETWORK_CONFIG_FOUND]="Netzwerkkonfiguration erkannt"
 EOF
 ```
 
-**5. Test New Category:**
+**6. Test New Category:**
 ```bash
 # Restart GUI to discover new modules
 ./gui_launcher.sh
@@ -302,46 +356,61 @@ EOF
 ./gui/little-linux-helper-gui
 
 # Verify in browser:
-# - New category appears in sidebar
+# - New category appears automatically in sidebar
 # - Module starts successfully
 # - Correct language inheritance
 # - Terminal output displays properly
+
+# Test CLI integration
+./help_master.sh
+# - New category appears in main menu
+# - Module executes correctly
 ```
 
 ## Module Documentation Integration
 
-### Automatic Documentation Mapping
+### Registry-Based Documentation Mapping
 
 **Documentation Discovery:**
+Documentation paths are stored in the module metadata and automatically resolved by the backend:
+
 ```go
-var moduleDocMap = map[string]string{
-    "backup":        "mod/doc_backup.md",
-    "btrfs_backup":  "mod/doc_btrfs_backup.md",
-    "disk":          "mod/doc_disk.md",
-    "docker":        "mod/doc_docker.md",
-    "network_info":  "mod/doc_network_info.md", // New module docs
-}
-
-func getModuleDocumentation(moduleID string) (string, error) {
-    docFile, exists := moduleDocMap[moduleID]
-    if !exists {
-        return "No documentation available", nil
+func getModuleDocumentation(c *fiber.Ctx) error {
+    moduleID := c.Params("id")
+    
+    // Find module in registry
+    module := findModuleByID(moduleID)
+    if module == nil {
+        return c.Status(404).JSON(fiber.Map{
+            "error": "Module not found",
+        })
     }
-
-    docPath := filepath.Join(lhRootDir, "docs", docFile)
+    
+    // Use docs path from registry metadata
+    docPath := filepath.Join(lhRootDir, "docs", module.Docs)
+    
+    // Validate path is within allowed directory
+    if !isPathSafe(docPath, filepath.Join(lhRootDir, "docs")) {
+        return c.Status(403).JSON(fiber.Map{
+            "error": "Invalid documentation path",
+        })
+    }
+    
     content, err := os.ReadFile(docPath)
     if err != nil {
-        return "Documentation file not found", err
+        return c.Status(404).JSON(fiber.Map{
+            "error": "Documentation not found",
+        })
     }
-
-    return string(content), nil
+    
+    return c.SendString(string(content))
 }
 ```
 
 **Documentation File Creation:**
 ```bash
 # Create documentation for new module
-cat > docs/mod/mod_network_info.md << 'EOF'
+cat > docs/modules/doc_network_info.md << 'EOF'
 # Network Information Module
 
 ## Overview
@@ -367,91 +436,92 @@ This module provides comprehensive network configuration analysis and troublesho
 EOF
 ```
 
+**Metadata Documentation Reference:**
+```json
+{
+  "id": "network_info",
+  "docs": "mod/doc_network_info.md",
+  // ... other metadata fields
+}
+```
+
+The registry system automatically maps module IDs to their documentation paths - no manual mapping required!
+
 ## Advanced Integration Patterns
 
+### Registry Metadata Schema
 
-### Adding New Module Categories
-
-**Current Implementation:**
-To add a new module category, you must modify the hardcoded module list in `gui/main.go` and add the new modules with the appropriate category string.
-
-```go
-// Add to the modules array in getModules() function
+**Complete Module Metadata Example:**
+```json
 {
-    ID:             "new_module",
-    Name:           "New Module Name", 
-    Description:    "Description of the new module",
-    Path:           "modules/mod_new_module.sh",
-    Category:       "New Category", // New category
-    SubmoduleCount: 3,
-},
-```
-
-**Available Categories (Current):**
-- "Recovery & Restarts"
-- "System Diagnosis & Analysis"
-- "Maintenance & Security" 
-- "Docker & Containers"
-- "Backup & Recovery"
-
-**Note**: The current implementation does not automatically scan the file system for modules. Everything is predefined inside `getModules`, which keeps ordering and descriptions under tight control.
-
-> **Future improvement idea:** A discovery helper could walk `modules/` at startup, parse metadata comments, and populate the slice dynamically. Implementing it would involve directory scanning plus validation, after which new modules could ship without touching the Go code.
-
-### Module Metadata Enhancement
-
-**Extended Module Information:**
-```go
-type ExtendedModuleInfo struct {
-    ModuleInfo
-    Version     string            `json:"version"`
-    Author      string            `json:"author"`
-    License     string            `json:"license"`
-    Dependencies []string         `json:"dependencies"`
-    Tags        []string          `json:"tags"`
-    Metadata    map[string]string `json:"metadata"`
-}
-
-func extractModuleMetadata(modulePath string) ExtendedModuleInfo {
-    // Read module file and extract metadata from comments
-    content, err := ioutil.ReadFile(modulePath)
-    if err != nil {
-        return ExtendedModuleInfo{}
+  "schema_version": 1,
+  "id": "advanced_module",
+  "entry": "modules/mod_advanced.sh",
+  "category": {
+    "id": "system"
+  },
+  "order": 20,
+  "docs": "mod/doc_advanced.md",
+  "display": {
+    "name_key": "ADVANCED_MODULE_NAME",
+    "description_key": "ADVANCED_MODULE_DESC",
+    "fallback_name": "Advanced System Module",
+    "fallback_description": "Advanced system management features"
+  },
+  "i18n": {
+    "module_name": "advanced"
+  },
+  "expose": {
+    "cli": true,
+    "gui": true
+  },
+  "enabled": true,
+  "requires_root": true,
+  "tags": ["system", "advanced", "admin"],
+  "version": "1.0.0",
+  "author": "Your Name",
+  "submodules": [
+    {
+      "id": "advanced_sub1",
+      "entry": "modules/advanced/sub1.sh",
+      "order": 10,
+      "docs_inherit": true,
+      "display": {
+        "name_key": "ADVANCED_SUB1_NAME",
+        "description_key": "ADVANCED_SUB1_DESC"
+      }
     }
-    
-    lines := strings.Split(string(content), "\n")
-    metadata := make(map[string]string)
-    
-    for _, line := range lines {
-        if strings.HasPrefix(line, "# @") {
-            // Parse metadata comments like: # @version 1.0.0
-            parts := strings.SplitN(line[3:], " ", 2)
-            if len(parts) == 2 {
-                metadata[parts[0]] = parts[1]
-            }
-        }
-    }
-    
-    return ExtendedModuleInfo{
-        ModuleInfo: createModuleInfo(modulePath, "", ""),
-        Version:    metadata["version"],
-        Author:     metadata["author"],
-        License:    metadata["license"],
-        // ... other metadata fields
-    }
+  ]
 }
 ```
 
-## Troubleshooting Module Integration
+**Registry Cache Structure:**
+The registry cache (`cache/module-registry.json`) contains:
+```json
+{
+  "schema_version": 1,
+  "loader_version": 1,
+  "cache_metadata": {
+    "build_time": "2025-12-09T10:30:00Z",
+    "validation_hash": "abc123...",
+    "file_hash": "def456..."
+  },
+  "modules": [...],
+  "categories": [...]
+}
+```
+
+**Registry Cache Structure:**
 
 ### Common Integration Issues
 
 **Module Not Appearing in GUI:**
-1. **Hardcoded List**: Verify module is added to the `modules` array in `gui/main.go`
-2. **Module File**: Ensure the actual module file exists at the specified path
-3. **File Permissions**: Verify file is executable (`chmod +x`) 
-4. **Backend Rebuild**: Restart GUI server after adding to hardcoded list
-5. **JSON Syntax**: Check for syntax errors in module definition
+1. **Metadata File**: Verify module metadata exists in `modules/meta/`
+2. **JSON Validity**: Validate JSON with `jq . modules/meta/mod_yourmodule.json`
+3. **Module File**: Ensure the actual module file exists at the specified `entry` path
+4. **File Permissions**: Verify file is executable (`chmod +x`)
+5. **Cache Rebuild**: Check registry cache rebuilt correctly in `cache/module-registry.json`
+6. **Backend Restart**: Restart GUI server to reload registry
 
 **Module Execution Failures:**
 1. **Environment Variables**: Verify `LH_ROOT_DIR` is set correctly
@@ -459,34 +529,45 @@ func extractModuleMetadata(modulePath string) ExtendedModuleInfo {
 3. **Permissions**: Check file and directory permissions
 4. **Shebang Line**: Confirm proper shebang (`#!/bin/bash`)
 5. **Library Loading**: Verify `lib_common.sh` sources correctly
+6. **Registry Entry**: Check module `entry` path in metadata is correct
 
 **Language Integration Problems:**
 1. **Translation Files**: Ensure language files exist in `lang/` directory
 2. **Key Definitions**: Verify all translation keys are defined
 3. **Loading Order**: Check module loads language files after `lib_common.sh`
 4. **Environment Variable**: Confirm `LH_LANG` is passed correctly
+5. **Metadata Keys**: Verify `name_key` and `description_key` match translation keys
 
 ### Debugging Module Integration
 
-**Module Definition Verification:**
-Check the hardcoded module list in `gui/main.go` for correct entries:
+**Registry Validation:**
+```bash
+# Validate registry cache
+jq . cache/module-registry.json
 
-```go
-// Verify your module is in the array
-func getModules(c *fiber.Ctx) error {
-    modules := []ModuleInfo{
-        // ... existing modules ...
-        {
-            ID:             "your_module",
-            Name:           "Your Module Name",
-            Description:    "Module description",
-            Path:           "modules/mod_your_module.sh", // Check path is correct
-            Category:       "Your Category",
-            SubmoduleCount: 0,
-        },
-    }
-    return c.JSON(modules)
-}
+# Check if module is in registry
+jq '.modules[] | select(.id == "your_module")' cache/module-registry.json
+
+# Force registry rebuild
+./scripts/registry_cache_helper.sh rebuild
+
+# Validate all metadata files
+for f in modules/meta/*.json; do
+  echo "Validating $f..."
+  jq . "$f" >/dev/null || echo "ERROR in $f"
+done
+```
+
+**Module Metadata Verification:**
+```bash
+# Check module metadata syntax
+jq . modules/meta/mod_your_module.json
+
+# Verify required fields
+jq '{id, entry, category, order, docs, display}' modules/meta/mod_your_module.json
+
+# Check for validation errors in logs
+grep -i "your_module" logs/sessions/latest.log
 ```
 
 **Manual Module Testing:**
@@ -502,6 +583,26 @@ export LH_LANG=en
 # Check for errors
 echo "Exit code: $?"
 ```
+
+**Registry Cache Debugging:**
+```bash
+# Check cache metadata
+jq '.cache_metadata' cache/module-registry.json
+
+# List all modules in cache
+jq '.modules[].id' cache/module-registry.json
+
+# Check module count
+echo "Modules in cache: $(jq '.modules | length' cache/module-registry.json)"
+
+# Compare with metadata files
+echo "Metadata files: $(ls -1 modules/meta/*.json | wc -l)"
+```
+
+### Registry System Troubleshooting
+
+For comprehensive registry troubleshooting, see:
+- `docs/registry/module_registry_troubleshooting.md` - Complete troubleshooting guide
 
 ---
 

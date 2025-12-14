@@ -1,12 +1,12 @@
 /*
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
-Licensed under the MIT License. See the LICENSE file in the project root for more information.
+Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 */
 
-import { useState, useEffect, Suspense, lazy } from 'react';
+import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { useTranslation } from 'react-i18next';
 import ModuleList from './components/ModuleList.jsx';
 import Terminal from './components/Terminal.jsx';
@@ -29,6 +29,7 @@ const ConfigPanel = lazy(() => import('./components/ConfigPanel.jsx'));
 function AppContent({ standaloneSessionId, isStandalone }) {
   const { t } = useTranslation('common');
   const [modules, setModules] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [selectedModule, setSelectedModule] = useState(null);
   const [moduleDocs, setModuleDocs] = useState('');
   const [panelWidths, setPanelWidths] = useState({ terminal: 50, help: 25, docs: 25 });
@@ -112,7 +113,16 @@ function AppContent({ standaloneSessionId, isStandalone }) {
       const response = await apiFetch('/api/modules');
       if (response.ok) {
         const data = await response.json();
-        setModules(data);
+        // Handle both old format (array) and new format (object with modules and categories)
+        if (Array.isArray(data)) {
+          // Old format - backward compatibility
+          setModules(data);
+          setCategories([]);
+        } else {
+          // New format with modules and categories
+          setModules(data.modules || []);
+          setCategories(data.categories || []);
+        }
       } else if (response.status !== 401) {
         console.error('Failed to fetch modules:', response.status);
       }
@@ -196,14 +206,39 @@ function AppContent({ standaloneSessionId, isStandalone }) {
     }
   };
 
-  // Group modules by category
-  const groupedModules = modules.reduce((acc, module) => {
-    if (!acc[module.category]) {
-      acc[module.category] = [];
-    }
-    acc[module.category].push(module);
-    return acc;
-  }, {});
+  // Group modules by category and sort both categories and modules by their order
+  const groupedModules = useMemo(() => {
+    // First, sort modules by order within their category
+    const sortedModules = [...modules].sort((a, b) => (a.order || 0) - (b.order || 0));
+    
+    // Group by category
+    const grouped = sortedModules.reduce((acc, module) => {
+      if (!acc[module.category]) {
+        acc[module.category] = [];
+      }
+      acc[module.category].push(module);
+      return acc;
+    }, {});
+    
+    // Sort the grouped object by category order
+    const sortedGrouped = {};
+    const sortedCategories = [...(categories || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+    
+    sortedCategories.forEach(cat => {
+      if (grouped[cat.id]) {
+        sortedGrouped[cat.id] = grouped[cat.id];
+      }
+    });
+    
+    // Add any categories not in the categories list (shouldn't happen, but defensive)
+    Object.keys(grouped).forEach(catId => {
+      if (!sortedGrouped[catId]) {
+        sortedGrouped[catId] = grouped[catId];
+      }
+    });
+    
+    return sortedGrouped;
+  }, [modules, categories]);
 
   // const activeSession = getActiveSession(); // Currently unused but kept for future use
 
@@ -267,6 +302,7 @@ function AppContent({ standaloneSessionId, isStandalone }) {
           <div className="sidebar">
             <ModuleList 
               groupedModules={groupedModules}
+              categories={categories}
               selectedModule={selectedModule}
               onModuleSelect={handleModuleSelect}
               onModuleStart={startModule}
@@ -464,6 +500,7 @@ function AppContent({ standaloneSessionId, isStandalone }) {
               
               <HelpPanel 
                 module={selectedModule}
+                modules={modules}
               />
               
               <Suspense fallback={<div className="loading-panel">Loading documentation...</div>}>

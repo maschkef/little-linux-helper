@@ -42,11 +42,13 @@ jobs:
         # Basic smoke test - try to run with help flag
         ./little-linux-helper-gui --help || true
         
-    - name: Run Go tests (if any exist)
+    - name: Run Go tests
       working-directory: ./gui
       run: |
         if ls *_test.go >/dev/null 2>&1; then
+          echo "Running Go tests (including registry tests)..."
           go test -v ./...
+          echo "✅ All Go tests passed"
         else
           echo "No Go tests found, skipping"
         fi
@@ -62,6 +64,13 @@ jobs:
         node-version: '20'
         cache: 'npm'
         cache-dependency-path: gui/web/package-lock.json
+    
+    - name: Sync GUI translations
+      run: |
+        chmod +x scripts/sync_gui_translations.sh
+        echo "🌍 Synchronizing translations..."
+        ./scripts/sync_gui_translations.sh
+        echo "✅ Translations synchronized"
     
     - name: Install dependencies
       working-directory: ./gui/web
@@ -83,9 +92,76 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     
-    - name: Test CLI help
+    - name: Test CLI syntax
       run: |
         chmod +x help_master.sh
         # Basic syntax check
         bash -n help_master.sh
-        echo "CLI syntax check passed"
+        echo "✅ CLI syntax check passed"
+    
+    - name: Validate module metadata JSON
+      run: |
+        # Install jq for JSON validation
+        sudo apt-get update && sudo apt-get install -y jq
+        
+        echo "Validating module metadata files..."
+        error_count=0
+        for f in modules/meta/*.json; do
+          echo "  Checking $f..."
+          if ! jq empty "$f" 2>/dev/null; then
+            echo "    ❌ Invalid JSON in $f"
+            error_count=$((error_count + 1))
+          fi
+        done
+        
+        if [ $error_count -gt 0 ]; then
+          echo "❌ Found $error_count invalid metadata file(s)"
+          exit 1
+        fi
+        echo "✅ All module metadata files are valid JSON"
+    
+    - name: Test registry cache build
+      run: |
+        chmod +x scripts/registry_cache_helper.sh
+        
+        # Ensure required tools are available
+        sudo apt-get install -y bc
+        
+        # Create cache directory if it doesn't exist
+        mkdir -p cache
+        
+        # Build the registry cache
+        echo "Building module registry cache..."
+        ./scripts/registry_cache_helper.sh rebuild
+        
+        # Verify cache was created
+        if [ ! -f cache/module-registry.json ]; then
+          echo "❌ Registry cache not created"
+          exit 1
+        fi
+        
+        # Validate cache JSON
+        if ! jq empty cache/module-registry.json 2>/dev/null; then
+          echo "❌ Invalid cache JSON"
+          exit 1
+        fi
+        
+        # Check module count
+        module_count=$(jq '.cache_metadata.module_count' cache/module-registry.json)
+        category_count=$(jq '.cache_metadata.category_count' cache/module-registry.json)
+        schema_version=$(jq '.schema_version' cache/module-registry.json)
+        
+        echo "✅ Registry cache built successfully"
+        echo "   - Modules: $module_count"
+        echo "   - Categories: $category_count"
+        echo "   - Schema version: $schema_version"
+    
+    - name: Test CLI loads with registry
+      run: |
+        # Test that help_master.sh can load the registry
+        # Use -h flag to avoid interactive menu
+        if ! ./help_master.sh -h >/dev/null 2>&1; then
+          echo "❌ CLI failed to load with registry"
+          exit 1
+        fi
+        echo "✅ CLI loads successfully with registry"

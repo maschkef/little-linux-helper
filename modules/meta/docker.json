@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "docker",
+  "entry": "modules/mod_docker.sh",
+  "category": {
+    "id": "maintenance"
+  },
+  "order": 90,
+  "docs": "modules/doc_docker.md",
+  "display": {
+    "name_key": "DOCKER_MODULE_NAME",
+    "description_key": "DOCKER_MODULE_DESC",
+    "fallback_name": "Docker Functions",
+    "fallback_description": "Docker management and security tools"
+  },
+  "i18n": {
+    "module_name": "docker"
+  },
+  "help": {
+    "overview_key": "DOCKER_HELP_OVERVIEW",
+    "options_key": "DOCKER_HELP_OPTIONS",
+    "notes_key": "DOCKER_HELP_NOTES"
+  },
+  "expose": {
+    "cli": true,
+    "gui": true
+  },
+  "enabled": true,
+  "requires_root": false,
+  "tags": ["docker", "containers", "management"]
+}

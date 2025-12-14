@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "network",
+  "entry": "modules/mod_network.sh",
+  "category": {
+    "id": "system"
+  },
+  "order": 30,
+  "docs": "modules/doc_network.md",
+  "display": {
+    "name_key": "NETWORK_MODULE_NAME",
+    "description_key": "NETWORK_MODULE_DESC",
+    "fallback_name": "Network Diagnostics & Tools",
+    "fallback_description": "Network status dashboards, connectivity checks, routing and DNS insights"
+  },
+  "i18n": {
+    "module_name": "network"
+  },
+  "help": {
+    "overview_key": "NETWORK_HELP_OVERVIEW",
+    "options_key": "NETWORK_HELP_OPTIONS",
+    "notes_key": "NETWORK_HELP_NOTES"
+  },
+  "expose": {
+    "cli": true,
+    "gui": true
+  },
+  "enabled": true,
+  "requires_root": false,
+  "tags": ["network", "diagnostics", "connectivity", "dns"]
+}

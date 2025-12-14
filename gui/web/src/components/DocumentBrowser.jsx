@@ -1,9 +1,9 @@
 /*
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
-Licensed under the MIT License. See the LICENSE file in the project root for more information.
+Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 */
 
 import { useState, useEffect, useMemo } from 'react';
@@ -15,115 +15,42 @@ import { apiFetch } from '../utils/api.js';
 
 function DocumentBrowser() {
   const [allDocs, setAllDocs] = useState([]);
+  const [categories, setCategories] = useState({});
   const [unlinkedDocPaths, setUnlinkedDocPaths] = useState([]);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [docContent, setDocContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showNavigation, setShowNavigation] = useState(true);
-  const [expandedCategories, setExpandedCategories] = useState({
-    'System Administration': true,
-    'Backup & Recovery': false,
-    'Docker & Containers': false,
-    'Logs & Analysis': false,
-    'System Maintenance': false,
-    'Libraries': false,
-    'BTRFS Reference': false,
-    'GUI Documentation': false,
-    'Development & Tools': false,
-    'Project Information': false,
-    'Unlinked Documents': true
-  });
-
-  // Document categorization mapping
-  const documentCategories = {
-    'System Administration': [
-      'mod_system_info', 'mod_security', 'mod_disk', 'mod_packages', 'mod_energy'
-    ],
-    'Backup & Recovery': [
-      'mod_backup', 'mod_btrfs_backup', 'mod_btrfs_restore', 'mod_backup_tar', 
-      'mod_restore_tar', 'mod_backup_rsync', 'mod_restore_rsync'
-    ],
-    'Docker & Containers': [
-      'mod_docker', 'mod_docker_setup', 'mod_docker_security'
-    ],
-    'Logs & Analysis': [
-      'mod_logs', 'advanced_log_analyzer'
-    ],
-    'System Maintenance': [
-      'mod_restarts'
-    ],
-    'Libraries': [
-      'lib_common', 'lib_colors', 'lib_config', 'lib_filesystem',
-      'lib_i18n', 'lib_logging', 'lib_notifications', 'lib_package_mappings',
-      'lib_packages', 'lib_system', 'lib_ui'
-    ],
-    'BTRFS Reference': [
-      'lib_btrfs', 'lib_btrfs_core', 'lib_btrfs_layout'
-    ],
-    'GUI Documentation': [
-      'gui_backend_api', 'gui_frontend_react', 'gui_i18n', 'gui_module_integration', 'gui_customization', 'gui_module_maintenance_guide'
-    ],
-    'Development & Tools': [
-      'DEVELOPER_GUIDE', 'GUI_DEVELOPER_GUIDE'
-    ],
-    'Project Information': [
-      'gui', 'README', 'README_DE', 'gui_README', 'doc_gui_launcher'
-    ]
-  };
-
-  // Friendly names for documents
-  const documentNames = {
-    'mod_system_info': 'System Information',
-    'mod_security': 'Security Analysis',
-    'mod_disk': 'Disk Management',
-    'mod_packages': 'Package Management',
-    'mod_energy': 'Energy Management',
-    'mod_backup': 'General Backup',
-    'mod_btrfs_backup': 'BTRFS Backup',
-    'mod_btrfs_restore': 'BTRFS Restore',
-    'mod_backup_tar': 'TAR Backup',
-    'mod_restore_tar': 'TAR Restore',
-    'mod_backup_rsync': 'RSYNC Backup',
-    'mod_restore_rsync': 'RSYNC Restore',
-    'mod_docker': 'Docker Management',
-    'mod_docker_setup': 'Docker Setup',
-    'mod_docker_security': 'Docker Security',
-    'mod_logs': 'Log Analysis',
-    'advanced_log_analyzer': 'Advanced Log Analyzer',
-    'mod_restarts': 'System Restarts',
-    'lib_btrfs': 'BTRFS Library',
-    'lib_common': 'Common Functions Library',
-    'lib_colors': 'Color Functions Library', 
-    'lib_config': 'Configuration Library',
-    'lib_filesystem': 'Filesystem Library',
-    'lib_i18n': 'Internationalization Library',
-    'lib_logging': 'Logging Library',
-    'lib_notifications': 'Notifications Library',
-    'lib_package_mappings': 'Package Mappings Library',
-    'lib_packages': 'Package Management Library',
-    'lib_system': 'System Information Library',
-    'lib_ui': 'User Interface Library',
-    'lib_btrfs_core': 'BTRFS Core Library',
-    'lib_btrfs_layout': 'BTRFS Layout Reference',
-    'DEVELOPER_GUIDE': 'CLI Developer Guide',
-    'GUI_DEVELOPER_GUIDE': 'GUI Developer Guide',
-    'gui_backend_api': 'GUI Backend API',
-    'gui_frontend_react': 'GUI React Frontend',
-    'gui_i18n': 'GUI Internationalization',
-    'gui_module_integration': 'GUI Module Integration',
-    'gui_customization': 'GUI Customization',
-    'gui_module_maintenance_guide': 'GUI Module Maintenance',
-    'gui': 'GUI Documentation',
-    'README': 'Project README',
-    'README_DE': 'Project README (German)',
-    'gui_README': 'GUI README',
-    'doc_gui_launcher': 'GUI Launcher Guide'
-  };
+  const [expandedCategories, setExpandedCategories] = useState({});
 
   useEffect(() => {
     fetchAllDocuments();
+    fetchCategories();
     fetchUnlinkedDocuments();
   }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await apiFetch('/api/docs/categories');
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data);
+        
+        // Auto-expand System Administration and Development categories by default
+        const initialExpanded = {};
+        Object.keys(data).forEach(catId => {
+          // Expand some categories by default
+          initialExpanded[catId] = ['system_administration', 'development', 'libraries'].includes(catId);
+        });
+        initialExpanded['Unlinked Documents'] = true;
+        setExpandedCategories(initialExpanded);
+      } else {
+        console.error('Failed to fetch categories');
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
 
   const fetchAllDocuments = async () => {
     try {
@@ -160,7 +87,9 @@ function DocumentBrowser() {
   const fetchDocument = async (docId) => {
     setIsLoading(true);
     try {
-      const response = await apiFetch(`/api/modules/${docId}/docs`);
+      // Handle unlinked file: IDs by extracting the path
+      const actualId = docId.startsWith('file:') ? docId.substring(5) : docId;
+      const response = await apiFetch(`/api/modules/${actualId}/docs`);
       if (response.ok) {
         const data = await response.json();
         setDocContent(data.content);
@@ -191,38 +120,28 @@ function DocumentBrowser() {
   const getCategorizedDocuments = () => {
     const categorized = {};
 
-    Object.keys(documentCategories).forEach(category => {
-      categorized[category] = [];
-    });
-
-    const uncategorized = [];
-
     allDocs.forEach(doc => {
-      const docId = doc.id || (doc.filename ? doc.filename.replace('.md', '') : '');
-      let placed = false;
-
-      for (const [category, docIds] of Object.entries(documentCategories)) {
-        if (docIds.includes(docId)) {
-          categorized[category].push({
-            ...doc,
-            id: docId,
-            selectable: true
-          });
-          placed = true;
-          break;
-        }
+      const categoryId = doc.category || 'uncategorized';
+      
+      if (!categorized[categoryId]) {
+        categorized[categoryId] = [];
       }
-
-      if (!placed) {
-        uncategorized.push({
-          ...doc,
-          id: docId,
-          selectable: Boolean(docId)
-        });
-      }
+      
+      categorized[categoryId].push({
+        ...doc,
+        displayName: doc.name,
+        selectable: true
+      });
     });
 
-    return { categorized, unlinked: uncategorized };
+    // Sort categories by order from API
+    const sortedEntries = Object.entries(categorized).sort((a, b) => {
+      const orderA = categories[a[0]]?.order ?? 999;
+      const orderB = categories[b[0]]?.order ?? 999;
+      return orderA - orderB;
+    });
+
+    return { categorized: Object.fromEntries(sortedEntries), unlinked: [] };
   };
 
   const { categorized, unlinked } = getCategorizedDocuments();
@@ -240,7 +159,7 @@ function DocumentBrowser() {
         id: `file:${path}`,
         name: path,
         filename: path,
-        selectable: false,
+        selectable: true,
         isFileOnly: true
       });
     }
@@ -359,11 +278,13 @@ function DocumentBrowser() {
             height: '100%'
           }}>
           
-          {Object.entries(categorizedDocs).map(([category, docs]) => (
-            docs.length > 0 && (
-              <div key={category} style={{ marginBottom: '10px' }}>
+          {Object.entries(categorizedDocs).map(([categoryId, docs]) => {
+            const categoryName = categories[categoryId]?.name || categories[categoryId]?.fallback_name || categoryId;
+            
+            return docs.length > 0 && (
+              <div key={categoryId} style={{ marginBottom: '10px' }}>
                 <div 
-                  onClick={() => toggleCategory(category)}
+                  onClick={() => toggleCategory(categoryId)}
                   style={{
                     cursor: 'pointer',
                     padding: '5px',
@@ -378,15 +299,15 @@ function DocumentBrowser() {
                   }}
                 >
                   <span style={{ marginRight: '5px' }}>
-                    {expandedCategories[category] ? '▼' : '▶'}
+                    {expandedCategories[categoryId] ? '▼' : '▶'}
                   </span>
-                  {category}
+                  {categoryName}
                 </div>
                 
-                {expandedCategories[category] && (
+                {expandedCategories[categoryId] && (
                   <div style={{ marginLeft: '15px' }}>
                     {docs.map((doc) => {
-                      const displayName = documentNames[doc.id] || doc.name || doc.filename || doc.id;
+                      const displayName = doc.displayName || doc.name || doc.id;
                       const docKey = doc.id || doc.filename || displayName;
 
                       if (doc.selectable === false) {
@@ -430,7 +351,7 @@ function DocumentBrowser() {
                             textAlign: 'left',
                             opacity: selectedDoc === doc.id ? 1 : 0.85
                           }}
-                          title={doc.description || documentNames[doc.id] || doc.id}
+                          title={doc.description || displayName}
                         >
                           {displayName}
                         </button>
@@ -439,8 +360,8 @@ function DocumentBrowser() {
                   </div>
                 )}
               </div>
-            )
-          ))}
+            );
+          })}
           </div>
         )}
 
@@ -462,7 +383,7 @@ function DocumentBrowser() {
                 borderBottom: '1px solid #34495e' 
               }}>
                 <h3 style={{ margin: '0', color: '#ecf0f1', fontSize: '16px' }}>
-                  {documentNames[selectedDoc] || selectedDoc}
+                  {allDocs.find(doc => doc.id === selectedDoc)?.name || selectedDoc}
                 </h3>
               </div>
               <MarkdownWithStatefulDetails

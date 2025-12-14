@@ -5,6 +5,8 @@ config/*.conf
 config/*.d/
 # For testing purposes
 temp/
+# Module registry cache
+cache/
 # GUI build artifacts
 gui/web/build/
 gui/web/node_modules/

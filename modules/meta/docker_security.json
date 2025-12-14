@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "docker_security",
+  "parent": "docker",
+  "entry": "modules/mod_docker_security.sh",
+  "category": {
+    "id": "maintenance"
+  },
+  "order": 20,
+  "docs": "modules/doc_docker_security.md",
+  "display": {
+    "name_key": "DOCKER_SECURITY_MODULE_NAME",
+    "description_key": "DOCKER_SECURITY_MODULE_DESC",
+    "fallback_name": "Docker Security",
+    "fallback_description": "Security audit for Docker containers"
+  },
+  "i18n": {
+    "module_name": "docker_security"
+  },
+  "expose": {
+    "cli": false,
+    "gui": false
+  },
+  "enabled": true,
+  "requires_root": false,
+  "tags": ["docker", "security", "audit", "containers"]
+}

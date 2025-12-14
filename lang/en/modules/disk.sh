@@ -2,12 +2,17 @@
 #
 # little-linux-helper/lang/en/disk.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # English language strings for disk module
 
 # Conditional declaration for module files
 [[ ! -v MSG_EN ]] && declare -A MSG_EN
+
+# Help content
+MSG_EN[DISK_HELP_OVERVIEW]="Tools for managing and analyzing your storage devices and disk space. Check drive health, find large files, monitor disk usage, and perform disk diagnostics."
+MSG_EN[DISK_HELP_OPTIONS]="1. Show Mounted Drives - See all connected drives and how much space they're using|2. SMART Values - Get detailed health information from your hard drives and SSDs|3. File Access Times - Check which programs are currently using files in a folder|4. Directory Sizes - Analyze disk space usage with visual tools like ncdu|5. Disk Speed Test - Test read/write performance of your storage devices|6. Check Filesystem - Scan drives for errors and fix file system problems|7. Check Health - Quick health check of your drives using SMART data|8. Largest Files - Find the biggest files taking up space on your system"
+MSG_EN[DISK_HELP_NOTES]="Drive health checks require administrator privileges|Missing diagnostic tools will be offered for automatic installation|Filesystem checks work best on unmounted drives|Speed tests and health checks are safe and won't modify data"
 
 # Menu items and headers
 MSG_EN[DISK_MENU_TITLE]="Disk Tools"

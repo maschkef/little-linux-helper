@@ -1,7 +1,7 @@
 <!--
 File: docs/lib/doc_btrfs_layout.md
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
 Licensed under the MIT License. See the LICENSE file in the project root for more information.
@@ -73,4 +73,4 @@ These helpers underpin retention policies, maintenance menus, and the restore se
   * `mod_btrfs_backup.sh` (bundle deletion, status views)
   * `mod_btrfs_restore.sh` (snapshot listing, parent chain resolution)
 
-Refer to `docs/lib/doc_btrfs.md` for detailed behavioural notes and to `docs/mod/doc_btrfs_backup.md` / `docs/mod/doc_btrfs_restore.md` for module-level workflows.
+Refer to `docs/lib/doc_btrfs.md` for detailed behavioural notes and to `docs/modules/doc_btrfs_backup.md` / `docs/modules/doc_btrfs_restore.md` for module-level workflows.

@@ -2,12 +2,17 @@
 #
 # little-linux-helper/lang/de/disk.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # German translations for the disk module
 
 # Conditional declaration for module files
 [[ ! -v MSG_DE ]] && declare -A MSG_DE
+
+# Help content
+MSG_DE[DISK_HELP_OVERVIEW]="Tools zur Verwaltung und Analyse Ihrer Speichergeräte und des Festplattenplatzes. Überprüfen Sie die Laufwerksgesundheit, finden Sie große Dateien, überwachen Sie die Festplattennutzung und führen Sie Festplattendiagnosen durch."
+MSG_DE[DISK_HELP_OPTIONS]="1. Eingehängte Laufwerke anzeigen - Alle angeschlossenen Laufwerke und deren Speicherplatznutzung|2. SMART-Werte - Detaillierte Gesundheitsinformationen von Festplatten und SSDs|3. Dateizugriffszeiten - Überprüfen welche Programme gerade Dateien in einem Ordner verwenden|4. Verzeichnisgrößen - Festplattenplatz-Nutzung mit visuellen Tools wie ncdu analysieren|5. Festplatten-Geschwindigkeitstest - Lese-/Schreibgeschwindigkeit Ihrer Speichergeräte testen|6. Dateisystem überprüfen - Laufwerke auf Fehler scannen und Dateisystem-Probleme reparieren|7. Gesundheit überprüfen - Schnelle Gesundheitsprüfung Ihrer Laufwerke mit SMART-Daten|8. Größte Dateien - Die größten Dateien finden, die Speicherplatz auf Ihrem System belegen"
+MSG_DE[DISK_HELP_NOTES]="Laufwerks-Gesundheitsprüfungen erfordern Administrator-Rechte|Fehlende Diagnose-Tools werden zur automatischen Installation angeboten|Dateisystem-Prüfungen funktionieren am besten bei nicht eingehängten Laufwerken|Geschwindigkeitstests und Gesundheitsprüfungen sind sicher und ändern keine Daten"
 
 # Menu items and headings
 MSG_DE[DISK_MENU_TITLE]="Festplatten-Werkzeuge"

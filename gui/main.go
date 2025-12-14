@@ -1,15 +1,17 @@
 /*
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
-Licensed under the MIT License. See the LICENSE file in the project root for more information.
+Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 */
 
 package main
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
@@ -44,13 +46,119 @@ import (
 )
 
 type ModuleInfo struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	Description    string `json:"description"`
-	Path           string `json:"path"`
-	Category       string `json:"category"`
-	Parent         string `json:"parent,omitempty"`          // Parent module ID for submodules
-	SubmoduleCount int    `json:"submodule_count,omitempty"` // Number of available submodules
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`                      // Fallback name
+	Description    string    `json:"description"`               // Fallback description
+	NameKey        string    `json:"name_key,omitempty"`        // Translation key for name
+	DescriptionKey string    `json:"description_key,omitempty"` // Translation key for description
+	Path           string    `json:"path"`
+	Category       string    `json:"category"`
+	Parent         string    `json:"parent,omitempty"`          // Parent module ID for submodules
+	SubmoduleCount int       `json:"submodule_count,omitempty"` // Number of available submodules
+	Help           *HelpInfo `json:"help,omitempty"`            // Help content keys
+}
+
+// ModulesResponse wraps modules and categories for the API
+type ModulesResponse struct {
+	Modules    []ModuleInfo   `json:"modules"`
+	Categories []CategoryInfo `json:"categories"`
+}
+
+// Registry structs for loading module metadata from cache
+type ModuleRegistry struct {
+	SchemaVersion int              `json:"schema_version"`
+	LoaderVersion int              `json:"loader_version"`
+	CacheMetadata CacheMetadata    `json:"cache_metadata"`
+	Categories    []CategoryInfo   `json:"categories"`
+	Modules       []RegistryModule `json:"modules"`
+}
+
+type CacheMetadata struct {
+	GeneratedAt    string `json:"generated_at"`
+	MetadataHash   string `json:"metadata_hash"`
+	ValidationHash string `json:"validation_hash"`
+	ModuleCount    int    `json:"module_count"`
+	CategoryCount  int    `json:"category_count"`
+}
+
+type CategoryInfo struct {
+	ID           string `json:"id"`
+	Order        int    `json:"order"`
+	NameKey      string `json:"name_key"`
+	FallbackName string `json:"fallback_name,omitempty"`
+}
+
+type RegistryModule struct {
+	SchemaVersion int              `json:"schema_version"`
+	ID            string           `json:"id"`
+	Entry         string           `json:"entry"`
+	Category      ModuleCategory   `json:"category"`
+	Order         int              `json:"order"`
+	Docs          string           `json:"docs"`
+	Display       DisplayInfo      `json:"display"`
+	I18n          I18nInfo         `json:"i18n"`
+	Expose        ExposeInfo       `json:"expose"`
+	Enabled       bool             `json:"enabled"`
+	RequiresRoot  bool             `json:"requires_root,omitempty"`
+	Tags          []string         `json:"tags,omitempty"`
+	Help          *HelpInfo        `json:"help,omitempty"`
+	Submodules    []RegistryModule `json:"submodules,omitempty"`
+	Version       string           `json:"version,omitempty"`
+	Author        string           `json:"author,omitempty"`
+}
+
+type ModuleCategory struct {
+	ID string `json:"id"`
+}
+
+type DisplayInfo struct {
+	NameKey             string `json:"name_key"`
+	DescriptionKey      string `json:"description_key"`
+	FallbackName        string `json:"fallback_name,omitempty"`
+	FallbackDescription string `json:"fallback_description,omitempty"`
+}
+
+type I18nInfo struct {
+	ModuleName string `json:"module_name"`
+}
+
+type ExposeInfo struct {
+	CLI bool `json:"cli"`
+	GUI bool `json:"gui"`
+}
+
+type HelpInfo struct {
+	OverviewKey string `json:"overview_key,omitempty"`
+	OptionsKey  string `json:"options_key,omitempty"`
+	NotesKey    string `json:"notes_key,omitempty"`
+}
+
+// Documentation Registry structures
+type DocumentationRegistry struct {
+	SchemaVersion int                     `json:"schema_version"`
+	Categories    []DocCategoryInfo       `json:"categories"`
+	Documents     []DocumentationMetadata `json:"documents"`
+}
+
+type DocCategoryInfo struct {
+	ID    string `json:"id"`
+	Order int    `json:"order"`
+	Name  string `json:"name"`
+}
+
+type DocumentationMetadata struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Filename    string `json:"filename"`
+	Category    string `json:"category"`
+}
+
+// AppState holds the application state including loaded registry
+type AppState struct {
+	registry    *ModuleRegistry
+	docRegistry *DocumentationRegistry
+	mutex       sync.RWMutex
 }
 
 type SessionManager struct {
@@ -90,10 +198,23 @@ type StartModuleRequest struct {
 }
 
 type DocMetadata struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Filename    string `json:"filename"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	NameKey        string `json:"name_key,omitempty"`
+	Description    string `json:"description"`
+	DescriptionKey string `json:"description_key,omitempty"`
+	Filename       string `json:"filename"`
+	Category       string `json:"category,omitempty"`
+	IsModule       bool   `json:"is_module"`
+	ParentID       string `json:"parent_id,omitempty"`
+}
+
+type CategoryMetadata struct {
+	ID           string `json:"id"`
+	Order        int    `json:"order"`
+	NameKey      string `json:"name_key,omitempty"`
+	FallbackName string `json:"fallback_name,omitempty"`
+	Name         string `json:"name,omitempty"`
 }
 
 type ConfigFormDefinition struct {
@@ -193,6 +314,9 @@ type AuthSettings struct {
 }
 
 var (
+	appState = &AppState{
+		registry: nil,
+	}
 	sessionManager = &SessionManager{
 		sessions: make(map[string]*ModuleSession),
 	}
@@ -918,6 +1042,116 @@ func loadConfig() *Config {
 	return config
 }
 
+// loadRegistry loads the module registry from cache via subprocess helper
+func loadRegistry(rootDir string) (*ModuleRegistry, error) {
+	// Path to the registry cache helper script
+	helperScript := filepath.Join(rootDir, "scripts", "registry_cache_helper.sh")
+
+	// Check if helper script exists
+	if _, err := os.Stat(helperScript); os.IsNotExist(err) {
+		return nil, fmt.Errorf("registry cache helper script not found: %s", helperScript)
+	}
+
+	// Call the subprocess with rebuild-or-read command
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, helperScript, "rebuild-or-read")
+	cmd.Env = append(os.Environ(), fmt.Sprintf("LH_ROOT_DIR=%s", rootDir))
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	log.Printf("Loading module registry via: %s rebuild-or-read", helperScript)
+
+	err := cmd.Run()
+	if err != nil {
+		// Log stderr if available
+		if stderr.Len() > 0 {
+			log.Printf("Registry helper stderr: %s", stderr.String())
+		}
+
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("registry cache helper timeout after 30s")
+		}
+		return nil, fmt.Errorf("registry cache helper failed: %w", err)
+	}
+
+	// Parse cache path from stdout (first line)
+	cachePath := strings.TrimSpace(strings.Split(stdout.String(), "\n")[0])
+	if cachePath == "" {
+		return nil, fmt.Errorf("registry cache helper returned empty cache path")
+	}
+
+	log.Printf("Loading registry from cache: %s", cachePath)
+
+	// Read cache file
+	cacheData, err := os.ReadFile(cachePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read registry cache: %w", err)
+	}
+
+	// Parse JSON
+	var registry ModuleRegistry
+	if err := json.Unmarshal(cacheData, &registry); err != nil {
+		return nil, fmt.Errorf("failed to parse registry JSON: %w", err)
+	}
+
+	// Validate schema version
+	if registry.SchemaVersion != 1 {
+		log.Printf("WARNING: Registry schema version %d, expected 1. Unknown fields will be ignored.", registry.SchemaVersion)
+	}
+
+	log.Printf("Successfully loaded registry: %d modules, %d categories (schema v%d, loader v%d)",
+		registry.CacheMetadata.ModuleCount,
+		registry.CacheMetadata.CategoryCount,
+		registry.SchemaVersion,
+		registry.LoaderVersion)
+
+	return &registry, nil
+}
+
+func loadDocumentationRegistry(rootDir string) (*DocumentationRegistry, error) {
+	registryPath := filepath.Join(rootDir, "docs", "meta", "_documentation_registry.json")
+
+	log.Printf("Loading documentation registry from: %s", registryPath)
+
+	// Read registry file
+	data, err := os.ReadFile(registryPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			log.Printf("Documentation registry not found at %s, continuing without it", registryPath)
+			return nil, nil // Not an error - registry is optional
+		}
+		return nil, fmt.Errorf("failed to read documentation registry: %w", err)
+	}
+
+	// Parse JSON
+	var docRegistry DocumentationRegistry
+	if err := json.Unmarshal(data, &docRegistry); err != nil {
+		return nil, fmt.Errorf("failed to parse documentation registry JSON: %w", err)
+	}
+
+	// Validate schema version
+	if docRegistry.SchemaVersion != 1 {
+		log.Printf("WARNING: Documentation registry schema version %d, expected 1", docRegistry.SchemaVersion)
+	}
+
+	// Validate that all referenced files exist and warn for missing ones
+	for _, doc := range docRegistry.Documents {
+		docPath := filepath.Join(rootDir, "docs", doc.Filename)
+		if _, err := os.Stat(docPath); err != nil {
+			log.Printf("WARNING: Documentation file not found: %s (referenced by doc ID: %s)", docPath, doc.ID)
+		}
+	}
+
+	log.Printf("Successfully loaded documentation registry: %d documents, %d categories",
+		len(docRegistry.Documents), len(docRegistry.Categories))
+
+	return &docRegistry, nil
+}
+
 func init() {
 	// Get the Little Linux Helper root directory
 	executable, err := os.Executable()
@@ -1007,6 +1241,32 @@ func main() {
 	// Load configuration
 	config := loadConfig()
 	configFormSchemas = loadConfigFormSchemas()
+
+	// Load module registry
+	log.Println("Loading module registry...")
+	registry, err := loadRegistry(lhRootDir)
+	if err != nil {
+		log.Printf("WARNING: Failed to load module registry: %v", err)
+		log.Println("GUI will start with limited module information")
+	} else {
+		appState.mutex.Lock()
+		appState.registry = registry
+		appState.mutex.Unlock()
+		log.Println("Module registry loaded successfully")
+	}
+
+	// Load documentation registry
+	log.Println("Loading documentation registry...")
+	docRegistry, err := loadDocumentationRegistry(lhRootDir)
+	if err != nil {
+		log.Printf("WARNING: Failed to load documentation registry: %v", err)
+		log.Println("GUI will start with limited documentation information")
+	} else if docRegistry != nil {
+		appState.mutex.Lock()
+		appState.docRegistry = docRegistry
+		appState.mutex.Unlock()
+		log.Println("Documentation registry loaded successfully")
+	}
 
 	// Override port from command line if provided (either -p or --port)
 	portValue := *portFlag
@@ -1172,6 +1432,9 @@ func main() {
 	// Get available modules
 	protectedAPI.Get("/modules", getModules)
 
+	// Manually refresh the module registry
+	protectedAPI.Post("/modules/refresh", refreshRegistry)
+
 	// Release/version information
 	protectedAPI.Get("/version", getVersion)
 
@@ -1180,6 +1443,7 @@ func main() {
 
 	// Get all available documentation
 	protectedAPI.Get("/docs", getAllDocs)
+	protectedAPI.Get("/docs/categories", getDocCategories)
 	protectedAPI.Get("/docs/unlinked", getUnlinkedDocs)
 
 	// Configuration file management
@@ -1258,396 +1522,204 @@ func main() {
 	log.Fatal(app.Listen(listenAddr))
 }
 
-// detectLanguage extracts language preference from Accept-Language header or query param
-func detectLanguage(c *fiber.Ctx) string {
-	// First check for explicit lang query parameter
-	if lang := c.Query("lang"); lang != "" {
-		return lang
+// convertRegistryModuleToModuleInfo converts a RegistryModule to the ModuleInfo format expected by frontend
+func convertRegistryModuleToModuleInfo(rm RegistryModule, parentID string, inheritedCategory string) ModuleInfo {
+	info := ModuleInfo{
+		ID:             rm.ID,
+		Name:           rm.Display.FallbackName,
+		Description:    rm.Display.FallbackDescription,
+		NameKey:        rm.Display.NameKey,
+		DescriptionKey: rm.Display.DescriptionKey,
+		Path:           rm.Entry,
+		Category:       rm.Category.ID,
+		Help:           rm.Help,
 	}
 
-	// Then check Accept-Language header
-	acceptLang := c.Get("Accept-Language")
-	if acceptLang != "" {
-		// Simple language detection - take first language code
-		if strings.HasPrefix(acceptLang, "de") {
-			return "de"
-		}
-		if strings.HasPrefix(acceptLang, "en") {
-			return "en"
-		}
+	// If category is empty (submodule), inherit from parent
+	if info.Category == "" && inheritedCategory != "" {
+		info.Category = inheritedCategory
 	}
 
-	// Default to English
-	return "en"
+	if parentID != "" {
+		info.Parent = parentID
+	}
+
+	if len(rm.Submodules) > 0 {
+		info.SubmoduleCount = len(rm.Submodules)
+	}
+
+	return info
 }
 
-// translateModuleCategory translates module category based on language
-func translateModuleCategory(category, lang string) string {
-	categoryTranslations := map[string]map[string]string{
-		"Recovery & Restarts": {
-			"en": "Recovery & Restarts",
-			"de": "Wiederherstellung & Neustarts",
-		},
-		"System Diagnosis & Analysis": {
-			"en": "System Diagnosis & Analysis",
-			"de": "Systemdiagnose & Analyse",
-		},
-		"Maintenance & Security": {
-			"en": "Maintenance & Security",
-			"de": "Wartung & Sicherheit",
-		},
-		"Docker & Containers": {
-			"en": "Docker & Containers",
-			"de": "Docker & Container",
-		},
-		"Backup & Recovery": {
-			"en": "Backup & Recovery",
-			"de": "Backup & Wiederherstellung",
-		},
-	}
+// flattenModules recursively flattens registry modules and submodules into a flat list
+func flattenModules(modules []RegistryModule, parentID string, inheritedCategory string) []ModuleInfo {
+	var result []ModuleInfo
 
-	if translations, exists := categoryTranslations[category]; exists {
-		if translated, exists := translations[lang]; exists {
-			return translated
+	for _, rm := range modules {
+		// Skip disabled or non-GUI modules
+		if !rm.Enabled || !rm.Expose.GUI {
+			continue
+		}
+
+		// Add the module itself
+		moduleInfo := convertRegistryModuleToModuleInfo(rm, parentID, inheritedCategory)
+		result = append(result, moduleInfo)
+
+		// Recursively add submodules, inheriting this module's category
+		if len(rm.Submodules) > 0 {
+			categoryToInherit := rm.Category.ID
+			if categoryToInherit == "" {
+				categoryToInherit = inheritedCategory
+			}
+			result = append(result, flattenModules(rm.Submodules, rm.ID, categoryToInherit)...)
 		}
 	}
 
-	// Return original if no translation found
-	return category
+	return result
 }
 
-// translateModuleName translates module name based on language
-func translateModuleName(name, lang string) string {
-	nameTranslations := map[string]map[string]string{
-		"Services & Desktop Restart Options": {
-			"en": "Services & Desktop Restart Options",
-			"de": "Dienste & Desktop Neustart-Optionen",
-		},
-		"Display System Information": {
-			"en": "Display System Information",
-			"de": "Systeminformationen anzeigen",
-		},
-		"Disk Tools": {
-			"en": "Disk Tools",
-			"de": "Festplatten-Tools",
-		},
-		"Log Analysis Tools": {
-			"en": "Log Analysis Tools",
-			"de": "Log-Analyse-Tools",
-		},
-		"Package Management & Updates": {
-			"en": "Package Management & Updates",
-			"de": "Paketmanagement & Updates",
-		},
-		"Security Checks": {
-			"en": "Security Checks",
-			"de": "Sicherheitsprüfungen",
-		},
-		"Energy Management": {
-			"en": "Energy Management",
-			"de": "Energieverwaltung",
-		},
-		"Docker Management": {
-			"en": "Docker Management",
-			"de": "Docker-Verwaltung",
-		},
-		"Complete System Backup": {
-			"en": "Complete System Backup",
-			"de": "Vollständige Systemsicherung",
-		},
-		"BTRFS Snapshot Backup": {
-			"en": "BTRFS Snapshot Backup",
-			"de": "BTRFS Snapshot-Backup",
-		},
-		"BTRFS System Restore": {
-			"en": "BTRFS System Restore",
-			"de": "BTRFS System-Wiederherstellung",
-		},
-		"Backup & Recovery": {
-			"en": "Backup & Recovery",
-			"de": "Backup & Wiederherstellung",
-		},
-		"BTRFS Backup": {
-			"en": "BTRFS Backup",
-			"de": "BTRFS Backup",
-		},
-		"BTRFS Restore": {
-			"en": "BTRFS Restore",
-			"de": "BTRFS Wiederherstellung",
-		},
-	}
-
-	if translations, exists := nameTranslations[name]; exists {
-		if translated, exists := translations[lang]; exists {
-			return translated
+// findModuleDocsPath searches for a module's docs path in the registry (recursively checks submodules)
+func findModuleDocsPath(modules []RegistryModule, moduleID string) string {
+	for _, module := range modules {
+		if module.ID == moduleID {
+			return module.Docs
+		}
+		// Recursively search submodules
+		if len(module.Submodules) > 0 {
+			if docsPath := findModuleDocsPath(module.Submodules, moduleID); docsPath != "" {
+				return docsPath
+			}
 		}
 	}
+	return ""
+}
 
-	// Return original if no translation found
-	return name
+// findModuleByID searches for a module by ID in the registry (recursively checks submodules)
+func findModuleByID(modules []RegistryModule, moduleID string) *RegistryModule {
+	for i := range modules {
+		if modules[i].ID == moduleID {
+			return &modules[i]
+		}
+		// Recursively search submodules
+		if len(modules[i].Submodules) > 0 {
+			if found := findModuleByID(modules[i].Submodules, moduleID); found != nil {
+				return found
+			}
+		}
+	}
+	return nil
 }
 
 func getModules(c *fiber.Ctx) error {
-	modules := []ModuleInfo{
-		// Main modules
-		{
-			ID:             "restarts",
-			Name:           "Services & Desktop Restart Options",
-			Description:    "Restart system services, desktop environment, and power management",
-			Path:           "modules/mod_restarts.sh",
-			Category:       "Recovery & Restarts",
-			SubmoduleCount: 7,
-		},
-		{
-			ID:             "system_info",
-			Name:           "Display System Information",
-			Description:    "Show comprehensive system information and hardware details",
-			Path:           "modules/mod_system_info.sh",
-			Category:       "System Diagnosis & Analysis",
-			SubmoduleCount: 9,
-		},
-		{
-			ID:             "network",
-			Name:           "Network Diagnostics & Tools",
-			Description:    "Network status dashboards, connectivity checks, routing and DNS insights",
-			Path:           "modules/mod_network.sh",
-			Category:       "System Diagnosis & Analysis",
-			SubmoduleCount: 6,
-		},
-		{
-			ID:             "disk",
-			Name:           "Disk Tools",
-			Description:    "Disk utilities and storage analysis tools",
-			Path:           "modules/mod_disk.sh",
-			Category:       "System Diagnosis & Analysis",
-			SubmoduleCount: 8,
-		},
-		{
-			ID:             "logs",
-			Name:           "Log Analysis Tools",
-			Description:    "Analyze system logs and troubleshoot issues",
-			Path:           "modules/mod_logs.sh",
-			Category:       "System Diagnosis & Analysis",
-			SubmoduleCount: 7,
-		},
-		{
-			ID:             "packages",
-			Name:           "Package Management & Updates",
-			Description:    "Manage packages and system updates",
-			Path:           "modules/mod_packages.sh",
-			Category:       "Maintenance & Security",
-			SubmoduleCount: 7,
-		},
-		{
-			ID:             "security",
-			Name:           "Security Checks",
-			Description:    "Perform security audits and checks",
-			Path:           "modules/mod_security.sh",
-			Category:       "Maintenance & Security",
-			SubmoduleCount: 7,
-		},
-		{
-			ID:             "energy",
-			Name:           "Energy Management",
-			Description:    "Power management and energy optimization",
-			Path:           "modules/mod_energy.sh",
-			Category:       "Maintenance & Security",
-			SubmoduleCount: 4,
-		},
+	// Try to get modules from registry
+	appState.mutex.RLock()
+	registry := appState.registry
+	appState.mutex.RUnlock()
 
-		// Docker modules
-		{
-			ID:             "docker",
-			Name:           "Docker Functions",
-			Description:    "Docker management and security tools",
-			Path:           "modules/mod_docker.sh",
-			Category:       "Docker & Containers",
-			SubmoduleCount: 4,
-		},
+	if registry != nil {
+		// Convert registry modules to ModuleInfo format
+		modules := flattenModules(registry.Modules, "", "")
 
-		// Backup parent module
-		{
-			ID:             "backup",
-			Name:           "Backup & Recovery",
-			Description:    "Backup and restore operations",
-			Path:           "modules/backup/mod_backup.sh",
-			Category:       "Backup & Recovery",
-			SubmoduleCount: 7,
-		},
-
-		// Backup submodules
-		{
-			ID:             "btrfs_backup",
-			Name:           "BTRFS Backup",
-			Description:    "Advanced BTRFS snapshot-based backup system with maintenance tools",
-			Path:           "modules/backup/mod_btrfs_backup.sh",
-			Category:       "Backup & Recovery",
-			Parent:         "backup",
-			SubmoduleCount: 7,
-		},
-		{
-			ID:             "btrfs_restore",
-			Name:           "BTRFS Restore",
-			Description:    "BTRFS snapshot restoration with dry-run support",
-			Path:           "modules/backup/mod_btrfs_restore.sh",
-			Category:       "Backup & Recovery",
-			Parent:         "backup",
-			SubmoduleCount: 6,
-		},
+		// Return modules with categories
+		response := ModulesResponse{
+			Modules:    modules,
+			Categories: registry.Categories,
+		}
+		return c.JSON(response)
 	}
 
-	return c.JSON(modules)
+	// Registry is required - no fallback
+	log.Println("ERROR: Registry not loaded and no fallback available")
+	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+		"error":   "Module registry not loaded",
+		"message": "The module registry failed to load. Please check logs and rebuild cache.",
+	})
 }
 
-var documentationFiles = map[string]string{
-	// Main modules (both with and without mod_ prefix)
-	"restarts":        "mod/doc_restarts.md",
-	"mod_restarts":    "mod/doc_restarts.md",
-	"system_info":     "mod/doc_system_info.md",
-	"mod_system_info": "mod/doc_system_info.md",
-	"network":         "mod/doc_network.md",
-	"mod_network":     "mod/doc_network.md",
-	"disk":            "mod/doc_disk.md",
-	"mod_disk":        "mod/doc_disk.md",
-	"logs":            "mod/doc_logs.md",
-	"mod_logs":        "mod/doc_logs.md",
-	"packages":        "mod/doc_packages.md",
-	"mod_packages":    "mod/doc_packages.md",
-	"security":        "mod/doc_security.md",
-	"mod_security":    "mod/doc_security.md",
-	"energy":          "mod/doc_energy.md",
-	"mod_energy":      "mod/doc_energy.md",
+// refreshRegistry manually triggers a registry reload
+func refreshRegistry(c *fiber.Ctx) error {
+	log.Println("Manual registry refresh requested")
 
-	// Docker modules
-	"docker":              "mod/doc_docker.md",
-	"mod_docker":          "mod/doc_docker.md",
-	"mod_docker_setup":    "mod/doc_docker_setup.md",
-	"mod_docker_security": "mod/doc_docker_security.md",
+	// Load the registry (this will call the cache helper script)
+	registry, err := loadRegistry(lhRootDir)
+	if err != nil {
+		log.Printf("ERROR: Failed to refresh registry: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"error":   fmt.Sprintf("Failed to refresh registry: %v", err),
+		})
+	}
 
-	// Backup modules
-	"backup":            "mod/doc_backup.md",
-	"mod_backup":        "mod/doc_backup.md",
-	"btrfs_backup":      "mod/doc_btrfs_backup.md",
-	"mod_btrfs_backup":  "mod/doc_btrfs_backup.md",
-	"btrfs_restore":     "mod/doc_btrfs_restore.md",
-	"mod_btrfs_restore": "mod/doc_btrfs_restore.md",
-	"mod_backup_tar":    "mod/doc_backup_tar.md",
-	"mod_restore_tar":   "mod/doc_restore_tar.md",
-	"mod_backup_rsync":  "mod/doc_backup_rsync.md",
-	"mod_restore_rsync": "mod/doc_restore_rsync.md",
+	// Update the app state
+	appState.mutex.Lock()
+	appState.registry = registry
+	appState.mutex.Unlock()
 
-	// Other documentation
-	"advanced_log_analyzer": "tools/doc_advanced_log_analyzer.md",
+	log.Printf("Registry refreshed successfully: %d modules, %d categories",
+		registry.CacheMetadata.ModuleCount,
+		registry.CacheMetadata.CategoryCount)
 
-	// Library documentation
-	"lib_btrfs":            "lib/doc_btrfs.md",
-	"lib_common":           "lib/doc_common.md",
-	"lib_colors":           "lib/doc_colors.md",
-	"lib_config":           "lib/doc_config.md",
-	"lib_filesystem":       "lib/doc_filesystem.md",
-	"lib_i18n":             "lib/doc_i18n.md",
-	"lib_logging":          "lib/doc_logging.md",
-	"lib_notifications":    "lib/doc_notifications.md",
-	"lib_package_mappings": "lib/doc_package_mappings.md",
-	"lib_packages":         "lib/doc_packages.md",
-	"lib_system":           "lib/doc_system.md",
-	"lib_ui":               "lib/doc_ui.md",
-
-	// Project documentation
-	"DEVELOPER_GUIDE":     "CLI_DEVELOPER_GUIDE.md",
-	"GUI_DEVELOPER_GUIDE": "GUI_DEVELOPER_GUIDE.md",
-	"gui":                 "gui/doc_interface.md",
-
-	// GUI specialized documentation
-	"gui_backend_api":              "gui/doc_backend_api.md",
-	"gui_frontend_react":           "gui/doc_frontend_react.md",
-	"gui_i18n":                     "gui/doc_i18n.md",
-	"gui_module_integration":       "gui/doc_module_integration.md",
-	"gui_customization":            "gui/doc_customization.md",
-	"gui_module_maintenance_guide": "gui/doc_module_maintenance_guide.md",
-	"doc_gui_launcher":             "doc_gui_launcher.md",
-
-	"README":     "../README.md",
-	"README_DE":  "../README_DE.md",
-	"gui_README": "../gui/README.md",
-
-	"lib_btrfs_core":   "lib/doc_btrfs_core.md",
-	"lib_btrfs_layout": "lib/doc_btrfs_layout.md",
-}
-
-var docCatalog = []DocMetadata{
-	// System Administration
-	{ID: "mod_system_info", Name: "System Information", Description: "Show comprehensive system information and hardware details", Filename: "mod/doc_system_info.md"},
-	{ID: "mod_security", Name: "Security Analysis", Description: "Perform security audits and checks", Filename: "mod/doc_security.md"},
-	{ID: "mod_disk", Name: "Disk Management", Description: "Disk utilities and storage analysis tools", Filename: "mod/doc_disk.md"},
-	{ID: "mod_packages", Name: "Package Management", Description: "Manage packages and system updates", Filename: "mod/doc_packages.md"},
-	{ID: "mod_energy", Name: "Energy Management", Description: "Power management and energy optimization", Filename: "mod/doc_energy.md"},
-
-	// Backup & Recovery
-	{ID: "mod_backup", Name: "General Backup", Description: "Backup and restore operations", Filename: "mod/doc_backup.md"},
-	{ID: "mod_btrfs_backup", Name: "BTRFS Backup", Description: "Advanced BTRFS snapshot-based backup system", Filename: "mod/doc_btrfs_backup.md"},
-	{ID: "mod_btrfs_restore", Name: "BTRFS Restore", Description: "BTRFS snapshot restoration with dry-run support", Filename: "mod/doc_btrfs_restore.md"},
-	{ID: "mod_backup_tar", Name: "TAR Backup", Description: "Archive-based backups", Filename: "mod/doc_backup_tar.md"},
-	{ID: "mod_restore_tar", Name: "TAR Restore", Description: "Restore from TAR archives", Filename: "mod/doc_restore_tar.md"},
-	{ID: "mod_backup_rsync", Name: "RSYNC Backup", Description: "Incremental file-based backups", Filename: "mod/doc_backup_rsync.md"},
-	{ID: "mod_restore_rsync", Name: "RSYNC Restore", Description: "Restore from RSYNC backups", Filename: "mod/doc_restore_rsync.md"},
-
-	// Docker & Containers
-	{ID: "mod_docker", Name: "Docker Management", Description: "Docker management and security tools", Filename: "mod/doc_docker.md"},
-	{ID: "mod_docker_setup", Name: "Docker Setup", Description: "Install and configure Docker", Filename: "mod/doc_docker_setup.md"},
-	{ID: "mod_docker_security", Name: "Docker Security", Description: "Security audit for Docker containers", Filename: "mod/doc_docker_security.md"},
-
-	// Logs & Analysis
-	{ID: "mod_logs", Name: "Log Analysis", Description: "Analyze system logs and troubleshoot issues", Filename: "mod/doc_logs.md"},
-	{ID: "advanced_log_analyzer", Name: "Advanced Log Analyzer", Description: "Python-based log analysis tool", Filename: "tools/doc_advanced_log_analyzer.md"},
-
-	// System Maintenance
-	{ID: "mod_restarts", Name: "System Restarts", Description: "Restart system services and desktop environment components", Filename: "mod/doc_restarts.md"},
-
-	// Development & Libraries
-	{ID: "lib_btrfs", Name: "BTRFS Library", Description: "Advanced BTRFS operations and utilities", Filename: "lib/doc_btrfs.md"},
-	{ID: "lib_common", Name: "Common Functions Library", Description: "Core shared functions and utilities", Filename: "lib/doc_common.md"},
-	{ID: "lib_colors", Name: "Color Functions Library", Description: "Terminal color formatting and styling", Filename: "lib/doc_colors.md"},
-	{ID: "lib_config", Name: "Configuration Library", Description: "Configuration file handling and management", Filename: "lib/doc_config.md"},
-	{ID: "lib_filesystem", Name: "Filesystem Library", Description: "File system operations and utilities", Filename: "lib/doc_filesystem.md"},
-	{ID: "lib_i18n", Name: "Internationalization Library", Description: "Multi-language support and message handling", Filename: "lib/doc_i18n.md"},
-	{ID: "lib_logging", Name: "Logging Library", Description: "Structured logging and error handling", Filename: "lib/doc_logging.md"},
-	{ID: "lib_notifications", Name: "Notifications Library", Description: "Desktop notification system integration", Filename: "lib/doc_notifications.md"},
-	{ID: "lib_package_mappings", Name: "Package Mappings Library", Description: "Cross-distribution package name mappings", Filename: "lib/doc_package_mappings.md"},
-	{ID: "lib_packages", Name: "Package Management Library", Description: "Distribution-agnostic package management", Filename: "lib/doc_packages.md"},
-	{ID: "lib_system", Name: "System Information Library", Description: "System detection and hardware information", Filename: "lib/doc_system.md"},
-	{ID: "lib_ui", Name: "User Interface Library", Description: "User interface functions and input handling", Filename: "lib/doc_ui.md"},
-	{ID: "lib_btrfs_core", Name: "BTRFS Core Library", Description: "Core BTRFS helper functions and routines", Filename: "lib/doc_btrfs_core.md"},
-	{ID: "lib_btrfs_layout", Name: "BTRFS Layout Reference", Description: "Reference for BTRFS snapshot and bundle layout", Filename: "lib/doc_btrfs_layout.md"},
-	{ID: "DEVELOPER_GUIDE", Name: "CLI Developer Guide", Description: "CLI development guidelines and architecture documentation", Filename: "CLI_DEVELOPER_GUIDE.md"},
-	{ID: "GUI_DEVELOPER_GUIDE", Name: "GUI Developer Guide", Description: "GUI development guidelines and architecture documentation", Filename: "GUI_DEVELOPER_GUIDE.md"},
-
-	// GUI Specialized Documentation
-	{ID: "gui_backend_api", Name: "GUI Backend API", Description: "Go backend development, API endpoints, and data structures", Filename: "gui/doc_backend_api.md"},
-	{ID: "gui_frontend_react", Name: "GUI React Frontend", Description: "React component development and frontend architecture", Filename: "gui/doc_frontend_react.md"},
-	{ID: "gui_i18n", Name: "GUI Internationalization", Description: "Internationalization system for frontend and backend", Filename: "gui/doc_i18n.md"},
-	{ID: "gui_module_integration", Name: "GUI Module Integration", Description: "How CLI modules automatically integrate with GUI", Filename: "gui/doc_module_integration.md"},
-	{ID: "gui_customization", Name: "GUI Customization", Description: "Theme customization, extensions, and advanced modifications", Filename: "gui/doc_customization.md"},
-	{ID: "gui_module_maintenance_guide", Name: "GUI Module Maintenance", Description: "Checklist for keeping GUI module metadata in sync", Filename: "gui/doc_module_maintenance_guide.md"},
-
-	// Project Information
-	{ID: "gui", Name: "GUI Documentation", Description: "Web-based graphical interface documentation", Filename: "gui/doc_interface.md"},
-	{ID: "doc_gui_launcher", Name: "GUI Launcher Guide", Description: "Usage guide for the GUI launcher script", Filename: "doc_gui_launcher.md"},
-	{ID: "README", Name: "Project README", Description: "Main project overview, features, and usage guide", Filename: "../README.md"},
-	{ID: "README_DE", Name: "Project README (German)", Description: "German project overview, features, and usage guide", Filename: "../README_DE.md"},
-	{ID: "gui_README", Name: "GUI README", Description: "GUI-specific setup, development, and usage guide", Filename: "../gui/README.md"},
+	return c.JSON(fiber.Map{
+		"success":        true,
+		"message":        "Registry refreshed successfully",
+		"module_count":   registry.CacheMetadata.ModuleCount,
+		"category_count": registry.CacheMetadata.CategoryCount,
+		"schema_version": registry.SchemaVersion,
+		"loader_version": registry.LoaderVersion,
+	})
 }
 
 func getModuleDocs(c *fiber.Ctx) error {
 	moduleId := c.Params("id")
 
-	docFile, exists := documentationFiles[moduleId]
-	if !exists {
-		return c.Status(404).JSON(fiber.Map{"error": "Documentation not found"})
+	var docFile string
+
+	// Try to get docs path from both registries
+	appState.mutex.RLock()
+	moduleRegistry := appState.registry
+	docRegistry := appState.docRegistry
+	appState.mutex.RUnlock()
+
+	// First check module registry
+	if moduleRegistry != nil {
+		docFile = findModuleDocsPath(moduleRegistry.Modules, moduleId)
+	}
+
+	// Then check documentation registry if not found
+	if docFile == "" && docRegistry != nil {
+		for _, doc := range docRegistry.Documents {
+			if doc.ID == moduleId {
+				docFile = doc.Filename
+				break
+			}
+		}
+	}
+
+	// If still not found, treat moduleId as a direct file path (for unlinked docs)
+	if docFile == "" {
+		// Check if it looks like a file path (contains .md extension)
+		if strings.HasSuffix(moduleId, ".md") {
+			docFile = moduleId
+		} else {
+			log.Printf("ERROR: Documentation for '%s' not found in any registry", moduleId)
+			return c.Status(404).JSON(fiber.Map{
+				"error":   "Documentation not found",
+				"message": fmt.Sprintf("Documentation for '%s' not found in registry", moduleId),
+			})
+		}
 	}
 
 	docPath := filepath.Join(lhRootDir, "docs", docFile)
-	content, err := os.ReadFile(docPath)
+
+	// Validate path to prevent directory traversal
+	cleanPath := filepath.Clean(docPath)
+	docsRoot := filepath.Join(lhRootDir, "docs")
+	if !strings.HasPrefix(cleanPath, docsRoot) {
+		log.Printf("Security: Rejected doc path outside docs root: %s", cleanPath)
+		return c.Status(403).JSON(fiber.Map{"error": "Access denied"})
+	}
+
+	content, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Documentation file not found"})
 	}
@@ -1656,28 +1728,144 @@ func getModuleDocs(c *fiber.Ctx) error {
 }
 
 func getAllDocs(c *fiber.Ctx) error {
-	docsDir := filepath.Join(lhRootDir, "docs")
-	availableDocs := make([]DocMetadata, 0, len(docCatalog))
+	appState.mutex.RLock()
+	moduleRegistry := appState.registry
+	docRegistry := appState.docRegistry
+	appState.mutex.RUnlock()
 
-	for _, doc := range docCatalog {
-		docPath := filepath.Join(docsDir, doc.Filename)
-		if _, err := os.Stat(docPath); err == nil {
-			availableDocs = append(availableDocs, doc)
+	allDocs := []DocMetadata{}
+	docsDir := filepath.Join(lhRootDir, "docs")
+
+	// 1. Add module docs from module registry
+	if moduleRegistry != nil {
+		for _, module := range moduleRegistry.Modules {
+			if module.Docs != "" {
+				// Check if doc file exists
+				docPath := filepath.Join(docsDir, module.Docs)
+				if _, err := os.Stat(docPath); err == nil {
+					allDocs = append(allDocs, DocMetadata{
+						ID:             module.ID,
+						NameKey:        module.Display.NameKey,
+						Name:           module.Display.FallbackName,
+						DescriptionKey: module.Display.DescriptionKey,
+						Description:    module.Display.FallbackDescription,
+						Filename:       module.Docs,
+						Category:       module.Category.ID,
+						IsModule:       true,
+					})
+				}
+			}
+			// Include submodules recursively
+			for _, sub := range module.Submodules {
+				if sub.Docs != "" {
+					docPath := filepath.Join(docsDir, sub.Docs)
+					if _, err := os.Stat(docPath); err == nil {
+						// Submodules inherit parent category if they don't have their own
+						categoryID := sub.Category.ID
+						if categoryID == "" {
+							categoryID = module.Category.ID
+						}
+						allDocs = append(allDocs, DocMetadata{
+							ID:             sub.ID,
+							NameKey:        sub.Display.NameKey,
+							Name:           sub.Display.FallbackName,
+							DescriptionKey: sub.Display.DescriptionKey,
+							Description:    sub.Display.FallbackDescription,
+							Filename:       sub.Docs,
+							Category:       categoryID,
+							IsModule:       true,
+							ParentID:       module.ID,
+						})
+					}
+				}
+			}
 		}
 	}
 
-	return c.JSON(availableDocs)
+	// 2. Add non-module docs from documentation registry
+	if docRegistry != nil {
+		for _, doc := range docRegistry.Documents {
+			// Check if doc file exists
+			docPath := filepath.Join(docsDir, doc.Filename)
+			if _, err := os.Stat(docPath); err == nil {
+				allDocs = append(allDocs, DocMetadata{
+					ID:          doc.ID,
+					Name:        doc.Name,
+					Description: doc.Description,
+					Filename:    doc.Filename,
+					Category:    doc.Category,
+					IsModule:    false,
+				})
+			}
+		}
+	}
+
+	return c.JSON(allDocs)
+}
+
+func getDocCategories(c *fiber.Ctx) error {
+	appState.mutex.RLock()
+	moduleRegistry := appState.registry
+	docRegistry := appState.docRegistry
+	appState.mutex.RUnlock()
+
+	categories := make(map[string]CategoryMetadata)
+
+	// Add module categories
+	if moduleRegistry != nil {
+		for _, cat := range moduleRegistry.Categories {
+			categories[cat.ID] = CategoryMetadata{
+				ID:           cat.ID,
+				Order:        cat.Order,
+				NameKey:      cat.NameKey,
+				FallbackName: cat.FallbackName,
+			}
+		}
+	}
+
+	// Add/override with doc registry categories
+	if docRegistry != nil {
+		for _, cat := range docRegistry.Categories {
+			categories[cat.ID] = CategoryMetadata{
+				ID:    cat.ID,
+				Order: cat.Order,
+				Name:  cat.Name,
+			}
+		}
+	}
+
+	return c.JSON(categories)
 }
 
 func getUnlinkedDocs(c *fiber.Ctx) error {
 	docsDir := filepath.Join(lhRootDir, "docs")
 	knownDocs := make(map[string]struct{})
 
-	for _, doc := range docCatalog {
-		knownDocs[filepath.ToSlash(filepath.Clean(doc.Filename))] = struct{}{}
+	// Add docs from documentation registry
+	appState.mutex.RLock()
+	docRegistry := appState.docRegistry
+	if docRegistry != nil {
+		for _, doc := range docRegistry.Documents {
+			knownDocs[filepath.ToSlash(filepath.Clean(doc.Filename))] = struct{}{}
+		}
 	}
-	for _, path := range documentationFiles {
-		knownDocs[filepath.ToSlash(filepath.Clean(path))] = struct{}{}
+
+	// Add module docs from module registry
+	registry := appState.registry
+	appState.mutex.RUnlock()
+
+	if registry != nil {
+		for _, module := range registry.Modules {
+			if module.Docs != "" {
+				knownDocs[filepath.ToSlash(filepath.Clean(module.Docs))] = struct{}{}
+			}
+			// Also check submodules
+			for _, sub := range module.Submodules {
+				if sub.Docs != "" {
+					knownDocs[filepath.ToSlash(filepath.Clean(sub.Docs))] = struct{}{}
+				}
+			}
+		}
 	}
 
 	unlinked := make([]string, 0)
@@ -1751,49 +1939,34 @@ func startModule(c *fiber.Ctx) error {
 	// Generate session ID
 	sessionId := fmt.Sprintf("%s_%d", moduleId, time.Now().Unix())
 
-	// Map module ID to human-readable names
-	moduleNames := map[string]string{
-		"restarts":      "Services & Desktop Restart Options",
-		"system_info":   "Display System Information",
-		"disk":          "Disk Tools",
-		"logs":          "Log Analysis Tools",
-		"packages":      "Package Management & Updates",
-		"security":      "Security Checks",
-		"energy":        "Energy Management",
-		"docker":        "Docker Functions",
-		"backup":        "Backup & Recovery",
-		"btrfs_backup":  "BTRFS Backup",
-		"btrfs_restore": "BTRFS Restore",
+	// Look up module in registry (including submodules)
+	appState.mutex.RLock()
+	registry := appState.registry
+	appState.mutex.RUnlock()
+
+	var modulePath string
+	var moduleName string
+	found := false
+
+	if registry != nil && registry.Modules != nil {
+		// Use the recursive findModuleByID function to search including submodules
+		if module := findModuleByID(registry.Modules, moduleId); module != nil {
+			modulePath = module.Entry
+			moduleName = module.Display.FallbackName
+			if moduleName == "" {
+				moduleName = module.ID
+			}
+			found = true
+		}
 	}
 
-	// Map module ID to script path
-	modulePaths := map[string]string{
-		// Main modules
-		"restarts":    "modules/mod_restarts.sh",
-		"system_info": "modules/mod_system_info.sh",
-		"disk":        "modules/mod_disk.sh",
-		"logs":        "modules/mod_logs.sh",
-		"packages":    "modules/mod_packages.sh",
-		"security":    "modules/mod_security.sh",
-		"energy":      "modules/mod_energy.sh",
-
-		// Docker modules
-		"docker": "modules/mod_docker.sh",
-
-		// Backup modules
-		"backup":        "modules/backup/mod_backup.sh",
-		"btrfs_backup":  "modules/backup/mod_btrfs_backup.sh",
-		"btrfs_restore": "modules/backup/mod_btrfs_restore.sh",
-	}
-
-	modulePath, exists := modulePaths[moduleId]
-	if !exists {
-		return c.Status(400).JSON(fiber.Map{"error": "Unknown module"})
-	}
-
-	moduleName, nameExists := moduleNames[moduleId]
-	if !nameExists {
-		moduleName = moduleId // Fallback to ID if name not found
+	// Registry is required - no fallback
+	if !found {
+		log.Printf("ERROR: Module '%s' not found in registry", moduleId)
+		return c.Status(404).JSON(fiber.Map{
+			"error":   "Module not found",
+			"message": fmt.Sprintf("Module '%s' not found in registry", moduleId),
+		})
 	}
 
 	scriptPath := filepath.Join(lhRootDir, modulePath)

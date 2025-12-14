@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "logs",
+  "entry": "modules/mod_logs.sh",
+  "category": {
+    "id": "system"
+  },
+  "order": 50,
+  "docs": "modules/doc_logs.md",
+  "display": {
+    "name_key": "LOGS_MODULE_NAME",
+    "description_key": "LOGS_MODULE_DESC",
+    "fallback_name": "Log Analysis Tools",
+    "fallback_description": "Analyze system logs and troubleshoot issues"
+  },
+  "i18n": {
+    "module_name": "logs"
+  },
+  "help": {
+    "overview_key": "LOGS_HELP_OVERVIEW",
+    "options_key": "LOGS_HELP_OPTIONS",
+    "notes_key": "LOGS_HELP_NOTES"
+  },
+  "expose": {
+    "cli": true,
+    "gui": true
+  },
+  "enabled": true,
+  "requires_root": false,
+  "tags": ["logs", "analysis", "troubleshooting", "journalctl"]
+}

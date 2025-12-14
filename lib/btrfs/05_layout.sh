@@ -2,7 +2,7 @@
 #
 # lib/btrfs/05_layout.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # BTRFS backup layout helpers (bundle-based hierarchy).
 # Provides path builders and enumeration utilities shared by backup/restore modules.

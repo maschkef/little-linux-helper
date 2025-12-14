@@ -2,11 +2,16 @@
 #
 # lang/en/modules/network_tools.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # English language strings for the network tools module
 
 [[ ! -v MSG_EN ]] && declare -A MSG_EN
+
+# Help content
+MSG_EN[NETWORK_HELP_OVERVIEW]="Diagnose connectivity issues with a unified view of interfaces, routing, DNS, and service health. Includes quick actions to restart network managers and flush DNS caches when troubleshooting."
+MSG_EN[NETWORK_HELP_OPTIONS]="1. Status Dashboard - Show every interface with MAC address, IPv4/IPv6 assignments, carrier state, and connection type (including NetworkManager metadata when available)|2. Connectivity Checks - Ping the default gateway and well-known internet hosts plus verify hostname resolution to confirm DNS health|3. Routing & DNS View - Display the default route, main routing table, and resolver configuration (resolvectl, systemd-resolve, or /etc/resolv.conf fallback)|4. Service Health Overview - Inspect systemctl status for common network services such as NetworkManager, systemd-networkd, wpa_supplicant, systemd-resolved, and connman|5. Restart Network Services - Reuse the restart module workflow to restart selected network daemons or all detected services|6. Clear DNS Cache - Flush caches for systemd-resolved, dnsmasq, nscd, and BIND/rndc when those services are active"
+MSG_EN[NETWORK_HELP_NOTES]="Requires standard networking utilities (ip, ping, getent); missing tools are reported with guidance|Service restarts and DNS cache flushes run with sudo and may briefly interrupt connectivity|NetworkManager-specific details are shown only when nmcli is installed; wireless tagging relies on the iw tool|Status and routing views are read-only unless you choose restart or cache-clearing actions"
 
 # Menu entries
 MSG_EN[NETWORK_TOOLS_TITLE]="Network Tools"

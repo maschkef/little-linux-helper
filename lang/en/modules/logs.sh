@@ -2,12 +2,17 @@
 #
 # lang/en/logs.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # English language strings for logs module
 
 # Declare MSG_EN as associative array if not already declared
 [[ ! -v MSG_EN ]] && declare -A MSG_EN
+
+# Help content
+MSG_EN[LOGS_HELP_OVERVIEW]="Find and analyze system logs to troubleshoot problems, monitor system health, or investigate what happened during crashes or errors."
+MSG_EN[LOGS_HELP_OPTIONS]="1. Recent Logs (Current Boot) - See what happened in the last few minutes or hours on your system|2. Recent Logs (Previous Boot) - Check what went wrong before your last reboot or crash|3. Service-Specific Logs - View logs for specific programs like SSH, web servers, or databases|4. X.org Logs - Check graphics system logs to troubleshoot display or driver issues|5. Kernel Messages - View low-level system messages from the Linux kernel (hardware, drivers)|6. Package Manager Logs - See history of software installations, updates, and removals|7. Advanced Analysis - Python-powered log analysis to automatically find errors and patterns"
+MSG_EN[LOGS_HELP_NOTES]="Most logs are automatically filtered to show errors and warnings first|You can save any log output to files for later review or sharing|Advanced analysis uses Python with regex patterns to parse logs and highlight issues|Some system logs require administrator privileges to access"
 
 # Log module headers
 MSG_EN[LOG_HEADER_LAST_MINUTES_CURRENT]="Logs from the last X minutes (current boot)"
@@ -175,7 +180,8 @@ MSG_EN[LOG_PYTHON_USING_AFTER_ENSURE]="Using 'python' as Python 3 interpreter af
 MSG_EN[LOG_PYTHON_NOT_FOUND]="Python 3 could not be found or installed (neither as 'python3' nor as 'python')."
 
 # File operations
-MSG_EN[LOG_INVALID_SELECTION]="Invalid selection"
+MSG_EN[LOG_MENU_TITLE]="Log File Management"
+MSG_EN[LOG_MENU_FILTER]="Set output filter"
 MSG_EN[LOG_BACK_TO_MAIN]="Back to main menu."
 
 # Error messages for dmesg

@@ -2,7 +2,7 @@
 #
 # lang/en/main_menu.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # English main menu language strings
 
@@ -16,12 +16,27 @@ MSG_EN[GUI_MODE_ENABLED]="Running in GUI mode - 'Any Key' prompts will be skippe
 MSG_EN[GOODBYE]="Goodbye!"
 
 # Menu categories
-MSG_EN[CATEGORY_RECOVERY]="[Recovery & Restarts]"
-MSG_EN[CATEGORY_DIAGNOSIS]="[System Diagnosis & Analysis]"
+MSG_EN[CATEGORY_SYSTEM]="[System Diagnosis & Analysis]"
 MSG_EN[CATEGORY_MAINTENANCE]="[Maintenance & Security]"
-MSG_EN[CATEGORY_SPECIAL]="[Special Functions]"
+MSG_EN[CATEGORY_BACKUP]="[Backup & Recovery]"
+MSG_EN[CATEGORY_DOCKER]="[Docker Management]"
+MSG_EN[CATEGORY_RECOVERY]="[Recovery & Restarts]"
+
 
 # Menu items
+MSG_EN[RESTARTS_MODULE_NAME]="Services & Desktop Restart Options"
+MSG_EN[SYSTEM_INFO_MODULE_NAME]="Display System Information"
+MSG_EN[NETWORK_MODULE_NAME]="Network Diagnostics & Tools"
+MSG_EN[DISK_MODULE_NAME]="Disk Tools"
+MSG_EN[LOGS_MODULE_NAME]="Log Analysis Tools"
+MSG_EN[PACKAGES_MODULE_NAME]="Package Management & Updates"
+MSG_EN[SECURITY_MODULE_NAME]="Security Checks"
+MSG_EN[BACKUP_MODULE_NAME]="Backup & Recovery"
+MSG_EN[DOCKER_MODULE_NAME]="Docker Functions"
+MSG_EN[DOCKER_SETUP_MODULE_NAME]="Docker Setup & Installation"
+MSG_EN[DOCKER_SECURITY_MODULE_NAME]="Docker Security Checks"
+MSG_EN[ENERGY_MODULE_NAME]="Energy Management"
+# Legacy menu items (kept for backwards compatibility)
 MSG_EN[MENU_RESTARTS]="Services & Desktop Restart Options"
 MSG_EN[MENU_SYSTEM_INFO]="Display System Information"
 MSG_EN[MENU_NETWORK_TOOLS]="Network Diagnostics & Tools"
@@ -33,6 +48,20 @@ MSG_EN[MENU_BACKUP]="Backup & Recovery"
 MSG_EN[MENU_DOCKER]="Docker Functions"
 MSG_EN[MENU_ENERGY]="Energy Management"
 MSG_EN[MENU_DEBUG_BUNDLE]="Collect Important Debug Info to File"
+
+# Module descriptions
+MSG_EN[BACKUP_MODULE_DESC]="Manage system backups and recovery operations"
+MSG_EN[DISK_MODULE_DESC]="Disk management and maintenance tools"
+MSG_EN[DOCKER_MODULE_DESC]="Docker container management and operations"
+MSG_EN[DOCKER_SECURITY_MODULE_DESC]="Security scanning and hardening for Docker"
+MSG_EN[DOCKER_SETUP_MODULE_DESC]="Install and configure Docker and Docker Compose"
+MSG_EN[ENERGY_MODULE_DESC]="Power management and energy optimization"
+MSG_EN[LOGS_MODULE_DESC]="System log analysis and viewing tools"
+MSG_EN[NETWORK_MODULE_DESC]="Network diagnostics and troubleshooting"
+MSG_EN[PACKAGES_MODULE_DESC]="Package installation, updates, and management"
+MSG_EN[RESTARTS_MODULE_DESC]="Restart services and desktop components"
+MSG_EN[SECURITY_MODULE_DESC]="System security checks and hardening"
+MSG_EN[SYSTEM_INFO_MODULE_DESC]="View detailed system information and status"
 
 # Debug bundle messages
 MSG_EN[DEBUG_HEADER]="Collecting Debug Information"

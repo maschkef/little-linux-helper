@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "packages",
+  "entry": "modules/mod_packages.sh",
+  "category": {
+    "id": "maintenance"
+  },
+  "order": 60,
+  "docs": "modules/doc_packages.md",
+  "display": {
+    "name_key": "PACKAGES_MODULE_NAME",
+    "description_key": "PACKAGES_MODULE_DESC",
+    "fallback_name": "Package Management & Updates",
+    "fallback_description": "Manage packages and system updates"
+  },
+  "i18n": {
+    "module_name": "packages"
+  },
+  "help": {
+    "overview_key": "PACKAGES_HELP_OVERVIEW",
+    "options_key": "PACKAGES_HELP_OPTIONS",
+    "notes_key": "PACKAGES_HELP_NOTES"
+  },
+  "expose": {
+    "cli": true,
+    "gui": true
+  },
+  "enabled": true,
+  "requires_root": true,
+  "tags": ["packages", "updates", "apt", "dnf", "pacman"]
+}

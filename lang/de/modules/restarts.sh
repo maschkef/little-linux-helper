@@ -2,12 +2,17 @@
 #
 # little-linux-helper/lang/de/restarts.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # German translations for the Restarts module
 
 # Conditional declaration for module files
 [[ ! -v MSG_DE ]] && declare -A MSG_DE
+
+# Help content
+MSG_DE[RESTARTS_HELP_OVERVIEW]="Neustart von Systemdiensten und Desktop-Umgebungen."
+MSG_DE[RESTARTS_HELP_OPTIONS]="1. Login-Manager neustarten - Display-Manager neu starten|2. Desktop-Umgebung neustarten - Nur GUI neu starten|3. Dienste verwalten - Systemdienste steuern"
+MSG_DE[RESTARTS_HELP_NOTES]="Einige Vorgänge erfordern aktive Sitzung|Desktop-Neustart beendet laufende Anwendungen|Benötigt systemd für Dienstverwaltung"
 
 # Module title and menu
 MSG_DE[RESTART_MODULE_TITLE]="Dienste & Desktop Neustart-Optionen"

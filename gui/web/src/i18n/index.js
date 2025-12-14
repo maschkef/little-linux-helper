@@ -1,9 +1,9 @@
 /*
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
-Licensed under the MIT License. See the LICENSE file in the project root for more information.
+Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 */
 
 import i18n from 'i18next';
@@ -15,15 +15,19 @@ import enCommon from './locales/en/common.json';
 import deCommon from './locales/de/common.json';
 import enHelp from './locales/en/help.json';
 import deHelp from './locales/de/help.json';
+import enModules from './locales/en/modules.json';
+import deModules from './locales/de/modules.json';
 
 const resources = {
   en: {
     common: enCommon,
-    help: enHelp
+    help: enHelp,
+    modules: enModules
   },
   de: {
     common: deCommon,
-    help: deHelp
+    help: deHelp,
+    modules: deModules
   }
 };
 
@@ -44,7 +48,7 @@ i18n
 
     // Namespace configuration
     defaultNS: 'common',
-    ns: ['common', 'help'],
+    ns: ['common', 'help', 'modules'],
 
     interpolation: {
       escapeValue: false // React already does escaping

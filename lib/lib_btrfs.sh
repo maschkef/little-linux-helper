@@ -2,7 +2,7 @@
 #
 # lib/lib_btrfs.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # Entry point for BTRFS-specific libraries used by little-linux-helper.
 # This script sources all BTRFS helper modules located under lib/btrfs/.

@@ -43,6 +43,14 @@ jobs:
     - name: Tidy Go modules
       working-directory: ./gui
       run: go mod tidy
+    
+    # Step 3.2: Sync translations from CLI to GUI
+    - name: Sync GUI translations
+      run: |
+        chmod +x scripts/sync_gui_translations.sh
+        echo "🌍 Synchronizing translations from CLI to GUI..."
+        ./scripts/sync_gui_translations.sh
+        echo "✅ Translations synchronized"
         
     # Step 4: Build the React frontend
     - name: Install and build React frontend
@@ -115,11 +123,28 @@ jobs:
           cp -r ../scripts "little-linux-helper-gui-$arch/"
           cp -r ../screenshots "little-linux-helper-gui-$arch/"
           
+          # Copy cache directory (create if not exists)
+          mkdir -p "little-linux-helper-gui-$arch/cache"
+          if [ -f ../cache/module-registry.json ]; then
+            cp ../cache/module-registry.json "little-linux-helper-gui-$arch/cache/"
+          fi
+          
+          # Copy mods directory structure (for third-party modules)
+          mkdir -p "little-linux-helper-gui-$arch/mods/bin"
+          mkdir -p "little-linux-helper-gui-$arch/mods/docs"
+          mkdir -p "little-linux-helper-gui-$arch/mods/lang"
+          mkdir -p "little-linux-helper-gui-$arch/mods/meta"
+          
           # Copy gui/ development files (Go source, configs, etc.) - excluding build artifacts
           find ../gui -type f -name "*.go" -exec cp --parents {} "little-linux-helper-gui-$arch/" \;
           find ../gui -type f -name "go.*" -exec cp --parents {} "little-linux-helper-gui-$arch/" \;
           find ../gui -type f -name "*.sh" -exec cp --parents {} "little-linux-helper-gui-$arch/" \;
           find ../gui -type f -name "README.md" -exec cp --parents {} "little-linux-helper-gui-$arch/" \;
+          
+          # Copy config-schema directory (JSON schemas for configuration)
+          if [ -d ../gui/config-schema ]; then
+            cp -r ../gui/config-schema "little-linux-helper-gui-$arch/gui/"
+          fi
           
           # Copy gui/web source files (but not node_modules or build)
           mkdir -p "little-linux-helper-gui-$arch/gui/web"

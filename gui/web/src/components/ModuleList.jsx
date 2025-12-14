@@ -1,14 +1,53 @@
 /*
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
-Licensed under the MIT License. See the LICENSE file in the project root for more information.
+Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
-function ModuleList({ groupedModules, selectedModule, onModuleSelect, onModuleStart }) {
+function ModuleList({ groupedModules, categories, selectedModule, onModuleSelect, onModuleStart }) {
+  const { t } = useTranslation(['modules', 'common']);
+
+  // Create a category name resolver function
+  const getCategoryName = (categoryId) => {
+    // Find category in the categories array
+    const category = categories?.find(cat => cat.id === categoryId);
+    if (category) {
+      // Try translation key first
+      if (category.name_key) {
+        const translated = t(category.name_key, { defaultValue: null });
+        if (translated) return translated;
+      }
+      // Fall back to fallback_name
+      if (category.fallback_name) {
+        return category.fallback_name;
+      }
+    }
+    // Ultimate fallback: use category ID as display name
+    return categoryId;
+  };
+
+  // Create a module name resolver function
+  const getModuleName = (module) => {
+    if (module.name_key) {
+      const translated = t(module.name_key, { defaultValue: null });
+      if (translated) return translated;
+    }
+    return module.name || module.id;
+  };
+
+  // Create a module description resolver function
+  const getModuleDescription = (module) => {
+    if (module.description_key) {
+      const translated = t(module.description_key, { defaultValue: null });
+      if (translated) return translated;
+    }
+    return module.description || '';
+  };
   // Separate parent modules from submodules
   const renderModules = (modules) => {
     const parentModules = modules.filter(module => !module.parent);
@@ -29,7 +68,7 @@ function ModuleList({ groupedModules, selectedModule, onModuleSelect, onModuleSt
           >
             <div className="module-header">
               <div className="module-name">
-                {module.name}
+                {getModuleName(module)}
                 {module.submodule_count > 0 && (
                   <span className="submodule-badge">
                     {module.submodule_count} options
@@ -47,7 +86,7 @@ function ModuleList({ groupedModules, selectedModule, onModuleSelect, onModuleSt
                 Start
               </button>
             </div>
-            <p className="module-description">{module.description}</p>
+            <p className="module-description">{getModuleDescription(module)}</p>
           </li>
           
           {/* Child modules (submodules) */}
@@ -65,7 +104,7 @@ function ModuleList({ groupedModules, selectedModule, onModuleSelect, onModuleSt
               }}
             >
               <div className="module-header">
-                <div className="module-name">↳ {subModule.name}</div>
+                <div className="module-name">↳ {getModuleName(subModule)}</div>
                 <button
                   className="start-module-btn"
                   onClick={(e) => {
@@ -77,7 +116,7 @@ function ModuleList({ groupedModules, selectedModule, onModuleSelect, onModuleSt
                   Start
                 </button>
               </div>
-              <p className="module-description">{subModule.description}</p>
+              <p className="module-description">{getModuleDescription(subModule)}</p>
             </li>
           ))}
         </React.Fragment>
@@ -91,7 +130,7 @@ function ModuleList({ groupedModules, selectedModule, onModuleSelect, onModuleSt
       <ul className="module-list">
         {Object.entries(groupedModules).map(([category, modules]) => (
           <React.Fragment key={category}>
-            <li className="module-category">{category}</li>
+            <li className="module-category">{getCategoryName(category)}</li>
             {renderModules(modules)}
           </React.Fragment>
         ))}

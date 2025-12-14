@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/maschkef/little-linux-helper/schemas/category-metadata.json",
+  "title": "Little Linux Helper Category Metadata",
+  "description": "Schema for category metadata files in Little Linux Helper",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "categories"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "description": "Schema version for compatibility handling",
+      "const": 1
+    },
+    "categories": {
+      "type": "array",
+      "description": "List of category definitions",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "order",
+          "name_key"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique category identifier",
+            "pattern": "^[a-z0-9_]+$",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "order": {
+            "type": "integer",
+            "description": "Default display order (can be overridden by config)",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "name_key": {
+            "type": "string",
+            "description": "Translation key for category name",
+            "pattern": "^[A-Z0-9_]+$"
+          },
+          "fallback_name": {
+            "type": "string",
+            "description": "English name when translation missing",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}

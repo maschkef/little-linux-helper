@@ -36,7 +36,9 @@ My environment is typically Arch (main system) or Debian (various services on my
 
 ## License
 
-This project is licensed under the MIT License. For more information, see the `LICENSE` file in the project root directory.
+This project is licensed under the Apache License 2.0. For more information, see the `LICENSE` file in the project root directory.
+
+Third-party dependencies and their licenses are documented in `THIRD_PARTY_LICENSES.md`.
 
 <details>
 <summary>❗ Known Issues and Limitations</summary>
@@ -122,6 +124,26 @@ The GUI maintains full compatibility with all CLI functionality while providing 
 
 </details>
 
+### 🔧 **Module Registry System**
+Both CLI and GUI interfaces use a registry-based module discovery system that provides:
+- **Automatic Discovery**: New modules appear automatically when metadata files are added - no code changes required
+- **Single Source of Truth**: Both interfaces load from the same JSON registry cache
+- **Metadata-Driven**: Module information, categories, and documentation paths defined in JSON metadata files
+- **Extensibility**: Support for extending modules via the `mods/` directory structure
+- **Translation Integration**: Built-in internationalization with fallback support
+- **Submodule Support**: Hierarchical module organization for complex features
+
+**Adding New Modules:**
+1. Create module script: `modules/mod_yourmodule.sh`
+2. Add metadata file: `modules/meta/mod_yourmodule.json`
+3. Add translations: `lang/*/yourmodule.sh`
+4. Add documentation: `docs/modules/doc_yourmodule.md`
+5. Restart application - module appears automatically!
+
+See `docs/registry/third_party_module_migration_guide.md` for complete module development guide.
+
+</details>
+
 ---
 
 Both interfaces provide access to the following modules:
@@ -155,7 +177,7 @@ Both interfaces provide access to the following modules:
     * **Restore Capabilities**: Complete system restore, individual subvolume restore, folder-level restoration, and bootloader integration *(Note: Restore functions are implemented but require comprehensive testing)*
     * **Safety Features**: Live environment detection, filesystem health checking, rollback capabilities, and dry-run support
     * **Maintenance Submenu**: Dedicated maintenance section with deletion tools, problematic backup cleanup, source snapshot management, incremental chain inspection, and orphan `.receiving_*` staging snapshot cleanup
-    * **Detailed Documentation**: See `docs/mod/doc_btrfs_backup.md`, `docs/mod/doc_btrfs_restore.md`, and `docs/lib/doc_btrfs.md`
+    * **Detailed Documentation**: See `docs/modules/doc_btrfs_backup.md`, `docs/modules/doc_btrfs_restore.md`, and `docs/lib/doc_btrfs.md`
 
 * **TAR Archive Backup & Restore** (`modules/backup/mod_backup_tar.sh`, `modules/backup/mod_restore_tar.sh`):
     * **Flexible Backup Options**: Home only, system config, full system, or custom directory selection
@@ -163,7 +185,7 @@ Both interfaces provide access to the following modules:
     * **Archive Management**: Compressed `.tar.gz` archives with automatic cleanup and retention policies
     * **Safe Restoration**: Multiple destination options with safety warnings and confirmation prompts
     * **Session Awareness**: Backup and restore operations register with appropriate blocking categories
-    * **Documentation**: See `docs/mod/doc_backup_tar.md` and `docs/mod/doc_restore_tar.md`
+    * **Documentation**: See `docs/modules/doc_backup_tar.md` and `docs/modules/doc_restore_tar.md`
 
 * **RSYNC Incremental Backup & Restore** (`modules/backup/mod_backup_rsync.sh`, `modules/backup/mod_restore_rsync.sh`):
     * **Incremental Intelligence**: Space-efficient backups using hardlink optimization with `--link-dest`
@@ -171,7 +193,7 @@ Both interfaces provide access to the following modules:
     * **Advanced Options**: Comprehensive RSYNC configuration with atomic operations and progress monitoring
     * **Flexible Restoration**: Real-time progress monitoring and complete directory tree restoration
     * **Session Awareness**: Backup and restore operations register with appropriate blocking categories
-    * **Documentation**: See `docs/mod/doc_backup_rsync.md` and `docs/mod/doc_restore_rsync.md`
+    * **Documentation**: See `docs/modules/doc_backup_rsync.md` and `docs/modules/doc_restore_rsync.md`
 
 </details>
 
@@ -479,8 +501,6 @@ Little Linux Helper supports multiple languages for the user interface. The inte
 **Supported Languages:**
 * **German (de)**: Full translation support for all modules
 * **English (en)**: Full translation support for all modules (default language and fallback)
-* **Spanish (es)**: Only scattered internal translations (log entries, etc.), practically unusable
-* **French (fr)**: Only scattered internal translations (log entries, etc.), practically unusable
 
 **Language Selection:**
 * **Automatic Detection**: The system automatically detects the system language based on environment variables (`LANG`, `LC_ALL`, `LC_MESSAGES`)
@@ -493,8 +513,6 @@ Little Linux Helper supports multiple languages for the user interface. The inte
 CFG_LH_LANG="auto"    # Automatic system language detection
 CFG_LH_LANG="de"      # German
 CFG_LH_LANG="en"      # English
-CFG_LH_LANG="es"      # Spanish (practically unusable, only internal messages)
-CFG_LH_LANG="fr"      # French (practically unusable, only internal messages)
 ```
 
 **Technical Details:**

@@ -2,12 +2,17 @@
 #
 # little-linux-helper/lang/de/packages.sh
 # Copyright (c) 2025 maschkef
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # German translations for the package management module
 
 # Ensure MSG_DE array is declared
 [[ ! -v MSG_DE ]] && declare -A MSG_DE
+
+# Help content
+MSG_DE[PACKAGES_HELP_OVERVIEW]="Pakete und System-Updates verwalten."
+MSG_DE[PACKAGES_HELP_OPTIONS]="1. System-Update - Alle Pakete aktualisieren|2. Verwaiste Pakete finden - Unbenutzte Pakete erkennen|3. Paket-Cache bereinigen - Zwischengespeicherte Paket-Dateien löschen|4. Suchen & Installieren - Neue Pakete finden und installieren|5. Docker-Setup - Docker installieren und konfigurieren|6. Installierte auflisten - Installierte Pakete anzeigen|7. Paket-Logs anzeigen - Paket-Manager-Protokolle anzeigen"
+MSG_DE[PACKAGES_HELP_NOTES]="Unterstützt mehrere Paket-Manager|Automatische Erkennung verfügbarer Manager|Einige Vorgänge erfordern eine Internetverbindung"
 
 # Module header
 MSG_DE[PKG_HEADER_MAIN]="Paketverwaltung & Updates"

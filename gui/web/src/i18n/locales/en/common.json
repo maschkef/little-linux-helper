@@ -243,9 +243,7 @@
             "options": {
               "auto": "Auto detect (system locale)",
               "de": "German",
-              "en": "English",
-              "es": "Spanish (partial)",
-              "fr": "French (partial)"
+              "en": "English"
             }
           }
         }

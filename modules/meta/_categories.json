@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "categories": [
+    {
+      "id": "recovery",
+      "order": 10,
+      "name_key": "CATEGORY_RECOVERY",
+      "fallback_name": "Recovery"
+    },
+    {
+      "id": "system",
+      "order": 20,
+      "name_key": "CATEGORY_DIAGNOSIS",
+      "fallback_name": "Diagnosis"
+    },
+    {
+      "id": "maintenance",
+      "order": 30,
+      "name_key": "CATEGORY_MAINTENANCE",
+      "fallback_name": "Maintenance"
+    },
+    {
+      "id": "special",
+      "order": 40,
+      "name_key": "CATEGORY_SPECIAL",
+      "fallback_name": "Special"
+    }
+  ]
+}

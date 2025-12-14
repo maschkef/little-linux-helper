@@ -1,40 +1,17 @@
 /*
 Copyright (c) 2025 maschkef
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 This project is part of the 'little-linux-helper' collection.
-Licensed under the MIT License. See the LICENSE file in the project root for more information.
+Licensed under the Apache License 2.0. See the LICENSE file in the project root for more information.
 */
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-function HelpPanel({ module }) {
-  const { t, i18n } = useTranslation(['common', 'help']);
+function HelpPanel({ module, modules }) {
+  const { t, i18n } = useTranslation(['common', 'modules', 'help']);
   const [helpSource, setHelpSource] = useState('automatic');
-
-  const helpBundle = useMemo(() => {
-    const activeBundle = i18n.getResourceBundle(i18n.language, 'help');
-    if (activeBundle) {
-      return activeBundle;
-    }
-
-    const fallbackLng = i18n.options?.fallbackLng;
-    const fallbackList = Array.isArray(fallbackLng)
-      ? fallbackLng
-      : fallbackLng
-        ? [fallbackLng]
-        : [];
-
-    for (const fallback of fallbackList) {
-      const bundle = i18n.getResourceBundle(fallback, 'help');
-      if (bundle) {
-        return bundle;
-      }
-    }
-
-    return {};
-  }, [i18n, i18n.language]);
 
   const formatHelpLabel = useCallback((helpId) => {
     if (!helpId) {
@@ -57,29 +34,42 @@ function HelpPanel({ module }) {
   }, [t]);
 
   const availableHelpOptions = useMemo(() => {
-    if (!helpBundle || typeof helpBundle !== 'object') {
+    if (!modules || modules.length === 0) {
       return [];
     }
 
-    return Object.entries(helpBundle)
-      .filter(([, value]) => value && typeof value === 'object' && !Array.isArray(value))
-      .map(([id]) => ({ id, label: formatHelpLabel(id) || id }))
+    // Get modules that:
+    // 1. Are enabled
+    // 2. Are exposed to GUI
+    // 3. Have help metadata defined in registry
+    return modules
+      .filter(mod => {
+        // Check if module is enabled (defaults to true if not specified)
+        const isEnabled = mod.enabled !== false;
+        // Check if module is exposed to GUI (defaults to true if not specified)
+        const isExposedToGui = !mod.expose || mod.expose.gui !== false;
+        // Check if module has help metadata
+        const hasHelp = mod.help && mod.help.overview_key;
+        
+        return isEnabled && isExposedToGui && hasHelp;
+      })
+      .map(mod => ({ 
+        id: mod.id, 
+        label: mod.name || formatHelpLabel(mod.id)
+      }))
       .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
-  }, [helpBundle, formatHelpLabel]);
+  }, [modules, formatHelpLabel]);
 
   const isAutomatic = helpSource === 'automatic';
   const activeHelpId = isAutomatic ? module?.id : helpSource;
 
   const getModuleHelp = (moduleId) => {
     try {
-      const overviewKey = `help:${moduleId}.overview`;
-      const optionsKey = `help:${moduleId}.options`;
-      const notesKey = `help:${moduleId}.notes`;
-
-      const helpExists = t(overviewKey, { defaultValue: null, returnObjects: false });
-
-      if (!helpExists || helpExists === overviewKey) {
-        console.warn(`[HelpPanel] No help content found for module: ${moduleId}`);
+      // Find module in registry to get help keys
+      const registryModule = modules?.find(m => m.id === moduleId);
+      
+      if (!registryModule || !registryModule.help) {
+        console.warn(`[HelpPanel] No help metadata in registry for module: ${moduleId}`);
         return {
           overview: t('help.noHelpAvailable', { defaultValue: 'Help information not available for this module.' }),
           options: [],
@@ -87,25 +77,45 @@ function HelpPanel({ module }) {
         };
       }
 
+      const { overview_key, options_key, notes_key } = registryModule.help;
+
+      // Translation keys are at the root level in modules namespace (not nested under modules.)
+      const overview = t(overview_key, { 
+        ns: 'modules',
+        defaultValue: `Help overview for ${moduleId}` 
+      });
+
       let options = [];
       let notes = [];
 
-      try {
-        const optionsResult = t(optionsKey, { defaultValue: [], returnObjects: true });
-        options = Array.isArray(optionsResult) ? optionsResult : [];
-      } catch (error) {
-        console.warn(`[HelpPanel] Failed to load options for module ${moduleId}:`, error);
+      if (options_key) {
+        try {
+          const optionsResult = t(options_key, { 
+            ns: 'modules',
+            defaultValue: [], 
+            returnObjects: true 
+          });
+          options = Array.isArray(optionsResult) ? optionsResult : [];
+        } catch (error) {
+          console.warn(`[HelpPanel] Failed to load options for module ${moduleId}:`, error);
+        }
       }
 
-      try {
-        const notesResult = t(notesKey, { defaultValue: [], returnObjects: true });
-        notes = Array.isArray(notesResult) ? notesResult : [];
-      } catch (error) {
-        console.warn(`[HelpPanel] Failed to load notes for module ${moduleId}:`, error);
+      if (notes_key) {
+        try {
+          const notesResult = t(notes_key, { 
+            ns: 'modules',
+            defaultValue: [], 
+            returnObjects: true 
+          });
+          notes = Array.isArray(notesResult) ? notesResult : [];
+        } catch (error) {
+          console.warn(`[HelpPanel] Failed to load notes for module ${moduleId}:`, error);
+        }
       }
 
       return {
-        overview: t(overviewKey, { defaultValue: `Help overview for ${moduleId}` }),
+        overview,
         options,
         notes
       };
