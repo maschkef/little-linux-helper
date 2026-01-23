@@ -37,6 +37,7 @@ MSG_EN[DOCKER_MODULE_NAME]="Docker Functions"
 MSG_EN[DOCKER_SETUP_MODULE_NAME]="Docker Setup & Installation"
 MSG_EN[DOCKER_SECURITY_MODULE_NAME]="Docker Security Checks"
 MSG_EN[ENERGY_MODULE_NAME]="Energy Management"
+MSG_EN[OSXPHOTOS_BACKUP_MODULE_NAME]="osxphotos Backup"
 # Legacy menu items (kept for backwards compatibility)
 MSG_EN[MENU_RESTARTS]="Services & Desktop Restart Options"
 MSG_EN[MENU_SYSTEM_INFO]="Display System Information"

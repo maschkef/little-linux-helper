@@ -142,6 +142,8 @@ Both CLI and GUI interfaces use a registry-based module discovery system that pr
 4. Add documentation: `docs/modules/doc_yourmodule.md`
 5. Restart application - module appears automatically!
 
+Note on bundled mods: I have not decided yet whether my own mods will remain in this repository or move to a separate GitHub project. For now they live here, also because the CLI main menu still requires adding a menu entry in the existing language files (`lang/*/core/main_menu.sh`).
+
 See `docs/registry/third_party_module_migration_guide.md` for complete module development guide.
 
 </details>

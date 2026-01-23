@@ -142,6 +142,8 @@ Sowohl CLI- als auch GUI-Oberflächen verwenden ein registry-basiertes Modul-Erk
 4. Dokumentation hinzufügen: `docs/modules/doc_deinmodul.md`
 5. Anwendung neu starten - Modul erscheint automatisch!
 
+Hinweis zu Mods: Ich habe noch nicht entschieden, ob meine eigenen Mods dauerhaft in diesem Repository bleiben oder eine eigene GitHub-Seite bekommen. Aktuell liegen sie hier, auch weil der CLI-Main-Menu-Eintrag derzeit in den bestehenden Sprachdateien ergänzt werden muss (`lang/*/core/main_menu.sh`).
+
 Siehe `docs/registry/third_party_module_migration_guide.md` für eine vollständige Anleitung zur Modulentwicklung.
 
 </details>
