@@ -93,12 +93,12 @@ source "$LIB_COMMON_PATH"
 
 ### Translation Loading Pattern
 ```bash
-# Load module-specific translations
-lh_load_language_module "demo_mod"
-# Load common UI translations
-lh_load_language_module "common"
-# Load library function messages
-lh_load_language_module "lib"
+# Load translations if not already loaded
+if [[ -z "${MSG[DEMO_MENU_TITLE]:-}" ]]; then
+    lh_load_language_module "demo_mod"   # Module-specific translations
+    lh_load_language_module "common"     # Common UI translations
+    lh_load_language_module "lib"        # Library function messages
+fi
 ```
 
 ### Session Management

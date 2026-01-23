@@ -185,3 +185,14 @@ MSG_EN[LIB_POWER_TOOLS_SUMMARY]="%s power management tools available: %s"
 # System command execution messages
 MSG_EN[LIB_COMMAND_EXECUTION]="Executing command as user %s: %s"
 MSG_EN[LIB_XDG_RUNTIME_ERROR]="XDG_RUNTIME_DIR does not exist for user %s"
+
+# AUR helper messages
+MSG_EN[LIB_AUR_HELPER_CHOICE_PROMPT]="Please choose which AUR helper to install:"
+MSG_EN[LIB_AUR_HELPER_YAY_DESC]="Popular, written in Go, fast"
+MSG_EN[LIB_AUR_HELPER_PARU_DESC]="Modern, written in Rust, feature-rich"
+MSG_EN[LIB_AUR_HELPER_INSTALLING]="Installing AUR helper: %s"
+MSG_EN[LIB_AUR_HELPER_SUCCESS]="Successfully installed AUR helper: %s"
+MSG_EN[LIB_AUR_HELPER_FAILED]="Failed to install AUR helper: %s"
+MSG_EN[LIB_AUR_HELPER_ALREADY_INSTALLED]="AUR helper already available: %s"
+MSG_EN[LIB_AUR_HELPER_PREREQUISITES]="Installing prerequisites for AUR helper..."
+MSG_EN[LIB_AUR_HELPER_NOT_ARCH]="AUR helpers are only available on Arch-based systems"

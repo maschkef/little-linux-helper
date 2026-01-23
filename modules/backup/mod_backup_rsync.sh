@@ -557,7 +557,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     lh_log_msg "DEBUG" "Module called with parameters: $*"
 
     lh_log_active_sessions_debug "$(lh_msg 'BACKUP_RSYNC_HEADER')"
-    lh_begin_module_session "mod_backup_rsync" "$(lh_msg 'BACKUP_RSYNC_HEADER')" "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP' "$(lh_msg 'BACKUP_RSYNC_HEADER')")"
+    lh_begin_module_session "mod_backup_rsync" "$(lh_msg 'BACKUP_RSYNC_HEADER')" "$(lh_msg 'LIB_SESSION_ACTIVITY_PREP' "$(lh_msg 'BACKUP_RSYNC_HEADER')")" "${LH_BLOCK_FILESYSTEM_WRITE},${LH_BLOCK_SYSTEM_CRITICAL}" "HIGH"
 
     # Brief info message
     echo -e "${LH_COLOR_INFO}$(lh_msg 'BACKUP_RSYNC_MODULE_INFO')${LH_COLOR_RESET}"

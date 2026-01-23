@@ -1,5 +1,6 @@
 # Ignore log files
 logs/
+state/
 # Ignore local configuration files
 config/*.conf
 config/*.d/

@@ -185,3 +185,14 @@ MSG_DE[LIB_POWER_TOOLS_SUMMARY]="%s Energieverwaltungs-Tools verfügbar: %s"
 # System-Befehlsausführungsnachrichten
 MSG_DE[LIB_COMMAND_EXECUTION]="Führe Befehl als Benutzer %s aus: %s"
 MSG_DE[LIB_XDG_RUNTIME_ERROR]="XDG_RUNTIME_DIR existiert nicht für Benutzer %s"
+
+# AUR-Helper-Nachrichten
+MSG_DE[LIB_AUR_HELPER_CHOICE_PROMPT]="Bitte wählen Sie welchen AUR-Helper installiert werden soll:"
+MSG_DE[LIB_AUR_HELPER_YAY_DESC]="Beliebt, in Go geschrieben, schnell"
+MSG_DE[LIB_AUR_HELPER_PARU_DESC]="Modern, in Rust geschrieben, funktionsreich"
+MSG_DE[LIB_AUR_HELPER_INSTALLING]="Installiere AUR-Helper: %s"
+MSG_DE[LIB_AUR_HELPER_SUCCESS]="AUR-Helper erfolgreich installiert: %s"
+MSG_DE[LIB_AUR_HELPER_FAILED]="AUR-Helper konnte nicht installiert werden: %s"
+MSG_DE[LIB_AUR_HELPER_ALREADY_INSTALLED]="AUR-Helper bereits verfügbar: %s"
+MSG_DE[LIB_AUR_HELPER_PREREQUISITES]="Installiere Voraussetzungen für AUR-Helper..."
+MSG_DE[LIB_AUR_HELPER_NOT_ARCH]="AUR-Helper sind nur auf Arch-basierten Systemen verfügbar"

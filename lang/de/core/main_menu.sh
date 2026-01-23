@@ -17,6 +17,7 @@ MSG_DE[GOODBYE]="Auf Wiedersehen!"
 
 # Menu categories
 MSG_DE[CATEGORY_SYSTEM]="[Systemdiagnose & Analyse]"
+MSG_DE[CATEGORY_DIAGNOSIS]="[Diagnose & Analyse]"
 MSG_DE[CATEGORY_MAINTENANCE]="[Wartung & Sicherheit]"
 MSG_DE[CATEGORY_BACKUP]="[Backup & Wiederherstellung]"
 MSG_DE[CATEGORY_DOCKER]="[Docker-Verwaltung]"

@@ -17,6 +17,7 @@ MSG_EN[GOODBYE]="Goodbye!"
 
 # Menu categories
 MSG_EN[CATEGORY_SYSTEM]="[System Diagnosis & Analysis]"
+MSG_EN[CATEGORY_DIAGNOSIS]="[Diagnosis & Analysis]"
 MSG_EN[CATEGORY_MAINTENANCE]="[Maintenance & Security]"
 MSG_EN[CATEGORY_BACKUP]="[Backup & Recovery]"
 MSG_EN[CATEGORY_DOCKER]="[Docker Management]"

@@ -22,6 +22,7 @@ My environment is typically Arch (main system) or Debian (various services on my
 > - **Session Awareness**: Enhanced session registry with intelligent conflict detection and blocking categories to prevent dangerous concurrent operations
 > - **Testing Status**: Backup functions are well-tested and stable; restore functions are implemented but require comprehensive testing before production use
 > - **Update**: the btrfs backup module needs testing (again)
+> - **New Package Audit module is experimental:** Logic and bundled profiles are untested/incomplete. Review results carefully before running restores or acting on recommendations.
 
 <details>
 <summary>⚠️ Important Usage Notes</summary>
@@ -59,6 +60,7 @@ Here is a list of known issues, limitations, or behaviors you might encounter wh
     * **BTRFS Operations**: Requires BTRFS filesystem and appropriate privileges
     * **Docker Security**: Scanning depth and accuracy depend on Compose file complexity
     * **Hardware Monitoring**: Temperature sensors require `lm-sensors` and proper hardware support
+    * **Package Audit (experimental)**: New and untested; bundled profiles may be incomplete or wrong. Review results carefully before running restores.
 
 </details>
 
