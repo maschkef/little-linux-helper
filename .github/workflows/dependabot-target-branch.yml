@@ -13,5 +13,22 @@ jobs:
     steps:
       - name: Block Dependabot PRs targeting main
         run: |
-          echo "::error::Dependabot PRs must target the develop branch. Please change the base branch from main to develop."
+          echo "::error::Dependabot PRs must target the develop branch, not main."
+          echo "::error::Workflow: develop (development) → main (production)"
+          echo "::error::To fix: Change base branch from main to develop or comment '@dependabot recreate'"
+          echo "::error::Dependencies should be tested in develop first before going to main"
           exit 1
+
+  enforce-develop-target:
+    if: >
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.base.ref != 'develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure Dependabot targets develop
+        run: |
+          echo "::warning::Dependabot PR targets '${BASE_REF}' but should target 'develop'"
+          echo "::warning::Expected: base branch = develop"
+          echo "::warning::Actual: base branch = ${BASE_REF}"
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}

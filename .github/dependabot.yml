@@ -1,5 +1,7 @@
 # Dependabot configuration for Little Linux Helper
 # Automatically creates pull requests to update dependencies
+# IMPORTANT: All PRs MUST target the 'develop' branch for development workflow
+# main = production/public branch, develop = development branch
 # See: https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
 version: 2
@@ -7,7 +9,7 @@ updates:
   # Go modules for the GUI backend
   - package-ecosystem: "gomod"
     directory: "/gui"
-    target-branch: "develop"
+    target-branch: "develop"  # ALWAYS develop, never main
     schedule:
       interval: "weekly"
       day: "saturday"
@@ -20,11 +22,26 @@ updates:
       prefix: "deps(go)"
       prefix-development: "deps-dev(go)"
     open-pull-requests-limit: 5
+    # Label major Go updates for manual review instead of ignoring them
+    labels:
+      - "dependencies"
+      - "golang"
+    # Group Go updates to reduce noise while keeping visibility
+    groups:
+      go-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor" 
+          - "patch"
+      go-major-updates:
+        applies-to: version-updates
+        update-types:
+          - "major"
 
-  # NPM packages for the GUI frontend
+  # NPM packages for the GUI frontend  
   - package-ecosystem: "npm"
     directory: "/gui/web"
-    target-branch: "develop"
+    target-branch: "develop"  # ALWAYS develop, never main
     schedule:
       interval: "weekly"
       day: "saturday"
