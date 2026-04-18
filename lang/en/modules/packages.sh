@@ -31,6 +31,7 @@ MSG_EN[PKG_MENU_SEARCH_INSTALL]="Search and install packages"
 MSG_EN[PKG_MENU_DOCKER_SETUP]="Docker installation & setup"
 MSG_EN[PKG_MENU_LIST_INSTALLED]="Show installed packages"
 MSG_EN[PKG_MENU_SHOW_LOGS]="Show package manager logs"
+MSG_EN[PKG_MENU_PACKAGE_AUDIT]="Package Audit & Restore"
 MSG_EN[PKG_MENU_BACK]="Back to main menu"
 
 # System update messages

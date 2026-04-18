@@ -1219,6 +1219,7 @@ function package_management_menu() {
         lh_print_menu_item 5 "$(lh_msg PKG_MENU_DOCKER_SETUP)"
         lh_print_menu_item 6 "$(lh_msg PKG_MENU_LIST_INSTALLED)"
         lh_print_menu_item 7 "$(lh_msg PKG_MENU_SHOW_LOGS)"
+        lh_print_menu_item 8 "$(lh_msg PKG_MENU_PACKAGE_AUDIT)"
         lh_print_gui_hidden_menu_item 0 "$(lh_msg PKG_MENU_BACK)"
         echo ""
 
@@ -1259,6 +1260,11 @@ function package_management_menu() {
             7)
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg PKG_MENU_SHOW_LOGS)")"
                 pkg_show_logs
+                ;;
+            8)
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_ACTION' "$(lh_msg PKG_MENU_PACKAGE_AUDIT)")"
+                # Source and call package audit module (runs in same shell context)
+                source "$LH_ROOT_DIR/modules/mod_package_audit.sh" --submodule
                 ;;
             0)
                 if lh_gui_mode_active; then

@@ -17,10 +17,12 @@ fi
 # shellcheck source=lib/lib_common.sh
 source "$LIB_COMMON_PATH"
 
-# Load Standard Translations
-lh_load_language_module "debug"
-lh_load_language_module "common"
-lh_load_language_module "lib"
+# Load translations if not already loaded
+if [[ -z "${MSG[DEBUG_HEADER_TITLE]:-}" ]]; then
+    lh_load_language_module "debug"
+    lh_load_language_module "common"
+    lh_load_language_module "lib"
+fi
 
 # --- Internal Functions ---
 

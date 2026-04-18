@@ -22,6 +22,7 @@ My environment is typically Arch (main system) or Debian (various services on my
 > - **Session Awareness**: Enhanced session registry with intelligent conflict detection and blocking categories to prevent dangerous concurrent operations
 > - **Testing Status**: Backup functions are well-tested and stable; restore functions are implemented but require comprehensive testing before production use
 > - **Update**: the btrfs backup module needs testing (again)
+> - **New Package Audit module is experimental:** Logic and bundled profiles are untested/incomplete. Review results carefully before running restores or acting on recommendations.
 
 <details>
 <summary>⚠️ Important Usage Notes</summary>
@@ -59,6 +60,7 @@ Here is a list of known issues, limitations, or behaviors you might encounter wh
     * **BTRFS Operations**: Requires BTRFS filesystem and appropriate privileges
     * **Docker Security**: Scanning depth and accuracy depend on Compose file complexity
     * **Hardware Monitoring**: Temperature sensors require `lm-sensors` and proper hardware support
+    * **Package Audit (experimental)**: New and untested; bundled profiles may be incomplete or wrong. Review results carefully before running restores.
 
 </details>
 
@@ -139,6 +141,8 @@ Both CLI and GUI interfaces use a registry-based module discovery system that pr
 3. Add translations: `lang/*/yourmodule.sh`
 4. Add documentation: `docs/modules/doc_yourmodule.md`
 5. Restart application - module appears automatically!
+
+Note on bundled mods: I have not decided yet whether my own mods will remain in this repository or move to a separate GitHub project. For now they live here, also because the CLI main menu still requires adding a menu entry in the existing language files (`lang/*/core/main_menu.sh`).
 
 See `docs/registry/third_party_module_migration_guide.md` for complete module development guide.
 

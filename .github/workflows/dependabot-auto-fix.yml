@@ -1,0 +1,53 @@
+name: Dependabot Auto-Fix
+
+# Automatically fixes Dependabot PRs that target wrong branch
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  auto-fix-target-branch:
+    if: >
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-comment fix suggestion
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo, number } = context.issue;
+            
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: number,
+              body: `🤖 **Dependabot Auto-Fix**: This PR targets the \`main\` branch but should target \`develop\`.
+              
+              **Quick Fix Options:**
+              1. **Auto-recreate**: Comment \`@dependabot recreate\` to auto-fix
+              2. **Manual**: Edit this PR and change base branch from \`main\` → \`develop\`
+              
+              **Workflow**: 
+              - \`develop\` = Development branch (dependencies, features)
+              - \`main\` = Production branch (public releases)
+              
+              ⚠️ This PR will fail CI until the base branch is corrected.`
+            });
+
+      - name: Add warning label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo, number } = context.issue;
+            
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: number,
+              labels: ['dependabot-wrong-target']
+            });

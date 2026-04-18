@@ -1,0 +1,23 @@
+# =============================================================================
+# AUDIT PROFILE: Custom (Template)
+# =============================================================================
+# @profile custom
+# @distro Your Distribution
+#
+# This is a template for creating your own custom profile.
+# Copy this file to a new name (e.g., "my-distro.conf") and customize it.
+#
+# The profile will automatically appear in the selection menu.
+
+# EXACT MATCHES
+# List package names that should EXACTLY match to be flagged as base packages.
+# These are typically core system packages that are part of the default install.
+# Separate multiple packages with commas (no spaces around commas).
+CFG_AUDIT_BASE_PACKAGES_EXACT="your-core-package,another-system-package"
+
+# PREFIX PATTERNS
+# List package name PREFIXES to match.
+# Any package whose name STARTS WITH one of these prefixes will be flagged.
+# Do NOT include trailing wildcard (*) - it's implied.
+# Example: "lib-" matches "lib-foo", "lib-bar", etc.
+CFG_AUDIT_BASE_PACKAGES_PREFIX="your-distro-,lib"

@@ -130,8 +130,12 @@ See the comprehensive developer guide: `docs/registry/third_party_module_migrati
    ```bash
    #!/bin/bash
    source "$LH_ROOT_DIR/lib/lib_common.sh"
-   lh_load_language_module "my_tool"
-   lh_load_language_module "common"
+   
+   # Load translations if not already loaded
+   if [[ -z "${MSG[MY_TOOL_MESSAGE]:-}" ]]; then
+       lh_load_language_module "my_tool"
+       lh_load_language_module "common"
+   fi
    
    echo "$(lh_msg 'MY_TOOL_MESSAGE')"
    # Your tool logic here

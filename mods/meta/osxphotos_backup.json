@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "id": "osxphotos_backup",
+  "entry": "mods/bin/mod_osxphotos_backup.sh",
+  "category": {
+    "id": "maintenance"
+  },
+  "order": 110,
+  "docs": "osxphotos_backup.md",
+  "display": {
+    "name_key": "OSXPHOTOS_BACKUP_MODULE_NAME",
+    "description_key": "OSXPHOTOS_BACKUP_MODULE_DESC",
+    "fallback_name": "osxphotos Backup",
+    "fallback_description": "Export Photos.app libraries with osxphotos and generate health reports"
+  },
+  "i18n": {
+    "module_name": "osxphotos_backup"
+  },
+  "expose": {
+    "cli": true,
+    "gui": true
+  },
+  "enabled": true,
+  "requires_root": false,
+  "tags": [
+    "backup",
+    "photos",
+    "osxphotos"
+  ],
+  "version": "1.0.0",
+  "author": "tux"
+}

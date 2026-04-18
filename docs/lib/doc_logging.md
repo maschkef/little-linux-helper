@@ -159,6 +159,11 @@ The function automatically detects the calling script and includes the filename 
 - INFO: Default color
 - DEBUG: Cyan color
 
+**Output Streams:**
+- **Console output** is written to **stderr** (file descriptor 2), not stdout
+- **File output** is written to the configured log file
+- This ensures log messages don't interfere with command substitution or data pipelines
+
 **Dependencies:**
 - `date`, `echo`, `basename` commands
 - `lh_should_log()` function
