@@ -112,16 +112,15 @@ if [[ "$LH_GUI_MODE" == "true" ]]; then
     lh_log_msg "INFO" "$(lh_msg "GUI_MODE_ENABLED")"
 fi
 
+lh_log_msg "INFO" "$(lh_msg "LOG_HELPER_STARTED")"
+
 # Welcome message
 lh_print_boxed_message \
     --preset info \
     --border-color "${LH_COLOR_BOLD_YELLOW}" \
     --title-color "${LH_COLOR_BOLD_WHITE}" \
-    "$(lh_msg "WELCOME_TITLE")"
-
-echo -e "${LH_COLOR_BOLD_WHITE}Version:${LH_COLOR_RESET} ${LH_COLOR_INFO}${release_version}${LH_COLOR_RESET}"
-
-lh_log_msg "INFO" "$(lh_msg "LOG_HELPER_STARTED")"
+    "$(lh_msg "WELCOME_TITLE")" \
+    "Version: ${release_version}"
 
 # Main loop
 while true; do

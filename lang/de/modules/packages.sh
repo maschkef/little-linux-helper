@@ -31,6 +31,7 @@ MSG_DE[PKG_MENU_SEARCH_INSTALL]="Pakete suchen und installieren"
 MSG_DE[PKG_MENU_DOCKER_SETUP]="Docker Installation & Einrichtung"
 MSG_DE[PKG_MENU_LIST_INSTALLED]="Installierte Pakete anzeigen"
 MSG_DE[PKG_MENU_SHOW_LOGS]="Paketmanager-Logs anzeigen"
+MSG_DE[PKG_MENU_PACKAGE_AUDIT]="Paket-Audit & Wiederherstellung"
 MSG_DE[PKG_MENU_BACK]="Zurück zum Hauptmenü"
 
 # System update

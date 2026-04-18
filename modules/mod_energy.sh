@@ -45,7 +45,7 @@ if [[ -z "${MSG[ENERGY_MENU_TITLE]:-}" ]]; then
 fi
 
 lh_log_active_sessions_debug "$(lh_msg 'MENU_ENERGY')"
-lh_begin_module_session "mod_energy" "$(lh_msg 'MENU_ENERGY')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')"
+lh_begin_module_session "mod_energy" "$(lh_msg 'MENU_ENERGY')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')" "${LH_BLOCK_SYSTEM_CRITICAL}" "MEDIUM"
 
 # Global variables for temporary settings
 ENERGY_TEMP_INHIBIT_ACTIVE=false

@@ -22,6 +22,7 @@ Meine Arbeitsumgebung basiert in der Regel auf Arch (Hauptsystem) oder Debian (v
 > - **Session Awareness**: Erweiterte Sitzungsregistrierung mit intelligenter Konflikterkennung und Sperrkategorien, um gefährliche Paralleloperationen zu verhindern
 > - **Teststatus**: Backup-Funktionen sind gut getestet und stabil; Restore-Funktionen sind implementiert, benötigen aber vor Produktionseinsatz umfangreiche Tests
 > - **Update**: Das BTRFS-Backup-Modul muss (erneut) getestet werden
+> - **Neues Paket-Audit-Modul ist experimentell:** Logik und mitgelieferte Profile sind ungetestet/unvollständig. Ergebnisse genau prüfen, bevor du Wiederherstellungen startest oder Empfehlungen folgst.
 
 <details>
 <summary>⚠️ Wichtige Hinweise zur Nutzung</summary>
@@ -59,6 +60,7 @@ Hier findest du eine Liste bekannter Probleme, Einschränkungen oder Verhaltensw
     * **BTRFS-Operationen**: Erfordern ein BTRFS-Dateisystem und entsprechende Berechtigungen
     * **Docker-Sicherheit**: Tiefe und Genauigkeit der Scans hängen von der Komplexität der Compose-Dateien ab
     * **Hardware-Monitoring**: Temperatursensoren benötigen `lm-sensors` und passende Hardwareunterstützung
+    * **Paket-Audit (experimentell)**: Neu und ungetestet; mitgelieferte Profile können unvollständig oder fehlerhaft sein. Ergebnisse vor Wiederherstellungen genau prüfen.
 
 </details>
 
@@ -139,6 +141,8 @@ Sowohl CLI- als auch GUI-Oberflächen verwenden ein registry-basiertes Modul-Erk
 3. Übersetzungen hinzufügen: `lang/*/deinmodul.sh`
 4. Dokumentation hinzufügen: `docs/modules/doc_deinmodul.md`
 5. Anwendung neu starten - Modul erscheint automatisch!
+
+Hinweis zu Mods: Ich habe noch nicht entschieden, ob meine eigenen Mods dauerhaft in diesem Repository bleiben oder eine eigene GitHub-Seite bekommen. Aktuell liegen sie hier, auch weil der CLI-Main-Menu-Eintrag derzeit in den bestehenden Sprachdateien ergänzt werden muss (`lang/*/core/main_menu.sh`).
 
 Siehe `docs/registry/third_party_module_migration_guide.md` für eine vollständige Anleitung zur Modulentwicklung.
 

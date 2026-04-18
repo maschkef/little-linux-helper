@@ -496,11 +496,23 @@ The i18n system implements a sophisticated multi-layer fallback mechanism to ens
 All modules should follow this standard pattern for loading language modules:
 
 ```bash
-# Load translations - standard practice for all modules
-lh_load_language_module "your_module_name"  # Module-specific translations
-lh_load_language_module "common"            # Common UI elements and messages  
-lh_load_language_module "lib"               # Library function messages
+# Load translations if not already loaded
+if [[ -z "${MSG[YOUR_MODULE_KEY]:-}" ]]; then
+    lh_load_language_module "your_module_name"  # Module-specific translations
+    lh_load_language_module "common"            # Common UI elements and messages  
+    lh_load_language_module "lib"               # Library function messages
+fi
 ```
+
+**Understanding the defensive check:**
+- `${MSG[KEY]:-}` safely accesses the MSG array - returns empty string if key doesn't exist (instead of an error)
+- `-z` tests if the string is empty (zero length)
+- The modules are loaded **only if** the translation key is missing or empty
+- This prevents unnecessary reloading if translations were already loaded (e.g., by a parent module)
+
+**Choosing a check key:**
+- Use a key that is **unique to your module** (e.g., `YOUR_MODULE_MENU_TITLE`)
+- Don't use keys from `common` or `lib` as they might be loaded independently
 
 **Why load common and lib modules?**
 - **"common"**: Contains shared UI messages, confirmation prompts, error messages, and navigation text used across multiple modules

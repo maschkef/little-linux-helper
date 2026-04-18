@@ -27,5 +27,32 @@
   },
   "enabled": true,
   "requires_root": true,
-  "tags": ["packages", "updates", "apt", "dnf", "pacman"]
+  "tags": ["packages", "updates", "apt", "dnf", "pacman"],
+  "submodules": [
+    {
+      "id": "package_audit",
+      "entry": "modules/mod_package_audit.sh",
+      "order": 8,
+      "display": {
+        "name_key": "AUDIT_MODULE_NAME",
+        "description_key": "AUDIT_MODULE_DESC",
+        "fallback_name": "Package Audit & Restore",
+        "fallback_description": "Audit and restore installed packages"
+      },
+      "i18n": {
+        "module_name": "package_audit"
+      },
+      "docs": "modules/doc_package_audit.md",
+      "docs_inherit": false,
+      "expose": {
+        "cli": true,
+        "gui": true
+      },
+      "requires_root": true,
+      "tags": ["audit", "backup", "restore", "migration"],
+      "help": {
+        "notes_key": "AUDIT_HELP_NOTES"
+      }
+    }
+  ]
 }

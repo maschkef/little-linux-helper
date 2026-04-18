@@ -17,6 +17,7 @@ MSG_DE[GOODBYE]="Auf Wiedersehen!"
 
 # Menu categories
 MSG_DE[CATEGORY_SYSTEM]="[Systemdiagnose & Analyse]"
+MSG_DE[CATEGORY_DIAGNOSIS]="[Diagnose & Analyse]"
 MSG_DE[CATEGORY_MAINTENANCE]="[Wartung & Sicherheit]"
 MSG_DE[CATEGORY_BACKUP]="[Backup & Wiederherstellung]"
 MSG_DE[CATEGORY_DOCKER]="[Docker-Verwaltung]"
@@ -36,6 +37,7 @@ MSG_DE[DOCKER_MODULE_NAME]="Docker-Funktionen"
 MSG_DE[DOCKER_SETUP_MODULE_NAME]="Docker-Einrichtung & Installation"
 MSG_DE[DOCKER_SECURITY_MODULE_NAME]="Docker-Sicherheitsüberprüfungen"
 MSG_DE[ENERGY_MODULE_NAME]="Energieverwaltung"
+MSG_DE[OSXPHOTOS_BACKUP_MODULE_NAME]="osxphotos Backup"
 # Legacy menu items (kept for backwards compatibility)
 MSG_DE[MENU_RESTARTS]="Dienste & Desktop Neustart-Optionen"
 MSG_DE[MENU_SYSTEM_INFO]="Systeminformationen anzeigen"

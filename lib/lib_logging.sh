@@ -189,8 +189,9 @@ function lh_log_msg() {
     fi
 
     # Colored output to console (only if enabled)
+    # Output to stderr to avoid polluting stdout when commands are called in subshells
     if [ "${LH_LOG_TO_CONSOLE:-true}" = "true" ]; then
-        echo -e "$color_log_msg"
+        echo -e "$color_log_msg" >&2
     fi
 
     # Unformatted output to log file if defined and enabled
