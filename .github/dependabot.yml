@@ -61,8 +61,23 @@ updates:
         update-types:
           - "minor"
           - "patch"
-    # Selectively ignore major updates only for packages known to have frequent breaking changes
+      # Group major NPM updates that need coordination to avoid dependency conflicts  
+      npm-major-coordinated:
+        applies-to: version-updates
+        update-types:
+          - "major"
+    # Ignore problematic individual major updates - use groups instead
     ignore:
+      # Vite ecosystem - update together to avoid peer dependency conflicts
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      # i18n ecosystem - update together to avoid peer dependency conflicts  
+      - dependency-name: "react-i18next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "i18next"
+        update-types: ["version-update:semver-major"]
       # Testing libraries often have breaking API changes - keep stable for development workflow
       - dependency-name: "@testing-library/react"
         update-types: ["version-update:semver-major"]
