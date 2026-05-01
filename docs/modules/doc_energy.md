@@ -58,7 +58,10 @@ After each operation, the user is prompted to "Press any key to continue..." bef
   4. **Restore Sleep**: Re-enables sleep functionality if disabled by this module.
 * **Mechanism**:
   * Uses `systemd-inhibit` for sleep prevention via library functions `lh_prevent_standby`/`lh_allow_standby`.
+  * Uses a reduced inhibit scope (`sleep:idle`) for user-triggered energy actions to avoid blocking unrelated power keys and shutdown handling.
   * Maintains internal state tracking with `ENERGY_TEMP_INHIBIT_ACTIVE` variable.
+  * Timed inhibit mode now starts a background timer and restores standby automatically when the selected duration expires.
+  * If a module-local inhibit is already active, the user is prompted to replace it before applying a new inhibit configuration.
   * Provides cleanup functionality via `energy_cleanup()` trap handler.
   * Checks for existing backup operation inhibits to inform user of concurrent operations.
 * **Special Notes**: 
@@ -124,7 +127,7 @@ After each operation, the user is prompted to "Press any key to continue..." bef
 ## Special Considerations for the Module
 
 * **Power Management Integration**: The module integrates with the library's power management system (`lh_prevent_standby`/`lh_allow_standby`) for consistent sleep inhibition behavior across the entire application suite.
-* **State Tracking**: Maintains internal state with `ENERGY_TEMP_INHIBIT_ACTIVE` to track module-specific sleep inhibits and ensure proper cleanup.
+* **State Tracking**: Maintains internal state with `ENERGY_TEMP_INHIBIT_ACTIVE`, timer PID, and timer end timestamp to track module-specific inhibits and timed auto-restore behavior.
 * **Cleanup Handling**: Implements a trap-based cleanup system (`energy_cleanup()`) to restore power settings when the module exits unexpectedly.
 * **Tool Detection**: Automatically detects and adapts to available power management tools (systemd-inhibit, cpupower, brightnessctl, etc.).
 * **Privilege Management**: Uses `$LH_SUDO_CMD` for operations requiring elevated privileges, with clear indication of when sudo is needed.

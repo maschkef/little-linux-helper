@@ -45,14 +45,125 @@ if [[ -z "${MSG[ENERGY_MENU_TITLE]:-}" ]]; then
 fi
 
 lh_log_active_sessions_debug "$(lh_msg 'MENU_ENERGY')"
-lh_begin_module_session "mod_energy" "$(lh_msg 'MENU_ENERGY')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')" "${LH_BLOCK_SYSTEM_CRITICAL}" "MEDIUM"
+lh_begin_module_session "mod_energy" "$(lh_msg 'MENU_ENERGY')" "$(lh_msg 'LIB_SESSION_ACTIVITY_MENU')" "" "LOW"
 
 # Global variables for temporary settings
 ENERGY_TEMP_INHIBIT_ACTIVE=false
+ENERGY_TEMP_INHIBIT_TIMER_PID=""
+ENERGY_TEMP_INHIBIT_END_EPOCH=""
+
+# Energy module should only inhibit sleep/idle by default.
+ENERGY_INHIBIT_SCOPE="sleep:idle"
+
+function energy_stop_inhibit_timer() {
+    if [[ -n "$ENERGY_TEMP_INHIBIT_TIMER_PID" ]] && kill -0 "$ENERGY_TEMP_INHIBIT_TIMER_PID" 2>/dev/null; then
+        kill "$ENERGY_TEMP_INHIBIT_TIMER_PID" 2>/dev/null || true
+        wait "$ENERGY_TEMP_INHIBIT_TIMER_PID" 2>/dev/null || true
+    fi
+
+    ENERGY_TEMP_INHIBIT_TIMER_PID=""
+    ENERGY_TEMP_INHIBIT_END_EPOCH=""
+}
+
+function energy_start_inhibit_timer() {
+    local duration_seconds="$1"
+
+    energy_stop_inhibit_timer
+    ENERGY_TEMP_INHIBIT_END_EPOCH=$(( $(date +%s) + duration_seconds ))
+
+    (
+        sleep "$duration_seconds"
+        kill -USR1 "$$" 2>/dev/null || true
+    ) &
+
+    ENERGY_TEMP_INHIBIT_TIMER_PID=$!
+    lh_log_msg "DEBUG" "Started energy inhibit timer with PID $ENERGY_TEMP_INHIBIT_TIMER_PID for ${duration_seconds}s"
+}
+
+function energy_format_duration_human() {
+    local total_seconds="$1"
+    local days hours minutes seconds
+    local parts=()
+
+    if (( total_seconds < 0 )); then
+        total_seconds=0
+    fi
+
+    if (( total_seconds < 60 )); then
+        echo "${total_seconds}s"
+        return 0
+    fi
+
+    days=$((total_seconds / 86400))
+    hours=$(( (total_seconds % 86400) / 3600 ))
+    minutes=$(( (total_seconds % 3600) / 60 ))
+    seconds=$((total_seconds % 60))
+
+    if (( days > 0 )); then
+        parts+=("${days}d")
+    fi
+    if (( hours > 0 )); then
+        parts+=("${hours}h")
+    fi
+    if (( minutes > 0 )); then
+        parts+=("${minutes}m")
+    fi
+    # Keep seconds for sub-hour values, but omit them from 1 hour and above.
+    if (( total_seconds < 3600 )) && (( seconds > 0 || ${#parts[@]} == 0 )); then
+        parts+=("${seconds}s")
+    fi
+
+    local result=""
+    local part
+    for part in "${parts[@]}"; do
+        if [[ -n "$result" ]]; then
+            result+=" "
+        fi
+        result+="$part"
+    done
+
+    echo "$result"
+}
+
+function energy_handle_timer_expiry() {
+    lh_log_msg "INFO" "Energy module timed inhibit reached timeout"
+
+    ENERGY_TEMP_INHIBIT_TIMER_PID=""
+    ENERGY_TEMP_INHIBIT_END_EPOCH=""
+
+    if [[ "$ENERGY_TEMP_INHIBIT_ACTIVE" == "true" ]]; then
+        if energy_allow_standby; then
+            lh_send_notification "info" "$(lh_msg 'ENERGY_NOTIFICATION_TITLE')" "$(lh_msg 'ENERGY_NOTIFICATION_SLEEP_RESTORED')"
+            lh_log_msg "INFO" "Energy module timed inhibit restored standby automatically"
+        else
+            lh_log_msg "ERROR" "Failed to restore standby after energy timer expiry"
+        fi
+    fi
+}
+
+function energy_prepare_new_inhibit() {
+    if [[ "$ENERGY_TEMP_INHIBIT_ACTIVE" != "true" ]]; then
+        return 0
+    fi
+
+    echo -e "${LH_COLOR_WARNING}$(lh_msg 'ENERGY_INFO_ALREADY_ACTIVE_INHIBIT')${LH_COLOR_RESET}"
+    if ! lh_confirm_action "$(lh_msg 'ENERGY_CONFIRM_REPLACE_ACTIVE_INHIBIT')"; then
+        lh_log_msg "INFO" "User kept existing energy inhibit settings"
+        return 1
+    fi
+
+    if ! energy_allow_standby; then
+        echo -e "${LH_COLOR_ERROR}Failed to restore existing sleep inhibit before applying new settings${LH_COLOR_RESET}"
+        return 1
+    fi
+
+    return 0
+}
 
 # Function to cleanup temporary settings
 function energy_cleanup() {
     lh_log_msg "DEBUG" "Cleaning up energy management temporary settings"
+    energy_stop_inhibit_timer
     
     # Use library function to restore standby if we have an active inhibit
     if [[ "$ENERGY_TEMP_INHIBIT_ACTIVE" == "true" ]]; then
@@ -64,6 +175,7 @@ function energy_cleanup() {
 
 # Set trap for cleanup
 trap energy_cleanup EXIT
+trap energy_handle_timer_expiry USR1
 
 # Helper function to prevent standby using library functions
 function energy_prevent_standby() {
@@ -72,13 +184,16 @@ function energy_prevent_standby() {
     
     lh_log_msg "DEBUG" "Preventing standby for energy module: $reason"
     
-    # Use the library function directly
-    if lh_prevent_standby "Energy: $reason"; then
+    # Use the library function directly with a reduced inhibit scope for user actions.
+    if lh_prevent_standby "Energy: $reason" "$ENERGY_INHIBIT_SCOPE"; then
         ENERGY_TEMP_INHIBIT_ACTIVE=true
         lh_log_msg "INFO" "Energy module sleep prevention active"
         
         if [[ "$duration_seconds" -gt 0 ]]; then
-            lh_log_msg "INFO" "Energy module sleep prevention will be manually restored or via program exit"
+            energy_start_inhibit_timer "$duration_seconds"
+            lh_log_msg "INFO" "Energy module sleep prevention will be automatically restored after timeout"
+        else
+            energy_stop_inhibit_timer
         fi
         
         return 0
@@ -96,6 +211,7 @@ function energy_allow_standby() {
     fi
     
     lh_log_msg "INFO" "Restoring standby after energy module operation"
+    energy_stop_inhibit_timer
     
     # Use library function to restore standby
     if lh_allow_standby "Energy module restore"; then
@@ -181,6 +297,10 @@ function energy_disable_sleep_until_shutdown() {
     fi
     
     if lh_confirm_action "$(lh_msg 'ENERGY_CONFIRM_DISABLE_SLEEP_PERMANENT')"; then
+        if ! energy_prepare_new_inhibit; then
+            return 1
+        fi
+
         lh_log_msg "INFO" "$(lh_msg 'ENERGY_LOG_DISABLING_SLEEP_PERMANENT')"
         
         # Use library-based prevention (permanent = 0 duration)
@@ -258,6 +378,10 @@ function energy_disable_sleep_for_time() {
     esac
     
     if lh_confirm_action "$(lh_msg 'ENERGY_CONFIRM_DISABLE_SLEEP_TIME' "$duration_text")"; then
+        if ! energy_prepare_new_inhibit; then
+            return 1
+        fi
+
         # Check for existing backup operations
         if command -v systemd-inhibit >/dev/null 2>&1; then
             local backup_inhibits
@@ -308,6 +432,16 @@ function energy_show_sleep_status() {
     # Check our energy module inhibit status
     if [[ "$ENERGY_TEMP_INHIBIT_ACTIVE" == "true" ]]; then
         echo -e "${LH_COLOR_SUCCESS}$(lh_msg 'ENERGY_STATUS_OUR_INHIBIT_ACTIVE')${LH_COLOR_RESET}"
+        if [[ -n "$ENERGY_TEMP_INHIBIT_END_EPOCH" ]]; then
+            local now remaining
+            now=$(date +%s)
+            if (( ENERGY_TEMP_INHIBIT_END_EPOCH > now )); then
+                local remaining_human
+                remaining=$((ENERGY_TEMP_INHIBIT_END_EPOCH - now))
+                remaining_human=$(energy_format_duration_human "$remaining")
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'ENERGY_STATUS_TIMER_REMAINING' "$remaining_human")${LH_COLOR_RESET}"
+            fi
+        fi
     else
         echo -e "${LH_COLOR_INFO}$(lh_msg 'ENERGY_STATUS_OUR_INHIBIT_INACTIVE')${LH_COLOR_RESET}"
     fi
