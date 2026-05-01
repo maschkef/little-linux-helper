@@ -217,6 +217,41 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
     * `btrfs_restore_format_size(bytes)` – converts raw byte counters into human readable sizes without re-running `du`.
     * `RESTORE_VERIFIED_RECEIVED_UUID` – tracks parent chains already validated so later phases skip redundant confirmations.
 
+**7.5. Filesystem Structure Reconstruction (Undocumented Helpers):**
+
+These functions support re-creating a valid filesystem layout on the target system from metadata embedded in the backup's JSON metadata file or from defaults.
+
+*   **`parse_filesystem_config_from_marker(metadata_json_path)`**
+    *   **Purpose:** Reads and parses the `filesystem_config` field from a bundle's JSON metadata file.
+    *   **Mechanism:** Uses `jq` to extract the escaped config string and converts it back to usable key=value lines.
+    *   **Returns:** Parsed configuration text (FSTAB entries, subvolume assignments) from backup-time state.
+    *   **Usage:** Called by `detect_boot_configuration()` when using the JSON metadata method.
+
+*   **`recreate_filesystem_structure(target_root, metadata_json_path)`**
+    *   **Purpose:** Reconstructs standard mount-point directories and FSTAB entries on the restored system based on data from the backup's JSON metadata.
+    *   **Mechanism:** Parses `filesystem_config` from the metadata, creates missing directories under `target_root`, and writes an updated `/etc/fstab` for the target.
+    *   **Usage:** Called during full-system restore when the target filesystem structure needs to be restored alongside the subvolumes.
+
+*   **`create_default_filesystem_structure(target_root)`**
+    *   **Purpose:** Generates a minimal default filesystem structure on the target when no metadata is available.
+    *   **Mechanism:** Creates standard directories (`/boot`, `/home`, `/var`, etc.) and a template FSTAB with placeholder UUIDs.
+    *   **Usage:** Fallback when the JSON metadata file is missing or its `filesystem_config` field is empty.
+
+*   **`generate_fstab_entries(subvolumes, uuids)`**
+    *   **Purpose:** Produces FSTAB lines for a given set of subvolumes and disk UUIDs.
+    *   **Mechanism:** Iterates over the subvolume list and emits a `UUID=<uuid> <mount> btrfs subvol=<subvol> ...` line per entry.
+    *   **Usage:** Used by `recreate_filesystem_structure()` and the post-restore verification wizard.
+
+*   **`generate_default_fstab_entries(target_root)`**
+    *   **Purpose:** Produces a generic FSTAB using the currently detected disk UUIDs when subvolume-specific data is unavailable.
+    *   **Mechanism:** Runs `blkid` on the target block device to obtain UUIDs and generates standard entries.
+    *   **Usage:** Fallback inside `create_default_filesystem_structure()`.
+
+*   **`show_disk_information()`**
+    *   **Purpose:** Displays comprehensive disk and filesystem analysis to aid restore planning.
+    *   **Mechanism:** Runs `lsblk`, `blkid`, `df -h`, and `btrfs filesystem show` to present an overview of available block devices, their UUIDs, mount status, and BTRFS filesystem details.
+    *   **Usage:** Accessible via main menu option 4 ("Show Disk Information").
+
 **8. Subvolume Management and Safety:**
 
 *   **`safely_replace_subvolume()`**
@@ -270,8 +305,8 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
 *   **`detect_boot_configuration()`**
     *   **Purpose:** Analyzes boot configuration to determine safe bootloader update strategies using marker files or filesystem inspection.
     *   **Mechanism:**
-        *   **Marker File Method (Preferred):**
-            *   Parses the `filesystem_config` field from JSON marker file
+        *   **JSON Metadata Method (Preferred):**
+            *   Parses the `filesystem_config` field from the JSON metadata file (`meta/${timestamp}.json`)
             *   Extracts FSTAB entries and analyzes for `subvol=` patterns
             *   Works perfectly in dry-run mode without requiring filesystem access
             *   Provides accurate detection based on backup-time configuration
@@ -301,19 +336,18 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
     *   **Known Issue (Fixed):**
         *   Initial implementation used output redirection which created subshells
         *   Variables set inside subshells were lost, causing empty strategy detection
-        *   **Fix:** Changed to global variable pattern - function sets globals directly, calling code accesses them
-        *   See `/temp/SUBSHELL_SCOPE_FIX_COMPLETE.md` for complete fix documentation
+        *   **Fix:** Changed to global variable pattern — function sets globals directly, calling code reads them without a subshell
     *   **Dependencies (system):** `jq` (for marker file parsing), `/etc/fstab`, GRUB config files, `btrfs subvolume get-default`
 
 *   **`choose_boot_strategy()`**
     *   **Purpose:** Interactive method selection for bootloader detection and strategy execution.
     *   **Mechanism:**
         *   **Offers three detection methods:**
-            1. Marker file - Use boot config from backup (recommended, works in dry-run)
-            2. Filesystem - Detect from current filesystem (fallback if marker unavailable)
-            3. Auto - Try marker first, automatically fallback to filesystem if needed
+            1. JSON metadata - Use boot config from backup metadata file (recommended, works in dry-run)
+            2. Filesystem - Detect from current filesystem (fallback if metadata unavailable)
+            3. Auto - Try JSON metadata first, automatically fallback to filesystem if needed
         *   Calls `detect_boot_configuration()` with appropriate parameters
-        *   **Intelligent Fallback:** If marker detection fails, automatically offers filesystem detection
+        *   **Intelligent Fallback:** If metadata detection fails, automatically offers filesystem detection
         *   Implements safety checks to ensure `DETECTED_BOOT_STRATEGY` is never empty
         *   Displays comprehensive analysis results to user
         *   Offers strategy execution options based on detected configuration
@@ -322,8 +356,8 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
         *   Handles empty/unknown strategies gracefully with error messages
     *   **Detection Method Selection:**
         *   User can force a specific method or use auto-fallback
-        *   Marker file method provides most accurate results (based on backup-time config)
-        *   Filesystem method useful when marker is unavailable or for verification
+        *   JSON metadata method provides most accurate results (based on backup-time config)
+        *   Filesystem method useful when metadata is unavailable or for verification
     *   **Strategies:**
         1. `explicit_subvol`: Use explicit subvolume paths (safer, no bootloader changes needed)
         2. `default_subvol`: Update default subvolume (simpler, requires `btrfs subvolume set-default`)
@@ -393,7 +427,7 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
         *   Creates checkpoint for system state inspection
     *   **Dependencies (internal):** `choose_boot_strategy`, `get_restore_subvolumes`, `create_manual_checkpoint`
 
-**10. System Rollback and Recovery:**
+**11. System Rollback and Recovery:**
 
 *   **`perform_complete_system_rollback()`**
     *   **Purpose:** Comprehensive system rollback for failed restore operations with coordinated recovery.
@@ -429,7 +463,7 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
     *   **Dependencies (internal):** `restore_log_msg`
     *   **Dependencies (system):** `grub-mkconfig`, bootloader utilities
 
-**11. Folder-Level Restore Operations:**
+**12. Folder-Level Restore Operations:**
 
 *   **`restore_folder_from_snapshot()`**
     *   **Purpose:** Granular folder-level restore from snapshots without full subvolume replacement.
@@ -456,7 +490,7 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
         *   Selective recovery of user data or application states
     *   **Dependencies (internal):** `list_available_snapshots`, `validate_restore_snapshot`, `restore_log_msg`
 
-**12. Enhanced Error Handling:**
+**13. Enhanced Error Handling:**
 
 *   **`handle_restore_btrfs_error()`**
     *   **Purpose:** Advanced pattern-based BTRFS error analysis and recovery guidance for restore operations.
@@ -479,7 +513,7 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
     *   **Dependencies (internal):** `restore_log_msg`, internationalization system
     *   **Dependencies (system):** `btrfs filesystem usage`, mount analysis tools
 
-**13. Logging and Manual Checkpoints:**
+**14. Logging and Manual Checkpoints:**
 
 *   **`init_restore_log()`**
     *   **Purpose:** Initializes restore-specific log file with timestamp.
@@ -506,7 +540,7 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
         *   Logs checkpoint creation for audit trail
     *   **Safety Features:** Allows users to verify operations at critical points
 
-**14. Cleanup and Maintenance:**
+**15. Cleanup and Maintenance:**
 
 *   **`cleanup_old_restore_artifacts()`**
     *   **Purpose:** Intelligent cleanup of old restore artifacts and temporary files with safety checks.
@@ -526,7 +560,7 @@ This module provides comprehensive BTRFS snapshot-based restore functionality de
         *   Timestamped restoration logs older than retention period
     *   **Dependencies (internal):** `intelligent_cleanup` (from lib_btrfs.sh), `restore_log_msg`
 
-**15. lib_btrfs.sh Integration Details:**
+**16. lib_btrfs.sh Integration Details:**
 
 The module's integration with `lib_btrfs.sh` provides enterprise-grade atomic restore operations, mirroring the advanced capabilities of the backup module:
 
@@ -570,7 +604,7 @@ The module's integration with `lib_btrfs.sh` provides enterprise-grade atomic re
 
 This integration transforms the restore module from a standard BTRFS restore script into a professional-grade disaster recovery solution that matches the enterprise-level reliability and safety features of the backup module, ensuring consistent atomic operations across the entire backup and restore ecosystem.
 
-**16. Configuration Integration:**
+**17. Configuration Integration:**
 
 *   **Backup Configuration:** Loads settings from `backup.conf` including:
     *   `LH_BACKUP_DIR`: Backup directory structure
@@ -581,7 +615,7 @@ This integration transforms the restore module from a standard BTRFS restore scr
 *   **General Configuration:** Inherits logging settings and system configuration
 *   **Language Support:** Integrated with internationalization system for multi-language support
 
-**17. Safety Features and Error Handling:**
+**18. Safety Features and Error Handling:**
 
 *   **Live Environment Detection:** Prevents accidental execution on running systems
 *   **Comprehensive Validation:** Validates all components before operations
@@ -593,7 +627,7 @@ This integration transforms the restore module from a standard BTRFS restore scr
 *   **Graceful Degradation:** Handles missing components and configuration issues
 *   **User Confirmations:** Requires explicit confirmation for destructive operations
 
-**18. Operation Modes:**
+**19. Operation Modes:**
 
 *   **Dry-Run Mode:** 
     *   Shows what operations would be performed without making changes
@@ -604,7 +638,7 @@ This integration transforms the restore module from a standard BTRFS restore scr
     *   Includes all validation and checkpoint mechanisms
     *   Creates comprehensive audit trails
 
-**18.5. Post-Restore Verification and Bootloader Setup:**
+**20. Post-Restore Verification and Bootloader Setup:**
 
 The module includes an advanced post-restore verification wizard designed to guide users through critical verification steps, especially important when restoring to different hardware or when UUIDs have changed.
 
@@ -673,7 +707,7 @@ The module includes an advanced post-restore verification wizard designed to gui
         *   Can be used standalone for quick bootloader fixes
         *   Option 7 vs Option 8 in menu
 
-**19. Integration with Main System:**
+**21. Integration with Main System:**
 
 *   **Module Loading:** Can be run standalone or integrated with main helper system
 *   **Configuration Sharing:** Shares configuration with backup module and main system
@@ -681,7 +715,7 @@ The module includes an advanced post-restore verification wizard designed to gui
 *   **Logging Integration:** Integrates with main logging infrastructure
 *   **Error Handling:** Follows project standards for error reporting and user feedback
 
-**20. Special Considerations:**
+**22. Special Considerations:**
 
 *   **Live Environment Requirement:** Designed specifically for live environment usage
 *   **BTRFS Expertise:** Implements advanced BTRFS features and safety patterns
@@ -694,7 +728,7 @@ The module includes an advanced post-restore verification wizard designed to gui
 *   **Audit Requirements:** Provides comprehensive logging for compliance and troubleshooting
 *   **Recovery Focus:** Designed specifically for disaster recovery scenarios
 
-**21. User Interface and Menu Structure:**
+**23. User Interface and Menu Structure:**
 
 The module provides an interactive menu-driven interface with the following main options:
 

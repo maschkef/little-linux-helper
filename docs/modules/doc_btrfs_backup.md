@@ -18,19 +18,19 @@ The updated backup system uses a **bundle-based layout** where all subvolumes fr
 ```
 ${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/
 ├── snapshots/                        # All backup bundles
-│   ├── 2025-10-06_150226/            # Bundle: timestamp directory
+│   ├── 2025-10-06_15-02-26/          # Bundle: timestamp directory
 │   │   ├── @/                        # Subvolume snapshot (BTRFS subvolume)
 │   │   ├── @.backup_complete         # Marker file (next to snapshot)
 │   │   ├── @home/                    # Subvolume snapshot (BTRFS subvolume)
 │   │   ├── @home.backup_complete     # Marker file (next to snapshot)
 │   │   ├── @var/                     # Subvolume snapshot (BTRFS subvolume)
 │   │   └── @var.backup_complete      # Marker file (next to snapshot)
-│   ├── 2025-10-07_083015/            # Another bundle
+│   ├── 2025-10-07_08-30-15/          # Another bundle
 │   │   ├── @/
 │   │   ├── @.backup_complete
 │   │   ├── @home/
 │   │   └── @home.backup_complete
-│   └── 2025-10-08_120145/            # Most recent bundle
+│   └── 2025-10-08_12-01-45/          # Most recent bundle
 │       ├── @/
 │       ├── @.backup_complete
 │       ├── @home/
@@ -38,9 +38,9 @@ ${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/
 │       ├── @var/
 │       └── @var.backup_complete
 └── meta/                             # Metadata directory
-    ├── 2025-10-06_150226.json        # Metadata for first bundle
-    ├── 2025-10-07_083015.json        # Metadata for second bundle
-    └── 2025-10-08_120145.json        # Metadata for latest bundle
+    ├── 2025-10-06_15-02-26.json      # Metadata for first bundle
+    ├── 2025-10-07_08-30-15.json      # Metadata for second bundle
+    └── 2025-10-08_12-01-45.json      # Metadata for latest bundle
 ```
 
 **Key Layout Concepts:**
@@ -65,12 +65,12 @@ ${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/
    btrfs_backup_meta_root          # Returns: ${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/meta
    
    # Get bundle path
-   btrfs_bundle_path "2025-10-06_150226"
-   # Returns: ${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/snapshots/2025-10-06_150226
+   btrfs_bundle_path "2025-10-06_15-02-26"
+   # Returns: ${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/snapshots/2025-10-06_15-02-26
    
    # Get subvolume path within bundle
-   btrfs_bundle_path "2025-10-06_150226" "@home"
-   # Returns: ${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/snapshots/2025-10-06_150226/@home
+   btrfs_bundle_path "2025-10-06_15-02-26" "@home"
+   # Returns: ${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/snapshots/2025-10-06_15-02-26/@home
    ```
 
 4. **Marker Files:**
@@ -301,14 +301,14 @@ The module exposes a streamlined two-level menu:
         {
           "schema_label": "bundle",
           "session": {
-            "timestamp": "2025-10-06_150226",
+            "timestamp": "2025-10-06_15-02-26",
             "date_completed": "2025-10-06 15:03:45",
             "date_iso8601": "2025-10-06T15:03:45+02:00",
             "duration_seconds": 123,
             "duration_human": "00h 02m 03s",
             "has_errors": false,
             "backup_root": "/mnt/backup",
-            "bundle_path": "/mnt/backup/snapshots/2025-10-06_150226"
+            "bundle_path": "/mnt/backup/snapshots/2025-10-06_15-02-26"
           },
           "tool_release": "v0.5.0-beta",
           "system": {
@@ -325,35 +325,35 @@ The module exposes a streamlined two-level menu:
           "subvolumes": [
             {
               "name": "@",
-              "snapshot_path": "/mnt/backup/snapshots/2025-10-06_150226/@",
+              "snapshot_path": "/mnt/backup/snapshots/2025-10-06_15-02-26/@",
               "size_bytes": 5368709120,
               "size_human": "5.0G",
               "duration_seconds": 45,
               "backup_type": "incremental",
-              "parent_snapshot": "/mnt/backup/snapshots/2025-10-05_150226/@",
+              "parent_snapshot": "/mnt/backup/snapshots/2025-10-05_15-02-26/@",
               "status": "completed",
-              "marker_file": "/mnt/backup/snapshots/2025-10-06_150226/@/.backup_complete"
+              "marker_file": "/mnt/backup/snapshots/2025-10-06_15-02-26/@.backup_complete"
             },
             {
               "name": "@home",
-              "snapshot_path": "/mnt/backup/snapshots/2025-10-06_150226/@home",
+              "snapshot_path": "/mnt/backup/snapshots/2025-10-06_15-02-26/@home",
               "size_bytes": 6442450944,
               "size_human": "6.0G",
               "duration_seconds": 58,
               "backup_type": "full",
               "status": "completed",
-              "marker_file": "/mnt/backup/snapshots/2025-10-06_150226/@home/.backup_complete"
+              "marker_file": "/mnt/backup/snapshots/2025-10-06_15-02-26/@home.backup_complete"
             },
             {
               "name": "@var",
-              "snapshot_path": "/mnt/backup/snapshots/2025-10-06_150226/@var",
+              "snapshot_path": "/mnt/backup/snapshots/2025-10-06_15-02-26/@var",
               "size_bytes": 1073741824,
               "size_human": "1.0G",
               "duration_seconds": 20,
               "backup_type": "incremental",
-              "parent_snapshot": "/mnt/backup/snapshots/2025-10-05_150226/@var",
+              "parent_snapshot": "/mnt/backup/snapshots/2025-10-05_15-02-26/@var",
               "status": "completed",
-              "marker_file": "/mnt/backup/snapshots/2025-10-06_150226/@var/.backup_complete"
+              "marker_file": "/mnt/backup/snapshots/2025-10-06_15-02-26/@var.backup_complete"
             }
           ],
           "filesystem_config": "# Subvolume configuration\nLH_BACKUP_SUBVOLUMES=\"@ @home @var\"\nLH_AUTO_DETECT_SUBVOLUMES=true\n..."
@@ -377,7 +377,7 @@ The module exposes a streamlined two-level menu:
     *   **Usage Examples:**
         ```bash
         # Read metadata for a specific backup
-        timestamp="2025-10-06_150226"
+        timestamp="2025-10-06_15-02-26"
         meta_file="${LH_BACKUP_ROOT}${LH_BACKUP_DIR}/meta/${timestamp}.json"
         
         # Extract total size
@@ -416,35 +416,22 @@ The module exposes a streamlined two-level menu:
         *   Checks the BTRFS subvolume itself using `btrfs subvolume show`.
         *   (Optional, if other snapshots exist) Compares the size of the snapshot (`du -sb`) against an average of up to 3 other snapshots in the same subvolume directory. Flags if significantly smaller (less than 50% of average).
         *   Checks if a snapshot without a marker was created very recently (last 30 minutes), possibly indicating an ongoing backup.
-    *   **Output:** Returns a string `status|issues_list`, where status can be "OK", "UNVOLLSTÄNDIG", "VERDÄCHTIG", "BESCHÄDIGT", or "WIRD_ERSTELLT".
+    *   **Output:** Returns a string `status|issues_list`, where status is an i18n message key: `OK`, `BTRFS_STATUS_INCOMPLETE`, `BTRFS_STATUS_SUSPICIOUS`, `BTRFS_STATUS_CORRUPTED`, or `BTRFS_INTEGRITY_BEING_CREATED`. These keys are resolved to locale-specific strings at display time (e.g. `UNVOLLSTÄNDIG` in German for `BTRFS_STATUS_INCOMPLETE`).
 
 *   **`list_snapshots_with_integrity(subvol)`**
     *   **Purpose:** Lists available BTRFS snapshots for a given subvolume, including an integrity status for each.
     *   **Mechanism:**
-        *   Lists snapshot directories in `$LH_BACKUP_ROOT$LH_BACKUP_DIR/$subvol`.
+        *   Lists snapshot directories in the bundle-based layout (`snapshots/${timestamp}/${subvol}`).
         *   For each snapshot, calls `check_backup_integrity()` and formats the output with status, date, name, and size.
         *   Prints a summary of total, OK, and problematic snapshots.
     *   **Interaction:** Displays a formatted table to the user.
-
-*   **`delete_btrfs_backups()`**
-    *   **Purpose:** Provides an interactive way to delete BTRFS backups.
-    *   **Interaction:**
-        *   Checks for root privileges; prompts to re-run with `sudo` if needed.
-        *   Lists available subvolumes (`@`, `@home`) found in the backup directory.
-        *   Prompts user to select a subvolume or all subvolumes.
-        *   For each selected subvolume:
-            *   Calls `list_snapshots_with_integrity()` to display snapshots.
-            *   Offers deletion options: select individual snapshots, delete old snapshots exceeding retention, delete snapshots older than X days, delete ALL snapshots (with multiple confirmations).
-            *   Prompts for confirmation before deleting selected snapshots.
-        *   Deletes selected BTRFS subvolumes using `btrfs subvolume delete` and their corresponding `.backup_complete` marker files.
-    *   **Mechanism:** Uses `ls`, `grep`, `sort`, `wc`, `read`, `lh_confirm_action`, `lh_ask_for_input`, `date`, `sed`.
 
 *   **`cleanup_problematic_backups()`**
     *   **Purpose:** Scans all BTRFS backups for issues using `check_backup_integrity` and offers to delete problematic ones.
     *   **Interaction:**
         *   Checks for root privileges.
-        *   Iterates through `@` and `@home` subvolumes.
-        *   For each snapshot, calls `check_backup_integrity`. If status is not "OK" or "WIRD_ERSTELLT", it's listed as problematic.
+        *   Iterates through all configured subvolumes via `get_backup_subvolumes()`.
+        *   For each snapshot, calls `check_backup_integrity`. If status is not `OK` or `BTRFS_INTEGRITY_BEING_CREATED`, it's listed as problematic.
         *   If problematic backups are found, prompts for confirmation (via `lh_confirm_action`) to delete them all.
     *   **Mechanism:** Deletes BTRFS subvolumes and their marker files.
 
@@ -602,6 +589,49 @@ The module exposes a streamlined two-level menu:
     *   **Parameters:** `snapshot_path` (path to snapshot directory)
     *   **Returns:** Human-readable size string or "?" if marker is missing/invalid
     *   **Usage:** Used by backup status and listing functions for efficient size reporting.
+
+*   **`json_unquote(input)`**
+    *   **Purpose:** Strips surrounding JSON double-quotes from a string value.
+    *   **Mechanism:** Removes leading and trailing `"` characters from the input string.
+    *   **Usage:** Used when parsing raw `jq -r` output that may still contain quote characters.
+
+*   **`format_bundle_timestamp()`**
+    *   **Purpose:** Generates the current session timestamp in the canonical bundle format.
+    *   **Mechanism:** Calls `date` with format `%Y-%m-%d_%H-%M-%S` to produce a timestamp suitable for bundle directory names.
+    *   **Returns:** Timestamp string, e.g. `2025-10-06_15-02-26`.
+
+*   **`verify_snapshot_for_send(snapshot_path)`**
+    *   **Purpose:** Validates that a snapshot is suitable for use with `btrfs send` before attempting a transfer.
+    *   **Mechanism:** Checks that the snapshot is a read-only BTRFS subvolume and is accessible.
+    *   **Returns:** 0 if the snapshot can be sent, non-zero otherwise.
+    *   **Usage:** Called before initiating incremental or full send operations.
+
+*   **`validate_received_uuid_integrity(snapshot_path)`**
+    *   **Purpose:** Module-local companion to `verify_received_uuid_integrity()` from `lib_btrfs.sh`; validates that received snapshots carry a non-empty `received_uuid`.
+    *   **Mechanism:** Parses `btrfs subvolume show` output and checks the `received uuid` field.
+    *   **Usage:** Called before using a received snapshot as an incremental parent to avoid broken chains.
+
+*   **`check_btrfs_availability()`**
+    *   **Purpose:** Lightweight check for the `btrfs` command availability, without prompting to install.
+    *   **Mechanism:** Uses `command -v btrfs` and returns a boolean result.
+    *   **Usage:** Used internally in guards where a full `check_btrfs_support()` dialog is not appropriate.
+
+*   **`is_snapshot_directory(path)`**
+    *   **Purpose:** Determines whether a given path is a BTRFS subvolume directory.
+    *   **Mechanism:** Runs `btrfs subvolume show` on the path and checks the exit code.
+    *   **Returns:** 0 if the path is a BTRFS subvolume, non-zero otherwise.
+    *   **Usage:** Used by cleanup and listing functions to filter out non-subvolume entries.
+
+*   **`collect_btrfs_filesystem_info(path)`**
+    *   **Purpose:** Gathers BTRFS filesystem statistics for a given mount point.
+    *   **Mechanism:** Runs `btrfs filesystem usage` and parses the output for metadata and data block group information.
+    *   **Returns:** Structured text with usage statistics.
+    *   **Usage:** Called by `show_backup_status()` and space-checking functions.
+
+*   **`delete_source_snapshot_for_bundle(bundle_name, subvol)`**
+    *   **Purpose:** Removes the source (temporary) snapshot that was created for a specific bundle/subvolume pair after the bundle has been deleted from the backup destination.
+    *   **Mechanism:** Locates the source snapshot in `$LH_SOURCE_SNAPSHOT_DIR` using the bundle timestamp and subvolume name, then deletes it via `btrfs subvolume delete`.
+    *   **Usage:** Called by `delete_btrfs_backups()` after successfully removing a bundle to keep the source snapshot directory clean.
 
 
 **5. Special Considerations:**
