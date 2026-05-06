@@ -24,6 +24,9 @@
 # This module provides comprehensive BTRFS snapshot-based restore functionality
 # following best practices for safe operations.
 
+# Critical: Enable pipeline failure detection (mirrors mod_btrfs_backup.sh)
+set -o pipefail
+
 # Load common library and BTRFS library
 LIB_COMMON_PATH="$(dirname "${BASH_SOURCE[0]}")/../../lib/lib_common.sh"
 if [[ ! -r "$LIB_COMMON_PATH" ]]; then
@@ -155,9 +158,9 @@ recreate_filesystem_structure() {
     restore_log_msg "INFO" "Creating subvolumes: $detected_subvols"
     
     # Mount the target device temporarily to create subvolumes
-    local temp_mount="/tmp/btrfs_recreate_$$"
-    mkdir -p "$temp_mount"
-    
+    local temp_mount
+    temp_mount=$(mktemp -d) || { restore_log_msg "ERROR" "Failed to create temp mount directory"; return 1; }
+
     if ! $LH_SUDO_CMD mount "$target_device" "$temp_mount"; then
         restore_log_msg "ERROR" "Failed to mount $target_device for subvolume creation"
         rmdir "$temp_mount" 2>/dev/null
@@ -168,7 +171,9 @@ recreate_filesystem_structure() {
     
     # Create subvolumes
     local created_subvolumes=()
-    for subvol in $detected_subvols; do
+    local -a detected_subvols_arr
+    IFS=' ' read -ra detected_subvols_arr <<< "$detected_subvols"
+    for subvol in "${detected_subvols_arr[@]}"; do
         restore_log_msg "INFO" "Creating subvolume: $subvol"
         
         if $LH_SUDO_CMD btrfs subvolume create "$temp_mount/$subvol" >/dev/null 2>&1; then
@@ -199,9 +204,9 @@ create_default_filesystem_structure() {
     restore_log_msg "INFO" "Creating default BTRFS filesystem structure on $target_device"
     
     # Mount temporarily
-    local temp_mount="/tmp/btrfs_default_$$" 
-    mkdir -p "$temp_mount"
-    
+    local temp_mount
+    temp_mount=$(mktemp -d) || { restore_log_msg "ERROR" "Failed to create temp mount directory"; return 1; }
+
     if ! $LH_SUDO_CMD mount "$target_device" "$temp_mount"; then
         restore_log_msg "ERROR" "Failed to mount $target_device"
         rmdir "$temp_mount" 2>/dev/null
@@ -913,12 +918,14 @@ restore_log_msg() {
     lh_log_msg "$level" "$message"
 
     # Additionally log to restore-specific log if available
-    if [[ -z "$LH_RESTORE_LOG" && -n "${LH_LOG_DIR:-}" ]]; then
-        init_restore_log
+    if [[ -z "$LH_RESTORE_LOG" ]]; then
+        init_restore_log 2>/dev/null || true
     fi
 
     if [[ -n "$LH_RESTORE_LOG" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >> "$LH_RESTORE_LOG"
+    else
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" >&2
     fi
 }
 
@@ -1471,7 +1478,7 @@ remove_readonly_flag() {
         else
             # Check if this is a received snapshot before modifying
             local received_uuid
-            received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$subvol_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+            received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$subvol_path" 2>/dev/null | sed -n 's/^[[:space:]]*Received UUID:[[:space:]]*//p' || echo "")
             
             if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
                 restore_log_msg "WARN" "WARNING: Removing read-only flag from received snapshot"
@@ -1495,7 +1502,7 @@ remove_readonly_flag() {
                 
                 # Log the received_uuid destruction if applicable
                 local received_uuid_check
-                received_uuid_check=$($LH_SUDO_CMD btrfs subvolume show "$subvol_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+                received_uuid_check=$($LH_SUDO_CMD btrfs subvolume show "$subvol_path" 2>/dev/null | sed -n 's/^[[:space:]]*Received UUID:[[:space:]]*//p' || echo "")
                 if [[ -z "$received_uuid_check" || "$received_uuid_check" == "-" ]]; then
                     restore_log_msg "WARN" "received_uuid destroyed as expected"
                 fi
@@ -1506,7 +1513,7 @@ remove_readonly_flag() {
         else
             restore_log_msg "INFO" "DRY-RUN: Would remove read-only flag from $subvol_path"
             local received_uuid
-            received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$subvol_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+            received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$subvol_path" 2>/dev/null | sed -n 's/^[[:space:]]*Received UUID:[[:space:]]*//p' || echo "")
             if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
                 restore_log_msg "INFO" "DRY-RUN: This would destroy received_uuid: $received_uuid"
             fi
@@ -1544,7 +1551,7 @@ safely_replace_subvolume() {
     if [[ "$DRY_RUN" == "false" ]]; then
         # Check if existing subvolume has received_uuid (critical for BTRFS)
         local existing_received_uuid
-        existing_received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$existing_subvol" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+        existing_received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$existing_subvol" 2>/dev/null | sed -n 's/^[[:space:]]*Received UUID:[[:space:]]*//p' || echo "")
         
         if [[ -n "$existing_received_uuid" && "$existing_received_uuid" != "-" ]]; then
             restore_log_msg "WARN" "Existing subvolume has received_uuid: $existing_received_uuid"
@@ -1579,7 +1586,7 @@ safely_replace_subvolume() {
     else
         # Enhanced dry-run logging with received_uuid awareness
         local existing_received_uuid
-        existing_received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$existing_subvol" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+        existing_received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$existing_subvol" 2>/dev/null | sed -n 's/^[[:space:]]*Received UUID:[[:space:]]*//p' || echo "")
         
         if [[ -n "$existing_received_uuid" && "$existing_received_uuid" != "-" ]]; then
             restore_log_msg "INFO" "DRY-RUN: Would create BTRFS snapshot $existing_subvol -> $backup_name (preserving received_uuid: $existing_received_uuid)"
@@ -1692,8 +1699,15 @@ perform_subvolume_restore() {
                 lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
                 return 1
             fi
+            if [[ -z "$expected_received_path" ]]; then
+                restore_log_msg "ERROR" "expected_received_path is empty — refusing destructive delete"
+                lh_allow_standby "BTRFS restore of $subvol_to_restore (error)"
+                return 1
+            fi
             restore_log_msg "WARN" "Removing leftover temporary snapshot: $expected_received_path"
-            $LH_SUDO_CMD btrfs subvolume delete "$expected_received_path" 2>/dev/null || $LH_SUDO_CMD rm -rf "$expected_received_path" 2>/dev/null || true
+            if ! $LH_SUDO_CMD btrfs subvolume delete "$expected_received_path" 2>/dev/null; then
+                restore_log_msg "WARN" "Could not remove leftover via btrfs: $expected_received_path — manual cleanup may be required"
+            fi
         fi
         
         restore_log_msg "INFO" "Using atomic receive pattern from BTRFS library"
@@ -1703,7 +1717,7 @@ perform_subvolume_restore() {
         # Use library's atomic receive function (no parent for restore operations)
         local receive_result=0
         local receive_stderr
-        receive_stderr=$(mktemp)
+        receive_stderr=$(mktemp) || { restore_log_msg "ERROR" "Failed to create temp file for stderr capture"; return 1; }
         
         if atomic_receive_with_validation "$snapshot_to_use" "$expected_received_path" 2>"$receive_stderr"; then
             restore_log_msg "INFO" "Atomic restore operation completed successfully"
@@ -1715,7 +1729,7 @@ perform_subvolume_restore() {
                 if [[ -d "$expected_received_path" ]]; then
                     # Check if received snapshot has received_uuid before moving
                     local received_uuid
-                    received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$expected_received_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+                    received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$expected_received_path" 2>/dev/null | sed -n 's/^[[:space:]]*Received UUID:[[:space:]]*//p' || echo "")
                     
                     if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
                         # Use snapshot instead of mv to preserve received_uuid
@@ -1801,7 +1815,7 @@ validate_restore_snapshot() {
     
     # Check if snapshot has received_uuid (indicates it's from incremental backup)
     local received_uuid
-    received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+    received_uuid=$($LH_SUDO_CMD btrfs subvolume show "$snapshot_path" 2>/dev/null | sed -n 's/^[[:space:]]*Received UUID:[[:space:]]*//p' || echo "")
     
     if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
         restore_log_msg "DEBUG" "Snapshot has received_uuid: $received_uuid (part of incremental chain)"
@@ -2126,7 +2140,7 @@ select_restore_type_and_snapshot() {
                 local snapshot_path="${selected_snapshots[$subvol]}"
                 
                 local received_uuid
-                received_uuid=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+                received_uuid=$(btrfs subvolume show "$snapshot_path" 2>/dev/null | sed -n 's/^[[:space:]]*Received UUID:[[:space:]]*//p' || echo "")
                 
                 if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
                     restore_log_msg "DEBUG" "Validating $subvol incremental snapshot parent chain"
@@ -2342,7 +2356,7 @@ select_restore_type_and_snapshot() {
             
             # Check parent chain integrity if this is an incremental snapshot
             local received_uuid
-            received_uuid=$(btrfs subvolume show "$selected_snapshot" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+            received_uuid=$(btrfs subvolume show "$selected_snapshot" 2>/dev/null | sed -n 's/^[[:space:]]*Received UUID:[[:space:]]*//p' || echo "")
             
             if [[ -n "$received_uuid" && "$received_uuid" != "-" ]]; then
                 restore_log_msg "DEBUG" "Validating incremental snapshot parent chain"
@@ -3672,13 +3686,17 @@ cleanup_old_restore_artifacts() {
         for artifact in "${old_artifacts[@]}"; do
             restore_log_msg "INFO" "Removing old restore artifact: $(basename "$artifact")"
             
+            if [[ -z "$artifact" ]]; then
+                restore_log_msg "WARN" "Skipping empty artifact path during cleanup"
+                continue
+            fi
             if [[ -d "$artifact" ]]; then
                 # Try to delete as subvolume first, then as directory
                 if ! $LH_SUDO_CMD btrfs subvolume delete "$artifact" 2>/dev/null; then
-                    rm -rf "$artifact" 2>/dev/null || restore_log_msg "WARN" "Failed to remove: $artifact"
+                    $LH_SUDO_CMD rm -rf "$artifact" 2>/dev/null || restore_log_msg "WARN" "Failed to remove: $artifact"
                 fi
             else
-                rm -f "$artifact" 2>/dev/null || restore_log_msg "WARN" "Failed to remove: $artifact"
+                $LH_SUDO_CMD rm -f "$artifact" 2>/dev/null || restore_log_msg "WARN" "Failed to remove: $artifact"
             fi
         done
     fi

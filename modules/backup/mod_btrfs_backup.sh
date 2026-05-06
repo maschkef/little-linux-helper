@@ -185,12 +185,12 @@ find_btrfs_root() {
     mount_point=$(mount | grep " on $subvol_path " | grep "btrfs" | awk '{print $3}' | head -n1)
     if [ -z "$mount_point" ]; then
         # If not found directly, check parent paths
-        for mp in $(mount | grep "btrfs" | awk '{print $3}' | sort -r); do
+        while IFS= read -r mp; do
             if [[ "$subvol_path" == "$mp"* ]]; then
                 mount_point="$mp"
                 break
             fi
-        done
+        done < <(mount | grep "btrfs" | awk '{print $3}' | sort -r)
     fi
     
     if [ -n "$mount_point" ]; then
@@ -367,12 +367,14 @@ configure_backup() {
             if [ -n "$new_subvolumes" ]; then
                 # Validate subvolume format
                 local valid=true
+                set -f  # disable globbing to prevent expansion of user input
                 for subvol in $new_subvolumes; do
-                    if [[ ! "$subvol" =~ ^@[a-zA-Z0-9/_-]*$ ]]; then
-                        echo -e "${LH_COLOR_ERROR}Invalid subvolume name: $subvol (must start with @)${LH_COLOR_RESET}"
+                    if [[ ! "$subvol" =~ ^@[a-zA-Z0-9_-]+$ ]]; then
+                        echo -e "${LH_COLOR_ERROR}Invalid subvolume name: $subvol (must start with @, only letters/digits/underscore/dash allowed)${LH_COLOR_RESET}"
                         valid=false
                     fi
                 done
+                set +f
                 
                 if [ "$valid" = true ]; then
                     LH_BACKUP_SUBVOLUMES="$new_subvolumes"
@@ -511,7 +513,7 @@ handle_snapshot_preservation() {
     
     # Move snapshot to permanent location
     backup_log_msg "INFO" "Moving snapshot to permanent location: $permanent_snapshot_path"
-    if mv "$temp_snapshot_path" "$permanent_snapshot_path"; then
+    if $LH_SUDO_CMD mv "$temp_snapshot_path" "$permanent_snapshot_path"; then
         # Mark as script-created
         mark_script_created_snapshot "$permanent_snapshot_path" "$timestamp"
         backup_log_msg "INFO" "Source snapshot preserved: $permanent_snapshot_path"
@@ -556,8 +558,8 @@ create_direct_snapshot() {
 
     # Determine mount point for the subvolume using actual mount information
     local mount_point=""
-    mount_point=$(grep "subvol=/$subvol" /proc/mounts 2>/dev/null | awk '{print $2}' | head -1)
-    
+    mount_point=$(grep -F "subvol=/$subvol" /proc/mounts 2>/dev/null | awk '{print $2}' | head -1)
+
     # Fallback to common mappings if not found in mounts
     if [[ -z "$mount_point" ]]; then
         case "$subvol" in
@@ -734,8 +736,8 @@ validate_subvolume_exists() {
     
     # Determine mount point for the subvolume using actual mount information
     local mount_point
-    mount_point=$(grep "subvol=/$subvol" /proc/mounts 2>/dev/null | awk '{print $2}' | head -1)
-    
+    mount_point=$(grep -F "subvol=/$subvol" /proc/mounts 2>/dev/null | awk '{print $2}' | head -1)
+
     # Fallback to common mappings if not found in mounts
     if [[ -z "$mount_point" ]]; then
         case "$subvol" in
@@ -1233,7 +1235,7 @@ btrfs_backup() {
         
         # Create direct snapshot or use existing one
         local actual_snapshot_path
-        if ! actual_snapshot_path=$(create_direct_snapshot "$subvol" "$timestamp" "$GLOBAL_KEEP_SNAPSHOTS" 2>&2) || [ -z "$actual_snapshot_path" ]; then
+        if ! actual_snapshot_path=$(create_direct_snapshot "$subvol" "$timestamp" "$GLOBAL_KEEP_SNAPSHOTS") || [ -z "$actual_snapshot_path" ]; then
             # create_direct_snapshot already outputs error message and logs
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'BTRFS_SNAPSHOT_CREATE_ERROR' "$subvol")${LH_COLOR_RESET}"
             continue
@@ -1307,7 +1309,7 @@ btrfs_backup() {
             # Enhanced Step 1: Verify destination parent has valid received_uuid (critical requirement)
             backup_log_msg "DEBUG" "Step 1: Verifying destination parent received_uuid integrity"
             local dest_received_uuid
-            dest_received_uuid=$(btrfs subvolume show "$last_backup" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "")
+            dest_received_uuid=$(btrfs subvolume show "$last_backup" 2>/dev/null | sed -n 's/^[[:space:]]*Received UUID:[[:space:]]*//p' || echo "")
             
             if [ -z "$dest_received_uuid" ] || [ "$dest_received_uuid" = "-" ]; then
                 backup_log_msg "WARN" "Destination parent missing received_uuid, cannot use for incremental backup"
@@ -1701,7 +1703,7 @@ btrfs_backup() {
             # This ensures the next backup can use this snapshot as a parent for incremental transfer
             backup_log_msg "INFO" "Preserving current snapshot as chain parent for future backups: $(basename "$snapshot_path")" >&2
             local current_chain_marker="${snapshot_path}.chain_parent"
-            if ! touch "$current_chain_marker" 2>/dev/null; then
+            if ! $LH_SUDO_CMD touch "$current_chain_marker" 2>/dev/null; then
                 backup_log_msg "WARN" "Could not create chain parent marker for current snapshot: $current_chain_marker" >&2
             else
                 backup_log_msg "DEBUG" "Created chain parent marker for current snapshot: $current_chain_marker" >&2
@@ -1716,7 +1718,7 @@ btrfs_backup() {
             
             # Create a marker to indicate this snapshot is needed for incremental chains
             local parent_marker="${parent_snapshot}.chain_parent"
-            if ! touch "$parent_marker" 2>/dev/null; then
+            if ! $LH_SUDO_CMD touch "$parent_marker" 2>/dev/null; then
                 backup_log_msg "WARN" "Could not create chain parent marker: $parent_marker"
             else
                 backup_log_msg "DEBUG" "Created chain parent marker: $parent_marker"
@@ -2826,7 +2828,7 @@ debug_incremental_backup_chain() {
                 local backup_uuid
                 backup_uuid=$(btrfs subvolume show "$bundle_path" 2>/dev/null | grep "UUID:" | head -n1 | awk '{print $2}' || echo "unknown")
                 local received_uuid
-                received_uuid=$(btrfs subvolume show "$bundle_path" 2>/dev/null | grep "Received UUID:" | awk '{print $3}' || echo "none")
+                received_uuid=$(btrfs subvolume show "$bundle_path" 2>/dev/null | sed -n 's/^[[:space:]]*Received UUID:[[:space:]]*//p' || echo "none")
                 local generation
                 generation=$(btrfs subvolume show "$bundle_path" 2>/dev/null | grep "Generation:" | awk '{print $2}' || echo "unknown")
                 local ro_status
