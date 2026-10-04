@@ -219,9 +219,13 @@ Beide Oberflächen bieten Zugriff auf die folgenden Module:
     * Prüfung von Dateizugriffen auf Ordner (erfordert `lsof`).
     * Analyse der Festplattenbelegung (mit `df` und optional `ncdu`).
     * Testen der Festplattengeschwindigkeit (erfordert `hdparm`).
-    * Überprüfung des Dateisystems (erfordert `fsck`).
-    * Prüfung des Festplatten-Gesundheitszustands (erfordert `smartmontools`).
+    * Überprüfung des Dateisystems (erfordert `fsck`). Mount-Erkennung erfolgt mit `findmnt` (exakter Quellen-Match).
+    * Prüfung des Festplatten-Gesundheitszustands (erfordert `smartmontools`), inklusive:
+        * Kurzer Selbsttest (~2 Min).
+        * **Langer Selbsttest (Stunden), optional mit `systemd-inhibit`-basiertem Standby-Schutz** — der auf der Platte laufende Test wird nicht abgebrochen, wenn der Host in den Ruhezustand geht. Fortschritt wird per `watch` überwacht, `Ctrl+C` beendet den Monitor, nicht den Test auf der Platte.
+        * Anzeige des letzten Selbsttest-Protokolls.
     * Anzeige der größten Dateien in einem Verzeichnis.
+    * **USB-Geräte-Baum mit Zuordnung** — annotierte `lsusb -t`-Ausgabe (jede Baum-Zeile mit VID:PID und Hersteller/Produktname) plus Liste der USB-angeschlossenen Blockgeräte, sodass klar ist, welche `/dev/sdX` welches externe Laufwerk ist — hilfreich vor zerstörerischen oder lang laufenden Operationen.
     * **Session Awareness**: Ressourcenintensive Aktionen registrieren sich mit Sperrkategorien (`RESOURCE_INTENSIVE`).
 * **Log-Analyse-Werkzeuge (`mod_logs.sh`)**:
     * Anzeige von Logs der letzten X Minuten (aktueller und vorheriger Boot, erfordert ggf. `journalctl`).
@@ -550,7 +554,10 @@ Für bestimmte Funktionen werden zusätzliche Pakete benötigt, die das Skript b
     * `lsof` (für die Prüfung von Dateizugriffen)
     * `hdparm` (für Festplattengeschwindigkeitstests)
     * `ncdu` (für interaktive Festplattenanalyse, optional)
-    * `util-linux` (enthält `fsck`)
+    * `util-linux` (enthält `fsck`, `findmnt`)
+    * `usbutils` (für `lsusb` / USB-Geräte-Baum)
+    * `systemd` (stellt `systemd-inhibit` bereit — hält das System während langer SMART-Tests wach)
+    * `procps` o. ä. (stellt `watch` bereit — zur Überwachung langer SMART-Tests)
     * `iproute2` (enthält `ss`)
     * `rkhunter` (für Rootkit-Prüfungen)
     * `chkrootkit` (optional, für zusätzliche Rootkit-Prüfungen)

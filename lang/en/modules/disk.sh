@@ -11,8 +11,8 @@
 
 # Help content
 MSG_EN[DISK_HELP_OVERVIEW]="Tools for managing and analyzing your storage devices and disk space. Check drive health, find large files, monitor disk usage, and perform disk diagnostics."
-MSG_EN[DISK_HELP_OPTIONS]="1. Show Mounted Drives - See all connected drives and how much space they're using|2. SMART Values - Get detailed health information from your hard drives and SSDs|3. File Access Times - Check which programs are currently using files in a folder|4. Directory Sizes - Analyze disk space usage with visual tools like ncdu|5. Disk Speed Test - Test read/write performance of your storage devices|6. Check Filesystem - Scan drives for errors and fix file system problems|7. Check Health - Quick health check of your drives using SMART data|8. Largest Files - Find the biggest files taking up space on your system"
-MSG_EN[DISK_HELP_NOTES]="Drive health checks require administrator privileges|Missing diagnostic tools will be offered for automatic installation|Filesystem checks work best on unmounted drives|Speed tests and health checks are safe and won't modify data"
+MSG_EN[DISK_HELP_OPTIONS]="1. Show Mounted Drives - See all connected drives and how much space they're using|2. SMART Values - Get detailed health information from your hard drives and SSDs|3. File Access Times - Check which programs are currently using files in a folder|4. Directory Sizes - Analyze disk space usage with visual tools like ncdu|5. Disk Speed Test - Test read/write performance of your storage devices|6. Check Filesystem - Scan drives for errors and fix file system problems|7. Check Health - Health check and self-tests (short/long) of your drives using SMART data|8. Largest Files - Find the biggest files taking up space on your system|9. USB Device Tree - Show USB topology with device names and block device mapping"
+MSG_EN[DISK_HELP_NOTES]="Drive health checks require administrator privileges|Missing diagnostic tools will be offered for automatic installation|Filesystem checks work best on unmounted drives|Speed tests and health checks are safe and won't modify data|Long SMART self-tests take hours and can be monitored with standby inhibition so the drive does not sleep"
 
 # Menu items and headers
 MSG_EN[DISK_MENU_TITLE]="Disk Tools"
@@ -24,6 +24,7 @@ MSG_EN[DISK_MENU_SPEED_TEST]="Test disk speed"
 MSG_EN[DISK_MENU_FILESYSTEM]="Check filesystem"
 MSG_EN[DISK_MENU_HEALTH]="Check disk health status"
 MSG_EN[DISK_MENU_LARGEST_FILES]="Show largest files"
+MSG_EN[DISK_MENU_USB_TREE]="USB device tree (with mapping)"
 MSG_EN[DISK_MENU_BACK]="Back to main menu"
 
 # Headers
@@ -35,6 +36,7 @@ MSG_EN[DISK_HEADER_SPEED_TEST]="Test Disk Speed"
 MSG_EN[DISK_HEADER_FILESYSTEM]="Check Filesystem"
 MSG_EN[DISK_HEADER_HEALTH]="Check Disk Health Status"
 MSG_EN[DISK_HEADER_LARGEST_FILES]="Show Largest Files"
+MSG_EN[DISK_HEADER_USB_TREE]="USB Device Tree"
 
 # Mounted drives
 MSG_EN[DISK_MOUNTED_OVERVIEW]="Overview of currently mounted drives (df):"
@@ -119,9 +121,12 @@ MSG_EN[DISK_HEALTH_FOUND_DRIVES]="Found drives:"
 MSG_EN[DISK_HEALTH_SELECT_DRIVE]="Please select a drive (1-%d):"
 MSG_EN[DISK_HEALTH_ADDITIONAL_TESTS]="Would you like to perform additional tests?"
 MSG_EN[DISK_HEALTH_SHORT_TEST]="Short self-test (takes about 2 minutes)"
+MSG_EN[DISK_HEALTH_LONG_TEST]="Long self-test (hours, with optional standby protection)"
+MSG_EN[DISK_HEALTH_LAST_SELFTEST]="Show last self-test log (smartctl -l selftest)"
+MSG_EN[DISK_HEALTH_LAST_SELFTEST_FOR]="Last self-test log for %s:"
 MSG_EN[DISK_HEALTH_ATTRIBUTES]="Show extended attributes"
 MSG_EN[DISK_HEALTH_BACK]="Back"
-MSG_EN[DISK_HEALTH_SELECT_TEST]="Select an option (1-3):"
+MSG_EN[DISK_HEALTH_SELECT_TEST]="Select an option (1-5):"
 MSG_EN[DISK_HEALTH_STARTING_SHORT_TEST]="Starting short self-test for %s..."
 MSG_EN[DISK_HEALTH_TEST_RUNNING]="The test is now running in the background. After completion you can display the results."
 MSG_EN[DISK_HEALTH_TEST_COMPLETION]="The test should be completed in about 2 minutes."
@@ -130,6 +135,11 @@ MSG_EN[DISK_HEALTH_WAITING]="Waiting 2 minutes for test completion..."
 MSG_EN[DISK_HEALTH_TEST_RESULTS]="Test results for %s:"
 MSG_EN[DISK_HEALTH_EXTENDED_ATTRIBUTES]="Extended attributes for %s:"
 MSG_EN[DISK_HEALTH_OPERATION_CANCELLED]="Operation cancelled."
+MSG_EN[DISK_HEALTH_LONG_WARNING]="The long self-test can take several hours. The drive must not enter standby during the test — that can abort it."
+MSG_EN[DISK_HEALTH_LONG_STARTED]="Long self-test started on %s. The test runs on the drive itself and continues even if you leave this menu."
+MSG_EN[DISK_HEALTH_LONG_INHIBIT_MONITOR]="Monitor progress and keep the system awake (systemd-inhibit)? Ctrl+C ends the monitor but not the SMART test."
+MSG_EN[DISK_HEALTH_INHIBIT_UNAVAILABLE]="'systemd-inhibit' is not available. Monitoring without standby protection — the drive may enter standby."
+MSG_EN[DISK_HEALTH_AUTODETECT_HINT]="If smartctl fails with 'Unknown USB bridge', try '-d sat' or '-d scsi' manually."
 
 # Largest files
 MSG_EN[DISK_LARGEST_ENTER_PATH]="Enter the path to search in"
@@ -150,6 +160,15 @@ MSG_EN[DISK_ERROR_DU_NOT_INSTALLED]="The program 'du' is not installed and could
 MSG_EN[DISK_ERROR_LSOF_NOT_INSTALLED]="The program 'lsof' is not installed and could not be installed."
 MSG_EN[DISK_ERROR_HDPARM_NOT_INSTALLED]="The program 'hdparm' is not installed and could not be installed."
 MSG_EN[DISK_ERROR_FSCK_NOT_INSTALLED]="The program 'fsck' is not installed and could not be installed."
+MSG_EN[DISK_ERROR_LSUSB_NOT_INSTALLED]="The program 'lsusb' is not installed and could not be installed."
+
+# USB tree
+MSG_EN[DISK_USB_TREE_ANNOTATED]="USB topology with device names (lsusb -t annotated):"
+MSG_EN[DISK_USB_BLOCK_MAPPING]="Block devices connected via USB:"
+MSG_EN[DISK_USB_SHOW_RAW_PROMPT]="Also show raw lsusb and lsusb -t output?"
+MSG_EN[DISK_USB_FLAT_LIST]="USB devices (flat list):"
+MSG_EN[DISK_USB_TREE]="USB topology (lsusb -t):"
+MSG_EN[DISK_USB_NO_BLOCK_DEVICES]="No USB block devices detected."
 
 # General messages
 MSG_EN[DISK_INVALID_SELECTION]="Invalid selection."

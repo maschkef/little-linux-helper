@@ -219,9 +219,13 @@ Both interfaces provide access to the following modules:
     * Checking file access to folders (requires `lsof`).
     * Analysis of disk usage (with `df` and optionally `ncdu`).
     * Testing disk speed (requires `hdparm`).
-    * File system verification (requires `fsck`).
-    * Checking disk health status (requires `smartmontools`).
+    * File system verification (requires `fsck`). Mount-state detection uses `findmnt` for exact-source matching.
+    * Checking disk health status (requires `smartmontools`), including:
+        * Short self-test (~2 min).
+        * **Long self-test (hours), with optional `systemd-inhibit`-based standby protection** — the on-drive test won't be aborted by the host going to sleep. Monitors progress via `watch`, so `Ctrl+C` leaves the monitor without stopping the on-disk test.
+        * Last self-test log view.
     * Display of largest files in a directory.
+    * **USB device tree with name mapping** — annotated `lsusb -t` output (each tree entry labelled with VID:PID and vendor/product name) plus the list of USB-connected block devices, so it's obvious which `/dev/sdX` is which external drive before running destructive or long-running operations.
     * **Session Awareness**: Resource-intensive operations register with blocking categories (`RESOURCE_INTENSIVE`).
 * **Log Analysis Tools (`mod_logs.sh`)**:
     * Display of logs from the last X minutes (current and previous boot, may require `journalctl`).
@@ -551,7 +555,10 @@ For specific functions, additional packages are required that the script will at
     * `lsof` (for file access checking)
     * `hdparm` (for disk speed testing)
     * `ncdu` (for interactive disk analysis, optional)
-    * `util-linux` (contains `fsck`)
+    * `util-linux` (contains `fsck`, `findmnt`)
+    * `usbutils` (for `lsusb` / USB device tree)
+    * `systemd` (provides `systemd-inhibit` — used to keep the system awake during long SMART tests)
+    * `procps` or similar (provides `watch` — used to monitor long SMART tests)
     * `iproute2` (contains `ss`)
     * `rkhunter` (for rootkit checking)
     * `chkrootkit` (optional, for additional rootkit checking)

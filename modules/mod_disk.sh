@@ -57,6 +57,35 @@ function disk_show_mounted() {
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 }
 
+# Scan for SMART-capable drives. Message keys are passed in so callers keep
+# their own translation namespace. Result goes into the variable named in $4
+# (bash nameref). Returns 0 if drives found, 1 otherwise.
+function _disk_scan_smart_drives() {
+    local scanning_key="$1" no_drives_key="$2" no_drives_found_key="$3"
+    local -n _result="$4"
+    _result=""
+
+    echo -e "${LH_COLOR_INFO}$(lh_msg "$scanning_key")${LH_COLOR_RESET}"
+    local drives
+    drives=$($LH_SUDO_CMD smartctl --scan | awk '{print $1}')
+
+    if [ -z "$drives" ]; then
+        lh_print_boxed_message --preset warning "$(lh_msg "$no_drives_key")"
+        for device in /dev/sd? /dev/nvme?n? /dev/hd?; do
+            if [ -b "$device" ]; then
+                drives="$drives $device"
+            fi
+        done
+    fi
+    if [ -z "$drives" ]; then
+        echo -e "${LH_COLOR_ERROR}$(lh_msg "$no_drives_found_key")${LH_COLOR_RESET}"
+        return 1
+    fi
+
+    _result="$drives"
+    return 0
+}
+
 # Function to read S.M.A.R.T. values
 function disk_smart_values() {
     lh_print_header "$(lh_msg 'DISK_HEADER_SMART')"
@@ -66,20 +95,8 @@ function disk_smart_values() {
         return 1
     fi
 
-    echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_SMART_SCANNING')${LH_COLOR_RESET}"
     local drives
-    drives=$($LH_SUDO_CMD smartctl --scan | awk '{print $1}')
-
-    if [ -z "$drives" ]; then
-        lh_print_boxed_message --preset warning "$(lh_msg 'DISK_SMART_NO_DRIVES')"
-        for device in /dev/sd? /dev/nvme?n? /dev/hd?; do
-            if [ -b "$device" ]; then
-                drives="$drives $device"
-            fi
-        done
-    fi
-    if [ -z "$drives" ]; then
-        echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_SMART_NO_DRIVES_FOUND')${LH_COLOR_RESET}"
+    if ! _disk_scan_smart_drives DISK_SMART_SCANNING DISK_SMART_NO_DRIVES DISK_SMART_NO_DRIVES_FOUND drives; then
         return 1
     fi
 
@@ -257,8 +274,8 @@ function disk_check_filesystem() {
             return 1
         fi
 
-        # Check if the partition is mounted
-        if mount | grep -q "$partition"; then
+        # Check if the partition is mounted (findmnt avoids substring matches like /dev/sda1 vs /dev/sda11)
+        if findmnt --source "$partition" >/dev/null 2>&1; then
             echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_FSCK_PARTITION_MOUNTED' "$partition")${LH_COLOR_RESET}"
             echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_FSCK_UNMOUNT_INFO' "$partition")${LH_COLOR_RESET}"
 
@@ -269,10 +286,10 @@ function disk_check_filesystem() {
                     echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_FSCK_UNMOUNT_FAILED')${LH_COLOR_RESET}"
                     return 1
                 fi
-                else
+            else
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_FSCK_CHECK_ABORTED')${LH_COLOR_RESET}"
                 return 1
-                fi
+            fi
         fi
 
         # Display options for fsck
@@ -332,21 +349,8 @@ function disk_check_health() {
     fi
 
     # Scan for available drives
-    echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_HEALTH_SCANNING')${LH_COLOR_RESET}"
     local drives
-    drives=$($LH_SUDO_CMD smartctl --scan | awk '{print $1}')
-
-    if [ -z "$drives" ]; then
-        lh_print_boxed_message --preset warning "$(lh_msg 'DISK_HEALTH_NO_DRIVES')"
-        for device in /dev/sd? /dev/nvme?n? /dev/hd?; do
-            if [ -b "$device" ]; then
-                drives="$drives $device"
-            fi
-        done
-    fi
-
-    if [ -z "$drives" ]; then
-        echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_HEALTH_NO_DRIVES_FOUND')${LH_COLOR_RESET}"
+    if ! _disk_scan_smart_drives DISK_HEALTH_SCANNING DISK_HEALTH_NO_DRIVES DISK_HEALTH_NO_DRIVES_FOUND drives; then
         return 1
     fi
 
@@ -392,8 +396,10 @@ function disk_check_health() {
         # Offer additional tests
         echo -e "\n${LH_COLOR_PROMPT}$(lh_msg 'DISK_HEALTH_ADDITIONAL_TESTS')${LH_COLOR_RESET}"
         echo -e "${LH_COLOR_MENU_NUMBER}1.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_HEALTH_SHORT_TEST')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_HEALTH_ATTRIBUTES')${LH_COLOR_RESET}"
-        echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_HEALTH_BACK')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_MENU_NUMBER}2.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_HEALTH_LONG_TEST')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_MENU_NUMBER}3.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_HEALTH_LAST_SELFTEST')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_MENU_NUMBER}4.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_HEALTH_ATTRIBUTES')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_MENU_NUMBER}5.${LH_COLOR_RESET} ${LH_COLOR_MENU_TEXT}$(lh_msg 'DISK_HEALTH_BACK')${LH_COLOR_RESET}"
 
         read -r -p "$(echo -e "${LH_COLOR_PROMPT}$(lh_msg 'DISK_HEALTH_SELECT_TEST') ${LH_COLOR_RESET}")" test_option
 
@@ -413,12 +419,36 @@ function disk_check_health() {
                 fi
                 ;;
             2)
+                lh_print_boxed_message --preset warning "$(lh_msg 'DISK_HEALTH_LONG_WARNING')"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_HEALTH_AUTODETECT_HINT')${LH_COLOR_RESET}"
+                $LH_SUDO_CMD smartctl -t long "$selected_drive"
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_HEALTH_LONG_STARTED' "$selected_drive")${LH_COLOR_RESET}"
+
+                if lh_confirm_action "$(lh_msg 'DISK_HEALTH_LONG_INHIBIT_MONITOR')" "y"; then
+                    lh_check_command "watch" true >/dev/null
+                    if command -v systemd-inhibit >/dev/null 2>&1; then
+                        $LH_SUDO_CMD systemd-inhibit --what=sleep:idle \
+                            --why="smartctl long test on $selected_drive" \
+                            watch -n 60 "smartctl -c '$selected_drive' | grep -A2 'Self-test execution'"
+                    else
+                        lh_print_boxed_message --preset warning "$(lh_msg 'DISK_HEALTH_INHIBIT_UNAVAILABLE')"
+                        watch -n 60 "$LH_SUDO_CMD smartctl -c '$selected_drive' | grep -A2 'Self-test execution'"
+                    fi
+                fi
+                ;;
+            3)
+                echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_HEALTH_LAST_SELFTEST_FOR' "$selected_drive")${LH_COLOR_RESET}"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
+                $LH_SUDO_CMD smartctl -l selftest "$selected_drive"
+                echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
+                ;;
+            4)
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_HEALTH_EXTENDED_ATTRIBUTES' "$selected_drive")${LH_COLOR_RESET}"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 $LH_SUDO_CMD smartctl -a "$selected_drive"
                 echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
                 ;;
-            3)
+            5)
                 echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_HEALTH_OPERATION_CANCELLED')${LH_COLOR_RESET}"
                 ;;
             *)
@@ -445,34 +475,8 @@ function disk_show_largest_files() {
         return 1
     fi
 
-    local file_count_prompt
-    file_count_prompt="$(lh_msg 'DISK_LARGEST_FILE_COUNT')"
-    local file_count_regex="^[1-9][0-9]*$" # Regex for positive integers
-    local file_count_error
-    file_count_error="$(lh_msg 'DISK_LARGEST_INVALID_NUMBER')"
     local file_count
-
-    # Call lh_ask_for_input correctly
-    file_count=$(lh_ask_for_input "$file_count_prompt" "$file_count_regex" "$file_count_error")
-
-    # Handle cases where lh_ask_for_input returns an empty string due to an error or empty input (not caught by regex)
-    # or when the user cancels the input (which lh_ask_for_input doesn't handle directly).
-    # Since lh_ask_for_input enforces input that matches the regex, file_count should be valid here,
-    # unless the regex allows empty inputs, which ^[1-9][0-9]*$ does not.
-
-    # If you want a default value for empty input, lh_ask_for_input would need to support that
-    # or you do it after the call:
-    # if [ -z "$file_count" ]; then # This won't happen if regex is ^[1-9][0-9]*$
-    # file_count="$file_count_default"
-    # fi
-
-    # The above logic with explicit default handling is better if lh_ask_for_input
-    # doesn't have a default parameter. The current lh_ask_for_input implementation
-    # doesn't have a default parameter. It enforces input that matches the regex.
-
-    # So, when you use lh_ask_for_input, it will keep asking until the regex matches.
-    # A separate default assignment like "file_count=20" for invalid input is then no longer needed,
-    # since lh_ask_for_input already ensures validity.
+    file_count=$(lh_ask_for_input "$(lh_msg 'DISK_LARGEST_FILE_COUNT')" "^[1-9][0-9]*$" "$(lh_msg 'DISK_LARGEST_INVALID_NUMBER')")
 
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_LARGEST_SEARCHING' "$file_count" "$search_path")${LH_COLOR_RESET}"
     echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_LARGEST_PLEASE_WAIT')${LH_COLOR_RESET}"
@@ -500,6 +504,75 @@ function disk_show_largest_files() {
     echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
 }
 
+# Build an annotated lsusb tree: appends "[VID:PID Name]" to each Dev line
+# by joining lsusb (flat) with lsusb -t by bus and device number.
+function _disk_annotated_usb_tree() {
+    local -A dev_names=()
+    local line bus dev
+    while IFS= read -r line; do
+        # Format: "Bus 001 Device 002: ID 1d6b:0003 Linux Foundation 3.0 root hub"
+        if [[ $line =~ ^Bus[[:space:]]+0*([0-9]+)[[:space:]]+Device[[:space:]]+0*([0-9]+):[[:space:]]+ID[[:space:]]+([0-9a-fA-F]{4}:[0-9a-fA-F]{4})[[:space:]]*(.*)$ ]]; then
+            bus="${BASH_REMATCH[1]}"
+            dev="${BASH_REMATCH[2]}"
+            dev_names["$bus:$dev"]="${BASH_REMATCH[3]} ${BASH_REMATCH[4]}"
+        fi
+    done < <(lsusb)
+
+    local current_bus=""
+    while IFS= read -r line; do
+        # Root-hub line: "/:  Bus 01.Port 1: Dev 1, ..."
+        if [[ $line =~ Bus[[:space:]]+0*([0-9]+)\.Port ]]; then
+            current_bus="${BASH_REMATCH[1]}"
+        fi
+        if [[ -n "$current_bus" && $line =~ Dev[[:space:]]+0*([0-9]+), ]]; then
+            local key="$current_bus:${BASH_REMATCH[1]}"
+            if [[ -n "${dev_names[$key]:-}" ]]; then
+                printf '%s  [%s]\n' "$line" "${dev_names[$key]}"
+                continue
+            fi
+        fi
+        printf '%s\n' "$line"
+    done < <(lsusb -t)
+}
+
+# Function to display USB device tree with device mapping
+function disk_show_usb_tree() {
+    lh_print_header "$(lh_msg 'DISK_HEADER_USB_TREE')"
+
+    if ! lh_check_command "lsusb" true; then
+        echo -e "${LH_COLOR_ERROR}$(lh_msg 'DISK_ERROR_LSUSB_NOT_INSTALLED')${LH_COLOR_RESET}"
+        return 1
+    fi
+
+    echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_USB_TREE_ANNOTATED')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
+    _disk_annotated_usb_tree
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
+
+    echo -e "\n${LH_COLOR_INFO}$(lh_msg 'DISK_USB_BLOCK_MAPPING')${LH_COLOR_RESET}"
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
+    local usb_block
+    usb_block=$(lsblk -S -o NAME,TRAN,VENDOR,MODEL,SERIAL,SIZE | awk 'NR==1 || $2=="usb"')
+    if [[ $(echo "$usb_block" | wc -l) -le 1 ]]; then
+        echo -e "${LH_COLOR_INFO}$(lh_msg 'DISK_USB_NO_BLOCK_DEVICES')${LH_COLOR_RESET}"
+    else
+        echo "$usb_block"
+    fi
+    echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
+
+    if lh_confirm_action "$(lh_msg 'DISK_USB_SHOW_RAW_PROMPT')" "n"; then
+        echo -e "\n${LH_COLOR_INFO}$(lh_msg 'DISK_USB_FLAT_LIST')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
+        lsusb
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
+
+        echo -e "\n${LH_COLOR_INFO}$(lh_msg 'DISK_USB_TREE')${LH_COLOR_RESET}"
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
+        lsusb -t
+        echo -e "${LH_COLOR_SEPARATOR}--------------------------${LH_COLOR_RESET}"
+    fi
+}
+
 # Main function of the module: display submenu and control actions
 function disk_tools_menu() {
     while true; do
@@ -514,6 +587,7 @@ function disk_tools_menu() {
         lh_print_menu_item 6 "$(lh_msg 'DISK_MENU_FILESYSTEM')"
         lh_print_menu_item 7 "$(lh_msg 'DISK_MENU_HEALTH')"
         lh_print_menu_item 8 "$(lh_msg 'DISK_MENU_LARGEST_FILES')"
+        lh_print_menu_item 9 "$(lh_msg 'DISK_MENU_USB_TREE')"
         lh_print_gui_hidden_menu_item 0 "$(lh_msg 'DISK_MENU_BACK')"
         echo ""
 
@@ -552,6 +626,10 @@ function disk_tools_menu() {
             8)
                 lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'DISK_MENU_LARGEST_FILES')")"
                 disk_show_largest_files
+                ;;
+            9)
+                lh_update_module_session "$(lh_msg 'LIB_SESSION_ACTIVITY_SECTION' "$(lh_msg 'DISK_MENU_USB_TREE')")"
+                disk_show_usb_tree
                 ;;
             0)
                 if lh_gui_mode_active; then
