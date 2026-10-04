@@ -43,6 +43,7 @@ if [[ -z "${MSG[PKG_HEADER_SYSTEM_UPDATE]:-}" ]]; then
     lh_load_language_module "packages"
     lh_load_language_module "common"
     lh_load_language_module "lib"
+    lh_load_language_module "main_menu"
 fi
 
 lh_log_active_sessions_debug "$(lh_msg 'MENU_PACKAGE_MGMT')"

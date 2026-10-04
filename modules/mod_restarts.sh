@@ -37,6 +37,7 @@ if [[ -z "${MSG[RESTART_LOGIN_MANAGER_STARTING]:-}" ]]; then
     lh_load_language_module "restarts"
     lh_load_language_module "common"
     lh_load_language_module "lib"
+    lh_load_language_module "main_menu"
 fi
 
 lh_log_active_sessions_debug "$(lh_msg 'MENU_RESTARTS')"

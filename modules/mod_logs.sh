@@ -37,6 +37,7 @@ if [[ -z "${MSG[LOG_HEADER_LAST_MINUTES_CURRENT]:-}" ]]; then
     lh_load_language_module "logs"
     lh_load_language_module "common"
     lh_load_language_module "lib"
+    lh_load_language_module "main_menu"
 fi
 
 lh_log_active_sessions_debug "$(lh_msg 'MENU_LOG_ANALYSIS')"
