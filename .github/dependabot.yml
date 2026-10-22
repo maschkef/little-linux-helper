@@ -37,8 +37,15 @@ updates:
         applies-to: version-updates
         update-types:
           - "major"
+      # Group ALL security updates together (patterns required for security-update groups).
+      # Security PRs still target main (Dependabot platform limitation) and are labeled
+      # as "dependabot-wrong-target" by the guard workflow.
+      go-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
 
-  # NPM packages for the GUI frontend  
+  # NPM packages for the GUI frontend
   - package-ecosystem: "npm"
     directory: "/gui/web"
     target-branch: "develop"  # ALWAYS develop, never main
@@ -61,11 +68,18 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      # Group major NPM updates that need coordination to avoid dependency conflicts  
+      # Group major NPM updates that need coordination to avoid dependency conflicts
       npm-major-coordinated:
         applies-to: version-updates
         update-types:
           - "major"
+      # Group ALL security updates together (patterns required for security-update groups).
+      # Security PRs still target main (Dependabot platform limitation) and are labeled
+      # as "dependabot-wrong-target" by the guard workflow.
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
     # Ignore problematic individual major updates - use groups instead
     ignore:
       # Vite ecosystem - update together to avoid peer dependency conflicts
