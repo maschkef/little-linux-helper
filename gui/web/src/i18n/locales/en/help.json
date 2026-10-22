@@ -67,14 +67,17 @@
       "4. Directory Sizes - Analyze disk space usage with visual tools like ncdu",
       "5. Disk Speed Test - Test read/write performance of your storage devices",
       "6. Check Filesystem - Scan drives for errors and fix file system problems",
-      "7. Check Health - Quick health check of your drives using SMART data",
-      "8. Largest Files - Find the biggest files taking up space on your system"
+      "7. Check Health - SMART health check with optional short or long self-test; the long test can run under 'systemd-inhibit' to keep the drive from entering standby, and the last self-test log can be inspected without starting a new test",
+      "8. Largest Files - Find the biggest files taking up space on your system",
+      "9. USB Device Tree - Annotated 'lsusb -t' output with vendor/product names, plus the list of USB-connected block devices (so you can tell which /dev/sdX is which external drive)"
     ],
     "notes": [
       "Drive health checks require administrator privileges",
       "Missing diagnostic tools will be offered for automatic installation",
       "Filesystem checks work best on unmounted drives",
-      "Speed tests and health checks are safe and won't modify data"
+      "Speed tests and health checks are safe and won't modify data",
+      "Long SMART self-tests run on the drive itself and continue even if you close the menu. Ctrl+C in the progress monitor stops the monitor only, not the test",
+      "The USB device tree needs 'usbutils' (lsusb). 'systemd-inhibit' (standby protection for the long test) comes with systemd"
     ]
   },
   "logs": {

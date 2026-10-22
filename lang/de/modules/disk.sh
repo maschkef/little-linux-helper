@@ -11,8 +11,8 @@
 
 # Help content
 MSG_DE[DISK_HELP_OVERVIEW]="Tools zur Verwaltung und Analyse Ihrer Speichergeräte und des Festplattenplatzes. Überprüfen Sie die Laufwerksgesundheit, finden Sie große Dateien, überwachen Sie die Festplattennutzung und führen Sie Festplattendiagnosen durch."
-MSG_DE[DISK_HELP_OPTIONS]="1. Eingehängte Laufwerke anzeigen - Alle angeschlossenen Laufwerke und deren Speicherplatznutzung|2. SMART-Werte - Detaillierte Gesundheitsinformationen von Festplatten und SSDs|3. Dateizugriffszeiten - Überprüfen welche Programme gerade Dateien in einem Ordner verwenden|4. Verzeichnisgrößen - Festplattenplatz-Nutzung mit visuellen Tools wie ncdu analysieren|5. Festplatten-Geschwindigkeitstest - Lese-/Schreibgeschwindigkeit Ihrer Speichergeräte testen|6. Dateisystem überprüfen - Laufwerke auf Fehler scannen und Dateisystem-Probleme reparieren|7. Gesundheit überprüfen - Schnelle Gesundheitsprüfung Ihrer Laufwerke mit SMART-Daten|8. Größte Dateien - Die größten Dateien finden, die Speicherplatz auf Ihrem System belegen"
-MSG_DE[DISK_HELP_NOTES]="Laufwerks-Gesundheitsprüfungen erfordern Administrator-Rechte|Fehlende Diagnose-Tools werden zur automatischen Installation angeboten|Dateisystem-Prüfungen funktionieren am besten bei nicht eingehängten Laufwerken|Geschwindigkeitstests und Gesundheitsprüfungen sind sicher und ändern keine Daten"
+MSG_DE[DISK_HELP_OPTIONS]="1. Eingehängte Laufwerke anzeigen - Alle angeschlossenen Laufwerke und deren Speicherplatznutzung|2. SMART-Werte - Detaillierte Gesundheitsinformationen von Festplatten und SSDs|3. Dateizugriffszeiten - Überprüfen welche Programme gerade Dateien in einem Ordner verwenden|4. Verzeichnisgrößen - Festplattenplatz-Nutzung mit visuellen Tools wie ncdu analysieren|5. Festplatten-Geschwindigkeitstest - Lese-/Schreibgeschwindigkeit Ihrer Speichergeräte testen|6. Dateisystem überprüfen - Laufwerke auf Fehler scannen und Dateisystem-Probleme reparieren|7. Gesundheit überprüfen - Gesundheitsprüfung und Selbsttests (kurz/lang) der Laufwerke über SMART-Daten|8. Größte Dateien - Die größten Dateien finden, die Speicherplatz auf Ihrem System belegen|9. USB-Geräte-Baum - USB-Topologie mit Gerätenamen und Zuordnung zu Blockgeräten"
+MSG_DE[DISK_HELP_NOTES]="Laufwerks-Gesundheitsprüfungen erfordern Administrator-Rechte|Fehlende Diagnose-Tools werden zur automatischen Installation angeboten|Dateisystem-Prüfungen funktionieren am besten bei nicht eingehängten Laufwerken|Geschwindigkeitstests und Gesundheitsprüfungen sind sicher und ändern keine Daten|Lange SMART-Selbsttests dauern Stunden und können mit Standby-Schutz überwacht werden, damit die Platte nicht einschläft"
 
 # Menu items and headings
 MSG_DE[DISK_MENU_TITLE]="Festplatten-Werkzeuge"
@@ -24,6 +24,7 @@ MSG_DE[DISK_MENU_SPEED_TEST]="Festplattengeschwindigkeit testen"
 MSG_DE[DISK_MENU_FILESYSTEM]="Dateisystem überprüfen"
 MSG_DE[DISK_MENU_HEALTH]="Festplatten-Gesundheitsstatus prüfen"
 MSG_DE[DISK_MENU_LARGEST_FILES]="Größte Dateien anzeigen"
+MSG_DE[DISK_MENU_USB_TREE]="USB-Geräte-Baum (mit Zuordnung)"
 MSG_DE[DISK_MENU_BACK]="Zurück zum Hauptmenü"
 
 # Headings
@@ -35,6 +36,7 @@ MSG_DE[DISK_HEADER_SPEED_TEST]="Festplattengeschwindigkeit testen"
 MSG_DE[DISK_HEADER_FILESYSTEM]="Dateisystem überprüfen"
 MSG_DE[DISK_HEADER_HEALTH]="Festplatten-Gesundheitsstatus prüfen"
 MSG_DE[DISK_HEADER_LARGEST_FILES]="Größte Dateien anzeigen"
+MSG_DE[DISK_HEADER_USB_TREE]="USB-Geräte-Baum"
 
 # Mounted drives
 MSG_DE[DISK_MOUNTED_OVERVIEW]="Übersicht der aktuell eingebundenen Laufwerke (df):"
@@ -119,9 +121,12 @@ MSG_DE[DISK_HEALTH_FOUND_DRIVES]="Gefundene Laufwerke:"
 MSG_DE[DISK_HEALTH_SELECT_DRIVE]="Bitte wählen Sie ein Laufwerk (1-%d):"
 MSG_DE[DISK_HEALTH_ADDITIONAL_TESTS]="Möchten Sie weitere Tests durchführen?"
 MSG_DE[DISK_HEALTH_SHORT_TEST]="Kurzer Selbsttest (dauert etwa 2 Minuten)"
+MSG_DE[DISK_HEALTH_LONG_TEST]="Langer Selbsttest (Stunden, optional mit Standby-Schutz)"
+MSG_DE[DISK_HEALTH_LAST_SELFTEST]="Letztes Selbsttest-Protokoll anzeigen (smartctl -l selftest)"
+MSG_DE[DISK_HEALTH_LAST_SELFTEST_FOR]="Letztes Selbsttest-Protokoll für %s:"
 MSG_DE[DISK_HEALTH_ATTRIBUTES]="Erweiterte Attribute anzeigen"
 MSG_DE[DISK_HEALTH_BACK]="Zurück"
-MSG_DE[DISK_HEALTH_SELECT_TEST]="Wählen Sie eine Option (1-3):"
+MSG_DE[DISK_HEALTH_SELECT_TEST]="Wählen Sie eine Option (1-5):"
 MSG_DE[DISK_HEALTH_STARTING_SHORT_TEST]="Starte kurzen Selbsttest für %s..."
 MSG_DE[DISK_HEALTH_TEST_RUNNING]="Der Test läuft nun im Hintergrund. Nach Abschluss können Sie die Ergebnisse anzeigen."
 MSG_DE[DISK_HEALTH_TEST_COMPLETION]="Nach etwa 2 Minuten sollte der Test abgeschlossen sein."
@@ -130,6 +135,11 @@ MSG_DE[DISK_HEALTH_WAITING]="Warte 2 Minuten auf den Testabschluss..."
 MSG_DE[DISK_HEALTH_TEST_RESULTS]="Testergebnisse für %s:"
 MSG_DE[DISK_HEALTH_EXTENDED_ATTRIBUTES]="Erweiterte Attribute für %s:"
 MSG_DE[DISK_HEALTH_OPERATION_CANCELLED]="Operation abgebrochen."
+MSG_DE[DISK_HEALTH_LONG_WARNING]="Der lange Selbsttest kann mehrere Stunden dauern. Die Platte darf währenddessen nicht in den Standby wechseln — das kann den Test abbrechen."
+MSG_DE[DISK_HEALTH_LONG_STARTED]="Langer Selbsttest auf %s gestartet. Der Test läuft auf der Platte selbst und wird fortgesetzt, auch wenn Sie dieses Menü verlassen."
+MSG_DE[DISK_HEALTH_LONG_INHIBIT_MONITOR]="Fortschritt überwachen und System wachhalten (systemd-inhibit)? Mit Ctrl+C beenden Sie den Monitor, nicht den SMART-Test."
+MSG_DE[DISK_HEALTH_INHIBIT_UNAVAILABLE]="'systemd-inhibit' ist nicht verfügbar. Monitor läuft ohne Standby-Schutz — die Platte kann in Standby wechseln."
+MSG_DE[DISK_HEALTH_AUTODETECT_HINT]="Falls smartctl mit 'Unknown USB bridge' scheitert, hilft manuell '-d sat' oder '-d scsi'."
 
 # Largest files
 MSG_DE[DISK_LARGEST_ENTER_PATH]="Geben Sie den Pfad an, in dem gesucht werden soll"
@@ -150,6 +160,15 @@ MSG_DE[DISK_ERROR_DU_NOT_INSTALLED]="Das Programm 'du' ist nicht installiert und
 MSG_DE[DISK_ERROR_LSOF_NOT_INSTALLED]="Das Programm 'lsof' ist nicht installiert und konnte nicht installiert werden."
 MSG_DE[DISK_ERROR_HDPARM_NOT_INSTALLED]="Das Programm 'hdparm' ist nicht installiert und konnte nicht installiert werden."
 MSG_DE[DISK_ERROR_FSCK_NOT_INSTALLED]="Das Programm 'fsck' ist nicht installiert und konnte nicht installiert werden."
+MSG_DE[DISK_ERROR_LSUSB_NOT_INSTALLED]="Das Programm 'lsusb' ist nicht installiert und konnte nicht installiert werden."
+
+# USB-Baum
+MSG_DE[DISK_USB_TREE_ANNOTATED]="USB-Topologie mit Gerätenamen (lsusb -t annotiert):"
+MSG_DE[DISK_USB_BLOCK_MAPPING]="Über USB angeschlossene Blockgeräte:"
+MSG_DE[DISK_USB_SHOW_RAW_PROMPT]="Zusätzlich die rohen lsusb- und lsusb -t-Ausgaben zeigen?"
+MSG_DE[DISK_USB_FLAT_LIST]="USB-Geräte (flache Liste):"
+MSG_DE[DISK_USB_TREE]="USB-Topologie (lsusb -t):"
+MSG_DE[DISK_USB_NO_BLOCK_DEVICES]="Keine USB-Blockgeräte erkannt."
 
 # General messages
 MSG_DE[DISK_INVALID_SELECTION]="Ungültige Auswahl."

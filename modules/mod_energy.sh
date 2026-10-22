@@ -42,6 +42,7 @@ if [[ -z "${MSG[ENERGY_MENU_TITLE]:-}" ]]; then
     lh_load_language_module "energy"
     lh_load_language_module "common"
     lh_load_language_module "lib"
+    lh_load_language_module "main_menu"
 fi
 
 lh_log_active_sessions_debug "$(lh_msg 'MENU_ENERGY')"

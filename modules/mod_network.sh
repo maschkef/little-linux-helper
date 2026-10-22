@@ -36,6 +36,7 @@ if [[ -z "${MSG[NETWORK_TOOLS_TITLE]:-}" ]]; then
     lh_load_language_module "network_tools"
     lh_load_language_module "common"
     lh_load_language_module "lib"
+    lh_load_language_module "main_menu"
 fi
 
 lh_log_active_sessions_debug "$(lh_msg 'MENU_NETWORK_TOOLS')"

@@ -37,6 +37,7 @@ if [[ -z "${MSG[SECURITY_OPEN_PORTS_TITLE]:-}" ]]; then
     lh_load_language_module "security"
     lh_load_language_module "common"
     lh_load_language_module "lib"
+    lh_load_language_module "main_menu"
 fi
 
 lh_log_active_sessions_debug "$(lh_msg 'MENU_SECURITY')"

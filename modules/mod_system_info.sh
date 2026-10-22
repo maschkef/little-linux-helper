@@ -37,6 +37,7 @@ if [[ -z "${MSG[SYSINFO_HEADER_OS_KERNEL]:-}" ]]; then
     lh_load_language_module "system_info"
     lh_load_language_module "common"
     lh_load_language_module "lib"
+    lh_load_language_module "main_menu"
 fi
 
 lh_log_active_sessions_debug "$(lh_msg 'MENU_SYSTEM_INFO')"

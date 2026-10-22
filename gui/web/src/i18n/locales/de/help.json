@@ -67,14 +67,17 @@
       "4. Verzeichnisgrößen - Festplattenplatz-Nutzung mit visuellen Tools wie ncdu analysieren",
       "5. Festplatten-Geschwindigkeitstest - Lese-/Schreibgeschwindigkeit Ihrer Speichergeräte testen",
       "6. Dateisystem überprüfen - Laufwerke auf Fehler scannen und Dateisystem-Probleme reparieren",
-      "7. Gesundheit überprüfen - Schnelle Gesundheitsprüfung Ihrer Laufwerke mit SMART-Daten",
-      "8. Größte Dateien - Die größten Dateien finden, die Speicherplatz auf Ihrem System belegen"
+      "7. Gesundheit überprüfen - SMART-Gesundheitsprüfung mit optionalem kurzem oder langem Selbsttest; der lange Test kann unter 'systemd-inhibit' laufen, damit die Platte nicht in Standby wechselt, und das letzte Selbsttest-Protokoll kann ohne neuen Test eingesehen werden",
+      "8. Größte Dateien - Die größten Dateien finden, die Speicherplatz auf Ihrem System belegen",
+      "9. USB-Geräte-Baum - Annotierte 'lsusb -t'-Ausgabe mit Hersteller-/Produktnamen plus Liste der über USB angeschlossenen Blockgeräte (so ist erkennbar, welche /dev/sdX welches externe Laufwerk ist)"
     ],
     "notes": [
       "Laufwerks-Gesundheitsprüfungen erfordern Administrator-Rechte",
       "Fehlende Diagnose-Tools werden zur automatischen Installation angeboten",
       "Dateisystem-Prüfungen funktionieren am besten bei nicht eingehängten Laufwerken",
-      "Geschwindigkeitstests und Gesundheitsprüfungen sind sicher und ändern keine Daten"
+      "Geschwindigkeitstests und Gesundheitsprüfungen sind sicher und ändern keine Daten",
+      "Lange SMART-Selbsttests laufen auf der Platte selbst und werden fortgesetzt, auch wenn Sie das Menü verlassen. Ctrl+C im Fortschrittsmonitor beendet nur den Monitor, nicht den Test",
+      "Der USB-Geräte-Baum benötigt 'usbutils' (lsusb). 'systemd-inhibit' (Standby-Schutz für den langen Test) ist Teil von systemd"
     ]
   },
   "logs": {
